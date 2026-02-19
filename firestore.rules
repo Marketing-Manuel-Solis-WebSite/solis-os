@@ -1,0 +1,271 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ======== HELPER FUNCTIONS ========
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOrgMember(orgId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/orgs/$(orgId)/memberships/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/orgs/$(orgId)/memberships/$(request.auth.uid)).data.active == true;
+    }
+
+    function getRole(orgId) {
+      return get(/databases/$(database)/documents/orgs/$(orgId)/memberships/$(request.auth.uid)).data.role;
+    }
+
+    function isOwner(orgId) {
+      return isOrgMember(orgId) && getRole(orgId) == 'owner';
+    }
+
+    function isAdmin(orgId) {
+      return isOrgMember(orgId) && (getRole(orgId) == 'owner' || getRole(orgId) == 'admin');
+    }
+
+    function isManager(orgId) {
+      return isOrgMember(orgId) && (getRole(orgId) in ['owner', 'admin', 'manager']);
+    }
+
+    function isSelf(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function hasOrgId(orgId) {
+      return request.resource.data.orgId == orgId;
+    }
+
+    // ======== ORGANIZATIONS ========
+
+    match /orgs/{orgId} {
+      allow read: if isOrgMember(orgId);
+      allow create: if isSignedIn(); // Creating new org
+      allow update: if isAdmin(orgId);
+      allow delete: if isOwner(orgId);
+
+      // Memberships
+      match /memberships/{userId} {
+        allow read: if isOrgMember(orgId);
+        allow create: if isAdmin(orgId);
+        allow update: if isAdmin(orgId) || isSelf(userId);
+        allow delete: if isOwner(orgId);
+      }
+
+      // Invitations
+      match /invitations/{inviteId} {
+        allow read: if isOrgMember(orgId);
+        allow create: if isAdmin(orgId);
+        allow update: if isAdmin(orgId);
+        allow delete: if isAdmin(orgId);
+      }
+
+      // Settings
+      match /settings/{settingId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isAdmin(orgId);
+      }
+    }
+
+    // ======== USER PROFILES ========
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSelf(userId);
+      allow update: if isSelf(userId);
+      allow delete: if false; // Prevent user self-deletion
+    }
+
+    // ======== WORKSPACES ========
+
+    match /workspaces/{workspaceId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isAdmin(request.resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
+    }
+
+    // ======== SPACES ========
+
+    match /spaces/{spaceId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isManager(request.resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
+    }
+
+    // ======== FOLDERS ========
+
+    match /folders/{folderId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow delete: if isSignedIn() && isManager(resource.data.orgId);
+    }
+
+    // ======== LISTS ========
+
+    match /lists/{listId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow delete: if isSignedIn() && isManager(resource.data.orgId);
+    }
+
+    // ======== TASKS ========
+
+    match /tasks/{taskId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow delete: if isSignedIn() && isManager(resource.data.orgId);
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && request.auth.uid == resource.data.createdBy;
+        allow delete: if isSignedIn() && (request.auth.uid == resource.data.createdBy);
+      }
+
+      match /activity/{activityId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update, delete: if false; // Activity log is immutable
+      }
+    }
+
+    // ======== DOCS ========
+
+    match /docs/{docId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow delete: if isSignedIn() && isManager(resource.data.orgId);
+
+      match /revisions/{revisionId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update, delete: if false; // Revisions are immutable
+      }
+    }
+
+    // ======== CHANNELS ========
+
+    match /channels/{channelId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && request.auth.uid == resource.data.createdBy;
+        allow delete: if isSignedIn() && (request.auth.uid == resource.data.createdBy);
+      }
+    }
+
+    // ======== AUTOMATIONS ========
+
+    match /automations/{automationId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isManager(request.resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
+
+      match /logs/{logId} {
+        allow read: if isSignedIn();
+        allow create: if false; // Only Cloud Functions write logs
+        allow update, delete: if false;
+      }
+    }
+
+    // ======== NOTIFICATIONS ========
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow create: if false; // Only Cloud Functions create notifications
+      allow update: if isSignedIn() && request.auth.uid == resource.data.userId; // Mark as read
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+
+    // ======== AUDIT LOGS ========
+
+    match /auditLogs/{logId} {
+      allow read: if isSignedIn() && isAdmin(resource.data.orgId);
+      allow create: if isSignedIn(); // Any authenticated user can create audit entries
+      allow update, delete: if false; // Audit logs are immutable
+    }
+
+    // ======== INSIGHTS ========
+
+    match /insights/{insightId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if false; // Only Cloud Functions / server-side
+      allow update, delete: if isSignedIn() && isAdmin(resource.data.orgId);
+    }
+
+    // ======== TEMPLATES ========
+
+    match /templates/{templateId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isManager(request.resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
+    }
+
+    // ======== EMAIL TEMPLATES ========
+
+    match /emailTemplates/{templateId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow write: if isSignedIn() && isAdmin(resource.data.orgId);
+    }
+
+    // ======== ROLES ========
+
+    match /roles/{roleId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isAdmin(resource.data.orgId);
+    }
+
+    // ======== CUSTOM FIELD SCHEMAS ========
+
+    match /customFieldSchemas/{schemaId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isAdmin(request.resource.data.orgId);
+    }
+
+    // ======== WEBHOOK EVENTS ========
+
+    match /webhookEvents/{eventId} {
+      allow read: if isSignedIn() && isAdmin(resource.data.orgId);
+      allow create: if false; // Only server-side
+      allow update, delete: if false;
+    }
+
+    // ======== CRM ========
+
+    match /contacts/{contactId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow delete: if isSignedIn() && isManager(resource.data.orgId);
+    }
+
+    match /deals/{dealId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow delete: if isSignedIn() && isManager(resource.data.orgId);
+    }
+
+    match /cases/{caseId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow delete: if isSignedIn() && isManager(resource.data.orgId);
+    }
+  }
+}
