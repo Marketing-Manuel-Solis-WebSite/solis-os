@@ -42,3 +42,438 @@ body { background: #06080F; color: #CBD5E1; }
   background: #0C1017; border: 1px solid #1F2937; border-radius: 10px; color: #F1F5F9;
   padding: 0 12px; height: 38px; font-size: 13px; outline: none; cursor: pointer;
 }
+
+/* ========================================
+   DOCUMENT PREVIEW STYLES
+   Add these to your app/globals.css file
+   ======================================== */
+
+/* === Document Preview Container === */
+.doc-preview {
+  color: #CBD5E1;
+  line-height: 1.8;
+  font-size: 15px;
+}
+
+/* === Headings === */
+.doc-h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #F1F5F9;
+  margin: 2rem 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid rgba(212, 168, 67, 0.2);
+  letter-spacing: -0.025em;
+}
+.doc-h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #E2E8F0;
+  margin: 1.75rem 0 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(31, 41, 55, 0.6);
+}
+.doc-h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #D4A843;
+  margin: 1.5rem 0 0.5rem;
+}
+.doc-h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #CBD5E1;
+  margin: 1.25rem 0 0.5rem;
+}
+.doc-h5 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #94A3B8;
+  margin: 1rem 0 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.85rem;
+}
+.doc-h6 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748B;
+  margin: 0.75rem 0 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* === Paragraphs === */
+.doc-p {
+  margin: 0.6rem 0;
+  color: #B0BAC9;
+}
+
+/* === Bold, Italic, Strikethrough === */
+.doc-preview strong {
+  color: #F1F5F9;
+  font-weight: 700;
+}
+.doc-preview em {
+  color: #D4A843;
+  font-style: italic;
+}
+.doc-preview del {
+  color: #64748B;
+  text-decoration: line-through;
+}
+.doc-preview u {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(212, 168, 67, 0.4);
+}
+
+/* === Lists === */
+.doc-ul {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+  list-style: none;
+}
+.doc-ul .doc-li {
+  position: relative;
+  padding: 0.2rem 0 0.2rem 0.5rem;
+  color: #B0BAC9;
+}
+.doc-ul .doc-li::before {
+  content: '▸';
+  position: absolute;
+  left: -1rem;
+  color: #D4A843;
+  font-weight: bold;
+}
+.doc-ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+  list-style: none;
+  counter-reset: doc-counter;
+}
+.doc-ol .doc-oli {
+  position: relative;
+  padding: 0.2rem 0 0.2rem 0.5rem;
+  color: #B0BAC9;
+  counter-increment: doc-counter;
+}
+.doc-ol .doc-oli::before {
+  content: counter(doc-counter) '.';
+  position: absolute;
+  left: -1.5rem;
+  color: #D4A843;
+  font-weight: 700;
+  font-size: 0.85em;
+}
+
+/* === Checkbox Lists === */
+.doc-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  margin: 0.15rem 0;
+}
+.doc-checkbox.checked .doc-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 0.3rem;
+  background: rgba(34, 197, 94, 0.15);
+  color: #22C55E;
+  font-size: 0.7rem;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  flex-shrink: 0;
+}
+.doc-check-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 0.3rem;
+  background: rgba(31, 41, 55, 0.5);
+  color: #475569;
+  font-size: 0.6rem;
+  border: 1px solid rgba(55, 65, 81, 0.5);
+  flex-shrink: 0;
+}
+.doc-check-text {
+  color: #B0BAC9;
+  font-size: 0.9rem;
+}
+.doc-check-text.done {
+  color: #64748B;
+  text-decoration: line-through;
+}
+
+/* === Blockquote === */
+.doc-blockquote {
+  border-left: 3px solid #D4A843;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  background: rgba(212, 168, 67, 0.05);
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: #94A3B8;
+  font-style: italic;
+}
+
+/* === Code === */
+.doc-inline-code {
+  background: rgba(31, 41, 55, 0.8);
+  color: #D4A843;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.3rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+  border: 1px solid rgba(55, 65, 81, 0.5);
+}
+.doc-code-block {
+  background: #0C1017;
+  border: 1px solid rgba(31, 41, 55, 0.8);
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #CBD5E1;
+}
+
+/* === Horizontal Rule === */
+.doc-hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212, 168, 67, 0.3), transparent);
+  margin: 2rem 0;
+}
+
+/* === Tables === */
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgba(31, 41, 55, 0.6);
+}
+.doc-th {
+  background: rgba(17, 24, 39, 0.8);
+  color: #D4A843;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 2px solid rgba(212, 168, 67, 0.15);
+}
+.doc-td {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid rgba(31, 41, 55, 0.4);
+  color: #94A3B8;
+}
+.doc-table tbody tr:hover .doc-td {
+  background: rgba(255, 255, 255, 0.01);
+}
+
+/* === Links === */
+.doc-link {
+  color: #D4A843;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(212, 168, 67, 0.3);
+  transition: all 0.2s;
+}
+.doc-link:hover {
+  color: #E8C85A;
+  text-decoration-color: rgba(212, 168, 67, 0.6);
+}
+
+/* === Images === */
+.doc-img {
+  max-width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(31, 41, 55, 0.6);
+  margin: 1rem 0;
+}
+
+/* =============================================
+   SOLIS AI — Content Rendering Styles
+   ADD this to the bottom of app/globals.css
+   ============================================= */
+
+.ai-content {
+  font-size: 0.875rem;
+  line-height: 1.75;
+  color: #d1d5db;
+}
+
+.ai-content .ai-h1 {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 1.25rem 0 0.75rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(31, 41, 55, 0.4);
+}
+
+.ai-content .ai-h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #D4A843;
+  margin: 1.25rem 0 0.5rem 0;
+}
+
+.ai-content .ai-h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin: 1rem 0 0.5rem 0;
+}
+
+.ai-content .ai-h4 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #d1d5db;
+  margin: 0.75rem 0 0.375rem 0;
+}
+
+.ai-content .ai-p {
+  margin: 0.375rem 0;
+}
+
+.ai-content .ai-bold {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.ai-content .ai-ul,
+.ai-content .ai-ol {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+.ai-content .ai-ul {
+  list-style-type: none;
+}
+
+.ai-content .ai-ul .ai-li::before {
+  content: '▸';
+  color: #D4A843;
+  margin-right: 0.5rem;
+  margin-left: -1rem;
+}
+
+.ai-content .ai-ol {
+  list-style-type: decimal;
+}
+
+.ai-content .ai-ol .ai-li-num {
+  list-style: decimal;
+  margin: 0.25rem 0;
+}
+
+.ai-content .ai-li,
+.ai-content .ai-li-num {
+  margin: 0.25rem 0;
+  display: list-item;
+}
+
+.ai-content .ai-checkbox {
+  list-style: none;
+  margin: 0.25rem 0;
+}
+
+.ai-content .ai-checkbox.checked {
+  color: #22c55e;
+}
+
+.ai-content .ai-blockquote {
+  border-left: 3px solid #D4A843;
+  padding: 0.5rem 1rem;
+  margin: 0.75rem 0;
+  background: rgba(212, 168, 67, 0.05);
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.ai-content .ai-code-block {
+  background: #0a0e16;
+  border: 1px solid rgba(31, 41, 55, 0.6);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.ai-content .ai-code-block code {
+  color: #e5e7eb;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.ai-content .ai-inline-code {
+  background: rgba(31, 41, 55, 0.6);
+  border: 1px solid rgba(55, 65, 81, 0.5);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+  color: #D4A843;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.ai-content .ai-hr {
+  border: none;
+  border-top: 1px solid rgba(31, 41, 55, 0.4);
+  margin: 1rem 0;
+}
+
+.ai-content .ai-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  border: 1px solid rgba(31, 41, 55, 0.6);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.ai-content .ai-table .ai-td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(31, 41, 55, 0.4);
+  font-size: 0.8125rem;
+}
+
+.ai-content .ai-table tr:first-child .ai-td {
+  background: rgba(31, 41, 55, 0.3);
+  font-weight: 600;
+  color: #D4A843;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.ai-content .ai-table tr:hover .ai-td {
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.ai-content .ai-table .ai-table-sep {
+  display: none;
+}
+
+.ai-content .ai-link {
+  color: #D4A843;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ai-content .ai-link:hover {
+  color: #e8c565;
+}
