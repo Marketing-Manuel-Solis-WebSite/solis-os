@@ -7,10 +7,11 @@ import { auth } from '@/lib/firebase';
 import { LayoutDashboard, CheckSquare, FileText, MessageSquare, Zap, BarChart3, Users, Shield, LogOut, Bell, Menu, X, Bot, Search, Plus, ChevronLeft } from 'lucide-react';
 
 function Shell({ children }: { children: React.ReactNode }) {
-  const { user, me, loading, isAdmin } = useAuth();
+  const { user, me, loading, isAdmin, teams, activeTeamId, setActiveTeamId, canSeeAllTeams } = useAuth();
   const router = useRouter();
   const path = usePathname();
   const [open, setOpen] = useState(true);
+  const activeTeam = teams.find(t => t.id === activeTeamId);
 
   useEffect(() => { if (!loading && !user) router.push('/login'); }, [loading, user, router]);
 
@@ -100,9 +101,32 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div className={`flex-1 transition-all duration-300 ${open ? 'ml-[240px]' : 'ml-[68px]'}`}>
         <header className="h-16 glass sticky top-0 z-30 flex items-center justify-between px-6 border-b border-[#1F2937]/40">
           <div className="flex items-center gap-3 flex-1">
-            <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
-              <input placeholder="Search workspace..." className="input-dark pl-10 h-9 text-sm bg-[#06080F]/60" />
+            <button onClick={()=>setOpen(!open)} className="p-2 text-gray-600 hover:text-gray-400 transition"><Menu className="h-4 w-4" /></button>
+            {/* Team Selector */}
+            <div className="flex items-center gap-2">
+              <select
+                value={activeTeamId}
+                onChange={e => setActiveTeamId(e.target.value)}
+                className="h-9 px-3 rounded-xl text-sm font-semibold border cursor-pointer transition-all"
+                style={{
+                  backgroundColor: activeTeam ? `${activeTeam.color}15` : '#111827',
+                  borderColor: activeTeam ? `${activeTeam.color}30` : '#1F2937',
+                  color: activeTeam ? activeTeam.color : '#94A3B8',
+                }}
+              >
+                {canSeeAllTeams && <option value="__all__">🏢 All Teams</option>}
+                {(canSeeAllTeams ? teams : teams.filter(t => me?.teamIds?.includes(t.id))).map(t => (
+                  <option key={t.id} value={t.id}>{t.icon} {t.name}</option>
+                ))}
+              </select>
+              {activeTeam && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold tracking-wider" style={{ backgroundColor: `${activeTeam.color}15`, color: activeTeam.color, border: `1px solid ${activeTeam.color}30` }}>
+                  {activeTeam.name.toUpperCase()}
+                </span>
+              )}
+              {activeTeamId === '__all__' && canSeeAllTeams && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold tracking-wider bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20">ALL TEAMS</span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">

@@ -5,17 +5,17 @@ import { getChannels, createChannel, getMessages, sendMessage } from '@/lib/db';
 import { Plus, Send, Hash, MessageSquare } from 'lucide-react';
 
 export default function ChatPage() {
-  const { user, me } = useAuth();
+  const { user, me, activeTeamId } = useAuth();
   const [channels, setChannels] = useState<any[]>([]); const [active, setActive] = useState<any>(null);
   const [msgs, setMsgs] = useState<any[]>([]); const [txt, setTxt] = useState('');
   const [newName, setNewName] = useState(''); const [showNew, setShowNew] = useState(false);
 
-  const loadCh = async () => { const c = await getChannels(); setChannels(c); if (c.length && !active) setActive(c[0]); };
+  const loadCh = async () => { const c = await getChannels(activeTeamId); setChannels(c); if (c.length && !active) setActive(c[0]); };
   useEffect(() => { loadCh(); }, []);
   useEffect(() => { if (active) getMessages(active.id).then(setMsgs); }, [active]);
 
   const send = async () => { if (!txt.trim()||!active) return; await sendMessage(active.id, { content: txt.trim(), userId: user!.uid, displayName: me!.displayName }); setTxt(''); setMsgs(await getMessages(active.id)); };
-  const addCh = async () => { if (!newName.trim()) return; await createChannel({ name: newName.trim() }); setNewName(''); setShowNew(false); loadCh(); };
+  const addCh = async () => { if (!newName.trim()) return; await createChannel({ name: newName.trim(), teamId: activeTeamId === '__all__' ? '' : activeTeamId }); setNewName(''); setShowNew(false); loadCh(); };
 
   return (
     <div className="flex h-[calc(100vh-64px)]">

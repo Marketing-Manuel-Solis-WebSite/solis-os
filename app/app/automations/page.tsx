@@ -5,17 +5,17 @@ import { getAutomations, createAutomation, deleteAutomation, logAction } from '@
 import { Plus, Trash2, Zap, ArrowRight } from 'lucide-react';
 
 export default function AutomationsPage() {
-  const { user, me } = useAuth();
+  const { user, me, activeTeamId } = useAuth();
   const [rules, setRules] = useState<any[]>([]); const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState({name:'',trigger:'task_created',condition:'',action:'change_status'});
 
-  const load = async () => { setRules(await getAutomations()); setLoading(false); };
-  useEffect(() => { load(); }, []);
+  const load = async () => { setRules(await getAutomations(activeTeamId)); setLoading(false); };
+  useEffect(() => { setLoading(true); load(); }, [activeTeamId]);
 
   const add = async () => {
     if (!form.name.trim()) return;
-    await createAutomation(form);
+    await createAutomation({...form, teamId: activeTeamId === '__all__' ? '' : activeTeamId});
     await logAction({ action:'created', resource:'automation', detail:form.name, actorId:user!.uid, actorName:me!.displayName });
     setForm({name:'',trigger:'task_created',condition:'',action:'change_status'}); setShowNew(false); load();
   };

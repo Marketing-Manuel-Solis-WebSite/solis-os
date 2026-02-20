@@ -1,7 +1,7 @@
 'use client';
 import { useAuth, Role } from '@/lib/auth';
 import { useEffect, useState } from 'react';
-import { getMembers, updateMember, getAuditLogs, logAction, getOrg, updateOrg, getSettings, saveSettings, getWorkspaces, createWorkspace, deleteWorkspace, getTemplates, createTemplate, deleteTemplate, getAutomations, createAutomation, deleteAutomation, ORG } from '@/lib/db';
+import { getMembers, updateMember, getAuditLogs, logAction, getOrg, updateOrg, getSettings, saveSettings, getWorkspaces, createWorkspace, deleteWorkspace, getTemplates, createTemplate, deleteTemplate, getAutomations, createAutomation, deleteAutomation, getTeams, createTeam, deleteTeam, ORG } from '@/lib/db';
 import { Shield, Users, Building2, Columns3, Zap, Bell, Bot, Plug, ScrollText, FileStack, LayoutGrid, Plus, Trash2, Save, Search, ChevronRight, Check, X } from 'lucide-react';
 
 type S = 'org'|'users'|'perms'|'struct'|'fields'|'tpl'|'auto'|'notif'|'ai'|'integ'|'audit';
@@ -58,15 +58,16 @@ function OrgS() {
 }
 
 function UsersS() {
-  const { user, me } = useAuth(); const [ms,setMs]=useState<any[]>([]); const [ld,setLd]=useState(true); const [q,setQ]=useState('');
+  const { user, me, teams } = useAuth(); const [ms,setMs]=useState<any[]>([]); const [ld,setLd]=useState(true); const [q,setQ]=useState('');
   useEffect(()=>{getMembers().then(m=>{setMs(m);setLd(false);});},[]);
   const cR=async(id:string,r:Role)=>{await updateMember(id,{role:r});await logAction({action:'role_changed',resource:'member',detail:r,actorId:user!.uid,actorName:me!.displayName});setMs(await getMembers());};
+  const cT=async(id:string,tid:string)=>{await updateMember(id,{teamId:tid,teamIds:[tid]});await logAction({action:'team_changed',resource:'member',detail:tid,actorId:user!.uid,actorName:me!.displayName});setMs(await getMembers());};
   const f=ms.filter(m=>m.displayName?.toLowerCase().includes(q.toLowerCase())||m.email?.toLowerCase().includes(q.toLowerCase()));
   if(ld)return<Sk/>;
-  return <div className="p-6 max-w-4xl"><h2 className="text-xl font-bold text-white mb-4">Users ({ms.length})</h2>
+  return <div className="p-6 max-w-5xl"><h2 className="text-xl font-bold text-white mb-4">Users ({ms.length})</h2>
     <div className="relative mb-4"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600"/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search..." className="input-dark pl-10"/></div>
-    <div className="rounded-2xl border border-[#1F2937]/60 bg-[#111827] overflow-hidden"><table className="w-full text-sm"><thead><tr className="border-b border-[#1F2937]/60"><th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600">User</th><th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600">Role</th><th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600">Status</th></tr></thead>
-    <tbody>{f.map(m=><tr key={m.id} className="border-b border-[#1F2937]/30 hover:bg-white/[0.01]"><td className="px-5 py-3"><p className="font-medium text-white">{m.displayName}</p><p className="text-[11px] text-gray-600">{m.email}</p></td><td className="px-5 py-3"><select value={m.role} onChange={e=>cR(m.id,e.target.value as Role)} className="select-dark text-xs h-8">{['owner','admin','manager','member','guest','readonly'].map(r=><option key={r}>{r}</option>)}</select></td><td className="px-5 py-3"><span className={`text-xs ${m.active!==false?'text-emerald-400':'text-gray-600'}`}>{m.active!==false?'Active':'Inactive'}</span></td></tr>)}</tbody></table></div></div>;
+    <div className="rounded-2xl border border-[#1F2937]/60 bg-[#111827] overflow-hidden"><table className="w-full text-sm"><thead><tr className="border-b border-[#1F2937]/60"><th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600">User</th><th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600">Role</th><th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600">Team</th><th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600">Status</th></tr></thead>
+    <tbody>{f.map(m=>{const tm=teams.find(t=>t.id===m.teamId);return<tr key={m.id} className="border-b border-[#1F2937]/30 hover:bg-white/[0.01]"><td className="px-5 py-3"><p className="font-medium text-white">{m.displayName}</p><p className="text-[11px] text-gray-600">{m.email}</p></td><td className="px-5 py-3"><select value={m.role} onChange={e=>cR(m.id,e.target.value as Role)} className="select-dark text-xs h-8">{['owner','admin','manager','member','guest','readonly'].map(r=><option key={r}>{r}</option>)}</select></td><td className="px-5 py-3"><select value={m.teamId||''} onChange={e=>cT(m.id,e.target.value)} className="select-dark text-xs h-8" style={{borderColor:tm?`${tm.color}30`:undefined,color:tm?tm.color:undefined}}><option value="">No Team</option>{teams.map(t=><option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}</select></td><td className="px-5 py-3"><span className={`text-xs ${m.active!==false?'text-emerald-400':'text-gray-600'}`}>{m.active!==false?'Active':'Inactive'}</span></td></tr>})}</tbody></table></div></div>;
 }
 
 function PermsS() {

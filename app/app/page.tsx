@@ -5,17 +5,17 @@ import { getTasks, getMembers, getAuditLogs } from '@/lib/db';
 import { CheckSquare, Clock, AlertTriangle, Users, TrendingUp, Zap, ArrowUpRight, Activity } from 'lucide-react';
 
 export default function Dashboard() {
-  const { me } = useAuth();
+  const { me, activeTeamId } = useAuth();
   const [tasks, setTasks] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getTasks(), getMembers(), getAuditLogs()]).then(([t, m, l]) => {
+    Promise.all([getTasks(activeTeamId), getMembers(), getAuditLogs()]).then(([t, m, l]) => {
       setTasks(t); setMembers(m); setLogs(l); setLoading(false);
     });
-  }, []);
+  }, [activeTeamId]);
 
   const done = tasks.filter(t => t.status === 'done').length;
   const active = tasks.filter(t => t.status === 'in_progress').length;

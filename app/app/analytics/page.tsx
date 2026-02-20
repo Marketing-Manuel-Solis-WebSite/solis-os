@@ -1,11 +1,13 @@
 'use client';
+import { useAuth } from '@/lib/auth';
 import { useEffect, useState } from 'react';
 import { getTasks, getMembers } from '@/lib/db';
 import { BarChart3, TrendingUp, Target } from 'lucide-react';
 
 export default function AnalyticsPage() {
+  const { activeTeamId } = useAuth();
   const [tasks, setTasks] = useState<any[]>([]); const [members, setMembers] = useState<any[]>([]); const [loading, setLoading] = useState(true);
-  useEffect(() => { Promise.all([getTasks(), getMembers()]).then(([t,m])=>{setTasks(t);setMembers(m);setLoading(false);}); }, []);
+  useEffect(() => { Promise.all([getTasks(activeTeamId), getMembers()]).then(([t,m])=>{setTasks(t);setMembers(m);setLoading(false);}); }, []);
 
   const byStatus = tasks.reduce((a:any,t:any)=>{a[t.status]=(a[t.status]||0)+1;return a;},{});
   const byPriority = tasks.reduce((a:any,t:any)=>{a[t.priority]=(a[t.priority]||0)+1;return a;},{});

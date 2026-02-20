@@ -5,15 +5,15 @@ import { getDocuments, createDocument, updateDocument, deleteDocument, logAction
 import { Plus, Trash2, FileText, Edit2, Check, X, Save } from 'lucide-react';
 
 export default function DocsPage() {
-  const { user, me } = useAuth();
+  const { user, me, activeTeamId } = useAuth();
   const [docs, setDocs] = useState<any[]>([]); const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false); const [newTitle, setNewTitle] = useState('');
   const [editId, setEditId] = useState<string|null>(null); const [editContent, setEditContent] = useState('');
 
-  const load = async () => { setDocs(await getDocuments()); setLoading(false); };
-  useEffect(() => { load(); }, []);
+  const load = async () => { setDocs(await getDocuments(activeTeamId)); setLoading(false); };
+  useEffect(() => { setLoading(true); load(); }, [activeTeamId]);
 
-  const add = async () => { if (!newTitle.trim()) return; await createDocument({ title: newTitle.trim() }); await logAction({ action: 'created', resource: 'doc', detail: newTitle, actorId: user!.uid, actorName: me!.displayName }); setNewTitle(''); setShowNew(false); load(); };
+  const add = async () => { if (!newTitle.trim()) return; await createDocument({ title: newTitle.trim(), teamId: activeTeamId === '__all__' ? '' : activeTeamId }); await logAction({ action: 'created', resource: 'doc', detail: newTitle, actorId: user!.uid, actorName: me!.displayName }); setNewTitle(''); setShowNew(false); load(); };
   const save = async (id: string) => { await updateDocument(id, { content: editContent }); setEditId(null); load(); };
   const remove = async (d: any) => { if (!confirm(`Delete "${d.title}"?`)) return; await deleteDocument(d.id); await logAction({ action: 'deleted', resource: 'doc', detail: d.title, actorId: user!.uid, actorName: me!.displayName }); load(); };
 
