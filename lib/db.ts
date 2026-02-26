@@ -81,6 +81,7 @@ export async function createTask(data: any) {
   return addTo('tasks', {
     ...data, orgId: ORG, status: data.status || 'todo', priority: data.priority || 'medium',
     assignees: data.assignees || [], tags: data.tags || [], teamId: data.teamId || '',
+    visibility: data.visibility || 'team',
     description: data.description || '', dueDate: data.dueDate || null, startDate: data.startDate || null,
     timeEstimate: data.timeEstimate || null, timeSpent: data.timeSpent || 0,
     subtasks: data.subtasks || [], checklist: data.checklist || [], attachments: data.attachments || [],
@@ -389,6 +390,7 @@ export async function sendSystemMessage(channelId: string, content: string) {
 // ===========================================================
 export async function getAutomations(teamId?: string) { if (teamId) return getByTeam('automations', teamId); return getByOrg('automations'); }
 export async function createAutomation(data: any) { return addTo('automations', { ...data, orgId: ORG, enabled: true, teamId: data.teamId || '' }); }
+export async function updateAutomation(id: string, data: any) { return updateAt(`automations/${id}`, data); }
 export async function deleteAutomation(id: string) { return deleteAt(`automations/${id}`); }
 
 // ===== AUDIT LOG =====

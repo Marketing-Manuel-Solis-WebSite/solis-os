@@ -1,13 +1,10 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Bot, User, Copy, Check, Loader2, MessageSquare, Globe, FileSearch, RefreshCw } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Bot, Copy, Check, Loader2 } from 'lucide-react';
 import type { AIMessage, AIMode } from '@/lib/ai-db';
 
-const MODE_COLORS: Record<string, string> = {
-  chat: '#D4A843',
-  research: '#3B82F6',
-  deep: '#A855F7',
-};
+const MODE_COLORS: Record<string, string> = { chat: '#D4A843', research: '#3B82F6', deep: '#A855F7' };
 
 interface Props {
   messages: AIMessage[];
@@ -31,56 +28,39 @@ export default function AIMessages({ messages, loading, streamingText, mode, use
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
-  // Simple markdown → HTML renderer
   const renderMarkdown = (text: string): string => {
     let html = text
-      // Code blocks (must be first)
       .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="ai-code-block"><code class="lang-$1">$2</code></pre>')
-      // Inline code
       .replace(/`([^`]+)`/g, '<code class="ai-inline-code">$1</code>')
-      // Headers
       .replace(/^#### (.+)$/gm, '<h4 class="ai-h4">$1</h4>')
       .replace(/^### (.+)$/gm, '<h3 class="ai-h3">$1</h3>')
       .replace(/^## (.+)$/gm, '<h2 class="ai-h2">$1</h2>')
       .replace(/^# (.+)$/gm, '<h1 class="ai-h1">$1</h1>')
-      // Bold + Italic
       .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
       .replace(/\*\*(.+?)\*\*/g, '<strong class="ai-bold">$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      // Blockquotes
       .replace(/^> (.+)$/gm, '<blockquote class="ai-blockquote">$1</blockquote>')
-      // Horizontal rule
       .replace(/^---$/gm, '<hr class="ai-hr" />')
-      // Tables
       .replace(/^\|(.+)\|$/gm, (match) => {
         const cells = match.split('|').filter(Boolean).map(c => c.trim());
         if (cells.every(c => /^[-:]+$/.test(c))) return '<tr class="ai-table-sep"></tr>';
-        const tag = 'td';
-        return '<tr>' + cells.map(c => `<${tag} class="ai-td">${c}</${tag}>`).join('') + '</tr>';
+        return '<tr>' + cells.map(c => `<td class="ai-td">${c}</td>`).join('') + '</tr>';
       })
-      // Unordered lists
       .replace(/^[-*] (.+)$/gm, '<li class="ai-li">$1</li>')
-      // Ordered lists
       .replace(/^\d+\. (.+)$/gm, '<li class="ai-li-num">$1</li>')
-      // Checkboxes
       .replace(/^- \[x\] (.+)$/gm, '<li class="ai-checkbox checked">✅ $1</li>')
       .replace(/^- \[ \] (.+)$/gm, '<li class="ai-checkbox">⬜ $1</li>')
-      // Links
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="ai-link" target="_blank">$1</a>')
-      // Paragraphs (wrap lines that aren't already tagged)
       .replace(/^(?!<[hbluptd]|<li|<pre|<code|<hr|<tr|<blockquote)(.+)$/gm, '<p class="ai-p">$1</p>');
 
-    // Wrap consecutive li items in ul/ol
     html = html.replace(/(<li class="ai-li">.+?<\/li>\n?)+/g, '<ul class="ai-ul">$&</ul>');
     html = html.replace(/(<li class="ai-li-num">.+?<\/li>\n?)+/g, '<ol class="ai-ol">$&</ol>');
-    // Wrap table rows
     html = html.replace(/(<tr>.+?<\/tr>\n?)+/g, '<table class="ai-table">$&</table>');
-
     return html;
   };
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto scrollbar-thin">
       <div className="max-w-4xl mx-auto px-6 py-6 space-y-6">
         {messages.map((msg, i) => {
           const isUser = msg.role === 'user';
@@ -89,32 +69,31 @@ export default function AIMessages({ messages, loading, streamingText, mode, use
 
           if (isSystem) {
             return (
-              <div key={msg.id || i} className="flex justify-center py-2">
-                <span className="text-[11px] text-gray-600 bg-[#111827] px-3 py-1 rounded-full border border-[#1F2937]/40">{msg.content}</span>
-              </div>
+              <motion.div key={msg.id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center py-2">
+                <span className="text-[11px] text-[var(--text-muted)] bg-[var(--bg-card)] px-3 py-1 rounded-full border border-[var(--border)]">{msg.content}</span>
+              </motion.div>
             );
           }
 
           if (isUser) {
             return (
-              <div key={msg.id || i} className="flex justify-end anim-fade">
+              <motion.div key={msg.id || i} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2 }} className="flex justify-end">
                 <div className="max-w-[75%]">
                   <div className="px-4 py-3 rounded-2xl rounded-tr-md bg-[#D4A843]/10 border border-[#D4A843]/20">
-                    <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                    <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                   </div>
                   {msg.createdAt && (
-                    <p className="text-[9px] text-gray-700 mt-1 text-right">
+                    <p className="text-[9px] text-[var(--text-muted)] mt-1 text-right">
                       {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   )}
                 </div>
-              </div>
+              </motion.div>
             );
           }
 
-          // AI message
           return (
-            <div key={msg.id || i} className="anim-fade">
+            <motion.div key={msg.id || i} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2 }}>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${modeColor}15`, border: `1px solid ${modeColor}20` }}>
                   <Bot className="h-3.5 w-3.5" style={{ color: modeColor }} />
@@ -124,31 +103,29 @@ export default function AIMessages({ messages, loading, streamingText, mode, use
                   {msg.mode === 'deep' ? 'REPORT' : msg.mode === 'research' ? 'RESEARCH' : 'CHAT'}
                 </span>
                 {msg.createdAt && (
-                  <span className="text-[9px] text-gray-700 ml-auto">
+                  <span className="text-[9px] text-[var(--text-muted)] ml-auto">
                     {msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(msg.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
               </div>
-              <div className="ml-9 rounded-2xl rounded-tl-md bg-[#0C1017] border border-[#1F2937]/60 overflow-hidden">
+              <div className="ml-9 rounded-2xl rounded-tl-md bg-[var(--bg-card)] border border-[var(--border)] overflow-hidden">
                 <div className="p-5 ai-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
-                <div className="flex items-center gap-2 px-5 py-2.5 border-t border-[#1F2937]/40 bg-[#0A0E16]">
-                  <button onClick={() => copyText(msg.content, i)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] text-gray-600 hover:text-gray-400 hover:bg-white/5 transition">
+                <div className="flex items-center gap-2 px-5 py-2.5 border-t border-[var(--border)] bg-[var(--bg-base)]/50">
+                  <motion.button whileTap={{ scale: 0.9 }}
+                    onClick={() => copyText(msg.content, i)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition">
                     {copiedIdx === i ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
                     {copiedIdx === i ? 'Copied!' : 'Copy'}
-                  </button>
-                  {msg.tokens > 0 && (
-                    <span className="text-[9px] text-gray-700 ml-auto">{msg.tokens.toLocaleString()} chars</span>
-                  )}
+                  </motion.button>
+                  {msg.tokens > 0 && <span className="text-[9px] text-[var(--text-muted)] ml-auto">{msg.tokens.toLocaleString()} chars</span>}
                 </div>
               </div>
-            </div>
+            </motion.div>
           );
         })}
 
-        {/* Streaming indicator */}
         {loading && streamingText && (
-          <div className="anim-fade">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="flex items-center gap-2 mb-2">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${MODE_COLORS[mode]}15`, border: `1px solid ${MODE_COLORS[mode]}20` }}>
                 <Bot className="h-3.5 w-3.5" style={{ color: MODE_COLORS[mode] }} />
@@ -156,29 +133,28 @@ export default function AIMessages({ messages, loading, streamingText, mode, use
               <span className="text-xs font-semibold" style={{ color: MODE_COLORS[mode] }}>Solis AI</span>
               <Loader2 className="h-3 w-3 animate-spin" style={{ color: MODE_COLORS[mode] }} />
             </div>
-            <div className="ml-9 p-5 rounded-2xl rounded-tl-md bg-[#0C1017] border border-[#1F2937]/60">
+            <div className="ml-9 p-5 rounded-2xl rounded-tl-md bg-[var(--bg-card)] border border-[var(--border)]">
               <div className="ai-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }} />
               <span className="inline-block w-1.5 h-4 bg-[#D4A843] animate-pulse ml-0.5 rounded-sm" />
             </div>
-          </div>
+          </motion.div>
         )}
 
-        {/* Loading dots */}
         {loading && !streamingText && (
-          <div className="anim-fade">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="flex items-center gap-2 mb-2">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${MODE_COLORS[mode]}15`, border: `1px solid ${MODE_COLORS[mode]}20` }}>
                 <Bot className="h-3.5 w-3.5" style={{ color: MODE_COLORS[mode] }} />
               </div>
               <span className="text-xs font-semibold" style={{ color: MODE_COLORS[mode] }}>Solis AI</span>
             </div>
-            <div className="ml-9 px-5 py-4 rounded-2xl rounded-tl-md bg-[#0C1017] border border-[#1F2937]/60 flex items-center gap-3">
+            <div className="ml-9 px-5 py-4 rounded-2xl rounded-tl-md bg-[var(--bg-card)] border border-[var(--border)] flex items-center gap-3">
               <Loader2 className="h-4 w-4 animate-spin" style={{ color: MODE_COLORS[mode] }} />
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-[var(--text-muted)]">
                 {mode === 'deep' ? 'Generating comprehensive report...' : mode === 'research' ? 'Researching and analyzing...' : 'Thinking...'}
               </span>
             </div>
-          </div>
+          </motion.div>
         )}
 
         <div ref={bottomRef} />

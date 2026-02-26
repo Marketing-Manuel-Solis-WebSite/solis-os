@@ -2,31 +2,21 @@
 import { useAuth, Team } from '@/lib/auth';
 import { useEffect, useState, useCallback } from 'react';
 import { getMembers, updateMember, logAction, getTeams } from '@/lib/db';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, ChevronDown, ChevronRight, Edit2, Check, X, Crown, Shield,
   User, Eye, Search, Briefcase, Star, AlertTriangle
 } from 'lucide-react';
 
-// ========== TYPES ==========
 type HierarchyLevel = 'owner' | 'director' | 'manager' | 'lead' | 'member' | 'guest';
 
 interface OrgMember {
-  id: string;
-  displayName: string;
-  email: string;
-  title: string;
-  department: string;
-  role: string;
-  teamId: string;
-  managerId: string;
-  hierarchyLevel: HierarchyLevel;
-  photoURL: string;
-  active: boolean;
+  id: string; displayName: string; email: string; title: string; department: string;
+  role: string; teamId: string; managerId: string; hierarchyLevel: HierarchyLevel;
+  photoURL: string; active: boolean;
 }
 
-interface OrgNode extends OrgMember {
-  children: OrgNode[];
-}
+interface OrgNode extends OrgMember { children: OrgNode[]; }
 
 const LEVELS: { id: HierarchyLevel; label: string; icon: any; color: string; order: number; description: string }[] = [
   { id: 'owner', label: 'Owner / CEO', icon: Crown, color: '#D4A843', order: 0, description: 'Top-level leadership' },
@@ -49,13 +39,12 @@ function inferLevel(role: string): HierarchyLevel {
   }
 }
 
-// ========== MAIN PAGE ==========
 export default function OrgChartPage() {
-  const { user, me, isAdmin, teams } = useAuth();
+  const { user, me, teams } = useAuth();
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'tree' | 'department' | 'list'>('tree');
+  const [view, setView] = useState<'tree' | 'department' | 'list'>('department');
   const [search, setSearch] = useState('');
   const [filterDept, setFilterDept] = useState('all');
   const [filterLevel, setFilterLevel] = useState('all');
@@ -77,7 +66,6 @@ export default function OrgChartPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Build tree from manager relationships
   const buildTree = (list: OrgMember[]): OrgNode[] => {
     const map = new Map<string, OrgNode>();
     list.forEach(m => map.set(m.id, { ...m, children: [] }));
@@ -100,7 +88,6 @@ export default function OrgChartPage() {
     return roots;
   };
 
-  // Filter
   let filtered = members.filter(m => {
     if (search) {
       const q = search.toLowerCase();
@@ -120,16 +107,12 @@ export default function OrgChartPage() {
 
   const unassigned = filtered.filter(m => !m.teamId || m.teamId === '');
 
-  // Actions
   const saveEdit = async (id: string) => {
     const team = allTeams.find(t => t.id === editData.teamId);
     await updateMember(id, {
-      title: editData.title,
-      department: team?.name || editData.department,
-      managerId: editData.managerId,
-      hierarchyLevel: editData.hierarchyLevel,
-      teamId: editData.teamId,
-      teamIds: editData.teamId ? [editData.teamId] : [],
+      title: editData.title, department: team?.name || editData.department,
+      managerId: editData.managerId, hierarchyLevel: editData.hierarchyLevel,
+      teamId: editData.teamId, teamIds: editData.teamId ? [editData.teamId] : [],
     });
     await logAction({ action: 'updated', resource: 'org-chart', detail: `${editData.title} / ${editData.hierarchyLevel}`, actorId: user!.uid, actorName: me!.displayName });
     setEditId(null);
@@ -143,7 +126,7 @@ export default function OrgChartPage() {
 
   const quickAssignManager = async (memberId: string, managerId: string) => {
     await updateMember(memberId, { managerId });
-    await logAction({ action: 'updated', resource: 'org-chart', detail: `manager changed`, actorId: user!.uid, actorName: me!.displayName });
+    await logAction({ action: 'updated', resource: 'org-chart', detail: 'manager changed', actorId: user!.uid, actorName: me!.displayName });
     load();
   };
 
@@ -158,39 +141,46 @@ export default function OrgChartPage() {
     load();
   };
 
-  // Stats
   const levelCounts = LEVELS.map(l => ({ ...l, count: members.filter(m => m.hierarchyLevel === l.id).length }));
   const totalWithManager = members.filter(m => m.managerId).length;
 
+  const views = [
+    { id: 'department' as const, label: 'Departments', emoji: '🏢' },
+    { id: 'tree' as const, label: 'Tree', emoji: '🌳' },
+    { id: 'list' as const, label: 'List', emoji: '📋' },
+  ];
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="p-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-6 anim-slide">
+      <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
               Organization Chart
               {canEdit && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">EDIT MODE</span>}
             </h1>
-            <p className="text-sm text-gray-500 mt-1">{members.length} members · {allTeams.length} departments · {totalWithManager} with managers</p>
+            <p className="text-sm text-[var(--text-muted)] mt-1">{members.length} members · {allTeams.length} departments · {totalWithManager} with managers</p>
           </div>
         </div>
       </div>
 
       {/* Level legend */}
-      <div className="flex items-center gap-2 flex-wrap mb-4 anim-slide" style={{ animationDelay: '40ms' }}>
-        {levelCounts.filter(l => l.count > 0).map(l => (
-          <div key={l.id} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-medium" style={{ backgroundColor: `${l.color}10`, borderColor: `${l.color}20`, color: l.color }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="flex items-center gap-2 flex-wrap mb-4">
+        {levelCounts.filter(l => l.count > 0).map((l, i) => (
+          <motion.div key={l.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.05 * i }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-medium"
+            style={{ backgroundColor: `${l.color}10`, borderColor: `${l.color}20`, color: l.color }}>
             <l.icon className="h-3 w-3" />
             {l.label} <span className="opacity-60">({l.count})</span>
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2 flex-wrap mb-5 anim-slide" style={{ animationDelay: '80ms' }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="flex items-center gap-2 flex-wrap mb-5">
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search people..." className="input-dark pl-10 h-9 text-sm" />
         </div>
         <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="select-dark h-9 text-xs">
@@ -201,29 +191,32 @@ export default function OrgChartPage() {
           <option value="all">All Levels</option>
           {LEVELS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
         </select>
-        <div className="flex rounded-xl border border-[#1F2937]/60 overflow-hidden">
-          {([
-            { id: 'tree' as const, label: '🌳 Tree' },
-            { id: 'department' as const, label: '🏢 Depts' },
-            { id: 'list' as const, label: '📋 List' },
-          ]).map(v => (
-            <button key={v.id} onClick={() => setView(v.id)} className={`px-3 py-1.5 text-[11px] font-medium transition ${view === v.id ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-gray-600 hover:text-gray-400'}`}>
-              {v.label}
+        <div className="flex rounded-xl border border-[var(--border)] overflow-hidden bg-[var(--bg-card)]">
+          {views.map(v => (
+            <button key={v.id} onClick={() => setView(v.id)}
+              className={`px-3.5 py-1.5 text-[11px] font-medium transition-all relative ${view === v.id ? 'text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+              {view === v.id && <motion.div layoutId="org-view-tab" className="absolute inset-0 bg-[#D4A843]/10 rounded-lg" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />}
+              <span className="relative">{v.emoji} {v.label}</span>
             </button>
           ))}
         </div>
-      </div>
+      </motion.div>
 
       {loading ? (
         <div className="space-y-3">{[1, 2, 3, 4].map(i => <div key={i} className="h-16 skeleton rounded-xl" />)}</div>
       ) : members.length === 0 ? (
-        <div className="text-center py-20"><Users className="h-12 w-12 text-gray-700 mx-auto mb-3" /><p className="text-gray-600">No members yet.</p></div>
+        <div className="text-center py-20">
+          <div className="w-16 h-16 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center mx-auto mb-3">
+            <Users className="h-7 w-7 text-[var(--text-muted)]" />
+          </div>
+          <p className="text-[var(--text-muted)]">No members yet.</p>
+        </div>
       ) : (
         <>
           {/* TREE VIEW */}
           {view === 'tree' && (
-            <div className="space-y-1">
-              {tree.length === 0 && <p className="text-center py-10 text-gray-700 text-sm">No matching members</p>}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-1">
+              {tree.length === 0 && <p className="text-center py-10 text-[var(--text-muted)] text-sm">No matching members</p>}
               {tree.map(n => (
                 <TreeNode key={n.id} node={n} depth={0} members={members} teams={allTeams}
                   editId={editId} editData={editData} setEditData={setEditData}
@@ -231,7 +224,7 @@ export default function OrgChartPage() {
                   onQuickManager={quickAssignManager} onQuickLevel={quickAssignLevel} onQuickDept={quickAssignDept}
                 />
               ))}
-            </div>
+            </motion.div>
           )}
 
           {/* DEPARTMENT VIEW */}
@@ -245,10 +238,12 @@ export default function OrgChartPage() {
                 />
               ))}
               {unassigned.length > 0 && (
-                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.03] p-5 anim-slide">
+                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: byDepartment.length * 0.08 }}
+                  className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.03] p-5">
                   <div className="flex items-center gap-2 mb-3">
                     <AlertTriangle className="h-4 w-4 text-amber-400" />
                     <span className="text-sm font-bold text-amber-400">Unassigned ({unassigned.length})</span>
+                    <span className="text-[10px] text-[var(--text-muted)]">These members need a department</span>
                   </div>
                   <div className="space-y-1">
                     {unassigned.map(m => (
@@ -259,44 +254,46 @@ export default function OrgChartPage() {
                       />
                     ))}
                   </div>
-                </div>
+                </motion.div>
               )}
             </div>
           )}
 
           {/* LIST VIEW */}
           {view === 'list' && (
-            <div className="rounded-2xl border border-[#1F2937]/60 bg-[#111827] overflow-hidden">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#1F2937]/60">
-                    <th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600">Name</th>
-                    <th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600">Title</th>
-                    <th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600">Level</th>
-                    <th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600">Dept</th>
-                    <th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600">Reports To</th>
-                    {canEdit && <th className="text-left px-5 py-3 text-[10px] uppercase text-gray-600 w-10"></th>}
+                  <tr className="border-b border-[var(--border)]">
+                    <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)] font-semibold">Name</th>
+                    <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)] font-semibold">Title</th>
+                    <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)] font-semibold">Level</th>
+                    <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)] font-semibold">Dept</th>
+                    <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)] font-semibold">Reports To</th>
+                    {canEdit && <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)] font-semibold w-10"></th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.sort((a, b) => getLevelConfig(a.hierarchyLevel).order - getLevelConfig(b.hierarchyLevel).order).map(m => {
+                  {filtered.sort((a, b) => getLevelConfig(a.hierarchyLevel).order - getLevelConfig(b.hierarchyLevel).order).map((m, i) => {
                     const lv = getLevelConfig(m.hierarchyLevel);
                     const mgr = members.find(x => x.id === m.managerId);
                     const team = allTeams.find(t => t.id === m.teamId);
                     return (
-                      <tr key={m.id} className="border-b border-[#1F2937]/30 hover:bg-white/[0.01]">
+                      <motion.tr key={m.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }}
+                        className="border-b border-[var(--border)] hover:bg-[var(--hover-bg)] transition-colors">
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: `${lv.color}15`, color: lv.color }}>
+                            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: `${lv.color}15`, color: lv.color }}>
                               {m.displayName?.[0]?.toUpperCase() || '?'}
                             </div>
                             <div>
-                              <p className="font-medium text-white text-xs">{m.displayName}</p>
-                              <p className="text-[10px] text-gray-600">{m.email}</p>
+                              <p className="font-medium text-[var(--text-primary)] text-xs">{m.displayName}</p>
+                              <p className="text-[10px] text-[var(--text-muted)]">{m.email}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-3 text-xs text-gray-400">{m.title || '—'}</td>
+                        <td className="px-5 py-3 text-xs text-[var(--text-secondary)]">{m.title || '—'}</td>
                         <td className="px-5 py-3">
                           {canEdit ? (
                             <select value={m.hierarchyLevel} onChange={e => quickAssignLevel(m.id, e.target.value as HierarchyLevel)}
@@ -315,7 +312,7 @@ export default function OrgChartPage() {
                               {allTeams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
                             </select>
                           ) : (
-                            team ? <span className="text-[10px] font-medium" style={{ color: team.color }}>{team.icon} {team.name}</span> : <span className="text-gray-700 text-xs">—</span>
+                            team ? <span className="text-[10px] font-medium" style={{ color: team.color }}>{team.icon} {team.name}</span> : <span className="text-[var(--text-muted)] text-xs">—</span>
                           )}
                         </td>
                         <td className="px-5 py-3">
@@ -326,24 +323,24 @@ export default function OrgChartPage() {
                               {members.filter(x => x.id !== m.id).map(x => <option key={x.id} value={x.id}>{x.displayName}</option>)}
                             </select>
                           ) : (
-                            mgr ? <span className="text-xs text-gray-400">{mgr.displayName}</span> : <span className="text-gray-700 text-xs">—</span>
+                            mgr ? <span className="text-xs text-[var(--text-secondary)]">{mgr.displayName}</span> : <span className="text-[var(--text-muted)] text-xs">—</span>
                           )}
                         </td>
                         {canEdit && (
                           <td className="px-5 py-3">
-                            <button onClick={() => startEdit(m)} className="p-1.5 text-gray-600 hover:text-blue-400 rounded-lg"><Edit2 className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => startEdit(m)} className="p-1.5 text-[var(--text-muted)] hover:text-blue-400 rounded-lg transition"><Edit2 className="h-3.5 w-3.5" /></button>
                           </td>
                         )}
-                      </tr>
+                      </motion.tr>
                     );
                   })}
                 </tbody>
               </table>
-            </div>
+            </motion.div>
           )}
         </>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -356,15 +353,15 @@ function TreeNode({ node, depth, members, teams, editId, editData, setEditData, 
 }) {
   const [open, setOpen] = useState(depth < 3);
   const hasKids = node.children.length > 0;
+  const lv = getLevelConfig(node.hierarchyLevel);
 
   return (
-    <div>
+    <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2 }}>
       <div style={{ marginLeft: depth * 28 }}>
-        {/* Connector line */}
         {depth > 0 && (
           <div className="relative">
-            <div className="absolute -left-5 top-1/2 w-4 h-px bg-[#1F2937]" />
-            <div className="absolute -left-5 -top-2 w-px h-[calc(50%+8px)] bg-[#1F2937]" />
+            <div className="absolute -left-5 top-1/2 w-4 h-px" style={{ backgroundColor: `${lv.color}30` }} />
+            <div className="absolute -left-5 -top-2 w-px h-[calc(50%+8px)]" style={{ backgroundColor: `${lv.color}20` }} />
           </div>
         )}
         <MemberRow member={node} members={members} teams={teams}
@@ -374,14 +371,16 @@ function TreeNode({ node, depth, members, teams, editId, editData, setEditData, 
           onQuickManager={onQuickManager} onQuickLevel={onQuickLevel} onQuickDept={onQuickDept}
         />
       </div>
-      {open && hasKids && node.children.map(c => (
-        <TreeNode key={c.id} node={c} depth={depth + 1} members={members} teams={teams}
-          editId={editId} editData={editData} setEditData={setEditData}
-          canEdit={canEdit} onStartEdit={onStartEdit} onSaveEdit={onSaveEdit} onCancelEdit={onCancelEdit}
-          onQuickManager={onQuickManager} onQuickLevel={onQuickLevel} onQuickDept={onQuickDept}
-        />
-      ))}
-    </div>
+      <AnimatePresence>
+        {open && hasKids && node.children.map(c => (
+          <TreeNode key={c.id} node={c} depth={depth + 1} members={members} teams={teams}
+            editId={editId} editData={editData} setEditData={setEditData}
+            canEdit={canEdit} onStartEdit={onStartEdit} onSaveEdit={onSaveEdit} onCancelEdit={onCancelEdit}
+            onQuickManager={onQuickManager} onQuickLevel={onQuickLevel} onQuickDept={onQuickDept}
+          />
+        ))}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -399,49 +398,75 @@ function DeptGroup({ team, deptMembers, allMembers, teams, index, editId, editDa
   })).filter(g => g.members.length > 0);
 
   return (
-    <div className="rounded-2xl border border-[#1F2937]/60 bg-[#111827] overflow-hidden anim-slide" style={{ animationDelay: `${index * 60}ms` }}>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.08, duration: 0.3 }}
+      className="rounded-2xl border bg-[var(--bg-card)] overflow-hidden"
+      style={{ borderColor: `${team.color}25` }}
+    >
+      {/* Colored top bar */}
+      <div className="h-1" style={{ background: `linear-gradient(90deg, ${team.color}, ${team.color}60)` }} />
+
       {/* Department Header */}
-      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-white/[0.01] transition">
-        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0" style={{ backgroundColor: `${team.color}15`, border: `1px solid ${team.color}25` }}>
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-4 px-5 py-4 hover:bg-[var(--hover-bg)] transition">
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0" style={{ backgroundColor: `${team.color}12`, border: `1.5px solid ${team.color}25` }}>
           {team.icon}
         </div>
         <div className="flex-1 text-left min-w-0">
-          <p className="text-sm font-bold" style={{ color: team.color }}>{team.name}</p>
-          <p className="text-[11px] text-gray-600">{deptMembers.length} member{deptMembers.length !== 1 ? 's' : ''}{team.description ? ` · ${team.description}` : ''}</p>
+          <p className="text-base font-bold" style={{ color: team.color }}>{team.name}</p>
+          <p className="text-[11px] text-[var(--text-muted)]">
+            {deptMembers.length} member{deptMembers.length !== 1 ? 's' : ''}{team.description ? ` · ${team.description}` : ''}
+          </p>
         </div>
-        <div className="flex gap-1.5 shrink-0">
+        <div className="flex gap-1.5 shrink-0 flex-wrap">
           {levelGroups.map(g => (
             <span key={g.level.id} className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ backgroundColor: `${g.level.color}15`, color: g.level.color }}>
               {g.members.length} {g.level.label}
             </span>
           ))}
         </div>
-        {open ? <ChevronDown className="h-4 w-4 text-gray-600 shrink-0" /> : <ChevronRight className="h-4 w-4 text-gray-600 shrink-0" />}
+        <motion.div animate={{ rotate: open ? 0 : -90 }} transition={{ duration: 0.2 }}>
+          <ChevronDown className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
+        </motion.div>
       </button>
 
-      {open && (
-        <div className="border-t border-[#1F2937]/40 px-3 pb-3">
-          {levelGroups.map(g => (
-            <div key={g.level.id} className="mt-3">
-              <div className="flex items-center gap-2 px-2 mb-1.5">
-                <g.level.icon className="h-3 w-3" style={{ color: g.level.color }} />
-                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: g.level.color }}>{g.level.label}s</span>
-                <div className="flex-1 h-px" style={{ backgroundColor: `${g.level.color}15` }} />
-              </div>
-              <div className="space-y-0.5">
-                {g.members.map(m => (
-                  <MemberRow key={m.id} member={m} members={allMembers} teams={teams}
-                    editId={editId} editData={editData} setEditData={setEditData}
-                    canEdit={canEdit} onStartEdit={onStartEdit} onSaveEdit={onSaveEdit} onCancelEdit={onCancelEdit}
-                    onQuickManager={onQuickManager} onQuickLevel={onQuickLevel} onQuickDept={onQuickDept}
-                  />
-                ))}
-              </div>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <div className="border-t px-3 pb-3" style={{ borderColor: `${team.color}15` }}>
+              {levelGroups.map(g => (
+                <div key={g.level.id} className="mt-3">
+                  <div className="flex items-center gap-2 px-2 mb-1.5">
+                    <g.level.icon className="h-3 w-3" style={{ color: g.level.color }} />
+                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: g.level.color }}>{g.level.label}s</span>
+                    <div className="flex-1 h-px" style={{ backgroundColor: `${g.level.color}15` }} />
+                    <span className="text-[9px] text-[var(--text-muted)]">{g.members.length}</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {g.members.map((m, mi) => (
+                      <motion.div key={m.id} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: mi * 0.03 }}>
+                        <MemberRow member={m} members={allMembers} teams={teams}
+                          editId={editId} editData={editData} setEditData={setEditData}
+                          canEdit={canEdit} onStartEdit={onStartEdit} onSaveEdit={onSaveEdit} onCancelEdit={onCancelEdit}
+                          onQuickManager={onQuickManager} onQuickLevel={onQuickLevel} onQuickDept={onQuickDept}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-    </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -460,27 +485,24 @@ function MemberRow({ member, members, teams, hasChildren, isOpen, onToggle, edit
   const directReports = members.filter(m => m.managerId === member.id).length;
   const isEditing = editId === member.id;
 
-  // EDIT MODE
   if (isEditing) {
     return (
-      <div className="flex items-center gap-2 px-3 py-3 rounded-xl bg-[#D4A843]/[0.03] border border-[#D4A843]/15 flex-wrap anim-fade">
+      <motion.div initial={{ scale: 0.98 }} animate={{ scale: 1 }}
+        className="flex items-center gap-2 px-3 py-3 rounded-xl bg-[#D4A843]/[0.03] border border-[#D4A843]/15 flex-wrap">
         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: `${lv.color}10`, color: lv.color }}>
           {member.displayName?.[0]?.toUpperCase() || '?'}
         </div>
-        <span className="text-sm font-semibold text-white shrink-0 mr-1">{member.displayName}</span>
+        <span className="text-sm font-semibold text-[var(--text-primary)] shrink-0 mr-1">{member.displayName}</span>
 
         <div className="flex items-center gap-1.5 flex-wrap flex-1">
           <input value={editData.title} onChange={e => setEditData({ ...editData, title: e.target.value })} placeholder="Job title..." className="input-dark h-8 text-xs w-32 px-2" />
-
           <select value={editData.hierarchyLevel} onChange={e => setEditData({ ...editData, hierarchyLevel: e.target.value })} className="select-dark h-8 text-[10px] px-2 w-28">
             {LEVELS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
           </select>
-
           <select value={editData.teamId} onChange={e => setEditData({ ...editData, teamId: e.target.value })} className="select-dark h-8 text-[10px] px-2 w-32">
             <option value="">No Dept</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
           </select>
-
           <select value={editData.managerId} onChange={e => setEditData({ ...editData, managerId: e.target.value })} className="select-dark h-8 text-[10px] px-2 w-36">
             <option value="">No Manager (Top)</option>
             {members.filter(m => m.id !== member.id).map(m => {
@@ -490,66 +512,61 @@ function MemberRow({ member, members, teams, hasChildren, isOpen, onToggle, edit
           </select>
         </div>
 
-        <button onClick={() => onSaveEdit(member.id)} className="h-8 px-3 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs flex items-center gap-1 hover:bg-emerald-500/30 transition shrink-0">
+        <motion.button whileTap={{ scale: 0.9 }} onClick={() => onSaveEdit(member.id)}
+          className="h-8 px-3 rounded-lg bg-emerald-500/20 text-emerald-400 text-xs flex items-center gap-1 hover:bg-emerald-500/30 transition shrink-0">
           <Check className="h-3 w-3" /> Save
-        </button>
-        <button onClick={onCancelEdit} className="h-8 px-3 rounded-lg bg-[#1F2937] text-gray-400 text-xs hover:bg-[#2a3444] transition shrink-0">
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.9 }} onClick={onCancelEdit}
+          className="h-8 px-3 rounded-lg bg-[var(--bg-base)] border border-[var(--border)] text-[var(--text-muted)] text-xs hover:bg-[var(--hover-bg)] transition shrink-0">
           <X className="h-3 w-3" />
-        </button>
-      </div>
+        </motion.button>
+      </motion.div>
     );
   }
 
-  // NORMAL MODE
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl card-hover group">
-      {/* Expand/collapse toggle */}
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[var(--hover-bg)] group transition-colors">
       {onToggle ? (
         <button onClick={onToggle} className="w-5 shrink-0 flex items-center justify-center">
           {hasChildren
-            ? (isOpen ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronRight className="h-4 w-4 text-gray-500" />)
-            : <div className="w-1.5 h-1.5 rounded-full bg-[#1F2937]" />
+            ? (isOpen ? <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" /> : <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />)
+            : <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: `${lv.color}40` }} />
           }
         </button>
       ) : (
         <div className="w-5 shrink-0" />
       )}
 
-      {/* Avatar */}
       <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 border" style={{ backgroundColor: `${lv.color}10`, borderColor: `${lv.color}20`, color: lv.color }}>
         {member.displayName?.[0]?.toUpperCase() || '?'}
       </div>
 
-      {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-white truncate">{member.displayName}</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{member.displayName}</p>
           <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold border shrink-0 inline-flex items-center gap-0.5" style={{ backgroundColor: `${lv.color}10`, borderColor: `${lv.color}20`, color: lv.color }}>
             <lv.icon className="h-2.5 w-2.5" />{lv.label}
           </span>
         </div>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          <p className="text-[11px] text-gray-500 truncate">{member.title || 'No title'}</p>
+          <p className="text-[11px] text-[var(--text-muted)] truncate">{member.title || 'No title'}</p>
           {team && (
             <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium shrink-0" style={{ backgroundColor: `${team.color}10`, color: team.color }}>
               {team.icon} {team.name}
             </span>
           )}
-          {manager && <span className="text-[9px] text-gray-600 shrink-0">→ {manager.displayName}</span>}
+          {manager && <span className="text-[9px] text-[var(--text-muted)] shrink-0">→ {manager.displayName}</span>}
         </div>
       </div>
 
-      {/* Stats */}
       {directReports > 0 && (
-        <span className="text-[9px] px-2 py-1 rounded-full bg-[#1F2937] text-gray-500 shrink-0 flex items-center gap-1">
+        <span className="text-[9px] px-2 py-1 rounded-full bg-[var(--bg-base)] border border-[var(--border)] text-[var(--text-muted)] shrink-0 flex items-center gap-1">
           <Users className="h-2.5 w-2.5" /> {directReports} report{directReports !== 1 ? 's' : ''}
         </span>
       )}
 
-      {/* Quick actions (admin only) */}
       {canEdit && (
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition shrink-0">
-          {/* Quick level change */}
           <select value={member.hierarchyLevel}
             onChange={e => { e.stopPropagation(); onQuickLevel(member.id, e.target.value as HierarchyLevel); }}
             onClick={e => e.stopPropagation()}
@@ -557,7 +574,6 @@ function MemberRow({ member, members, teams, hasChildren, isOpen, onToggle, edit
             title="Change level">
             {LEVELS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
           </select>
-          {/* Quick manager change */}
           <select value={member.managerId || ''}
             onChange={e => { e.stopPropagation(); onQuickManager(member.id, e.target.value); }}
             onClick={e => e.stopPropagation()}
@@ -566,8 +582,7 @@ function MemberRow({ member, members, teams, hasChildren, isOpen, onToggle, edit
             <option value="">No Mgr</option>
             {members.filter(m => m.id !== member.id).map(m => <option key={m.id} value={m.id}>{m.displayName}</option>)}
           </select>
-          {/* Full edit */}
-          <button onClick={e => { e.stopPropagation(); onStartEdit(member); }} className="p-1.5 text-gray-600 hover:text-blue-400 rounded-lg transition" title="Full edit">
+          <button onClick={e => { e.stopPropagation(); onStartEdit(member); }} className="p-1.5 text-[var(--text-muted)] hover:text-blue-400 rounded-lg transition" title="Full edit">
             <Edit2 className="h-3.5 w-3.5" />
           </button>
         </div>

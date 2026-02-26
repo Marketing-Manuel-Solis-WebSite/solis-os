@@ -1,118 +1,329 @@
 'use client';
 import { useAuth } from '@/lib/auth';
-import { useEffect, useState } from 'react';
-import { getTasks, getMembers, getAuditLogs } from '@/lib/db';
-import { CheckSquare, Clock, AlertTriangle, Users, TrendingUp, Zap, ArrowUpRight, Activity } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { getTasks, getDocuments, getMembers, getAuditLogs, getChannels } from '@/lib/db';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import {
+  CheckSquare, Clock, AlertTriangle, Users, TrendingUp,
+  Activity, FileText, MessageSquare, ArrowRight, Calendar,
+  BarChart3, Bot, Target, Eye, Circle, Loader2, CheckCircle2,
+  Flag
+} from 'lucide-react';
 
 export default function Dashboard() {
-  const { me, activeTeamId } = useAuth();
+  const { user, me, canSeeAllTeams, activeTeamId, teams, canSeeResource } = useAuth();
+  const router = useRouter();
   const [tasks, setTasks] = useState<any[]>([]);
+  const [docs, setDocs] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
+  const [channels, setChannels] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getTasks(activeTeamId), getMembers(), getAuditLogs()]).then(([t, m, l]) => {
-      setTasks(t); setMembers(m); setLogs(l); setLoading(false);
+    if (!user) return;
+    Promise.all([
+      getTasks(activeTeamId).catch(() => []),
+      getDocuments(activeTeamId).catch(() => []),
+      getMembers().catch(() => []),
+      getAuditLogs().catch(() => []),
+      getChannels(activeTeamId).catch(() => []),
+    ]).then(([t, d, m, l, c]) => {
+      const filteredTasks = canSeeAllTeams ? t : (t as any[]).filter(tk => canSeeResource({ teamId: tk.teamId, createdBy: tk.createdBy, visibility: tk.visibility, assignees: tk.assignees }));
+      const filteredDocs = canSeeAllTeams ? d : (d as any[]).filter(dc => canSeeResource({ teamId: dc.teamId, createdBy: dc.createdBy, visibility: dc.visibility }));
+      setTasks(filteredTasks as any[]);
+      setDocs(filteredDocs as any[]);
+      setMembers(m as any[]);
+      setLogs(l as any[]);
+      setChannels(c as any[]);
+      setLoading(false);
     });
-  }, [activeTeamId]);
+  }, [activeTeamId, user, canSeeAllTeams, canSeeResource]);
 
-  const done = tasks.filter(t => t.status === 'done').length;
-  const active = tasks.filter(t => t.status === 'in_progress').length;
-  const overdue = tasks.filter(t => t.dueDate?.toDate && t.dueDate.toDate() < new Date() && t.status !== 'done').length;
-  const rate = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0;
+  const metrics = useMemo(() => {
+    const done = tasks.filter(t => t.status === 'done' || t.status === 'completed').length;
+    const inProgress = tasks.filter(t => t.status === 'in_progress').length;
+    const inReview = tasks.filter(t => t.status === 'in_review').length;
+    const overdue = tasks.filter(t => {
+      if (!t.dueDate) return false;
+      const due = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate);
+      return due < new Date() && t.status !== 'done' && t.status !== 'completed';
+    }).length;
+    const rate = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0;
+
+    const myTasks = tasks.filter(t => t.assignees?.includes(user?.uid) || t.createdBy === user?.uid);
+    const myPending = myTasks.filter(t => t.status !== 'done' && t.status !== 'completed');
+    const myOverdue = myTasks.filter(t => {
+      if (!t.dueDate) return false;
+      const due = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate);
+      return due < new Date() && t.status !== 'done' && t.status !== 'completed';
+    });
+
+    const now = new Date();
+    const weekLater = new Date(now.getTime() + 7 * 86400000);
+    const upcoming = tasks.filter(t => {
+      if (!t.dueDate || t.status === 'done' || t.status === 'completed') return false;
+      const due = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate);
+      return due >= now && due <= weekLater;
+    }).sort((a, b) => {
+      const da = a.dueDate?.toDate ? a.dueDate.toDate() : new Date(a.dueDate);
+      const db = b.dueDate?.toDate ? b.dueDate.toDate() : new Date(b.dueDate);
+      return da.getTime() - db.getTime();
+    });
+
+    const byPriority: Record<string, number> = {};
+    tasks.filter(t => t.status !== 'done' && t.status !== 'completed').forEach(t => {
+      byPriority[t.priority || 'medium'] = (byPriority[t.priority || 'medium'] || 0) + 1;
+    });
+
+    const byDept = teams.map(team => {
+      const dTasks = tasks.filter(t => t.teamId === team.id);
+      const dDone = dTasks.filter(t => t.status === 'done' || t.status === 'completed').length;
+      return { team, total: dTasks.length, done: dDone, rate: dTasks.length > 0 ? Math.round((dDone / dTasks.length) * 100) : 0 };
+    });
+
+    return { done, inProgress, inReview, overdue, rate, myTasks, myPending, myOverdue, upcoming, byPriority, byDept };
+  }, [tasks, user?.uid, teams]);
 
   const stats = [
-    { label: 'Total Tasks', val: tasks.length, icon: CheckSquare, color: 'from-blue-500/20 to-blue-600/5', iconColor: 'text-blue-400', glow: 'shadow-blue-500/10' },
-    { label: 'In Progress', val: active, icon: Clock, color: 'from-amber-500/20 to-amber-600/5', iconColor: 'text-amber-400', glow: 'shadow-amber-500/10' },
-    { label: 'Completed', val: done, icon: TrendingUp, color: 'from-emerald-500/20 to-emerald-600/5', iconColor: 'text-emerald-400', glow: 'shadow-emerald-500/10' },
-    { label: 'Overdue', val: overdue, icon: AlertTriangle, color: 'from-red-500/20 to-red-600/5', iconColor: 'text-red-400', glow: 'shadow-red-500/10' },
-    { label: 'Team', val: members.length, icon: Users, color: 'from-purple-500/20 to-purple-600/5', iconColor: 'text-purple-400', glow: 'shadow-purple-500/10' },
+    { label: 'Total Tasks', val: tasks.length, icon: CheckSquare, color: '#3B82F6', bg: 'from-blue-500/20 to-blue-600/5' },
+    { label: 'In Progress', val: metrics.inProgress, icon: Clock, color: '#F59E0B', bg: 'from-amber-500/20 to-amber-600/5' },
+    { label: 'Completed', val: metrics.done, icon: TrendingUp, color: '#22C55E', bg: 'from-emerald-500/20 to-emerald-600/5' },
+    { label: 'Overdue', val: metrics.overdue, icon: AlertTriangle, color: '#EF4444', bg: 'from-red-500/20 to-red-600/5' },
+    { label: 'Documents', val: docs.length, icon: FileText, color: '#8B5CF6', bg: 'from-purple-500/20 to-purple-600/5' },
+    { label: 'Team', val: members.length, icon: Users, color: '#D4A843', bg: 'from-[#D4A843]/20 to-[#D4A843]/5' },
   ];
 
+  const priorityColors: Record<string, string> = { urgent: '#EF4444', high: '#F59E0B', medium: '#3B82F6', low: '#64748B' };
+  const statusIcons: Record<string, any> = { todo: Circle, in_progress: Loader2, in_review: Eye, done: CheckCircle2, blocked: AlertTriangle };
+  const statusColors: Record<string, string> = { todo: '#64748B', in_progress: '#3B82F6', in_review: '#A855F7', done: '#22C55E', blocked: '#EF4444' };
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="p-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-8 anim-slide">
-        <h1 className="text-3xl font-bold text-white mb-1">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-1">
           Welcome back{me?.displayName ? `, ${me.displayName.split(' ')[0]}` : ''}
         </h1>
-        <p className="text-gray-500 text-sm">Here&apos;s what&apos;s happening in your workspace today.</p>
+        <p className="text-[var(--text-muted)] text-sm">
+          Here&apos;s what&apos;s happening in your workspace today.
+          {canSeeAllTeams && <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 font-semibold">ALL TEAMS VIEW</span>}
+        </p>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">{[1,2,3,4,5].map(i=><div key={i} className="h-28 skeleton" />)}</div>
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">{[1,2,3,4,5,6].map(i => <div key={i} className="h-28 skeleton rounded-2xl" />)}</div>
       ) : (
         <>
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
             {stats.map((s, i) => (
-              <div key={s.label} className={`relative rounded-2xl border border-[#1F2937]/60 bg-[#111827] p-5 card-hover overflow-hidden anim-slide`} style={{ animationDelay: `${i * 60}ms` }}>
-                <div className={`absolute inset-0 bg-gradient-to-br ${s.color} opacity-40`} />
+              <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.3 }}
+                whileHover={{ y: -2, transition: { duration: 0.15 } }}
+                className="relative rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5 overflow-hidden cursor-default">
+                <div className={`absolute inset-0 bg-gradient-to-br ${s.bg} opacity-40`} />
                 <div className="relative">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center mb-3 ${s.glow} shadow-lg`}>
-                    <s.icon className={`h-5 w-5 ${s.iconColor}`} />
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: `${s.color}15`, boxShadow: `0 4px 12px ${s.color}15` }}>
+                    <s.icon className="h-5 w-5" style={{ color: s.color }} />
                   </div>
-                  <p className="text-3xl font-bold text-white">{s.val}</p>
-                  <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+                  <p className="text-3xl font-bold text-[var(--text-primary)]">{s.val}</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">{s.label}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
 
           {/* Completion bar */}
-          <div className="rounded-2xl border border-[#1F2937]/60 bg-[#111827] p-5 mb-8 anim-slide" style={{ animationDelay: '300ms' }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
+            className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5 mb-8">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold text-white">Completion Rate</p>
-              <p className="text-sm font-bold text-[#D4A843]">{rate}%</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Completion Rate</p>
+              <p className="text-sm font-bold text-[#D4A843]">{metrics.rate}%</p>
             </div>
-            <div className="h-2 rounded-full bg-[#1F2937] overflow-hidden">
-              <div className="h-full rounded-full bg-gradient-to-r from-[#D4A843] to-[#E8C85A] transition-all duration-1000 shadow-[0_0_12px_rgba(212,168,67,0.4)]" style={{ width: `${rate}%` }} />
+            <div className="h-2.5 rounded-full bg-[var(--bg-base)] overflow-hidden">
+              <motion.div initial={{ width: 0 }} animate={{ width: `${metrics.rate}%` }} transition={{ duration: 1, ease: 'easeOut' }}
+                className="h-full rounded-full bg-gradient-to-r from-[#D4A843] to-[#E8C85A] shadow-[0_0_12px_rgba(212,168,67,0.4)]" />
             </div>
-          </div>
+            <div className="flex items-center gap-6 mt-3 text-[11px]">
+              <span className="flex items-center gap-1.5 text-emerald-400"><CheckCircle2 className="h-3 w-3" /> {metrics.done} done</span>
+              <span className="flex items-center gap-1.5 text-blue-400"><Loader2 className="h-3 w-3" /> {metrics.inProgress} in progress</span>
+              <span className="flex items-center gap-1.5 text-purple-400"><Eye className="h-3 w-3" /> {metrics.inReview} in review</span>
+              <span className="flex items-center gap-1.5 text-red-400"><AlertTriangle className="h-3 w-3" /> {metrics.overdue} overdue</span>
+            </div>
+          </motion.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Recent Tasks */}
-            <div className="rounded-2xl border border-[#1F2937]/60 bg-[#111827] overflow-hidden anim-slide" style={{ animationDelay: '400ms' }}>
-              <div className="p-5 border-b border-[#1F2937]/60 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-white flex items-center gap-2"><CheckSquare className="h-4 w-4 text-[#D4A843]" /> Recent Tasks</h2>
-                <span className="text-xs text-gray-600">{tasks.length} total</span>
-              </div>
-              <div className="divide-y divide-[#1F2937]/40 max-h-[340px] overflow-y-auto">
-                {tasks.length === 0 ? <p className="p-6 text-sm text-gray-600 text-center">No tasks yet. Go create some!</p> : tasks.slice(0, 8).map(t => (
-                  <div key={t.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-white/[0.01] transition">
-                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${t.status==='done'?'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]':t.status==='in_progress'?'bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.5)]':'bg-gray-600'}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm ${t.status==='done'?'text-gray-600 line-through':'text-gray-200'}`}>{t.title}</p>
+          {/* Department performance */}
+          {canSeeAllTeams && metrics.byDept.length > 0 && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
+              className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6 mb-8">
+              <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4"><BarChart3 className="h-4 w-4 text-[#D4A843]" /> Department Performance</h2>
+              <div className="space-y-3">
+                {metrics.byDept.map((dp, di) => (
+                  <motion.div key={dp.team.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.45 + di * 0.05 }}
+                    className="flex items-center gap-4">
+                    <div className="w-28 flex items-center gap-2 shrink-0">
+                      <span className="text-sm">{dp.team.icon}</span>
+                      <span className="text-xs font-medium truncate" style={{ color: dp.team.color }}>{dp.team.name}</span>
                     </div>
-                    <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium ${
-                      t.priority==='urgent'?'bg-red-500/10 text-red-400 border border-red-500/20':
-                      t.priority==='high'?'bg-amber-500/10 text-amber-400 border border-amber-500/20':
-                      t.priority==='medium'?'bg-blue-500/10 text-blue-400 border border-blue-500/20':
-                      'bg-gray-800 text-gray-500 border border-gray-700'
-                    }`}>{t.priority}</span>
-                  </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-4 rounded-full bg-[var(--bg-base)] overflow-hidden">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${dp.rate}%` }} transition={{ duration: 0.8, delay: 0.5 + di * 0.05 }}
+                            className="h-full rounded-full" style={{ backgroundColor: dp.team.color, opacity: 0.7 }} />
+                        </div>
+                        <span className="text-xs font-bold w-10 text-right" style={{ color: dp.team.color }}>{dp.rate}%</span>
+                      </div>
+                      <div className="flex gap-4 text-[10px] text-[var(--text-muted)] mt-0.5">
+                        <span>{dp.total} tasks</span><span>{dp.done} done</span>
+                      </div>
+                    </div>
+                  </motion.div>
                 ))}
               </div>
-            </div>
+            </motion.div>
+          )}
 
-            {/* Activity */}
-            <div className="rounded-2xl border border-[#1F2937]/60 bg-[#111827] overflow-hidden anim-slide" style={{ animationDelay: '500ms' }}>
-              <div className="p-5 border-b border-[#1F2937]/60">
-                <h2 className="text-sm font-semibold text-white flex items-center gap-2"><Activity className="h-4 w-4 text-[#D4A843]" /> Activity Feed</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* My Tasks */}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+              className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+              <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Target className="h-4 w-4 text-[#D4A843]" /> My Tasks</h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">{metrics.myPending.length} pending</span>
+                  {metrics.myOverdue.length > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">{metrics.myOverdue.length} overdue</span>}
+                </div>
               </div>
-              <div className="divide-y divide-[#1F2937]/40 max-h-[340px] overflow-y-auto">
-                {logs.length === 0 ? <p className="p-6 text-sm text-gray-600 text-center">Actions will appear here.</p> : logs.slice(0, 10).map(l => (
-                  <div key={l.id} className="px-5 py-3.5 hover:bg-white/[0.01] transition">
-                    <p className="text-sm"><span className="text-[#D4A843] font-medium">{l.actorName || l.actorId?.slice(0,8)}</span> <span className="text-gray-500">{l.action}</span> <span className="text-gray-300">{l.resource}</span></p>
-                    {l.detail && <p className="text-[11px] text-gray-600 mt-0.5">{l.detail}</p>}
+              <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto scrollbar-thin">
+                {metrics.myPending.length === 0 ? (
+                  <p className="p-6 text-sm text-[var(--text-muted)] text-center">All caught up! No pending tasks.</p>
+                ) : metrics.myPending.slice(0, 8).map((t: any) => {
+                  const StIcon = statusIcons[t.status] || Circle;
+                  const sColor = statusColors[t.status] || '#64748B';
+                  const team = teams.find(tm => tm.id === t.teamId);
+                  return (
+                    <div key={t.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--hover-bg)] transition cursor-pointer" onClick={() => router.push('/app/tasks')}>
+                      <StIcon className="h-4 w-4 shrink-0" style={{ color: sColor }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-[var(--text-primary)] truncate">{t.title}</p>
+                        {team && <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: `${team.color}10`, color: team.color }}>{team.icon} {team.name}</span>}
+                      </div>
+                      <span className="text-[10px] px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: `${priorityColors[t.priority] || '#64748B'}15`, color: priorityColors[t.priority] || '#64748B', border: `1px solid ${priorityColors[t.priority] || '#64748B'}25` }}>{t.priority}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {metrics.myPending.length > 8 && (
+                <div className="p-3 border-t border-[var(--border)] text-center">
+                  <button onClick={() => router.push('/app/tasks')} className="text-xs text-[#D4A843] hover:underline flex items-center gap-1 mx-auto">View all <ArrowRight className="h-3 w-3" /></button>
+                </div>
+              )}
+            </motion.div>
+
+            {/* Upcoming Deadlines */}
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
+              className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+              <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Calendar className="h-4 w-4 text-[#D4A843]" /> Upcoming Deadlines</h2>
+                <span className="text-[10px] text-[var(--text-muted)]">Next 7 days</span>
+              </div>
+              <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto scrollbar-thin">
+                {metrics.upcoming.length === 0 ? (
+                  <p className="p-6 text-sm text-[var(--text-muted)] text-center">No upcoming deadlines this week.</p>
+                ) : metrics.upcoming.slice(0, 8).map((t: any) => {
+                  const due = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate);
+                  const daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
+                  const team = teams.find(tm => tm.id === t.teamId);
+                  return (
+                    <div key={t.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--hover-bg)] transition">
+                      <Calendar className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-[var(--text-primary)] truncate">{t.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {team && <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: `${team.color}10`, color: team.color }}>{team.icon}</span>}
+                          <span className="text-[10px] text-[var(--text-muted)]">{due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                        </div>
+                      </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${daysLeft <= 1 ? 'bg-red-500/10 text-red-400 border border-red-500/20' : daysLeft <= 3 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-[var(--bg-base)] text-[var(--text-muted)] border border-[var(--border)]'}`}>
+                        {daysLeft === 0 ? 'Today' : daysLeft === 1 ? 'Tomorrow' : `${daysLeft}d left`}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Priority Breakdown */}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
+              className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6">
+              <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4"><Flag className="h-4 w-4 text-[#D4A843]" /> Open Tasks by Priority</h2>
+              <div className="space-y-3">
+                {['urgent', 'high', 'medium', 'low'].map(p => {
+                  const count = metrics.byPriority[p] || 0;
+                  const openTotal = Object.values(metrics.byPriority).reduce((s: number, v) => s + (v as number), 0);
+                  const pct = openTotal > 0 ? Math.round((count / openTotal) * 100) : 0;
+                  return (
+                    <div key={p} className="flex items-center gap-3">
+                      <span className="text-xs text-[var(--text-secondary)] w-16 capitalize">{p}</span>
+                      <div className="flex-1 h-3.5 rounded-full bg-[var(--bg-base)] overflow-hidden">
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.7, delay: 0.65 }}
+                          className="h-full rounded-full" style={{ backgroundColor: priorityColors[p] }} />
+                      </div>
+                      <span className="text-xs font-bold w-8 text-right text-[var(--text-secondary)]">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+
+            {/* Activity Feed */}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.65 }}
+              className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
+              <div className="p-5 border-b border-[var(--border)]">
+                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Activity className="h-4 w-4 text-[#D4A843]" /> Recent Activity</h2>
+              </div>
+              <div className="divide-y divide-[var(--border)] max-h-[240px] overflow-y-auto scrollbar-thin">
+                {logs.length === 0 ? (
+                  <p className="p-6 text-sm text-[var(--text-muted)] text-center">Actions will appear here.</p>
+                ) : logs.slice(0, 10).map((l: any) => (
+                  <div key={l.id} className="px-5 py-3 hover:bg-[var(--hover-bg)] transition">
+                    <p className="text-sm">
+                      <span className="text-[#D4A843] font-medium">{l.actorName || 'System'}</span>{' '}
+                      <span className="text-[var(--text-muted)]">{l.action}</span>{' '}
+                      <span className="text-[var(--text-secondary)]">{l.resource}</span>
+                    </p>
+                    {l.detail && <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{l.detail}</p>}
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           </div>
+
+          {/* Quick Actions */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
+            className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: 'New Task', icon: CheckSquare, color: '#3B82F6', href: '/app/tasks' },
+              { label: 'New Document', icon: FileText, color: '#8B5CF6', href: '/app/docs' },
+              { label: 'Open Chat', icon: MessageSquare, color: '#22C55E', href: '/app/chat' },
+              { label: 'Ask AI', icon: Bot, color: '#D4A843', href: '/app/ai' },
+            ].map(a => (
+              <motion.button key={a.label} whileHover={{ y: -2, transition: { duration: 0.15 } }} whileTap={{ scale: 0.98 }}
+                onClick={() => router.push(a.href)}
+                className="flex items-center gap-3 p-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] transition group">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${a.color}15` }}>
+                  <a.icon className="h-5 w-5" style={{ color: a.color }} />
+                </div>
+                <span className="text-sm font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition">{a.label}</span>
+                <ArrowRight className="h-4 w-4 text-[var(--text-muted)] ml-auto group-hover:text-[var(--text-secondary)] transition" />
+              </motion.button>
+            ))}
+          </motion.div>
         </>
       )}
-    </div>
+    </motion.div>
   );
 }

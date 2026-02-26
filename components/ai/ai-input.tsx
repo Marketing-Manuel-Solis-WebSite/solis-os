@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { Send, MessageSquare, Globe, FileSearch, Paperclip, Zap } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Send, MessageSquare, Globe, FileSearch, Zap } from 'lucide-react';
 import type { AIMode } from '@/lib/ai-db';
 
 const MODE_CONFIG: Record<AIMode, { label: string; icon: any; color: string; placeholder: string }> = {
@@ -25,18 +26,13 @@ export default function AIInput({ mode, loading, onSend, onModeChange }: Props) 
     if (!text.trim() || loading) return;
     onSend(text.trim());
     setText('');
-    // Reset textarea height
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
   };
 
-  // Auto-resize textarea
   const handleInput = () => {
     const el = textareaRef.current;
     if (!el) return;
@@ -44,105 +40,74 @@ export default function AIInput({ mode, loading, onSend, onModeChange }: Props) 
     el.style.height = Math.min(el.scrollHeight, 200) + 'px';
   };
 
-  useEffect(() => {
-    textareaRef.current?.focus();
-  }, [mode]);
+  useEffect(() => { textareaRef.current?.focus(); }, [mode]);
 
-  // Quick suggestions per mode
   const QUICK: Record<AIMode, string[]> = {
-    chat: [
-      'Redacta un correo para cliente',
-      'Lista de documentos para visa H-1B',
-      'Mejora este texto profesionalmente',
-    ],
-    research: [
-      'Cambios recientes en política migratoria',
-      'Estrategias de marketing para bufete legal',
-      'Comparar tipos de visa de trabajo',
-    ],
-    deep: [
-      'Reporte completo: Proceso de asilo',
-      'Análisis de mercado para firma de inmigración',
-      'Guía operativa para departamento de closers',
-    ],
+    chat: ['Redacta un correo para cliente', 'Lista de documentos para visa H-1B', 'Mejora este texto profesionalmente'],
+    research: ['Cambios recientes en política migratoria', 'Estrategias de marketing para bufete legal', 'Comparar tipos de visa de trabajo'],
+    deep: ['Reporte completo: Proceso de asilo', 'Análisis de mercado para firma de inmigración', 'Guía operativa para departamento de closers'],
   };
 
   return (
-    <div className="border-t border-[#1F2937]/60 bg-[#0C1017] shrink-0">
-      {/* Quick suggestions (when empty) */}
+    <div className="border-t border-[var(--border)] bg-[var(--bg-card)]/50 backdrop-blur-sm shrink-0">
       {!text && !loading && (
-        <div className="flex gap-1.5 px-5 pt-3 overflow-x-auto pb-1">
+        <div className="flex gap-1.5 px-5 pt-3 overflow-x-auto pb-1 scrollbar-thin">
           {QUICK[mode].map((q, i) => (
-            <button key={i} onClick={() => { setText(q); textareaRef.current?.focus(); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#1F2937] bg-[#111827] text-[10px] text-gray-500 hover:text-gray-300 hover:border-gray-600 transition whitespace-nowrap shrink-0">
+            <motion.button key={i} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+              onClick={() => { setText(q); textareaRef.current?.focus(); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-base)] text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-[var(--text-muted)] transition whitespace-nowrap shrink-0">
               <Zap className="h-2.5 w-2.5" style={{ color: config.color }} />
               {q}
-            </button>
+            </motion.button>
           ))}
         </div>
       )}
 
       <div className="p-4">
         <div className="flex items-end gap-3">
-          {/* Mode indicator */}
           <div className="flex items-center gap-1 px-2.5 py-2 rounded-xl border shrink-0 h-[46px]"
             style={{ backgroundColor: `${config.color}08`, borderColor: `${config.color}20` }}>
             <config.icon className="h-4 w-4" style={{ color: config.color }} />
             <span className="text-[10px] font-semibold" style={{ color: config.color }}>{config.label}</span>
           </div>
 
-          {/* Textarea */}
           <div className="flex-1 relative">
-            <textarea
-              ref={textareaRef}
-              value={text}
+            <textarea ref={textareaRef} value={text}
               onChange={e => { setText(e.target.value); handleInput(); }}
               onKeyDown={handleKeyDown}
               placeholder={config.placeholder}
-              rows={1}
-              disabled={loading}
-              className="w-full px-4 py-3 rounded-xl bg-[#111827] border text-sm text-gray-200 placeholder:text-gray-700 outline-none resize-none transition disabled:opacity-50"
-              style={{
-                minHeight: '46px',
-                maxHeight: '200px',
-                borderColor: text ? `${config.color}30` : '#1F293760',
-              }}
-              onFocus={e => e.target.style.borderColor = `${config.color}40`}
-              onBlur={e => e.target.style.borderColor = text ? `${config.color}30` : '#1F293760'}
+              rows={1} disabled={loading}
+              className="w-full px-4 py-3 rounded-xl bg-[var(--bg-base)] border text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none resize-none transition disabled:opacity-50 focus:ring-1"
+              style={{ minHeight: '46px', maxHeight: '200px', borderColor: text ? `${config.color}30` : 'var(--border)' }}
+              onFocus={e => { e.target.style.borderColor = `${config.color}40`; e.target.style.boxShadow = `0 0 0 1px ${config.color}10`; }}
+              onBlur={e => { e.target.style.borderColor = text ? `${config.color}30` : 'var(--border)'; e.target.style.boxShadow = 'none'; }}
             />
           </div>
 
-          {/* Send button */}
-          <button onClick={handleSubmit} disabled={!text.trim() || loading}
+          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.95 }}
+            onClick={handleSubmit} disabled={!text.trim() || loading}
             className="h-[46px] px-5 rounded-xl text-sm font-semibold flex items-center gap-2 transition disabled:opacity-30 shrink-0"
-            style={{
-              backgroundColor: `${config.color}15`,
-              color: config.color,
-              border: `1px solid ${config.color}25`,
-            }}>
+            style={{ backgroundColor: `${config.color}15`, color: config.color, border: `1px solid ${config.color}25` }}>
             <Send className="h-4 w-4" />
             {mode === 'deep' ? 'Generate' : 'Send'}
-          </button>
+          </motion.button>
         </div>
 
-        {/* Footer hints */}
         <div className="flex items-center justify-between mt-2 px-1">
-          <div className="flex items-center gap-3">
-            <span className="text-[9px] text-gray-700">Enter to send · Shift+Enter for new line</span>
-          </div>
+          <span className="text-[9px] text-[var(--text-muted)]">Enter to send · Shift+Enter for new line</span>
           <div className="flex items-center gap-2">
-            {text.length > 0 && <span className="text-[9px] text-gray-700">{text.length} chars</span>}
-            {/* Mode quick switch */}
+            {text.length > 0 && <span className="text-[9px] text-[var(--text-muted)]">{text.length} chars</span>}
             <div className="flex gap-0.5">
               {(['chat', 'research', 'deep'] as AIMode[]).map(m => {
                 const mc = MODE_CONFIG[m];
                 return (
-                  <button key={m} onClick={() => onModeChange(m)}
+                  <motion.button key={m} whileTap={{ scale: 0.85 }}
+                    onClick={() => onModeChange(m)}
                     className={`w-5 h-5 rounded flex items-center justify-center transition ${mode === m ? '' : 'opacity-30 hover:opacity-60'}`}
                     style={mode === m ? { backgroundColor: `${mc.color}15` } : {}}
                     title={mc.label}>
                     <mc.icon className="h-2.5 w-2.5" style={{ color: mc.color }} />
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>

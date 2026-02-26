@@ -1,95 +1,271 @@
 'use client';
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, getDocs, collection, limit, query, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
-export type Role = 'owner'|'admin'|'manager'|'member'|'guest';
+// ============================================
+// TYPES
+// ============================================
+export type Role = 'owner' | 'admin' | 'manager' | 'member' | 'guest' | 'readonly';
 
-export interface Team { id: string; name: string; color: string; icon: string; description: string; }
-
-export interface Member {
-  userId: string; orgId: string; role: Role;
-  teamId: string;       // Primary team/department
-  teamIds: string[];     // All teams (owner/admin get all)
-  displayName: string; email: string; title: string;
-  department: string; managerId: string; photoURL: string; active: boolean;
+export interface Team {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
+  description: string;
 }
 
+export interface Member {
+  userId: string;
+  orgId: string;
+  role: Role;
+  teamId: string;
+  teamIds: string[];
+  displayName: string;
+  email: string;
+  title: string;
+  department: string;
+  managerId: string;
+  hierarchyLevel: string;
+  photoURL: string;
+  active: boolean;
+}
+
+export type ResourceType =
+  | 'workspace' | 'task' | 'doc' | 'channel'
+  | 'automation' | 'analytics' | 'admin' | 'user' | 'org';
+
+export type PermAction = 'create' | 'read' | 'update' | 'delete' | 'manage';
+
+// ============================================
+// DEFAULT PERMISSIONS MATRIX
+// ============================================
+const DEFAULT_PERMS: Record<Role, Record<ResourceType, Record<PermAction, boolean>>> = {
+  owner: Object.fromEntries(
+    (['workspace', 'task', 'doc', 'channel', 'automation', 'analytics', 'admin', 'user', 'org'] as ResourceType[]).map(r => [r, { create: true, read: true, update: true, delete: true, manage: true }])
+  ) as any,
+  admin: Object.fromEntries(
+    (['workspace', 'task', 'doc', 'channel', 'automation', 'analytics', 'admin', 'user', 'org'] as ResourceType[]).map(r => [r, { create: true, read: true, update: true, delete: true, manage: true }])
+  ) as any,
+  manager: {
+    workspace: { create: true, read: true, update: true, delete: false, manage: false },
+    task: { create: true, read: true, update: true, delete: true, manage: true },
+    doc: { create: true, read: true, update: true, delete: true, manage: true },
+    channel: { create: true, read: true, update: true, delete: false, manage: true },
+    automation: { create: true, read: true, update: true, delete: true, manage: false },
+    analytics: { create: false, read: true, update: false, delete: false, manage: false },
+    admin: { create: false, read: false, update: false, delete: false, manage: false },
+    user: { create: false, read: true, update: false, delete: false, manage: false },
+    org: { create: false, read: true, update: false, delete: false, manage: false },
+  },
+  member: {
+    workspace: { create: false, read: true, update: false, delete: false, manage: false },
+    task: { create: true, read: true, update: true, delete: false, manage: false },
+    doc: { create: true, read: true, update: true, delete: false, manage: false },
+    channel: { create: true, read: true, update: false, delete: false, manage: false },
+    automation: { create: false, read: true, update: false, delete: false, manage: false },
+    analytics: { create: false, read: true, update: false, delete: false, manage: false },
+    admin: { create: false, read: false, update: false, delete: false, manage: false },
+    user: { create: false, read: true, update: false, delete: false, manage: false },
+    org: { create: false, read: true, update: false, delete: false, manage: false },
+  },
+  guest: {
+    workspace: { create: false, read: true, update: false, delete: false, manage: false },
+    task: { create: true, read: true, update: false, delete: false, manage: false },
+    doc: { create: false, read: true, update: false, delete: false, manage: false },
+    channel: { create: false, read: true, update: false, delete: false, manage: false },
+    automation: { create: false, read: false, update: false, delete: false, manage: false },
+    analytics: { create: false, read: false, update: false, delete: false, manage: false },
+    admin: { create: false, read: false, update: false, delete: false, manage: false },
+    user: { create: false, read: true, update: false, delete: false, manage: false },
+    org: { create: false, read: false, update: false, delete: false, manage: false },
+  },
+  readonly: {
+    workspace: { create: false, read: true, update: false, delete: false, manage: false },
+    task: { create: false, read: true, update: false, delete: false, manage: false },
+    doc: { create: false, read: true, update: false, delete: false, manage: false },
+    channel: { create: false, read: true, update: false, delete: false, manage: false },
+    automation: { create: false, read: false, update: false, delete: false, manage: false },
+    analytics: { create: false, read: true, update: false, delete: false, manage: false },
+    admin: { create: false, read: false, update: false, delete: false, manage: false },
+    user: { create: false, read: true, update: false, delete: false, manage: false },
+    org: { create: false, read: false, update: false, delete: false, manage: false },
+  },
+};
+
+// ============================================
+// CONTEXT
+// ============================================
 interface Ctx {
-  user: User|null; me: Member|null; loading: boolean; isAdmin: boolean;
+  user: User | null;
+  me: Member | null;
+  loading: boolean;
+  isAdmin: boolean;
+  isManager: boolean;
+  isDirector: boolean;
   teams: Team[];
+  allMembers: Member[];
   activeTeamId: string;
   setActiveTeamId: (id: string) => void;
   canSeeAllTeams: boolean;
   teamMembers: Member[];
   refreshTeams: () => Promise<void>;
   refreshMembers: () => Promise<void>;
+  can: (resource: ResourceType, action: PermAction) => boolean;
+  canSeeResource: (resource: { teamId?: string; createdBy?: string; visibility?: string; assignees?: string[] }) => boolean;
+  getMemberById: (id: string) => Member | undefined;
+  getMembersByTeam: (teamId: string) => Member[];
 }
 
 const AuthCtx = createContext<Ctx>({
-  user:null, me:null, loading:true, isAdmin:false,
-  teams:[], activeTeamId:'', setActiveTeamId:()=>{}, canSeeAllTeams:false, teamMembers:[],
-  refreshTeams: async()=>{}, refreshMembers: async()=>{},
+  user: null, me: null, loading: true, isAdmin: false, isManager: false, isDirector: false,
+  teams: [], allMembers: [], activeTeamId: '', setActiveTeamId: () => {}, canSeeAllTeams: false,
+  teamMembers: [], refreshTeams: async () => {}, refreshMembers: async () => {},
+  can: () => false, canSeeResource: () => false, getMemberById: () => undefined, getMembersByTeam: () => [],
 });
 
 // Default departments for the law office
-const DEFAULT_TEAMS: Omit<Team,'id'>[] = [
-  { name:'Marketing', color:'#8B5CF6', icon:'📣', description:'Marketing & social media campaigns' },
-  { name:'Openers', color:'#3B82F6', icon:'🚀', description:'Lead intake & case openers' },
-  { name:'Closers', color:'#22C55E', icon:'🎯', description:'Case closers & client conversion' },
-  { name:'Dirección', color:'#D4A843', icon:'👔', description:'Management & executive team' },
+const DEFAULT_TEAMS: Omit<Team, 'id'>[] = [
+  { name: 'Marketing', color: '#8B5CF6', icon: '📣', description: 'Marketing & social media campaigns' },
+  { name: 'Openers', color: '#3B82F6', icon: '🚀', description: 'Lead intake & case openers' },
+  { name: 'Closers', color: '#22C55E', icon: '🎯', description: 'Case closers & client conversion' },
+  { name: 'Dirección', color: '#D4A843', icon: '👔', description: 'Management & executive team' },
 ];
 
 const ORG_ID = 'solis-center';
 
+// ============================================
+// PROVIDER
+// ============================================
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<Omit<Ctx,'setActiveTeamId'|'refreshTeams'|'refreshMembers'>>({
-    user:null, me:null, loading:true, isAdmin:false,
-    teams:[], activeTeamId:'', canSeeAllTeams:false, teamMembers:[],
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [me, setMe] = useState<Member | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [allMembers, setAllMembers] = useState<Member[]>([]);
+  const [activeTeamId, setActiveTeamIdRaw] = useState('');
+  const [permMatrix, setPermMatrix] = useState<any>(null);
 
-  const setActiveTeamId = useCallback((id: string) => {
-    setState(prev => ({
-      ...prev, activeTeamId: id,
-      teamMembers: id === '__all__'
-        ? allMembers
-        : allMembers.filter(m => m.teamId === id || m.teamIds?.includes(id)),
-    }));
+  // Derived state
+  const isAdmin = me?.role === 'owner' || me?.role === 'admin';
+  const isManager = isAdmin || me?.role === 'manager';
+  const isDirector = isAdmin || me?.hierarchyLevel === 'director';
+  const canSeeAllTeams = isAdmin || isDirector;
+
+  const teamMembers = useMemo(() => {
+    if (activeTeamId === '__all__') return allMembers;
+    return allMembers.filter(m =>
+      m.teamId === activeTeamId || m.teamIds?.includes(activeTeamId)
+    );
+  }, [allMembers, activeTeamId]);
+
+  // Permission check
+  const can = useCallback((resource: ResourceType, action: PermAction): boolean => {
+    if (!me) return false;
+    const role = me.role;
+
+    // Check custom matrix first
+    if (permMatrix?.[role]?.[resource]?.[action] !== undefined) {
+      return !!permMatrix[role][resource][action];
+    }
+
+    // Fall back to defaults
+    return DEFAULT_PERMS[role]?.[resource]?.[action] ?? false;
+  }, [me, permMatrix]);
+
+  // Visibility check for resources (tasks, docs, etc)
+  const canSeeResource = useCallback((resource: {
+    teamId?: string;
+    createdBy?: string;
+    visibility?: string;
+    assignees?: string[];
+  }): boolean => {
+    if (!me || !user) return false;
+
+    // Admins and directors see everything
+    if (canSeeAllTeams) return true;
+
+    // Created by self
+    if (resource.createdBy === user.uid) return true;
+
+    // Assigned to self
+    if (resource.assignees?.includes(user.uid)) return true;
+
+    // Public visibility
+    if (resource.visibility === 'public') return true;
+
+    // Team visibility — check if in same team
+    if (resource.visibility === 'team' || !resource.visibility) {
+      if (!resource.teamId) return true; // No team = general
+      if (resource.teamId === me.teamId) return true;
+      if (me.teamIds?.includes(resource.teamId)) return true;
+    }
+
+    // Private — only creator and assignees (already checked above)
+    if (resource.visibility === 'private') return false;
+
+    // General (no team restriction) — everyone can see
+    if (!resource.teamId || resource.teamId === '') return true;
+
+    return false;
+  }, [me, user, canSeeAllTeams]);
+
+  const getMemberById = useCallback((id: string) => {
+    return allMembers.find(m => m.userId === id || (m as any).id === id);
   }, [allMembers]);
 
-  // Refresh teams from Firestore (called after admin creates/deletes teams)
+  const getMembersByTeam = useCallback((teamId: string) => {
+    if (teamId === '__all__') return allMembers;
+    return allMembers.filter(m => m.teamId === teamId || m.teamIds?.includes(teamId));
+  }, [allMembers]);
+
+  const setActiveTeamId = useCallback((id: string) => {
+    setActiveTeamIdRaw(id);
+  }, []);
+
+  // Refresh teams from Firestore
   const refreshTeams = useCallback(async () => {
     const teamsCol = collection(db, 'orgs', ORG_ID, 'teams');
     const teamsSnap = await getDocs(teamsCol);
-    const teams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Team));
-    setState(prev => ({ ...prev, teams }));
+    setTeams(teamsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Team)));
   }, []);
 
   // Refresh members from Firestore
   const refreshMembers = useCallback(async () => {
     const membersSnap = await getDocs(collection(db, 'orgs', ORG_ID, 'members'));
-    const allMems = membersSnap.docs.map(d => ({ id: d.id, ...d.data() } as unknown as Member));
-    setAllMembers(allMems);
-    setState(prev => ({
-      ...prev,
-      teamMembers: prev.activeTeamId === '__all__'
-        ? allMems
-        : allMems.filter(m => m.teamId === prev.activeTeamId || m.teamIds?.includes(prev.activeTeamId)),
-    }));
+    setAllMembers(membersSnap.docs.map(d => ({ id: d.id, ...d.data() } as unknown as Member)));
   }, []);
 
+  // Auth state listener
   useEffect(() => {
     return onAuthStateChanged(auth, async (u) => {
       if (!u) {
-        setState({ user:null, me:null, loading:false, isAdmin:false, teams:[], activeTeamId:'', canSeeAllTeams:false, teamMembers:[] });
+        setUser(null);
+        setMe(null);
+        setLoading(false);
+        setTeams([]);
+        setAllMembers([]);
+        setActiveTeamIdRaw('');
         return;
       }
+
+      setUser(u);
+
       try {
+        // Ensure org exists
         const orgRef = doc(db, 'orgs', ORG_ID);
         if (!(await getDoc(orgRef)).exists()) {
-          await setDoc(orgRef, { name:'Law Office of Manuel Solis', slug:ORG_ID, primaryColor:'#D4A843', secondaryColor:'#0C1017', createdBy:u.uid, createdAt:serverTimestamp() });
+          await setDoc(orgRef, {
+            name: 'Law Office of Manuel Solis',
+            slug: ORG_ID,
+            primaryColor: '#D4A843',
+            secondaryColor: '#0C1017',
+            timezone: 'America/Chicago',
+            createdBy: u.uid,
+            createdAt: serverTimestamp(),
+          });
         }
 
         // Ensure teams/departments exist
@@ -102,52 +278,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           teamsSnap = await getDocs(teamsCol);
         }
-        const teams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Team));
+        const loadedTeams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Team));
+        setTeams(loadedTeams);
 
-        // Ensure member
+        // Ensure member exists
         const memRef = doc(db, 'orgs', ORG_ID, 'members', u.uid);
         if (!(await getDoc(memRef)).exists()) {
           const existing = await getDocs(query(collection(db, 'orgs', ORG_ID, 'members'), limit(1)));
           const isFirst = existing.empty;
           const role: Role = isFirst ? 'owner' : 'member';
-          const direccionTeam = teams.find(t => t.name.toLowerCase().includes('direcci')) || teams[0];
-          const firstTeam = direccionTeam?.id || teams[0]?.id || '';
+          const direccionTeam = loadedTeams.find(t => t.name.toLowerCase().includes('direcci')) || loadedTeams[0];
+          const firstTeam = direccionTeam?.id || loadedTeams[0]?.id || '';
 
           await setDoc(memRef, {
             userId: u.uid, orgId: ORG_ID, role,
             teamId: isFirst ? firstTeam : '',
-            teamIds: isFirst ? teams.map(t => t.id) : [],
+            teamIds: isFirst ? loadedTeams.map(t => t.id) : [],
             displayName: u.displayName || u.email?.split('@')[0] || 'User',
-            email: u.email || '', title: isFirst ? 'Managing Partner' : '',
+            email: u.email || '',
+            title: isFirst ? 'Managing Partner' : '',
             department: isFirst ? (direccionTeam?.name || '') : '',
-            managerId: '', photoURL: u.photoURL || '',
-            active: true, joinedAt: serverTimestamp(),
+            managerId: '',
+            hierarchyLevel: isFirst ? 'owner' : 'member',
+            photoURL: u.photoURL || '',
+            active: true,
+            joinedAt: serverTimestamp(),
           });
         }
-        const me = (await getDoc(memRef)).data() as Member;
-        if (!me.teamIds) me.teamIds = me.teamId ? [me.teamId] : [];
+
+        const meData = (await getDoc(memRef)).data() as Member;
+        if (!meData.teamIds) meData.teamIds = meData.teamId ? [meData.teamId] : [];
+        setMe(meData);
 
         // Load all members
         const allMembersSnap = await getDocs(collection(db, 'orgs', ORG_ID, 'members'));
         const allMems = allMembersSnap.docs.map(d => ({ id: d.id, ...d.data() } as unknown as Member));
         setAllMembers(allMems);
 
-        const isAdmin = me.role === 'owner' || me.role === 'admin';
-        const canSeeAllTeams = isAdmin;
-        const activeTeamId = canSeeAllTeams ? '__all__' : (me.teamId || me.teamIds[0] || '');
-        const teamMembers = activeTeamId === '__all__'
-          ? allMems
-          : allMems.filter(m => m.teamId === activeTeamId || m.teamIds?.includes(activeTeamId));
+        // Load permissions matrix
+        try {
+          const permDoc = await getDoc(doc(db, 'orgs', ORG_ID, 'settings', 'permissions'));
+          if (permDoc.exists() && permDoc.data()?.matrix) {
+            setPermMatrix(permDoc.data().matrix);
+          }
+        } catch { /* Use defaults */ }
 
-        setState({ user: u, me, loading: false, isAdmin, teams, activeTeamId, canSeeAllTeams, teamMembers });
+        // Set active team
+        const userIsAdmin = meData.role === 'owner' || meData.role === 'admin';
+        const userIsDirector = userIsAdmin || meData.hierarchyLevel === 'director';
+        const userCanSeeAll = userIsAdmin || userIsDirector;
+        setActiveTeamIdRaw(userCanSeeAll ? '__all__' : (meData.teamId || meData.teamIds?.[0] || ''));
+
+        setLoading(false);
       } catch (e) {
         console.error('Auth bootstrap:', e);
-        setState({ user: u, me: null, loading: false, isAdmin: false, teams: [], activeTeamId: '', canSeeAllTeams: false, teamMembers: [] });
+        setMe(null);
+        setLoading(false);
       }
     });
   }, []);
 
-  return <AuthCtx.Provider value={{ ...state, setActiveTeamId, refreshTeams, refreshMembers }}>{children}</AuthCtx.Provider>;
+  const value = useMemo(() => ({
+    user, me, loading, isAdmin, isManager, isDirector,
+    teams, allMembers, activeTeamId, setActiveTeamId,
+    canSeeAllTeams, teamMembers,
+    refreshTeams, refreshMembers,
+    can, canSeeResource, getMemberById, getMembersByTeam,
+  }), [
+    user, me, loading, isAdmin, isManager, isDirector,
+    teams, allMembers, activeTeamId, setActiveTeamId,
+    canSeeAllTeams, teamMembers,
+    refreshTeams, refreshMembers,
+    can, canSeeResource, getMemberById, getMembersByTeam,
+  ]);
+
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
 
 export const useAuth = () => useContext(AuthCtx);

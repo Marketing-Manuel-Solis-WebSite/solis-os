@@ -2,7 +2,7 @@
 import { useAuth } from '@/lib/auth';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
-  getAllUserChannels, createChannel, updateChannel, deleteChannel, archiveChannel,
+  getAllUserChannels, getChannels, createChannel, updateChannel, deleteChannel, archiveChannel,
   getMessages, sendMessage, editMessage, deleteMessage as deleteMsg,
   pinMessage, unpinMessage, addReaction, removeReaction,
   addChannelMember, removeChannelMember, addChannelAdmin, removeChannelAdmin,
@@ -19,7 +19,7 @@ import PinnedDrawer from '@/components/chat/pinned-drawer';
 import { MessageSquare } from 'lucide-react';
 
 export default function ChatPage() {
-  const { user, me, isAdmin, activeTeamId, teams } = useAuth();
+  const { user, me, isAdmin, activeTeamId, teams, can, canSeeAllTeams } = useAuth();
   const [channels, setChannels] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [active, setActive] = useState<any>(null);
@@ -38,7 +38,10 @@ export default function ChatPage() {
   const loadChannels = useCallback(async () => {
     if (!user) return;
     const [chs, mems] = await Promise.all([
-      getAllUserChannels(user.uid),
+      // Admins/directors see ALL channels; others see only their channels
+      canSeeAllTeams
+        ? getChannels('__all__').catch(() => [])
+        : getAllUserChannels(user.uid),
       getMembers(),
     ]);
     setMembers(mems);
@@ -50,7 +53,7 @@ export default function ChatPage() {
     });
     setChannels(sorted);
     setLoading(false);
-  }, [user]);
+  }, [user, canSeeAllTeams]);
 
   useEffect(() => { loadChannels(); }, [loadChannels]);
 
@@ -75,7 +78,7 @@ export default function ChatPage() {
 
   const canManageChannel = (ch: any) => {
     if (!ch || !user) return false;
-    if (isAdmin) return true;
+    if (can('channel', 'manage')) return true;
     if (ch.createdBy === user.uid) return true;
     if (ch.admins?.includes(user.uid)) return true;
     return false;
@@ -249,6 +252,7 @@ export default function ChatPage() {
               onShowSettings={() => setShowSettings(true)}
               onShowMembers={() => setShowMembers(true)}
               onShowPinned={() => setShowPinned(true)}
+              onAddMember={handleAddMember}
             />
             <MessageList
               messages={msgs}
@@ -276,9 +280,11 @@ export default function ChatPage() {
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <MessageSquare className="h-14 w-14 text-gray-800 mx-auto mb-4" />
-              <p className="text-lg font-semibold text-gray-600">Select a channel</p>
-              <p className="text-sm text-gray-700 mt-1">or create a new one to start chatting</p>
+              <div className="w-16 h-16 rounded-2xl bg-[#D4A843]/10 border border-[#D4A843]/20 flex items-center justify-center mx-auto mb-4">
+                <MessageSquare className="h-7 w-7 text-[#D4A843]/60" />
+              </div>
+              <p className="text-lg font-semibold text-[var(--text-secondary)]">Select a channel</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">or create a new one to start chatting</p>
             </div>
           </div>
         )}

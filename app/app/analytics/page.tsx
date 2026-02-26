@@ -22,9 +22,9 @@ export interface PlatformData {
 }
 
 export default function AnalyticsPage() {
-  const { user, me, isAdmin, teams } = useAuth();
+  const { user, me, isAdmin, teams, can, canSeeAllTeams } = useAuth();
   const [data, setData] = useState<PlatformData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); 
   const [view, setView] = useState<'dashboard' | 'ai'>('dashboard');
   const [refreshing, setRefreshing] = useState(false);
 

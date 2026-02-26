@@ -34,7 +34,7 @@ interface Doc {
 
 // ========== MAIN PAGE ==========
 export default function DocsPage() {
-  const { user, me, isAdmin, activeTeamId, teams } = useAuth();
+  const { user, me, isAdmin, activeTeamId, teams, can, canSeeResource, canSeeAllTeams } = useAuth();
 
   // State
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -59,15 +59,14 @@ export default function DocsPage() {
       ]);
       setMembers(rawMembers);
 
-      // Role-based filtering
+      // Role-based filtering using canSeeResource
       let filtered = rawDocs as Doc[];
-      if (!isAdmin) {
-        filtered = filtered.filter((d: Doc) => {
-          if (d.createdBy === user?.uid) return true;
-          if (d.visibility === 'public') return true;
-          if (d.visibility === 'team' && d.teamId === activeTeamId) return true;
-          return false;
-        });
+      if (!canSeeAllTeams) {
+        filtered = filtered.filter((d: Doc) => canSeeResource({
+          teamId: d.teamId,
+          createdBy: d.createdBy,
+          visibility: d.visibility,
+        }));
       }
 
       setDocs(filtered);
@@ -75,7 +74,7 @@ export default function DocsPage() {
       console.error('Load docs error:', err);
     }
     setLoading(false);
-  }, [activeTeamId, isAdmin, user?.uid]);
+  }, [activeTeamId, canSeeAllTeams, canSeeResource, user?.uid]);
 
   useEffect(() => {
     setLoading(true);
@@ -199,7 +198,7 @@ export default function DocsPage() {
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-3">
             Documents
-            {isAdmin && (
+            {canSeeAllTeams && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 font-semibold">
                 ALL ACCESS
               </span>
@@ -209,9 +208,11 @@ export default function DocsPage() {
             {visible.length} document{visible.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-5 h-10 rounded-xl btn-gold text-sm shadow-lg shadow-[#D4A843]/10">
-          <Plus className="h-4 w-4" /> New Document
-        </button>
+        {can('doc', 'create') && (
+          <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-5 h-10 rounded-xl btn-gold text-sm shadow-lg shadow-[#D4A843]/10">
+            <Plus className="h-4 w-4" /> New Document
+          </button>
+        )}
       </div>
 
       {/* Toolbar */}
@@ -221,8 +222,8 @@ export default function DocsPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search documents..." className="input-dark pl-10 h-9 text-sm" />
         </div>
 
-        {/* Department filter — only for admins who see all */}
-        {isAdmin && teams.length > 0 && (
+        {/* Department filter — for admins/directors who see all */}
+        {canSeeAllTeams && teams.length > 0 && (
           <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="select-dark h-9 text-xs">
             <option value="all">All Departments</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
@@ -276,7 +277,7 @@ export default function DocsPage() {
               onClick={() => setActiveDoc(d)}
               onDelete={() => handleDelete(d)}
               onToggleStar={() => handleToggleStar(d)}
-              isOwner={d.createdBy === user?.uid || isAdmin}
+              isOwner={d.createdBy === user?.uid || can('doc', 'delete')}
             />
           ))}
         </div>
@@ -287,7 +288,7 @@ export default function DocsPage() {
               onClick={() => setActiveDoc(d)}
               onDelete={() => handleDelete(d)}
               onToggleStar={() => handleToggleStar(d)}
-              isOwner={d.createdBy === user?.uid || isAdmin}
+              isOwner={d.createdBy === user?.uid || can('doc', 'delete')}
             />
           ))}
         </div>
