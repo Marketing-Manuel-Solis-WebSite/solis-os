@@ -196,7 +196,7 @@ export default function DocsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6 anim-slide">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
             Documents
             {canSeeAllTeams && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 font-semibold">
@@ -204,7 +204,7 @@ export default function DocsPage() {
               </span>
             )}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-[var(--text-muted)] mt-1">
             {visible.length} document{visible.length !== 1 ? 's' : ''}
           </p>
         </div>
@@ -218,7 +218,7 @@ export default function DocsPage() {
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap mb-5 anim-slide" style={{ animationDelay: '60ms' }}>
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search documents..." className="input-dark pl-10 h-9 text-sm" />
         </div>
 
@@ -249,11 +249,11 @@ export default function DocsPage() {
           <option value="title">A → Z</option>
           <option value="wordCount">Word Count</option>
         </select>
-        <div className="flex rounded-xl border border-[#1F2937]/60 overflow-hidden">
-          <button onClick={() => setView('grid')} className={`px-3 py-1.5 text-xs ${view === 'grid' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-gray-600'}`}>
+        <div className="flex rounded-xl border border-[var(--border-subtle)] overflow-hidden">
+          <button onClick={() => setView('grid')} className={`px-3 py-1.5 text-xs ${view === 'grid' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)]'}`}>
             <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1" /><rect x="9" y="1" width="6" height="6" rx="1" /><rect x="1" y="9" width="6" height="6" rx="1" /><rect x="9" y="9" width="6" height="6" rx="1" /></svg>
           </button>
-          <button onClick={() => setView('list')} className={`px-3 py-1.5 text-xs ${view === 'list' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-gray-600'}`}>
+          <button onClick={() => setView('list')} className={`px-3 py-1.5 text-xs ${view === 'list' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)]'}`}>
             <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="2.5" rx="0.5" /><rect x="1" y="6.75" width="14" height="2.5" rx="0.5" /><rect x="1" y="11.5" width="14" height="2.5" rx="0.5" /></svg>
           </button>
         </div>
@@ -266,8 +266,8 @@ export default function DocsPage() {
         </div>
       ) : visible.length === 0 ? (
         <div className="text-center py-20">
-          <FileText className="h-14 w-14 text-gray-700 mx-auto mb-4" />
-          <p className="text-gray-500 text-sm mb-2">No documents found.</p>
+          <FileText className="h-14 w-14 text-[var(--text-muted)] mx-auto mb-4" />
+          <p className="text-[var(--text-muted)] text-sm mb-2">No documents found.</p>
           <button onClick={() => setShowCreate(true)} className="text-sm text-[#D4A843] hover:underline">Create your first document</button>
         </div>
       ) : view === 'grid' ? (
@@ -320,7 +320,7 @@ function DocCard({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }
 
   return (
     <div onClick={onClick}
-      className="group relative rounded-2xl border border-[#1F2937]/60 bg-[#111827] p-5 card-hover cursor-pointer anim-slide overflow-hidden"
+      className="group relative rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 card-hover cursor-pointer anim-slide overflow-hidden"
       style={{ animationDelay: `${index * 40}ms` }}>
       <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: team ? `linear-gradient(90deg, ${team.color}60, transparent)` : 'linear-gradient(90deg, rgba(212,168,67,0.4), transparent)' }} />
       <div className="flex items-start justify-between mb-3">
@@ -329,7 +329,7 @@ function DocCard({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }
             <FileText className="h-4 w-4 text-[#D4A843]" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-white truncate">{doc.title || 'Untitled'}</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{doc.title || 'Untitled'}</p>
             {team && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: `${team.color}15`, color: team.color }}>
                 {team.icon} {team.name}
@@ -339,26 +339,26 @@ function DocCard({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }
         </div>
         <div className="flex items-center gap-1">
           <button onClick={e => { e.stopPropagation(); onToggleStar(); }} className="p-1 rounded-lg hover:bg-white/5 transition">
-            {doc.starred ? <Star className="h-3.5 w-3.5 text-[#D4A843] fill-[#D4A843]" /> : <StarOff className="h-3.5 w-3.5 text-gray-700 opacity-0 group-hover:opacity-100" />}
+            {doc.starred ? <Star className="h-3.5 w-3.5 text-[#D4A843] fill-[#D4A843]" /> : <StarOff className="h-3.5 w-3.5 text-[var(--text-muted)] opacity-0 group-hover:opacity-100" />}
           </button>
           {isOwner && (
-            <button onClick={e => { e.stopPropagation(); onDelete(); }} className="p-1 rounded-lg hover:bg-red-500/10 text-gray-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">
+            <button onClick={e => { e.stopPropagation(); onDelete(); }} className="p-1 rounded-lg hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
       </div>
-      <p className="text-xs text-gray-600 line-clamp-3 mb-4 min-h-[3rem]">{preview || 'Empty document...'}</p>
+      <p className="text-xs text-[var(--text-muted)] line-clamp-3 mb-4 min-h-[3rem]">{preview || 'Empty document...'}</p>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={`flex items-center gap-1 text-[10px] ${visColor}`}>{visIcon}{doc.visibility}</span>
           {doc.tags?.slice(0, 2).map((t: string) => (
-            <span key={t} className="text-[9px] px-1.5 py-0.5 rounded bg-[#1F2937] text-gray-500">{t}</span>
+            <span key={t} className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-muted)]">{t}</span>
           ))}
         </div>
         <div className="flex items-center gap-2">
-          {doc.wordCount > 0 && <span className="text-[10px] text-gray-700">{doc.wordCount}w</span>}
-          {updated && <span className="text-[10px] text-gray-700">{updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+          {doc.wordCount > 0 && <span className="text-[10px] text-[var(--text-muted)]">{doc.wordCount}w</span>}
+          {updated && <span className="text-[10px] text-[var(--text-muted)]">{updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
         </div>
       </div>
     </div>
@@ -377,25 +377,25 @@ function DocListItem({ doc, index, teams, onClick, onDelete, onToggleStar, isOwn
 
   return (
     <div onClick={onClick}
-      className="group flex items-center gap-4 px-5 py-3.5 rounded-2xl border border-[#1F2937]/60 bg-[#111827] card-hover cursor-pointer anim-slide"
+      className="group flex items-center gap-4 px-5 py-3.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] card-hover cursor-pointer anim-slide"
       style={{ animationDelay: `${index * 25}ms` }}>
       <button onClick={e => { e.stopPropagation(); onToggleStar(); }} className="shrink-0">
-        {doc.starred ? <Star className="h-4 w-4 text-[#D4A843] fill-[#D4A843]" /> : <StarOff className="h-4 w-4 text-gray-700 opacity-0 group-hover:opacity-100 transition" />}
+        {doc.starred ? <Star className="h-4 w-4 text-[#D4A843] fill-[#D4A843]" /> : <StarOff className="h-4 w-4 text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition" />}
       </button>
       <div className="w-9 h-9 rounded-xl bg-[#D4A843]/10 border border-[#D4A843]/20 flex items-center justify-center shrink-0">
         <FileText className="h-4 w-4 text-[#D4A843]" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-white truncate">{doc.title || 'Untitled'}</p>
-        <p className="text-[11px] text-gray-600 truncate">{(doc.content || '').replace(/[#*_`>\-\[\]]/g, '').slice(0, 80) || 'Empty'}</p>
+        <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{doc.title || 'Untitled'}</p>
+        <p className="text-[11px] text-[var(--text-muted)] truncate">{(doc.content || '').replace(/[#*_`>\-\[\]]/g, '').slice(0, 80) || 'Empty'}</p>
       </div>
       {team && <span className="text-[10px] px-2 py-0.5 rounded-md font-medium shrink-0" style={{ backgroundColor: `${team.color}15`, color: team.color }}>{team.icon} {team.name}</span>}
       <span className={`flex items-center gap-1 text-[10px] shrink-0 ${visColor}`}>{visIcon}</span>
-      {doc.wordCount > 0 && <span className="text-[10px] text-gray-600 shrink-0">{doc.wordCount}w</span>}
-      {updated && <span className="text-[10px] text-gray-700 shrink-0">{updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
-      <span className="text-[10px] text-gray-700 shrink-0">{doc.createdByName}</span>
+      {doc.wordCount > 0 && <span className="text-[10px] text-[var(--text-muted)] shrink-0">{doc.wordCount}w</span>}
+      {updated && <span className="text-[10px] text-[var(--text-muted)] shrink-0">{updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+      <span className="text-[10px] text-[var(--text-muted)] shrink-0">{doc.createdByName}</span>
       {isOwner && (
-        <button onClick={e => { e.stopPropagation(); onDelete(); }} className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-700 hover:text-red-400 rounded-lg transition shrink-0">
+        <button onClick={e => { e.stopPropagation(); onDelete(); }} className="opacity-0 group-hover:opacity-100 p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition shrink-0">
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
@@ -439,25 +439,25 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="w-full max-w-lg bg-[#0C1017] border border-[#1F2937] rounded-2xl shadow-2xl anim-slide overflow-hidden">
-        <div className="flex items-center justify-between p-5 border-b border-[#1F2937]/60">
-          <h2 className="text-lg font-bold text-white">New Document</h2>
-          <button onClick={onClose} className="p-2 text-gray-600 hover:text-gray-400 rounded-lg"><X className="h-5 w-5" /></button>
+      <div onClick={e => e.stopPropagation()} className="w-full max-w-lg bg-[var(--bg-base)] border border-[var(--border)] rounded-2xl shadow-2xl anim-slide overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border-subtle)]">
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">New Document</h2>
+          <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Title</label>
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Document title..."
-              autoFocus className="w-full h-12 px-4 rounded-xl bg-[#111827] border border-[#1F2937] text-white text-lg font-semibold placeholder:text-gray-600 focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843]/30"
+              autoFocus className="w-full h-12 px-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-primary)] text-lg font-semibold placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843]/30"
               onKeyDown={e => e.key === 'Enter' && submit()} />
           </div>
 
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Template</label>
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Template</label>
             <div className="grid grid-cols-3 gap-2">
               {templates.map(t => (
                 <button key={t.id} onClick={() => setTemplate(t.id)}
-                  className={`text-left px-3 py-2.5 rounded-xl text-xs font-medium transition border ${template === t.id ? 'bg-[#D4A843]/10 text-[#D4A843] border-[#D4A843]/20' : 'bg-[#111827] text-gray-500 border-[#1F2937] hover:border-gray-600'}`}>
+                  className={`text-left px-3 py-2.5 rounded-xl text-xs font-medium transition border ${template === t.id ? 'bg-[#D4A843]/10 text-[#D4A843] border-[#D4A843]/20' : 'bg-[var(--bg-card)] text-[var(--text-muted)] border-[var(--border)] hover:border-gray-600'}`}>
                   {t.label}
                 </button>
               ))}
@@ -466,14 +466,14 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Department</label>
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Department</label>
               <select value={deptId} onChange={e => setDeptId(e.target.value)} className="select-dark w-full">
                 <option value="">No Department</option>
                 {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Visibility</label>
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Visibility</label>
               <select value={visibility} onChange={e => setVisibility(e.target.value as any)} className="select-dark w-full">
                 <option value="team">🏢 Team</option>
                 <option value="private">🔒 Private</option>
@@ -481,18 +481,18 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
               </select>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Category</label>
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Category</label>
               <input value={category} onChange={e => setCategory(e.target.value)} placeholder="Legal, HR..." className="input-dark h-[38px] text-sm" />
             </div>
           </div>
 
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Tags (comma-separated)</label>
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Tags (comma-separated)</label>
             <input value={tags} onChange={e => setTags(e.target.value)} placeholder="immigration, filing, urgent" className="input-dark h-9 text-sm" />
           </div>
         </div>
-        <div className="flex justify-end gap-2 p-5 border-t border-[#1F2937]/60">
-          <button onClick={onClose} className="px-5 h-10 rounded-xl border border-[#1F2937] text-sm text-gray-400">Cancel</button>
+        <div className="flex justify-end gap-2 p-5 border-t border-[var(--border-subtle)]">
+          <button onClick={onClose} className="px-5 h-10 rounded-xl border border-[var(--border)] text-sm text-[var(--text-secondary)]">Cancel</button>
           <button onClick={submit} disabled={!title.trim()} className="px-6 h-10 rounded-xl btn-gold text-sm disabled:opacity-40">Create</button>
         </div>
       </div>

@@ -143,13 +143,13 @@ export default function AutomationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6 anim-slide">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
             Automations
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">
               {activeCount} ACTIVE
             </span>
           </h1>
-          <p className="text-sm text-gray-500 mt-1">{rules.length} rules · {totalRuns} total runs</p>
+          <p className="text-sm text-[var(--text-muted)] mt-1">{rules.length} rules · {totalRuns} total runs</p>
         </div>
         {canManage && (
           <button onClick={() => { setEditingRule(null); setShowBuilder(true); }} className="flex items-center gap-2 px-5 h-10 rounded-xl btn-gold text-sm shadow-lg shadow-[#D4A843]/10">
@@ -166,8 +166,8 @@ export default function AutomationsPage() {
           { label: 'Inactive', val: rules.length - activeCount, color: '#64748B' },
           { label: 'Total Runs', val: totalRuns, color: '#D4A843' },
         ].map(s => (
-          <div key={s.label} className="p-4 rounded-2xl border border-[#1F2937]/60 bg-[#111827]">
-            <p className="text-2xl font-bold text-white">{s.val}</p>
+          <div key={s.label} className="p-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+            <p className="text-2xl font-bold text-[var(--text-primary)]">{s.val}</p>
             <p className="text-[10px] mt-0.5" style={{ color: s.color }}>{s.label}</p>
           </div>
         ))}
@@ -176,7 +176,7 @@ export default function AutomationsPage() {
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap mb-5 anim-slide" style={{ animationDelay: '80ms' }}>
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search automations..." className="input-dark pl-10 h-9 text-sm" />
         </div>
         <select value={filterEnabled} onChange={e => setFilterEnabled(e.target.value as any)} className="select-dark h-9 text-xs">
@@ -191,8 +191,8 @@ export default function AutomationsPage() {
         <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-24 skeleton rounded-2xl" />)}</div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-20">
-          <Zap className="h-12 w-12 text-gray-700 mx-auto mb-3" />
-          <p className="text-gray-600 text-sm mb-2">No automations found.</p>
+          <Zap className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
+          <p className="text-[var(--text-muted)] text-sm mb-2">No automations found.</p>
           {canManage && <button onClick={() => setShowBuilder(true)} className="text-sm text-[#D4A843] hover:underline">Create your first automation</button>}
         </div>
       ) : (
@@ -203,10 +203,10 @@ export default function AutomationsPage() {
             const ruleTeam = teams.find(t => t.id === rule.teamId);
 
             return (
-              <div key={rule.id} className="rounded-2xl border border-[#1F2937]/60 bg-[#111827] overflow-hidden card-hover group anim-slide" style={{ animationDelay: `${i * 40}ms` }}>
+              <div key={rule.id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] overflow-hidden card-hover group anim-slide" style={{ animationDelay: `${i * 40}ms` }}>
                 <div className="flex items-center gap-4 px-5 py-4">
                   {/* Enable/Disable toggle */}
-                  <button onClick={() => toggleEnabled(rule)} className={`w-10 h-6 rounded-full flex items-center transition-colors shrink-0 ${rule.enabled !== false ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-[#1F2937] border border-[#374151]'}`}>
+                  <button onClick={() => toggleEnabled(rule)} className={`w-10 h-6 rounded-full flex items-center transition-colors shrink-0 ${rule.enabled !== false ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-[var(--bg-elevated)] border border-[var(--border)]'}`}>
                     <div className={`w-5 h-5 rounded-full transition-all shadow ${rule.enabled !== false ? 'translate-x-[18px] bg-emerald-400' : 'translate-x-[2px] bg-gray-600'}`} />
                   </button>
 
@@ -218,10 +218,10 @@ export default function AutomationsPage() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className={`text-sm font-semibold ${rule.enabled !== false ? 'text-white' : 'text-gray-500'}`}>{rule.name}</p>
-                      {rule.enabled === false && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-800 text-gray-500 font-semibold">DISABLED</span>}
+                      <p className={`text-sm font-semibold ${rule.enabled !== false ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>{rule.name}</p>
+                      {rule.enabled === false && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] font-semibold">DISABLED</span>}
                     </div>
-                    {rule.description && <p className="text-[11px] text-gray-600 mt-0.5 truncate">{rule.description}</p>}
+                    {rule.description && <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{rule.description}</p>}
 
                     {/* Flow visualization */}
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -231,7 +231,7 @@ export default function AutomationsPage() {
 
                       {(rule.conditions || []).length > 0 && (
                         <>
-                          <ArrowRight className="h-3 w-3 text-gray-700" />
+                          <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
                           <span className="text-[10px] px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
                             {rule.conditions.length} condition{rule.conditions.length !== 1 ? 's' : ''}
                           </span>
@@ -240,7 +240,7 @@ export default function AutomationsPage() {
 
                       {(rule.actions || []).map((action, ai) => (
                         <span key={ai} className="flex items-center gap-1">
-                          <ArrowRight className="h-3 w-3 text-gray-700" />
+                          <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
                           <span className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
                             {ACTIONS.find(a => a.id === action.type)?.label || action.type}
                           </span>
@@ -250,7 +250,7 @@ export default function AutomationsPage() {
                       {/* Legacy support for simple trigger/action strings */}
                       {!(rule.actions || []).length && rule.trigger && (
                         <>
-                          <ArrowRight className="h-3 w-3 text-gray-700" />
+                          <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
                           <span className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
                             {(rule as any).action || 'Action'}
                           </span>
@@ -262,14 +262,14 @@ export default function AutomationsPage() {
                   {/* Meta */}
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {ruleTeam && <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: `${ruleTeam.color}15`, color: ruleTeam.color }}>{ruleTeam.icon} {ruleTeam.name}</span>}
-                    {rule.runCount > 0 && <span className="text-[10px] text-gray-600">{rule.runCount} runs</span>}
-                    {rule.lastRunAt && <span className="text-[10px] text-gray-700">Last: {rule.lastRunAt?.toDate?.()?.toLocaleDateString?.() || '—'}</span>}
+                    {rule.runCount > 0 && <span className="text-[10px] text-[var(--text-muted)]">{rule.runCount} runs</span>}
+                    {rule.lastRunAt && <span className="text-[10px] text-[var(--text-muted)]">Last: {rule.lastRunAt?.toDate?.()?.toLocaleDateString?.() || '—'}</span>}
                   </div>
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
-                    <button onClick={() => handleDuplicate(rule)} className="p-2 text-gray-600 hover:text-blue-400 rounded-lg" title="Duplicate"><Copy className="h-4 w-4" /></button>
-                    <button onClick={() => handleDelete(rule)} className="p-2 text-gray-600 hover:text-red-400 rounded-lg" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={() => handleDuplicate(rule)} className="p-2 text-[var(--text-muted)] hover:text-blue-400 rounded-lg" title="Duplicate"><Copy className="h-4 w-4" /></button>
+                    <button onClick={() => handleDelete(rule)} className="p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg" title="Delete"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </div>
               </div>
@@ -343,24 +343,24 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[#0C1017] border border-[#1F2937] rounded-2xl shadow-2xl anim-slide">
-        <div className="flex items-center justify-between p-5 border-b border-[#1F2937]/60">
+      <div onClick={e => e.stopPropagation()} className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[var(--bg-base)] border border-[var(--border)] rounded-2xl shadow-2xl anim-slide">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border-subtle)]">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center"><Zap className="h-4 w-4 text-amber-400" /></div>
             <div>
-              <h2 className="text-lg font-bold text-white">Automation Builder</h2>
-              <p className="text-[11px] text-gray-600">When → If → Then</p>
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">Automation Builder</h2>
+              <p className="text-[11px] text-[var(--text-muted)]">When → If → Then</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-gray-600 hover:text-gray-400 rounded-lg"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg"><X className="h-5 w-5" /></button>
         </div>
 
         {/* Steps indicator */}
-        <div className="flex items-center gap-2 px-5 py-3 border-b border-[#1F2937]/40">
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--border-subtle)]">
           {['Trigger', 'Conditions', 'Actions', 'Review'].map((s, i) => (
             <button key={s} onClick={() => setStep(i)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${step === i ? 'bg-[#D4A843]/10 text-[#D4A843]' : step > i ? 'text-emerald-400' : 'text-gray-600 hover:text-gray-400'}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === i ? 'bg-[#D4A843] text-[#06080F]' : step > i ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[#1F2937] text-gray-600'}`}>{step > i ? '✓' : i + 1}</span>
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${step === i ? 'bg-[#D4A843]/10 text-[#D4A843]' : step > i ? 'text-emerald-400' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === i ? 'bg-[#D4A843] text-[#06080F]' : step > i ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)]'}`}>{step > i ? '✓' : i + 1}</span>
               {s}
             </button>
           ))}
@@ -370,11 +370,11 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
           {/* Name + Description (always visible) */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Rule Name *</label>
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Rule Name *</label>
               <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g., Auto-assign urgent tasks" autoFocus className="input-dark text-sm" />
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Department</label>
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Department</label>
               <select value={teamId} onChange={e => setTeamId(e.target.value)} className="select-dark w-full">
                 <option value="">All Departments</option>
                 {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
@@ -382,7 +382,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
             </div>
           </div>
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Description</label>
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Description</label>
             <input value={description} onChange={e => setDescription(e.target.value)} placeholder="What does this rule do?" className="input-dark text-sm" />
           </div>
 
@@ -393,12 +393,12 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
               <div className="grid grid-cols-2 gap-2">
                 {TRIGGERS.map(t => (
                   <button key={t.id} onClick={() => setTrigger(t.id)}
-                    className={`flex items-start gap-3 p-4 rounded-xl border text-left transition ${trigger === t.id ? '' : 'bg-[#111827] border-[#1F2937] hover:border-gray-600'}`}
+                    className={`flex items-start gap-3 p-4 rounded-xl border text-left transition ${trigger === t.id ? '' : 'bg-[var(--bg-card)] border-[var(--border)] hover:border-gray-600'}`}
                     style={trigger === t.id ? { backgroundColor: `${t.color}08`, borderColor: `${t.color}30` } : {}}>
                     <t.icon className="h-5 w-5 shrink-0 mt-0.5" style={{ color: t.color }} />
                     <div>
-                      <p className={`text-xs font-semibold ${trigger === t.id ? 'text-white' : 'text-gray-300'}`}>{t.label}</p>
-                      <p className="text-[10px] text-gray-600 mt-0.5">{t.desc}</p>
+                      <p className={`text-xs font-semibold ${trigger === t.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{t.label}</p>
+                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{t.desc}</p>
                     </div>
                   </button>
                 ))}
@@ -416,15 +416,15 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                 </button>
               </div>
               {conditions.length === 0 ? (
-                <div className="text-center py-8 rounded-xl border border-dashed border-[#1F2937] bg-[#111827]/50">
-                  <Filter className="h-8 w-8 text-gray-700 mx-auto mb-2" />
-                  <p className="text-xs text-gray-600">No conditions. Rule will trigger for all matching events.</p>
+                <div className="text-center py-8 rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-card)]/50">
+                  <Filter className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2" />
+                  <p className="text-xs text-[var(--text-muted)]">No conditions. Rule will trigger for all matching events.</p>
                   <button onClick={addCondition} className="text-xs text-amber-400 hover:underline mt-2">Add a filter condition</button>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {conditions.map((cond, ci) => (
-                    <div key={cond.id} className="flex items-center gap-2 p-3 rounded-xl bg-[#111827] border border-[#1F2937]">
+                    <div key={cond.id} className="flex items-center gap-2 p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]">
                       {ci > 0 && <span className="text-[10px] text-amber-400 font-bold px-2">AND</span>}
                       <select value={cond.field} onChange={e => updateCondition(cond.id, 'field', e.target.value)} className="select-dark h-8 text-[11px] flex-1">
                         {CONDITION_FIELDS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
@@ -442,7 +442,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                         }
                         return <input value={cond.value} onChange={e => updateCondition(cond.id, 'value', e.target.value)} placeholder="Value..." className="input-dark h-8 text-[11px] flex-1" />;
                       })()}
-                      <button onClick={() => removeCondition(cond.id)} className="p-1.5 text-gray-600 hover:text-red-400 rounded-lg"><X className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeCondition(cond.id)} className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-lg"><X className="h-3.5 w-3.5" /></button>
                     </div>
                   ))}
                 </div>
@@ -459,18 +459,18 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                   {actions.map((action, ai) => {
                     const actionConf = ACTIONS.find(a => a.id === action.type);
                     return (
-                      <div key={action.id} className="p-3 rounded-xl bg-[#111827] border border-[#1F2937]">
+                      <div key={action.id} className="p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-[10px] font-bold text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10">{ai + 1}</span>
                           {actionConf && <actionConf.icon className="h-4 w-4" style={{ color: actionConf.color }} />}
-                          <span className="text-xs font-semibold text-gray-300">{actionConf?.label || action.type}</span>
+                          <span className="text-xs font-semibold text-[var(--text-secondary)]">{actionConf?.label || action.type}</span>
                           <div className="flex-1" />
-                          <button onClick={() => removeAction(action.id)} className="p-1 text-gray-600 hover:text-red-400 rounded"><X className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => removeAction(action.id)} className="p-1 text-[var(--text-muted)] hover:text-red-400 rounded"><X className="h-3.5 w-3.5" /></button>
                         </div>
                         {/* Config fields */}
                         {actionConf?.configFields?.map(field => (
                           <div key={field.key} className="mt-2">
-                            <label className="block text-[10px] text-gray-600 mb-1">{field.label}</label>
+                            <label className="block text-[10px] text-[var(--text-muted)] mb-1">{field.label}</label>
                             {(field as any).options ? (
                               <select value={action.config[field.key] || ''} onChange={e => updateActionConfig(action.id, field.key, e.target.value)} className="select-dark h-8 text-[11px] w-full">
                                 <option value="">Select...</option>
@@ -489,13 +489,13 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
               <div className="grid grid-cols-2 gap-2">
                 {ACTIONS.map(a => (
                   <button key={a.id} onClick={() => addAction(a.id)}
-                    className="flex items-center gap-2 p-3 rounded-xl border border-[#1F2937] bg-[#111827] hover:border-gray-600 text-left transition">
+                    className="flex items-center gap-2 p-3 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] hover:border-gray-600 text-left transition">
                     <a.icon className="h-4 w-4 shrink-0" style={{ color: a.color }} />
                     <div>
-                      <p className="text-xs font-medium text-gray-300">{a.label}</p>
-                      <p className="text-[10px] text-gray-600">{a.desc}</p>
+                      <p className="text-xs font-medium text-[var(--text-secondary)]">{a.label}</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">{a.desc}</p>
                     </div>
-                    <Plus className="h-3 w-3 text-gray-600 ml-auto shrink-0" />
+                    <Plus className="h-3 w-3 text-[var(--text-muted)] ml-auto shrink-0" />
                   </button>
                 ))}
               </div>
@@ -508,8 +508,8 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
               <label className="block text-[10px] uppercase tracking-wider text-[#D4A843] mb-3 font-semibold">REVIEW</label>
               <div className="rounded-xl border border-[#D4A843]/20 bg-[#D4A843]/[0.02] p-5 space-y-4">
                 <div>
-                  <p className="text-lg font-bold text-white">{name || 'Unnamed Rule'}</p>
-                  {description && <p className="text-xs text-gray-500 mt-1">{description}</p>}
+                  <p className="text-lg font-bold text-[var(--text-primary)]">{name || 'Unnamed Rule'}</p>
+                  {description && <p className="text-xs text-[var(--text-muted)] mt-1">{description}</p>}
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
@@ -533,8 +533,8 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-5 border-t border-[#1F2937]/60">
-          <button onClick={() => step > 0 ? setStep(step - 1) : onClose} className="px-5 h-10 rounded-xl border border-[#1F2937] text-sm text-gray-400">
+        <div className="flex items-center justify-between p-5 border-t border-[var(--border-subtle)]">
+          <button onClick={() => step > 0 ? setStep(step - 1) : onClose} className="px-5 h-10 rounded-xl border border-[var(--border)] text-sm text-[var(--text-secondary)]">
             {step > 0 ? '← Back' : 'Cancel'}
           </button>
           <div className="flex gap-2">

@@ -43,10 +43,10 @@ function TaskGroup({ group, children }: { group: { key: string; label: string; c
   return (
     <div>
       <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2 mb-2 group">
-        {collapsed ? <ChevronRight className="h-4 w-4 text-gray-600" /> : <ChevronDown className="h-4 w-4 text-gray-600" />}
+        {collapsed ? <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" /> : <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />}
         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color, boxShadow: `0 0 8px ${group.color}40` }} />
-        <span className="text-sm font-semibold text-gray-300">{group.label}</span>
-        <span className="text-xs text-gray-600">{group.count}</span>
+        <span className="text-sm font-semibold text-[var(--text-secondary)]">{group.label}</span>
+        <span className="text-xs text-[var(--text-muted)]">{group.count}</span>
       </button>
       {!collapsed && children}
     </div>
@@ -145,12 +145,12 @@ export default function TasksPage() {
         <div className="px-6 pt-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
                 Tasks
                 {activeTeam && <span className="text-sm font-semibold px-2.5 py-1 rounded-lg" style={{ backgroundColor: `${activeTeam.color}15`, color: activeTeam.color, border: `1px solid ${activeTeam.color}25` }}>{activeTeam.icon} {activeTeam.name}</span>}
                 {canSeeAllTeams && activeTeamId === '__all__' && <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 font-semibold">ALL ACCESS</span>}
               </h1>
-              <p className="text-sm text-gray-500 mt-1">{counts.all} tasks · {counts.done || 0} completed</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">{counts.all} tasks · {counts.done || 0} completed</p>
             </div>
             {canCreate && (
               <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-5 h-10 rounded-xl btn-gold text-sm shadow-lg shadow-[#D4A843]/10">
@@ -162,12 +162,12 @@ export default function TasksPage() {
           {/* Toolbar */}
           <div className="flex items-center gap-2 flex-wrap mb-4">
             <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="input-dark pl-10 h-9 text-sm" />
             </div>
-            <div className="flex rounded-xl border border-[#1F2937]/60 overflow-hidden">
-              <button onClick={() => setView('list')} className={`px-3 py-1.5 text-xs ${view === 'list' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-gray-600'}`}><LayoutList className="h-3.5 w-3.5" /></button>
-              <button onClick={() => setView('board')} className={`px-3 py-1.5 text-xs ${view === 'board' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-gray-600'}`}><LayoutGrid className="h-3.5 w-3.5" /></button>
+            <div className="flex rounded-xl border border-[var(--border-subtle)] overflow-hidden">
+              <button onClick={() => setView('list')} className={`px-3 py-1.5 text-xs ${view === 'list' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)]'}`}><LayoutList className="h-3.5 w-3.5" /></button>
+              <button onClick={() => setView('board')} className={`px-3 py-1.5 text-xs ${view === 'board' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)]'}`}><LayoutGrid className="h-3.5 w-3.5" /></button>
             </div>
             <select value={groupBy} onChange={e => setGroupBy(e.target.value)} className="select-dark h-9 text-xs">
               <option value="status">Group: Status</option>
@@ -184,10 +184,10 @@ export default function TasksPage() {
           </div>
 
           {/* Status tabs */}
-          <div className="flex gap-1.5 border-b border-[#1F2937]/40 pb-0">
+          <div className="flex gap-1.5 border-b border-[var(--border-subtle)] pb-0">
             {[{ id: 'all', label: 'All', color: '#94A3B8' }, ...STS].map(s => (
               <button key={s.id} onClick={() => setFilter(s.id)}
-                className={`px-3 py-2 text-xs font-semibold rounded-t-lg border-b-2 transition ${filter === s.id ? 'text-white' : 'text-gray-600 border-transparent hover:text-gray-400'}`}
+                className={`px-3 py-2 text-xs font-semibold rounded-t-lg border-b-2 transition ${filter === s.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'}`}
                 style={filter === s.id ? { color: s.color, borderColor: s.color } : {}}>
                 {s.label} <span className="ml-1 opacity-50">{counts[s.id] || 0}</span>
               </button>
@@ -201,8 +201,8 @@ export default function TasksPage() {
             <div className="space-y-2">{[1, 2, 3, 4, 5].map(i => <div key={i} className="h-14 skeleton rounded-xl" />)}</div>
           ) : vis.length === 0 ? (
             <div className="text-center py-20">
-              <CheckSquare className="h-10 w-10 text-gray-700 mx-auto mb-3" />
-              <p className="text-gray-600 text-sm">No tasks found.</p>
+              <CheckSquare className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
+              <p className="text-[var(--text-muted)] text-sm">No tasks found.</p>
               {canCreate && <button onClick={() => setShowCreate(true)} className="text-sm text-[#D4A843] hover:underline mt-2">Create your first task</button>}
             </div>
           ) : view === 'board' ? (
@@ -212,8 +212,8 @@ export default function TasksPage() {
                 <div key={g.key} className="w-72 shrink-0">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: g.color }} />
-                    <span className="text-sm font-semibold text-gray-300">{g.label}</span>
-                    <span className="text-xs text-gray-600">{g.tasks.length}</span>
+                    <span className="text-sm font-semibold text-[var(--text-secondary)]">{g.label}</span>
+                    <span className="text-xs text-[var(--text-muted)]">{g.tasks.length}</span>
                   </div>
                   <div className="space-y-2">
                     {g.tasks.map((t: any) => {
@@ -224,17 +224,17 @@ export default function TasksPage() {
                       const taskTeam = teams.find(tm => tm.id === t.teamId);
                       return (
                         <div key={t.id} onClick={() => setSel(t)}
-                          className={`p-3.5 rounded-xl border cursor-pointer transition ${sel?.id === t.id ? 'bg-[#D4A843]/5 border-[#D4A843]/20' : 'bg-[#111827] border-[#1F2937]/50 hover:border-[#374151]'}`}>
+                          className={`p-3.5 rounded-xl border cursor-pointer transition ${sel?.id === t.id ? 'bg-[#D4A843]/5 border-[#D4A843]/20' : 'bg-[var(--bg-card)] border-[var(--border)]/50 hover:border-[var(--bg-elevated)]'}`}>
                           <div className="flex items-center gap-2 mb-1.5">
                             <span className="text-xs">{p?.ic}</span>
-                            <p className={`text-sm font-medium flex-1 ${t.status === 'done' ? 'line-through text-gray-600' : 'text-gray-200'}`}>{t.title}</p>
+                            <p className={`text-sm font-medium flex-1 ${t.status === 'done' ? 'line-through text-[var(--text-muted)]' : 'text-gray-200'}`}>{t.title}</p>
                           </div>
-                          {t.description && <p className="text-[11px] text-gray-600 mb-2 line-clamp-2">{t.description}</p>}
+                          {t.description && <p className="text-[11px] text-[var(--text-muted)] mb-2 line-clamp-2">{t.description}</p>}
                           <div className="flex items-center gap-2 flex-wrap">
                             {taskTeam && <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: `${taskTeam.color}15`, color: taskTeam.color }}>{taskTeam.icon}</span>}
                             {visConf && <visConf.icon className="h-3 w-3" style={{ color: visConf.color }} />}
-                            {t.tags?.slice(0, 2).map((tg: string) => <span key={tg} className="text-[9px] px-1.5 py-0.5 rounded bg-[#1F2937] text-gray-500">{tg}</span>)}
-                            {due && <span className={`text-[10px] flex items-center gap-1 ${overdue ? 'text-red-400' : 'text-gray-600'}`}><Calendar className="h-3 w-3" />{due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                            {t.tags?.slice(0, 2).map((tg: string) => <span key={tg} className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-muted)]">{tg}</span>)}
+                            {due && <span className={`text-[10px] flex items-center gap-1 ${overdue ? 'text-red-400' : 'text-[var(--text-muted)]'}`}><Calendar className="h-3 w-3" />{due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
                             <div className="flex-1" />
                             {t.assignees?.slice(0, 2).map((uid: string) => {
                               const m = members.find((x: any) => x.id === uid);
@@ -267,26 +267,26 @@ export default function TasksPage() {
 
                       return (
                         <div key={t.id} onClick={() => setSel(t)}
-                          className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer group transition anim-slide ${sel?.id === t.id ? 'bg-[#D4A843]/5 border-[#D4A843]/20' : 'bg-[#111827] border-[#1F2937]/50 hover:border-[#374151] hover:bg-[#151D2E]'}`}
+                          className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer group transition anim-slide ${sel?.id === t.id ? 'bg-[#D4A843]/5 border-[#D4A843]/20' : 'bg-[var(--bg-card)] border-[var(--border)]/50 hover:border-[var(--bg-elevated)] hover:bg-[#151D2E]'}`}
                           style={{ animationDelay: `${i * 20}ms` }}>
                           <button onClick={e => { e.stopPropagation(); doUpdate(t.id, 'status', t.status === 'done' ? 'todo' : 'done', t.status); }} className="shrink-0">
                             <st.I className="h-5 w-5" style={{ color: st.color }} />
                           </button>
                           <tp.I className="h-4 w-4 shrink-0 opacity-40" style={{ color: tp.color }} />
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-medium truncate ${t.status === 'done' ? 'line-through text-gray-600' : 'text-gray-200'}`}>{t.title}</p>
-                            {t.description && <p className="text-[11px] text-gray-600 truncate mt-0.5">{t.description}</p>}
+                            <p className={`text-sm font-medium truncate ${t.status === 'done' ? 'line-through text-[var(--text-muted)]' : 'text-gray-200'}`}>{t.title}</p>
+                            {t.description && <p className="text-[11px] text-[var(--text-muted)] truncate mt-0.5">{t.description}</p>}
                           </div>
                           {/* Team badge */}
                           {taskTeam && <span className="hidden xl:flex text-[9px] px-1.5 py-0.5 rounded-md font-medium shrink-0" style={{ backgroundColor: `${taskTeam.color}15`, color: taskTeam.color }}>{taskTeam.icon} {taskTeam.name}</span>}
                           {/* Visibility icon */}
                           {visConf && <visConf.icon className="h-3.5 w-3.5 shrink-0 hidden lg:block" style={{ color: visConf.color }} />}
                           {/* Tags */}
-                          {t.tags?.length > 0 && <div className="hidden lg:flex gap-1">{t.tags.slice(0, 2).map((tg: string) => <span key={tg} className="text-[10px] px-2 py-0.5 rounded-md bg-[#1F2937] text-gray-400 border border-[#374151]/50">{tg}</span>)}</div>}
+                          {t.tags?.length > 0 && <div className="hidden lg:flex gap-1">{t.tags.slice(0, 2).map((tg: string) => <span key={tg} className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">{tg}</span>)}</div>}
                           {/* Subtasks progress */}
-                          {totalSub > 0 && <div className="hidden md:flex items-center gap-1.5 text-[11px] text-gray-500"><CheckSquare className="h-3 w-3" />{doneSub}/{totalSub}</div>}
+                          {totalSub > 0 && <div className="hidden md:flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]"><CheckSquare className="h-3 w-3" />{doneSub}/{totalSub}</div>}
                           {/* Due date */}
-                          {due && <span className={`hidden sm:flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md ${overdue ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-[#1F2937] text-gray-500 border border-[#374151]/50'}`}><Calendar className="h-3 w-3" />{due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                          {due && <span className={`hidden sm:flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md ${overdue ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]'}`}><Calendar className="h-3 w-3" />{due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
                           <span className="text-sm" title={p.label}>{p.ic}</span>
                           <div className="flex -space-x-1.5">
                             {t.assignees?.slice(0, 3).map((uid: string) => {
@@ -294,8 +294,8 @@ export default function TasksPage() {
                               return <div key={uid} className="w-6 h-6 rounded-full bg-[#D4A843]/15 border-2 border-[#111827] flex items-center justify-center text-[9px] font-bold text-[#D4A843]">{m?.displayName?.[0]?.toUpperCase() || '?'}</div>;
                             })}
                           </div>
-                          {t.points && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1F2937] text-gray-500 font-mono">{t.points}pt</span>}
-                          <button onClick={e => { e.stopPropagation(); doDelete(t); }} className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-700 hover:text-red-400 rounded-lg transition"><Trash2 className="h-3.5 w-3.5" /></button>
+                          {t.points && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-muted)] font-mono">{t.points}pt</span>}
+                          <button onClick={e => { e.stopPropagation(); doDelete(t); }} className="opacity-0 group-hover:opacity-100 p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition"><Trash2 className="h-3.5 w-3.5" /></button>
                         </div>
                       );
                     })}
@@ -343,24 +343,24 @@ function CreateModal({ members, teams, activeTeamId, onClose, onCreate }: any) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[#0C1017] border border-[#1F2937] rounded-2xl shadow-2xl anim-slide">
-        <div className="flex items-center justify-between p-5 border-b border-[#1F2937]/60">
-          <h2 className="text-lg font-bold text-white">Create Task</h2>
-          <button onClick={onClose} className="p-2 text-gray-600 hover:text-gray-400 rounded-lg"><X className="h-5 w-5" /></button>
+      <div onClick={e => e.stopPropagation()} className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[var(--bg-base)] border border-[var(--border)] rounded-2xl shadow-2xl anim-slide">
+        <div className="flex items-center justify-between p-5 border-b border-[var(--border-subtle)]">
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Create Task</h2>
+          <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-5 space-y-4">
           {/* Title */}
-          <input value={d.title} onChange={e => set('title', e.target.value)} placeholder="Task title..." autoFocus className="w-full h-12 px-4 rounded-xl bg-[#111827] border border-[#1F2937] text-white text-lg font-semibold placeholder:text-gray-600 focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843]/30" />
+          <input value={d.title} onChange={e => set('title', e.target.value)} placeholder="Task title..." autoFocus className="w-full h-12 px-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-primary)] text-lg font-semibold placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843]/30" />
           {/* Description */}
-          <textarea value={d.description} onChange={e => set('description', e.target.value)} placeholder="Add description, context, instructions..." rows={4} className="w-full px-4 py-3 rounded-xl bg-[#111827] border border-[#1F2937] text-gray-300 text-sm placeholder:text-gray-600 focus:outline-none focus:border-[#D4A843] resize-y" />
+          <textarea value={d.description} onChange={e => set('description', e.target.value)} placeholder="Add description, context, instructions..." rows={4} className="w-full px-4 py-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-secondary)] text-sm placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[#D4A843] resize-y" />
           {/* Type + Status + Priority */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Type</label>
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Type</label>
               <div className="flex flex-wrap gap-1.5">
                 {TYP.map(t => (
                   <button key={t.id} onClick={() => set('type', t.id)}
-                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${d.type === t.id ? 'border text-white' : 'bg-[#111827] text-gray-500 hover:text-gray-300'}`}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${d.type === t.id ? 'border text-[var(--text-primary)]' : 'bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
                     style={d.type === t.id ? { backgroundColor: `${t.color}15`, borderColor: `${t.color}30`, color: t.color } : {}}>
                     <t.I className="h-3 w-3" />{t.label}
                   </button>
@@ -368,22 +368,22 @@ function CreateModal({ members, teams, activeTeamId, onClose, onCreate }: any) {
               </div>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Status</label>
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Status</label>
               <select value={d.status} onChange={e => set('status', e.target.value)} className="select-dark w-full">{STS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Priority</label>
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Priority</label>
               <div className="flex gap-1">{PRI.map(p => <button key={p.id} onClick={() => set('priority', p.id)} title={p.label} className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm transition ${d.priority === p.id ? 'ring-2 ring-white/20 scale-110' : 'opacity-50 hover:opacity-80'}`}>{p.ic}</button>)}</div>
             </div>
           </div>
           {/* Visibility + Department */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Visibility</label>
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Visibility</label>
               <div className="flex gap-1.5">
                 {VIS.map(v => (
                   <button key={v.id} onClick={() => set('visibility', v.id)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition border ${d.visibility === v.id ? '' : 'bg-[#111827] text-gray-500 border-[#1F2937] hover:border-gray-600'}`}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition border ${d.visibility === v.id ? '' : 'bg-[var(--bg-card)] text-[var(--text-muted)] border-[var(--border)] hover:border-gray-600'}`}
                     style={d.visibility === v.id ? { backgroundColor: `${v.color}10`, borderColor: `${v.color}25`, color: v.color } : {}}>
                     <v.icon className="h-3 w-3" />{v.label}
                   </button>
@@ -391,7 +391,7 @@ function CreateModal({ members, teams, activeTeamId, onClose, onCreate }: any) {
               </div>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Department</label>
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Department</label>
               <select value={d.teamId} onChange={e => set('teamId', e.target.value)} className="select-dark w-full">
                 <option value="">General (All)</option>
                 {teams.map((t: any) => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
@@ -400,21 +400,21 @@ function CreateModal({ members, teams, activeTeamId, onClose, onCreate }: any) {
           </div>
           {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Start Date</label><input type="date" value={d.startDate} onChange={e => set('startDate', e.target.value)} className="input-dark h-9 text-sm" /></div>
-            <div><label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Due Date</label><input type="date" value={d.dueDate} onChange={e => set('dueDate', e.target.value)} className="input-dark h-9 text-sm" /></div>
+            <div><label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Start Date</label><input type="date" value={d.startDate} onChange={e => set('startDate', e.target.value)} className="input-dark h-9 text-sm" /></div>
+            <div><label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Due Date</label><input type="date" value={d.dueDate} onChange={e => set('dueDate', e.target.value)} className="input-dark h-9 text-sm" /></div>
           </div>
           {/* Time + Points */}
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Time Estimate (min)</label><input type="number" value={d.timeEstimate} onChange={e => set('timeEstimate', e.target.value)} placeholder="60" className="input-dark h-9 text-sm" /></div>
-            <div><label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Story Points</label><input type="number" value={d.points} onChange={e => set('points', e.target.value)} placeholder="5" className="input-dark h-9 text-sm" /></div>
+            <div><label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Time Estimate (min)</label><input type="number" value={d.timeEstimate} onChange={e => set('timeEstimate', e.target.value)} placeholder="60" className="input-dark h-9 text-sm" /></div>
+            <div><label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Story Points</label><input type="number" value={d.points} onChange={e => set('points', e.target.value)} placeholder="5" className="input-dark h-9 text-sm" /></div>
           </div>
           {/* Assignees */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Assignees</label>
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Assignees</label>
             <div className="flex gap-2 flex-wrap">
               {members.map((m: any) => (
                 <button key={m.id} onClick={() => toggleA(m.id)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition ${d.assignees.includes(m.id) ? 'bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20' : 'bg-[#111827] text-gray-500 border border-[#1F2937] hover:border-gray-600'}`}>
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition ${d.assignees.includes(m.id) ? 'bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20' : 'bg-[var(--bg-card)] text-[var(--text-muted)] border border-[var(--border)] hover:border-gray-600'}`}>
                   <div className="w-5 h-5 rounded-full bg-[#D4A843]/10 flex items-center justify-center text-[9px] font-bold">{m.displayName?.[0]?.toUpperCase()}</div>
                   {m.displayName}
                   {d.assignees.includes(m.id) && <Check className="h-3 w-3" />}
@@ -423,25 +423,25 @@ function CreateModal({ members, teams, activeTeamId, onClose, onCreate }: any) {
             </div>
           </div>
           {/* Tags */}
-          <div><label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Tags (comma-separated)</label><input value={d.tags} onChange={e => set('tags', e.target.value)} placeholder="design, social, facebook" className="input-dark h-9 text-sm" /></div>
+          <div><label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Tags (comma-separated)</label><input value={d.tags} onChange={e => set('tags', e.target.value)} placeholder="design, social, facebook" className="input-dark h-9 text-sm" /></div>
           {/* Subtasks */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Subtasks</label>
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Subtasks</label>
             {d.subtasks.map((s: any, i: number) => (
               <div key={s.id} className="flex items-center gap-2 mb-1.5">
-                <CheckSquare className="h-3.5 w-3.5 text-gray-600" />
-                <span className="text-sm text-gray-300 flex-1">{s.title}</span>
-                <button onClick={() => set('subtasks', d.subtasks.filter((_: any, j: number) => j !== i))} className="text-gray-700 hover:text-red-400"><X className="h-3.5 w-3.5" /></button>
+                <CheckSquare className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                <span className="text-sm text-[var(--text-secondary)] flex-1">{s.title}</span>
+                <button onClick={() => set('subtasks', d.subtasks.filter((_: any, j: number) => j !== i))} className="text-[var(--text-muted)] hover:text-red-400"><X className="h-3.5 w-3.5" /></button>
               </div>
             ))}
             <div className="flex gap-2">
               <input value={newSub} onChange={e => setNewSub(e.target.value)} placeholder="Add subtask..." className="input-dark h-8 text-xs flex-1" onKeyDown={e => e.key === 'Enter' && addSub()} />
-              <button onClick={addSub} className="px-3 h-8 rounded-lg bg-[#1F2937] text-xs text-gray-400 hover:text-white">Add</button>
+              <button onClick={addSub} className="px-3 h-8 rounded-lg bg-[var(--bg-elevated)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Add</button>
             </div>
           </div>
         </div>
-        <div className="flex justify-end gap-2 p-5 border-t border-[#1F2937]/60">
-          <button onClick={onClose} className="px-5 h-10 rounded-xl border border-[#1F2937] text-sm text-gray-400">Cancel</button>
+        <div className="flex justify-end gap-2 p-5 border-t border-[var(--border-subtle)]">
+          <button onClick={onClose} className="px-5 h-10 rounded-xl border border-[var(--border)] text-sm text-[var(--text-secondary)]">Cancel</button>
           <button onClick={submit} disabled={!d.title.trim()} className="px-6 h-10 rounded-xl btn-gold text-sm disabled:opacity-40">Create Task</button>
         </div>
       </div>
@@ -489,17 +489,17 @@ function DetailPanel({ task, members, teams, uid, uname, canUpdate, canDelete, o
   const addSub = () => { if (!newSub.trim() || !canUpdate) return; onUpdate(task.id, 'subtasks', [...(task.subtasks || []), { id: Date.now().toString(), title: newSub.trim(), done: false }]); setNewSub(''); };
 
   return (
-    <div className="w-[460px] shrink-0 bg-[#0C1017] border-l border-[#1F2937]/60 flex flex-col h-full overflow-hidden anim-slide">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#1F2937]/60">
+    <div className="w-[460px] shrink-0 bg-[var(--bg-base)] border-l border-[var(--border-subtle)] flex flex-col h-full overflow-hidden anim-slide">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-subtle)]">
         <div className="flex items-center gap-2">
           <tp.I className="h-4 w-4" style={{ color: tp.color }} />
-          <span className="text-xs font-semibold text-gray-500 uppercase">{tp.label}</span>
+          <span className="text-xs font-semibold text-[var(--text-muted)] uppercase">{tp.label}</span>
           {visConf && <span className="text-[9px] px-1.5 py-0.5 rounded-md flex items-center gap-1 font-medium" style={{ backgroundColor: `${visConf.color}10`, color: visConf.color }}><visConf.icon className="h-2.5 w-2.5" />{visConf.label}</span>}
           {taskTeam && <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: `${taskTeam.color}15`, color: taskTeam.color }}>{taskTeam.icon} {taskTeam.name}</span>}
         </div>
         <div className="flex items-center gap-1">
-          {(canDelete || task.createdBy === uid) && <button onClick={() => onDelete(task)} className="p-2 text-gray-700 hover:text-red-400 rounded-lg"><Trash2 className="h-4 w-4" /></button>}
-          <button onClick={onClose} className="p-2 text-gray-600 hover:text-gray-400 rounded-lg"><X className="h-4 w-4" /></button>
+          {(canDelete || task.createdBy === uid) && <button onClick={() => onDelete(task)} className="p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg"><Trash2 className="h-4 w-4" /></button>}
+          <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg"><X className="h-4 w-4" /></button>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
@@ -509,23 +509,23 @@ function DetailPanel({ task, members, teams, uid, uname, canUpdate, canDelete, o
             <div className="flex gap-2">
               <input value={titleVal} onChange={e => setTitleVal(e.target.value)} className="input-dark flex-1 text-lg font-bold" autoFocus onKeyDown={e => e.key === 'Enter' && saveTitle()} />
               <button onClick={saveTitle} className="p-2 text-emerald-400"><Check className="h-4 w-4" /></button>
-              <button onClick={() => { setEditTitle(false); setTitleVal(task.title); }} className="p-2 text-gray-600"><X className="h-4 w-4" /></button>
+              <button onClick={() => { setEditTitle(false); setTitleVal(task.title); }} className="p-2 text-[var(--text-muted)]"><X className="h-4 w-4" /></button>
             </div>
           ) : (
-            <h2 className={`text-xl font-bold text-white ${canUpdate ? 'cursor-pointer hover:text-[#D4A843]' : ''} transition`} onClick={() => canUpdate && setEditTitle(true)}>{task.title}</h2>
+            <h2 className={`text-xl font-bold text-[var(--text-primary)] ${canUpdate ? 'cursor-pointer hover:text-[#D4A843]' : ''} transition`} onClick={() => canUpdate && setEditTitle(true)}>{task.title}</h2>
           )}
 
           {/* Visibility + Team selectors */}
           {canUpdate && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Visibility</label>
+                <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Visibility</label>
                 <select value={task.visibility || 'team'} onChange={e => onUpdate(task.id, 'visibility', e.target.value, task.visibility)} className="select-dark w-full h-8 text-xs">
                   {VIS.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Department</label>
+                <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Department</label>
                 <select value={task.teamId || ''} onChange={e => onUpdate(task.id, 'teamId', e.target.value, task.teamId)} className="select-dark w-full h-8 text-xs">
                   <option value="">General</option>
                   {teams.map((t: any) => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
@@ -537,14 +537,14 @@ function DetailPanel({ task, members, teams, uid, uname, canUpdate, canDelete, o
           {/* Status + Priority */}
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Status</label>
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Status</label>
               <select value={task.status} onChange={e => canUpdate && onUpdate(task.id, 'status', e.target.value, task.status)} disabled={!canUpdate}
                 className="w-full h-9 px-3 rounded-xl text-xs font-semibold border cursor-pointer" style={{ backgroundColor: `${st.color}10`, borderColor: `${st.color}25`, color: st.color }}>
                 {STS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
             </div>
             <div className="flex-1">
-              <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Priority</label>
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Priority</label>
               <div className="flex gap-1">
                 {PRI.map(p => (
                   <button key={p.id} onClick={() => canUpdate && onUpdate(task.id, 'priority', p.id, task.priority)} title={p.label} disabled={!canUpdate}
@@ -558,13 +558,13 @@ function DetailPanel({ task, members, teams, uid, uname, canUpdate, canDelete, o
 
           {/* Assignees */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Assignees</label>
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Assignees</label>
             <div className="flex gap-1.5 flex-wrap">
               {members.map((m: any) => {
                 const a = task.assignees?.includes(m.id);
                 return (
                   <button key={m.id} disabled={!canUpdate} onClick={() => { const n = a ? task.assignees.filter((x: string) => x !== m.id) : [...(task.assignees || []), m.id]; onUpdate(task.id, 'assignees', n, task.assignees); }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition ${a ? 'bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20' : 'bg-[#111827] text-gray-600 border border-[#1F2937] hover:border-gray-600'}`}>
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition ${a ? 'bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20' : 'bg-[var(--bg-card)] text-[var(--text-muted)] border border-[var(--border)] hover:border-gray-600'}`}>
                     <div className="w-4 h-4 rounded-full bg-[#D4A843]/10 flex items-center justify-center text-[8px] font-bold">{m.displayName?.[0]?.toUpperCase()}</div>
                     {m.displayName?.split(' ')[0]}{a && <Check className="h-3 w-3" />}
                   </button>
@@ -575,24 +575,24 @@ function DetailPanel({ task, members, teams, uid, uname, canUpdate, canDelete, o
 
           {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Start</label><input type="date" value={start ? start.toISOString().split('T')[0] : ''} onChange={e => canUpdate && onUpdate(task.id, 'startDate', e.target.value ? new Date(e.target.value) : null)} disabled={!canUpdate} className="input-dark h-8 text-xs w-full" /></div>
-            <div><label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Due</label><input type="date" value={due ? due.toISOString().split('T')[0] : ''} onChange={e => canUpdate && onUpdate(task.id, 'dueDate', e.target.value ? new Date(e.target.value) : null)} disabled={!canUpdate} className="input-dark h-8 text-xs w-full" /></div>
+            <div><label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Start</label><input type="date" value={start ? start.toISOString().split('T')[0] : ''} onChange={e => canUpdate && onUpdate(task.id, 'startDate', e.target.value ? new Date(e.target.value) : null)} disabled={!canUpdate} className="input-dark h-8 text-xs w-full" /></div>
+            <div><label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Due</label><input type="date" value={due ? due.toISOString().split('T')[0] : ''} onChange={e => canUpdate && onUpdate(task.id, 'dueDate', e.target.value ? new Date(e.target.value) : null)} disabled={!canUpdate} className="input-dark h-8 text-xs w-full" /></div>
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Description</label>
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Description</label>
             {editDesc && canUpdate ? (
               <div>
-                <textarea value={descVal} onChange={e => setDescVal(e.target.value)} rows={5} className="w-full px-3 py-2 rounded-xl bg-[#111827] border border-[#1F2937] text-sm text-gray-300 resize-y focus:outline-none focus:border-[#D4A843]" autoFocus />
+                <textarea value={descVal} onChange={e => setDescVal(e.target.value)} rows={5} className="w-full px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm text-[var(--text-secondary)] resize-y focus:outline-none focus:border-[#D4A843]" autoFocus />
                 <div className="flex gap-2 mt-2">
                   <button onClick={saveDesc} className="px-3 h-7 rounded-lg btn-gold text-[11px]">Save</button>
-                  <button onClick={() => { setEditDesc(false); setDescVal(task.description || ''); }} className="px-3 h-7 rounded-lg border border-[#1F2937] text-[11px] text-gray-500">Cancel</button>
+                  <button onClick={() => { setEditDesc(false); setDescVal(task.description || ''); }} className="px-3 h-7 rounded-lg border border-[var(--border)] text-[11px] text-[var(--text-muted)]">Cancel</button>
                 </div>
               </div>
             ) : (
-              <div onClick={() => canUpdate && setEditDesc(true)} className={`min-h-[50px] px-3 py-2 rounded-xl bg-[#111827] border border-[#1F2937] ${canUpdate ? 'cursor-pointer hover:border-gray-600' : ''}`}>
-                {task.description ? <p className="text-sm text-gray-400 whitespace-pre-wrap">{task.description}</p> : <p className="text-sm text-gray-700">{canUpdate ? 'Click to add description...' : 'No description'}</p>}
+              <div onClick={() => canUpdate && setEditDesc(true)} className={`min-h-[50px] px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] ${canUpdate ? 'cursor-pointer hover:border-gray-600' : ''}`}>
+                {task.description ? <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{task.description}</p> : <p className="text-sm text-[var(--text-muted)]">{canUpdate ? 'Click to add description...' : 'No description'}</p>}
               </div>
             )}
           </div>
@@ -600,32 +600,32 @@ function DetailPanel({ task, members, teams, uid, uname, canUpdate, canDelete, o
           {/* Subtasks */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[10px] uppercase tracking-wider text-gray-600 font-semibold">Subtasks</label>
-              {totalSub > 0 && <span className="text-[10px] text-gray-600">{doneSub}/{totalSub} · {progress}%</span>}
+              <label className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">Subtasks</label>
+              {totalSub > 0 && <span className="text-[10px] text-[var(--text-muted)]">{doneSub}/{totalSub} · {progress}%</span>}
             </div>
-            {totalSub > 0 && <div className="h-1.5 rounded-full bg-[#1F2937] mb-3 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-r from-[#D4A843] to-[#E8C85A] transition-all duration-500" style={{ width: `${progress}%` }} /></div>}
+            {totalSub > 0 && <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] mb-3 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-r from-[#D4A843] to-[#E8C85A] transition-all duration-500" style={{ width: `${progress}%` }} /></div>}
             {(task.subtasks || []).map((s: any, i: number) => (
-              <div key={s.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[#111827] group">
-                <button onClick={() => toggleSub(i)} disabled={!canUpdate} className={`w-4 h-4 rounded-md border flex items-center justify-center transition shrink-0 ${s.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[#374151]'}`}>{s.done && <Check className="h-2.5 w-2.5" />}</button>
-                <span className={`text-sm flex-1 ${s.done ? 'line-through text-gray-600' : 'text-gray-300'}`}>{s.title}</span>
+              <div key={s.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--bg-card)] group">
+                <button onClick={() => toggleSub(i)} disabled={!canUpdate} className={`w-4 h-4 rounded-md border flex items-center justify-center transition shrink-0 ${s.done ? 'bg-emerald-500 border-emerald-500 text-[var(--text-primary)]' : 'border-[var(--border)]'}`}>{s.done && <Check className="h-2.5 w-2.5" />}</button>
+                <span className={`text-sm flex-1 ${s.done ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-secondary)]'}`}>{s.title}</span>
               </div>
             ))}
             {canUpdate && (
               <div className="flex gap-2 mt-2">
                 <input value={newSub} onChange={e => setNewSub(e.target.value)} placeholder="Add subtask..." className="input-dark h-8 text-xs flex-1" onKeyDown={e => e.key === 'Enter' && addSub()} />
-                <button onClick={addSub} className="px-3 h-8 rounded-lg bg-[#1F2937] text-xs text-gray-400 hover:text-white">+</button>
+                <button onClick={addSub} className="px-3 h-8 rounded-lg bg-[var(--bg-elevated)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]">+</button>
               </div>
             )}
           </div>
 
           {/* Tags */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-gray-600 mb-1.5 font-semibold">Tags</label>
+            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Tags</label>
             <div className="flex gap-1.5 flex-wrap">
               {(task.tags || []).map((tag: string) => (
-                <span key={tag} className="text-[11px] px-2.5 py-1 rounded-lg bg-[#1F2937] text-gray-400 border border-[#374151]/50 flex items-center gap-1">
+                <span key={tag} className="text-[11px] px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-subtle)] flex items-center gap-1">
                   <Hash className="h-3 w-3" />{tag}
-                  {canUpdate && <button onClick={() => onUpdate(task.id, 'tags', task.tags.filter((t: string) => t !== tag))} className="text-gray-600 hover:text-red-400"><X className="h-3 w-3" /></button>}
+                  {canUpdate && <button onClick={() => onUpdate(task.id, 'tags', task.tags.filter((t: string) => t !== tag))} className="text-[var(--text-muted)] hover:text-red-400"><X className="h-3 w-3" /></button>}
                 </span>
               ))}
             </div>
@@ -633,11 +633,11 @@ function DetailPanel({ task, members, teams, uid, uname, canUpdate, canDelete, o
         </div>
 
         {/* Tabs: Comments / Activity / Detail */}
-        <div className="border-t border-[#1F2937]/60">
+        <div className="border-t border-[var(--border-subtle)]">
           <div className="flex px-5">
             {(['detail', 'comments', 'activity'] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
-                className={`px-4 py-2.5 text-xs font-semibold border-b-2 capitalize transition ${tab === t ? 'text-[#D4A843] border-[#D4A843]' : 'text-gray-600 border-transparent hover:text-gray-400'}`}>
+                className={`px-4 py-2.5 text-xs font-semibold border-b-2 capitalize transition ${tab === t ? 'text-[#D4A843] border-[#D4A843]' : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'}`}>
                 {t === 'comments' ? `Comments (${comments.length})` : t}
               </button>
             ))}
@@ -646,16 +646,16 @@ function DetailPanel({ task, members, teams, uid, uname, canUpdate, canDelete, o
             {tab === 'comments' && (
               <div>
                 <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
-                  {comments.length === 0 && <p className="text-xs text-gray-700 text-center py-4">No comments yet.</p>}
+                  {comments.length === 0 && <p className="text-xs text-[var(--text-muted)] text-center py-4">No comments yet.</p>}
                   {comments.map(c => (
                     <div key={c.id} className="flex gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-[#D4A843]/10 flex items-center justify-center text-[10px] font-bold text-[#D4A843] shrink-0">{c.authorName?.[0]?.toUpperCase()}</div>
                       <div className="flex-1">
                         <div className="flex items-baseline gap-2">
-                          <span className="text-xs font-semibold text-white">{c.authorName}</span>
-                          <span className="text-[10px] text-gray-700">{c.createdAt?.toDate?.()?.toLocaleString?.() || ''}</span>
+                          <span className="text-xs font-semibold text-[var(--text-primary)]">{c.authorName}</span>
+                          <span className="text-[10px] text-[var(--text-muted)]">{c.createdAt?.toDate?.()?.toLocaleString?.() || ''}</span>
                         </div>
-                        <p className="text-sm text-gray-400 mt-0.5">{c.text}</p>
+                        <p className="text-sm text-[var(--text-secondary)] mt-0.5">{c.text}</p>
                       </div>
                     </div>
                   ))}
@@ -668,14 +668,14 @@ function DetailPanel({ task, members, teams, uid, uname, canUpdate, canDelete, o
             )}
             {tab === 'activity' && (
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {activity.length === 0 && <p className="text-xs text-gray-700 text-center py-4">No activity.</p>}
+                {activity.length === 0 && <p className="text-xs text-[var(--text-muted)] text-center py-4">No activity.</p>}
                 {activity.map(a => (
                   <div key={a.id} className="flex items-start gap-2 text-xs">
                     <div className="w-1.5 h-1.5 rounded-full bg-[#D4A843] mt-1.5 shrink-0" />
                     <div>
                       <span className="text-[#D4A843] font-medium">{a.actorName}</span>{' '}
-                      <span className="text-gray-500">{a.action} {a.field}</span>
-                      {a.to && <span className="text-gray-700"> → <span className="text-gray-300">{a.to}</span></span>}
+                      <span className="text-[var(--text-muted)]">{a.action} {a.field}</span>
+                      {a.to && <span className="text-[var(--text-muted)]"> → <span className="text-[var(--text-secondary)]">{a.to}</span></span>}
                       <span className="text-gray-800 ml-2">{a.createdAt?.toDate?.()?.toLocaleString?.() || ''}</span>
                     </div>
                   </div>
@@ -684,11 +684,11 @@ function DetailPanel({ task, members, teams, uid, uname, canUpdate, canDelete, o
             )}
             {tab === 'detail' && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs"><span className="text-gray-600">Type</span><span className="text-gray-300 flex items-center gap-1"><tp.I className="h-3 w-3" style={{ color: tp.color }} />{tp.label}</span></div>
-                <div className="flex items-center justify-between text-xs"><span className="text-gray-600">Visibility</span><span className="text-gray-300 flex items-center gap-1">{visConf && <><visConf.icon className="h-3 w-3" style={{ color: visConf.color }} />{visConf.label}</>}</span></div>
-                {task.timeEstimate && <div className="flex items-center justify-between text-xs"><span className="text-gray-600">Estimate</span><span className="text-gray-300">{task.timeEstimate}m</span></div>}
-                {task.points && <div className="flex items-center justify-between text-xs"><span className="text-gray-600">Points</span><span className="text-gray-300">{task.points}</span></div>}
-                <div className="flex items-center justify-between text-xs"><span className="text-gray-600">Created</span><span className="text-gray-300">{task.createdAt?.toDate?.()?.toLocaleDateString?.() || '—'}</span></div>
+                <div className="flex items-center justify-between text-xs"><span className="text-[var(--text-muted)]">Type</span><span className="text-[var(--text-secondary)] flex items-center gap-1"><tp.I className="h-3 w-3" style={{ color: tp.color }} />{tp.label}</span></div>
+                <div className="flex items-center justify-between text-xs"><span className="text-[var(--text-muted)]">Visibility</span><span className="text-[var(--text-secondary)] flex items-center gap-1">{visConf && <><visConf.icon className="h-3 w-3" style={{ color: visConf.color }} />{visConf.label}</>}</span></div>
+                {task.timeEstimate && <div className="flex items-center justify-between text-xs"><span className="text-[var(--text-muted)]">Estimate</span><span className="text-[var(--text-secondary)]">{task.timeEstimate}m</span></div>}
+                {task.points && <div className="flex items-center justify-between text-xs"><span className="text-[var(--text-muted)]">Points</span><span className="text-[var(--text-secondary)]">{task.points}</span></div>}
+                <div className="flex items-center justify-between text-xs"><span className="text-[var(--text-muted)]">Created</span><span className="text-[var(--text-secondary)]">{task.createdAt?.toDate?.()?.toLocaleDateString?.() || '—'}</span></div>
               </div>
             )}
           </div>

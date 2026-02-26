@@ -101,14 +101,14 @@ function TBtn({ icon: Icon, label, onClick, active, disabled }: {
 }) {
   return (
     <button onClick={onClick} disabled={disabled} title={label}
-      className={`w-8 h-8 rounded-lg flex items-center justify-center transition text-xs ${active ? 'bg-[#D4A843]/15 text-[#D4A843]' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'} ${disabled ? 'opacity-30 pointer-events-none' : ''}`}>
+      className={`w-8 h-8 rounded-lg flex items-center justify-center transition text-xs ${active ? 'bg-[#D4A843]/15 text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-white/5'} ${disabled ? 'opacity-30 pointer-events-none' : ''}`}>
       <Icon className="h-3.5 w-3.5" />
     </button>
   );
 }
 
 function TSep() {
-  return <div className="w-px h-5 bg-[#1F2937]/80 mx-0.5" />;
+  return <div className="w-px h-5 bg-[var(--bg-elevated)]/80 mx-0.5" />;
 }
 
 // ========== MAIN EDITOR ==========
@@ -267,13 +267,13 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
   return (
     <div className={containerClass}>
       {/* Top Bar */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#1F2937]/60 bg-[#0C1017] shrink-0">
-        <button onClick={onBack} className="p-2 text-gray-600 hover:text-gray-400 rounded-lg transition">
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-base)] shrink-0">
+        <button onClick={onBack} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition">
           <ArrowLeft className="h-4 w-4" />
         </button>
 
         <input value={title} onChange={e => { setTitle(e.target.value); setDirty(true); }}
-          className="flex-1 bg-transparent text-lg font-bold text-white border-none outline-none placeholder:text-gray-600"
+          className="flex-1 bg-transparent text-lg font-bold text-[var(--text-primary)] border-none outline-none placeholder:text-[var(--text-muted)]"
           placeholder="Untitled Document" />
 
         <div className="flex items-center gap-1.5">
@@ -286,7 +286,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
           </button>
 
           <button onClick={onToggleAI}
-            className={`p-2 rounded-lg transition ${showAI ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-gray-600 hover:text-[#D4A843] hover:bg-[#D4A843]/5'}`}
+            className={`p-2 rounded-lg transition ${showAI ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[#D4A843] hover:bg-[#D4A843]/5'}`}
             title="AI Assistant">
             <Sparkles className="h-4 w-4" />
           </button>
@@ -296,7 +296,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
             <Save className="h-3.5 w-3.5" /> Save
           </button>
 
-          <button onClick={() => setFullscreen(!fullscreen)} className="p-2 text-gray-600 hover:text-gray-400 rounded-lg">
+          <button onClick={() => setFullscreen(!fullscreen)} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg">
             {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
         </div>
@@ -304,9 +304,9 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
 
       {/* Metadata panel */}
       {showMeta && (
-        <div className="px-5 py-3 border-b border-[#1F2937]/60 bg-[#0A0E16] flex items-center gap-4 flex-wrap anim-fade">
+        <div className="px-5 py-3 border-b border-[var(--border-subtle)] bg-[#0A0E16] flex items-center gap-4 flex-wrap anim-fade">
           <div className="flex items-center gap-2">
-            <label className="text-[10px] text-gray-600 uppercase font-semibold">Visibility</label>
+            <label className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">Visibility</label>
             <select value={visibility} onChange={e => { setVisibility(e.target.value as any); setDirty(true); }} className="select-dark h-7 text-[11px] px-2">
               <option value="team">🏢 Team</option>
               <option value="private">🔒 Private</option>
@@ -314,14 +314,14 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-[10px] text-gray-600 uppercase font-semibold">Category</label>
+            <label className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">Category</label>
             <input value={category} onChange={e => { setCategory(e.target.value); setDirty(true); }} placeholder="Category" className="input-dark h-7 text-[11px] w-28 px-2" />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-[10px] text-gray-600 uppercase font-semibold">Tags</label>
+            <label className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">Tags</label>
             <input value={tags} onChange={e => { setTags(e.target.value); setDirty(true); }} placeholder="tag1, tag2" className="input-dark h-7 text-[11px] w-40 px-2" />
           </div>
-          <div className="flex items-center gap-3 ml-auto text-[10px] text-gray-700">
+          <div className="flex items-center gap-3 ml-auto text-[10px] text-[var(--text-muted)]">
             <span>By {doc.createdByName || 'Unknown'}</span>
             {doc.createdAt?.toDate && <span>{doc.createdAt.toDate().toLocaleDateString()}</span>}
           </div>
@@ -329,7 +329,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center gap-0.5 px-4 py-1.5 border-b border-[#1F2937]/60 bg-[#0C1017] flex-wrap shrink-0">
+      <div className="flex items-center gap-0.5 px-4 py-1.5 border-b border-[var(--border-subtle)] bg-[var(--bg-base)] flex-wrap shrink-0">
         <TBtn icon={Undo2} label="Undo (⌘Z)" onClick={undo} disabled={undoStack.length === 0} />
         <TBtn icon={Redo2} label="Redo (⌘⇧Z)" onClick={redo} disabled={redoStack.length === 0} />
         <TSep />
@@ -357,14 +357,14 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
         <div className="flex-1" />
 
         {/* View mode */}
-        <div className="flex rounded-lg border border-[#1F2937]/60 overflow-hidden">
-          <button onClick={() => setMode('edit')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'edit' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-gray-600 hover:text-gray-400'}`}>
+        <div className="flex rounded-lg border border-[var(--border-subtle)] overflow-hidden">
+          <button onClick={() => setMode('edit')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'edit' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             <Edit2 className="h-3 w-3" />
           </button>
-          <button onClick={() => setMode('split')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'split' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-gray-600 hover:text-gray-400'}`}>
+          <button onClick={() => setMode('split')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'split' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             Split
           </button>
-          <button onClick={() => setMode('preview')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'preview' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-gray-600 hover:text-gray-400'}`}>
+          <button onClick={() => setMode('preview')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'preview' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             <Eye className="h-3 w-3" />
           </button>
         </div>
@@ -374,13 +374,13 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
       <div className="flex-1 flex overflow-hidden">
         {/* Editor */}
         {(mode === 'edit' || mode === 'split') && (
-          <div className={`${mode === 'split' ? 'w-1/2 border-r border-[#1F2937]/40' : 'w-full'} flex flex-col`}>
+          <div className={`${mode === 'split' ? 'w-1/2 border-r border-[var(--border-subtle)]' : 'w-full'} flex flex-col`}>
             <textarea
               ref={editorRef}
               value={content}
               onChange={e => handleContentChange(e.target.value)}
               placeholder="Start writing... Use markdown for formatting.&#10;&#10;# Heading 1&#10;## Heading 2&#10;### Heading 3&#10;&#10;**bold** *italic* ~~strikethrough~~&#10;&#10;- Bullet list&#10;- [ ] Checklist&#10;&#10;> Blockquote&#10;&#10;| Table | Header |&#10;|-------|--------|&#10;| Cell  | Cell   |"
-              className="flex-1 w-full bg-transparent text-gray-200 resize-none outline-none p-6 font-mono text-sm leading-relaxed placeholder:text-gray-700/60"
+              className="flex-1 w-full bg-transparent text-gray-200 resize-none outline-none p-6 font-mono text-sm leading-relaxed placeholder:text-[var(--text-muted)]/60"
               style={{ tabSize: 2 }}
               spellCheck
               onKeyDown={e => {
@@ -440,7 +440,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
       </div>
 
       {/* Status Bar */}
-      <div className="flex items-center justify-between px-4 py-1.5 border-t border-[#1F2937]/60 bg-[#0C1017] text-[10px] text-gray-700 shrink-0">
+      <div className="flex items-center justify-between px-4 py-1.5 border-t border-[var(--border-subtle)] bg-[var(--bg-base)] text-[10px] text-[var(--text-muted)] shrink-0">
         <div className="flex items-center gap-4">
           <span>{wordCount} words</span>
           <span>{charCount} chars</span>

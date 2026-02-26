@@ -46,6 +46,24 @@ export async function getMembers() {
 }
 export async function getMember(uid: string) { return getOne(`orgs/${ORG}/members/${uid}`); }
 export async function updateMember(uid: string, data: any) { return updateAt(`orgs/${ORG}/members/${uid}`, data); }
+export async function createMember(uid: string, data: any) {
+  return setAt(`orgs/${ORG}/members/${uid}`, {
+    userId: uid, orgId: ORG,
+    role: data.role || 'member',
+    teamId: data.teamId || '',
+    teamIds: data.teamId ? [data.teamId] : [],
+    displayName: data.displayName || '',
+    email: data.email || '',
+    title: data.title || '',
+    department: data.department || '',
+    managerId: data.managerId || '',
+    hierarchyLevel: data.hierarchyLevel || 'member',
+    photoURL: data.photoURL || '',
+    active: true,
+  });
+}
+export async function softDeleteMember(uid: string) { return updateAt(`orgs/${ORG}/members/${uid}`, { active: false }); }
+export async function reactivateMember(uid: string) { return updateAt(`orgs/${ORG}/members/${uid}`, { active: true }); }
 
 // ===== ORG =====
 export async function getOrg() { return getOne(`orgs/${ORG}`); }

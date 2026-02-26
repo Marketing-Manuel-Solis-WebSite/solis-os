@@ -1,6 +1,6 @@
 'use client';
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
+import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, getDocs, collection, limit, query, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
@@ -281,32 +281,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const loadedTeams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Team));
         setTeams(loadedTeams);
 
-        // Ensure member exists
+        // Check member record
         const memRef = doc(db, 'orgs', ORG_ID, 'members', u.uid);
-        if (!(await getDoc(memRef)).exists()) {
-          const existing = await getDocs(query(collection(db, 'orgs', ORG_ID, 'members'), limit(1)));
-          const isFirst = existing.empty;
-          const role: Role = isFirst ? 'owner' : 'member';
-          const direccionTeam = loadedTeams.find(t => t.name.toLowerCase().includes('direcci')) || loadedTeams[0];
-          const firstTeam = direccionTeam?.id || loadedTeams[0]?.id || '';
+        const memSnap = await getDoc(memRef);
 
-          await setDoc(memRef, {
-            userId: u.uid, orgId: ORG_ID, role,
-            teamId: isFirst ? firstTeam : '',
-            teamIds: isFirst ? loadedTeams.map(t => t.id) : [],
-            displayName: u.displayName || u.email?.split('@')[0] || 'User',
-            email: u.email || '',
-            title: isFirst ? 'Managing Partner' : '',
-            department: isFirst ? (direccionTeam?.name || '') : '',
-            managerId: '',
-            hierarchyLevel: isFirst ? 'owner' : 'member',
-            photoURL: u.photoURL || '',
-            active: true,
-            joinedAt: serverTimestamp(),
-          });
+        if (!memSnap.exists()) {
+          // Allow first-ever user to bootstrap as owner
+          const existing = await getDocs(query(collection(db, 'orgs', ORG_ID, 'members'), limit(1)));
+          if (existing.empty) {
+            const direccionTeam = loadedTeams.find(t => t.name.toLowerCase().includes('direcci')) || loadedTeams[0];
+            const firstTeam = direccionTeam?.id || loadedTeams[0]?.id || '';
+            await setDoc(memRef, {
+              userId: u.uid, orgId: ORG_ID, role: 'owner' as Role,
+              teamId: firstTeam,
+              teamIds: loadedTeams.map(t => t.id),
+              displayName: u.displayName || u.email?.split('@')[0] || 'User',
+              email: u.email || '',
+              title: 'Managing Partner',
+              department: direccionTeam?.name || '',
+              managerId: '', hierarchyLevel: 'owner',
+              photoURL: u.photoURL || '',
+              active: true,
+              joinedAt: serverTimestamp(),
+            });
+          } else {
+            // No member record and not first user — access denied
+            await signOut(auth);
+            if (typeof window !== 'undefined') window.location.href = '/login?error=no_account';
+            setLoading(false);
+            return;
+          }
         }
 
         const meData = (await getDoc(memRef)).data() as Member;
+
+        // Block inactive users
+        if (meData.active === false) {
+          await signOut(auth);
+          if (typeof window !== 'undefined') window.location.href = '/login?error=deactivated';
+          setLoading(false);
+          return;
+        }
+
         if (!meData.teamIds) meData.teamIds = meData.teamId ? [meData.teamId] : [];
         setMe(meData);
 

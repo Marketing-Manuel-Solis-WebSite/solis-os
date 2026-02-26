@@ -86,26 +86,26 @@ export default function AnalyticsPage() {
           {/* Header */}
           <div className="flex items-center justify-between mb-6 anim-slide">
             <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
                 Analytics
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r from-[#D4A843]/10 to-purple-500/10 text-[#D4A843] border border-[#D4A843]/20 font-semibold">AI-POWERED</span>
               </h1>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-[var(--text-muted)] mt-1">
                 {data ? `Last updated: ${data.loadedAt.toLocaleTimeString()}` : 'Loading platform data...'}
               </p>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={refresh} disabled={refreshing}
-                className="flex items-center gap-2 px-4 h-9 rounded-xl border border-[#1F2937] text-sm text-gray-400 hover:text-gray-200 transition">
+                className="flex items-center gap-2 px-4 h-9 rounded-xl border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:text-gray-200 transition">
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
               </button>
-              <div className="flex rounded-xl border border-[#1F2937]/60 overflow-hidden">
+              <div className="flex rounded-xl border border-[var(--border-subtle)] overflow-hidden">
                 <button onClick={() => setView('dashboard')}
-                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition ${view === 'dashboard' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-gray-600 hover:text-gray-400'}`}>
+                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition ${view === 'dashboard' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
                   <BarChart3 className="h-3.5 w-3.5" /> Dashboard
                 </button>
                 <button onClick={() => setView('ai')}
-                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition ${view === 'ai' ? 'bg-purple-500/10 text-purple-400' : 'text-gray-600 hover:text-gray-400'}`}>
+                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition ${view === 'ai' ? 'bg-purple-500/10 text-purple-400' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
                   <Brain className="h-3.5 w-3.5" /> AI Analysis
                 </button>
               </div>
@@ -123,13 +123,13 @@ export default function AnalyticsPage() {
                 { label: 'Activity', value: stats.totalMessages, sub: 'events', icon: Activity, color: '#F59E0B' },
                 { label: 'AI Chats', value: stats.aiConversations, sub: 'conversations', icon: Zap, color: '#EC4899' },
               ].map((s, i) => (
-                <div key={s.label} className="p-4 rounded-2xl border border-[#1F2937]/60 bg-[#111827] card-hover anim-slide" style={{ animationDelay: `${(i + 2) * 40}ms` }}>
+                <div key={s.label} className="p-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] card-hover anim-slide" style={{ animationDelay: `${(i + 2) * 40}ms` }}>
                   <div className="flex items-center justify-between mb-2">
                     <s.icon className="h-4 w-4" style={{ color: s.color }} />
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ backgroundColor: `${s.color}10`, color: s.color }}>{s.sub}</span>
                   </div>
-                  <p className="text-2xl font-bold text-white">{s.value}</p>
-                  <p className="text-[10px] text-gray-600 mt-0.5">{s.label}</p>
+                  <p className="text-2xl font-bold text-[var(--text-primary)]">{s.value}</p>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{s.label}</p>
                 </div>
               ))}
             </div>
@@ -138,7 +138,7 @@ export default function AnalyticsPage() {
           {loading ? (
             <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="h-48 skeleton rounded-2xl" />)}</div>
           ) : !data ? (
-            <div className="text-center py-20"><BarChart3 className="h-12 w-12 text-gray-700 mx-auto mb-3" /><p className="text-gray-600">Could not load data.</p></div>
+            <div className="text-center py-20"><BarChart3 className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" /><p className="text-[var(--text-muted)]">Could not load data.</p></div>
           ) : (
             <>
               {view === 'dashboard' && <StatsDashboard data={data} />}

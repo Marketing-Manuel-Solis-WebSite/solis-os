@@ -273,7 +273,7 @@ ${deptContext}${docContext}
       <div className="flex items-center gap-3 flex-wrap anim-slide" style={{ animationDelay: '80ms' }}>
         <div className="flex items-center gap-2">
           <Brain className="h-4 w-4 text-purple-400" />
-          <span className="text-xs font-semibold text-gray-400">Focus:</span>
+          <span className="text-xs font-semibold text-[var(--text-secondary)]">Focus:</span>
         </div>
         <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)} className="select-dark h-8 text-xs">
           <option value="all">All Departments</option>
@@ -284,30 +284,30 @@ ${deptContext}${docContext}
           {data.docs.map((d: any) => <option key={d.id} value={d.id}>📄 {d.title || 'Untitled'}</option>)}
         </select>
         {(selectedDept !== 'all' || selectedDoc) && (
-          <button onClick={() => { setSelectedDept('all'); setSelectedDoc(''); }} className="text-[10px] text-gray-600 hover:text-gray-400">Clear filters</button>
+          <button onClick={() => { setSelectedDept('all'); setSelectedDoc(''); }} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)]">Clear filters</button>
         )}
       </div>
 
       {/* Analysis categories */}
       <div className="space-y-2 anim-slide" style={{ animationDelay: '120ms' }}>
         {ANALYSIS_CATEGORIES.map(cat => (
-          <div key={cat.id} className="rounded-2xl border border-[#1F2937]/60 bg-[#111827] overflow-hidden">
+          <div key={cat.id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] overflow-hidden">
             <button onClick={() => setExpandedCategory(expandedCategory === cat.id ? null : cat.id)}
               className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-white/[0.01] transition">
               <span className="text-lg">{cat.label.split(' ')[0]}</span>
               <span className="text-sm font-semibold" style={{ color: cat.color }}>{cat.label.split(' ').slice(1).join(' ')}</span>
-              <span className="text-[10px] text-gray-600 ml-2">{cat.analyses.length} analyses</span>
-              <ChevronDown className={`h-4 w-4 text-gray-600 ml-auto transition-transform ${expandedCategory === cat.id ? 'rotate-180' : ''}`} />
+              <span className="text-[10px] text-[var(--text-muted)] ml-2">{cat.analyses.length} analyses</span>
+              <ChevronDown className={`h-4 w-4 text-[var(--text-muted)] ml-auto transition-transform ${expandedCategory === cat.id ? 'rotate-180' : ''}`} />
             </button>
             {expandedCategory === cat.id && (
-              <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-[#1F2937]/40 pt-3">
+              <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-[var(--border-subtle)] pt-3">
                 {cat.analyses.map(a => (
                   <button key={a.id} onClick={() => runAnalysis(a.prompt, a.id)} disabled={loading}
-                    className="flex items-start gap-3 p-4 rounded-xl border border-[#1F2937] bg-[#0C1017] hover:border-gray-600 text-left transition group card-hover disabled:opacity-50">
+                    className="flex items-start gap-3 p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-base)] hover:border-gray-600 text-left transition group card-hover disabled:opacity-50">
                     <a.icon className="h-5 w-5 shrink-0 mt-0.5" style={{ color: cat.color }} />
                     <div>
-                      <p className="text-xs font-semibold text-gray-300 group-hover:text-white transition">{a.label}</p>
-                      <p className="text-[10px] text-gray-600 mt-0.5 line-clamp-2">{a.prompt.slice(0, 80)}...</p>
+                      <p className="text-xs font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition">{a.label}</p>
+                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5 line-clamp-2">{a.prompt.slice(0, 80)}...</p>
                     </div>
                   </button>
                 ))}
@@ -327,7 +327,7 @@ ${deptContext}${docContext}
         <div className="flex gap-2">
           <textarea value={customQ} onChange={e => setCustomQ(e.target.value)} placeholder="Ask anything about your organization, team, market, operations, documents..."
             rows={2} disabled={loading}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-[#111827] border border-[#1F2937] text-sm text-gray-200 placeholder:text-gray-700 outline-none focus:border-purple-500/30 resize-none disabled:opacity-50"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm text-gray-200 placeholder:text-[var(--text-muted)] outline-none focus:border-purple-500/30 resize-none disabled:opacity-50"
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustom(); } }} />
           <button onClick={handleCustom} disabled={loading || !customQ.trim()}
             className="h-[52px] px-5 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/20 text-sm font-semibold flex items-center gap-2 hover:bg-purple-500/25 transition disabled:opacity-30 shrink-0">
@@ -341,7 +341,7 @@ ${deptContext}${docContext}
             'Analiza nuestra estrategia de marketing vs competidores',
             'Recommend process automations',
           ].map((q, i) => (
-            <button key={i} onClick={() => { setCustomQ(q); }} className="text-[10px] px-2 py-1 rounded-lg bg-[#111827] border border-[#1F2937] text-gray-600 hover:text-gray-400 transition">
+            <button key={i} onClick={() => { setCustomQ(q); }} className="text-[10px] px-2 py-1 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
               {q}
             </button>
           ))}
@@ -351,21 +351,21 @@ ${deptContext}${docContext}
       {/* Results */}
       {analyses.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+          <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-[#D4A843]" />
             Analysis Results ({analyses.length})
           </h3>
           {analyses.map((a, i) => (
-            <div key={a.id} className="rounded-2xl border border-[#1F2937]/60 bg-[#0C1017] overflow-hidden anim-fade">
+            <div key={a.id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-base)] overflow-hidden anim-fade">
               {/* Question header */}
-              <div className="px-5 py-3 border-b border-[#1F2937]/40 bg-[#0A0E16] flex items-center gap-3">
+              <div className="px-5 py-3 border-b border-[var(--border-subtle)] bg-[#0A0E16] flex items-center gap-3">
                 <Brain className="h-4 w-4 text-purple-400 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-300 truncate">{a.question.slice(0, 120)}</p>
-                  <p className="text-[9px] text-gray-700 mt-0.5">{a.timestamp.toLocaleTimeString()}</p>
+                  <p className="text-xs text-[var(--text-secondary)] truncate">{a.question.slice(0, 120)}</p>
+                  <p className="text-[9px] text-[var(--text-muted)] mt-0.5">{a.timestamp.toLocaleTimeString()}</p>
                 </div>
                 <button onClick={() => copyResult(a.answer, a.id)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] text-gray-600 hover:text-gray-400 hover:bg-white/5 transition shrink-0">
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-white/5 transition shrink-0">
                   {copiedId === a.id ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
                   {copiedId === a.id ? 'Copied!' : 'Copy'}
                 </button>
@@ -383,7 +383,7 @@ ${deptContext}${docContext}
           <Loader2 className="h-5 w-5 text-purple-400 animate-spin shrink-0" />
           <div>
             <p className="text-sm text-purple-400 font-semibold">Analyzing platform data...</p>
-            <p className="text-[11px] text-gray-600 mt-0.5">{currentQ.slice(0, 80)}{currentQ.length > 80 ? '...' : ''}</p>
+            <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{currentQ.slice(0, 80)}{currentQ.length > 80 ? '...' : ''}</p>
           </div>
         </div>
       )}

@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     const genAI = new GoogleGenerativeAI(key);
 
     // Use different model configs per mode
-    const modelName = 'gemini-pro';
+    const modelName = 'gemini-2.0-flash';
     const generationConfig: any = {
       chat: { temperature: 0.7, topP: 0.9, maxOutputTokens: 2048 },
       research: { temperature: 0.4, topP: 0.95, maxOutputTokens: 4096 },

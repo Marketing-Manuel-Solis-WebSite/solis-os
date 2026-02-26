@@ -15,3 +15,10 @@ const app = getApps().length ? getApp() : initializeApp(cfg);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+/** Secondary Auth instance for admin user-creation without signing out the admin. */
+export function getSecondaryAuth() {
+  const existing = getApps().find(a => a.name === 'Secondary');
+  const secondaryApp = existing || initializeApp(cfg, 'Secondary');
+  return getAuth(secondaryApp);
+}

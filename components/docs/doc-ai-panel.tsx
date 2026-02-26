@@ -77,29 +77,29 @@ export default function DocAIPanel({ doc, onClose, onApply }: DocAIPanelProps) {
   };
 
   return (
-    <div className="w-[380px] shrink-0 bg-[#0C1017] border-l border-[#1F2937]/60 flex flex-col h-full overflow-hidden anim-slide">
+    <div className="w-[380px] shrink-0 bg-[var(--bg-base)] border-l border-[var(--border-subtle)] flex flex-col h-full overflow-hidden anim-slide">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#1F2937]/60">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#D4A843]/20 to-[#D4A843]/5 border border-[#D4A843]/20 flex items-center justify-center">
             <Sparkles className="h-4 w-4 text-[#D4A843]" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white">Solis AI</p>
-            <p className="text-[10px] text-gray-600">Document Assistant</p>
+            <p className="text-sm font-bold text-[var(--text-primary)]">Solis AI</p>
+            <p className="text-[10px] text-[var(--text-muted)]">Document Assistant</p>
           </div>
         </div>
-        <button onClick={onClose} className="p-2 text-gray-600 hover:text-gray-400 rounded-lg"><X className="h-4 w-4" /></button>
+        <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg"><X className="h-4 w-4" /></button>
       </div>
 
       {/* Quick Actions */}
       {messages.length === 0 && (
-        <div className="p-3 border-b border-[#1F2937]/40">
-          <p className="text-[10px] text-gray-600 uppercase font-semibold tracking-wider mb-2 px-1">Quick Actions</p>
+        <div className="p-3 border-b border-[var(--border-subtle)]">
+          <p className="text-[10px] text-[var(--text-muted)] uppercase font-semibold tracking-wider mb-2 px-1">Quick Actions</p>
           <div className="grid grid-cols-2 gap-1.5">
             {PROMPTS.map(p => (
               <button key={p.id} onClick={() => handleQuickPrompt(p)}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-medium bg-[#111827] border border-[#1F2937] hover:border-gray-600 text-gray-400 hover:text-gray-200 transition text-left">
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-medium bg-[var(--bg-card)] border border-[var(--border)] hover:border-gray-600 text-[var(--text-secondary)] hover:text-gray-200 transition text-left">
                 <p.icon className="h-3.5 w-3.5 shrink-0" style={{ color: p.color }} />
                 <span className="truncate">{p.label}</span>
               </button>
@@ -113,8 +113,8 @@ export default function DocAIPanel({ doc, onClose, onApply }: DocAIPanelProps) {
         {messages.length === 0 && (
           <div className="text-center py-8">
             <Bot className="h-10 w-10 text-gray-800 mx-auto mb-3" />
-            <p className="text-xs text-gray-600">Ask me anything about this document,</p>
-            <p className="text-xs text-gray-600">or use a quick action above.</p>
+            <p className="text-xs text-[var(--text-muted)]">Ask me anything about this document,</p>
+            <p className="text-xs text-[var(--text-muted)]">or use a quick action above.</p>
           </div>
         )}
 
@@ -130,12 +130,12 @@ export default function DocAIPanel({ doc, onClose, onApply }: DocAIPanelProps) {
                   <Bot className="h-3.5 w-3.5 text-[#D4A843]" />
                   <span className="text-[10px] font-semibold text-[#D4A843]">Solis AI</span>
                 </div>
-                <div className="px-3.5 py-3 rounded-2xl rounded-tl-md bg-[#111827] border border-[#1F2937]/60">
-                  <p className="text-xs text-gray-300 whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                <div className="px-3.5 py-3 rounded-2xl rounded-tl-md bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+                  <p className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                 </div>
                 <div className="flex items-center gap-1.5 pl-1">
                   <button onClick={() => handleCopy(msg.text, i)}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-gray-600 hover:text-gray-400 hover:bg-white/5 transition">
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-white/5 transition">
                     {copied === i ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
                     {copied === i ? 'Copied' : 'Copy'}
                   </button>
@@ -155,18 +155,18 @@ export default function DocAIPanel({ doc, onClose, onApply }: DocAIPanelProps) {
         {loading && (
           <div className="flex items-center gap-2 px-3 py-3">
             <Loader2 className="h-4 w-4 text-[#D4A843] animate-spin" />
-            <span className="text-xs text-gray-500">Analyzing document...</span>
+            <span className="text-xs text-[var(--text-muted)]">Analyzing document...</span>
           </div>
         )}
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t border-[#1F2937]/60 bg-[#0A0E16]">
+      <div className="p-3 border-t border-[var(--border-subtle)] bg-[#0A0E16]">
         {messages.length > 0 && (
           <div className="flex gap-1.5 mb-2 overflow-x-auto pb-1">
             {PROMPTS.slice(0, 4).map(p => (
               <button key={p.id} onClick={() => handleQuickPrompt(p)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-[#111827] border border-[#1F2937] text-gray-500 hover:text-gray-300 transition whitespace-nowrap shrink-0">
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition whitespace-nowrap shrink-0">
                 <p.icon className="h-3 w-3" style={{ color: p.color }} />
                 {p.label}
               </button>
