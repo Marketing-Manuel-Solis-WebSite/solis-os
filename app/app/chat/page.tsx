@@ -8,6 +8,7 @@ import {
   addChannelMember, removeChannelMember, addChannelAdmin, removeChannelAdmin,
   findOrCreateDM, sendSystemMessage, onMessagesSnapshot, getMembers, logAction,
 } from '@/lib/db';
+import { notifyMany } from '@/lib/notifications';
 import ChannelSidebar from '@/components/chat/channel-sidebar';
 import ChannelHeader from '@/components/chat/channel-header';
 import MessageList from '@/components/chat/message-list';
@@ -98,6 +99,40 @@ export default function ChatPage() {
       replyAuthor: replyTo?.displayName || null,
     });
     setReplyTo(null);
+
+    // Notify channel members (except sender)
+    const recipientIds = (active.members || []).filter((id: string) => id !== user!.uid);
+    if (recipientIds.length > 0) {
+      const channelName = active.type === 'dm' ? 'Mensaje Directo' : `#${active.name}`;
+      notifyMany(recipientIds, {
+        type: 'channel_message',
+        title: `Nuevo mensaje en ${channelName}`,
+        message: content.trim().slice(0, 80),
+        entityType: 'channel',
+        entityId: active.id,
+        entityUrl: '/app/chat',
+        actorId: user!.uid,
+        actorName: me!.displayName,
+      }).catch(() => {});
+    }
+
+    // Notify mentioned users separately
+    if (mentions.length > 0) {
+      const mentionRecipients = mentions.filter(id => id !== user!.uid);
+      if (mentionRecipients.length > 0) {
+        notifyMany(mentionRecipients, {
+          type: 'channel_mention',
+          title: `${me!.displayName} te mencionó en ${active.type === 'dm' ? 'un DM' : '#' + active.name}`,
+          message: content.trim().slice(0, 80),
+          entityType: 'channel',
+          entityId: active.id,
+          entityUrl: '/app/chat',
+          actorId: user!.uid,
+          actorName: me!.displayName,
+        }).catch(() => {});
+      }
+    }
+
     loadChannels(); // refresh last message
   };
 

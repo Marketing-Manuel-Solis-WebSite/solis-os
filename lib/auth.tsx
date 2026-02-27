@@ -148,10 +148,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [activeTeamId, setActiveTeamIdRaw] = useState('');
   const [permMatrix, setPermMatrix] = useState<any>(null);
 
-  // Derived state
-  const isAdmin = me?.role === 'owner' || me?.role === 'admin';
-  const isManager = isAdmin || me?.role === 'manager';
-  const isDirector = isAdmin || me?.hierarchyLevel === 'director';
+  // Derived state — normalize role for robust comparison
+  const roleNorm = (me?.role || '').toLowerCase().trim();
+  const hierNorm = (me?.hierarchyLevel || '').toLowerCase().trim();
+  const isAdmin = roleNorm === 'owner' || roleNorm === 'admin';
+  const isManager = isAdmin || roleNorm === 'manager';
+  const isDirector = isAdmin || hierNorm === 'director' || hierNorm === 'owner';
   const canSeeAllTeams = isAdmin || isDirector;
 
   const teamMembers = useMemo(() => {
@@ -222,8 +224,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [allMembers]);
 
   const setActiveTeamId = useCallback((id: string) => {
+    if (!canSeeAllTeams) {
+      if (id === '__all__') return;
+      if (me && me.teamId !== id && !me.teamIds?.includes(id)) return;
+    }
     setActiveTeamIdRaw(id);
-  }, []);
+  }, [canSeeAllTeams, me]);
 
   // Refresh teams from Firestore
   const refreshTeams = useCallback(async () => {
@@ -232,11 +238,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setTeams(teamsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Team)));
   }, []);
 
-  // Refresh members from Firestore
+  // Refresh members from Firestore — also updates `me` if current user's data changed
   const refreshMembers = useCallback(async () => {
     const membersSnap = await getDocs(collection(db, 'orgs', ORG_ID, 'members'));
-    setAllMembers(membersSnap.docs.map(d => ({ id: d.id, ...d.data() } as unknown as Member)));
-  }, []);
+    const allMems = membersSnap.docs.map(d => ({ id: d.id, ...d.data() } as unknown as Member));
+    setAllMembers(allMems);
+    // Sync `me` with latest Firestore data
+    if (user) {
+      const fresh = allMems.find(m => m.userId === user.uid || (m as any).id === user.uid);
+      if (fresh) {
+        if (!fresh.teamIds) fresh.teamIds = fresh.teamId ? [fresh.teamId] : [];
+        setMe(fresh);
+      }
+    }
+  }, [user]);
 
   // Auth state listener
   useEffect(() => {
@@ -339,9 +354,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } catch { /* Use defaults */ }
 
-        // Set active team
-        const userIsAdmin = meData.role === 'owner' || meData.role === 'admin';
-        const userIsDirector = userIsAdmin || meData.hierarchyLevel === 'director';
+        // Set active team — must match derived state logic above
+        const r = (meData.role || '').toLowerCase().trim();
+        const h = (meData.hierarchyLevel || '').toLowerCase().trim();
+        const userIsAdmin = r === 'owner' || r === 'admin';
+        const userIsDirector = userIsAdmin || h === 'director' || h === 'owner';
         const userCanSeeAll = userIsAdmin || userIsDirector;
         setActiveTeamIdRaw(userCanSeeAll ? '__all__' : (meData.teamId || meData.teamIds?.[0] || ''));
 

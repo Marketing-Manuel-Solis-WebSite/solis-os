@@ -43,7 +43,24 @@ function TeamSelector() {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const teamList = canSeeAllTeams ? teams : teams.filter(t => me?.teamIds?.includes(t.id));
+  // Restricted users: static read-only team indicator
+  if (!canSeeAllTeams) {
+    const myTeam = teams.find(t => t.id === me?.teamId);
+    return (
+      <div className="flex items-center gap-2.5 h-10 px-3.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)]">
+        {myTeam ? (
+          <>
+            <span className="text-sm">{myTeam.icon}</span>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">{myTeam.name}</span>
+          </>
+        ) : (
+          <span className="text-sm text-[var(--text-muted)]">No Department</span>
+        )}
+      </div>
+    );
+  }
+
+  // Privileged users: full dropdown with gold-themed button
   const getMemberCount = (teamId: string) => allMembers.filter(m => m.teamId === teamId || m.teamIds?.includes(teamId)).length;
 
   return (
@@ -52,27 +69,28 @@ function TeamSelector() {
         whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2.5 h-10 px-3.5 rounded-xl border transition-all"
+        className="flex items-center gap-2.5 h-10 px-4 rounded-xl border transition-all"
         style={{
-          background: activeTeam ? `${activeTeam.color}10` : 'var(--bg-card)',
-          borderColor: activeTeam ? `${activeTeam.color}30` : 'var(--border)',
+          background: 'linear-gradient(135deg, rgba(212,168,67,0.1), rgba(212,168,67,0.03))',
+          borderColor: 'rgba(212,168,67,0.35)',
+          boxShadow: '0 0 16px rgba(212,168,67,0.08)',
         }}
       >
         {activeTeamId === '__all__' ? (
           <>
             <span className="text-sm">🏢</span>
-            <span className="text-sm font-semibold text-[var(--gold)]">All Teams</span>
+            <span className="text-sm font-semibold text-[#D4A843]">General</span>
           </>
         ) : activeTeam ? (
           <>
             <span className="text-sm">{activeTeam.icon}</span>
-            <span className="text-sm font-semibold" style={{ color: activeTeam.color }}>{activeTeam.name}</span>
+            <span className="text-sm font-semibold text-[#D4A843]">{activeTeam.name}</span>
           </>
         ) : (
           <span className="text-sm text-[var(--text-muted)]">Select Team</span>
         )}
         <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
-          <ChevronDown className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+          <ChevronDown className="h-3.5 w-3.5 text-[#D4A843]" />
         </motion.span>
       </motion.button>
 
@@ -86,19 +104,17 @@ function TeamSelector() {
             className="absolute left-0 top-full mt-2 w-[260px] rounded-2xl border border-[var(--border)] bg-[var(--bg-base)] shadow-2xl shadow-black/20 overflow-hidden z-50"
           >
             <div className="p-2">
-              {canSeeAllTeams && (
-                <button onClick={() => { setActiveTeamId('__all__'); setOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${activeTeamId === '__all__' ? 'bg-[var(--gold)]/10' : 'hover:bg-[var(--hover-bg)]'}`}>
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#D4A843]/20 to-[#D4A843]/5 flex items-center justify-center text-sm">🏢</div>
-                  <div className="text-left flex-1">
-                    <p className="text-sm font-semibold text-[var(--gold)]">All Teams</p>
-                    <p className="text-[10px] text-[var(--text-muted)]">{allMembers.length} members</p>
-                  </div>
-                  {activeTeamId === '__all__' && <div className="w-2 h-2 rounded-full bg-[var(--gold)] shadow-[0_0_6px_rgba(212,168,67,0.5)]" />}
-                </button>
-              )}
-              {canSeeAllTeams && teamList.length > 0 && <div className="h-px bg-[var(--border)] my-1.5 mx-3" />}
-              {teamList.map(t => (
+              <button onClick={() => { setActiveTeamId('__all__'); setOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${activeTeamId === '__all__' ? 'bg-[#D4A843]/10' : 'hover:bg-[var(--hover-bg)]'}`}>
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#D4A843]/20 to-[#D4A843]/5 flex items-center justify-center text-sm">🏢</div>
+                <div className="text-left flex-1">
+                  <p className="text-sm font-semibold text-[#D4A843]">General</p>
+                  <p className="text-[10px] text-[var(--text-muted)]">All departments</p>
+                </div>
+                {activeTeamId === '__all__' && <div className="w-2 h-2 rounded-full bg-[#D4A843] shadow-[0_0_6px_rgba(212,168,67,0.5)]" />}
+              </button>
+              <div className="h-px bg-[var(--border)] my-1.5 mx-3" />
+              {teams.map(t => (
                 <button key={t.id} onClick={() => { setActiveTeamId(t.id); setOpen(false); }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${activeTeamId === t.id ? 'bg-[var(--hover-bg)]' : 'hover:bg-[var(--hover-bg)]'}`}>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base" style={{ backgroundColor: `${t.color}15` }}>
@@ -381,6 +397,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
+import { ToastProvider } from '@/components/notifications/toast-provider';
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return <AuthProvider><Shell>{children}</Shell></AuthProvider>;
+  return <AuthProvider><ToastProvider><Shell>{children}</Shell></ToastProvider></AuthProvider>;
 }

@@ -13,6 +13,7 @@ const TYPE_ICONS: Record<string, string> = {
   task_due_soon: '⏰',
   task_comment: '💬',
   channel_mention: '📣',
+  channel_message: '📨',
   doc_mentioned: '📄',
   system: '⚙️',
 };

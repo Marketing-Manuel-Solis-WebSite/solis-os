@@ -1,23 +1,21 @@
 'use client';
 import { useAuth } from '@/lib/auth';
 import { useEffect, useState, useMemo } from 'react';
-import { getTasks, getDocuments, getMembers, getAuditLogs, getChannels } from '@/lib/db';
+import { getTasks, getDocuments, getAuditLogs } from '@/lib/db';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   CheckSquare, Clock, AlertTriangle, Users, TrendingUp,
-  Activity, FileText, MessageSquare, ArrowRight, Calendar,
-  BarChart3, Bot, Target, Eye, Circle, Loader2, CheckCircle2,
+  Activity, FileText, ArrowRight, Calendar,
+  BarChart3, Target, Eye, Circle, Loader2, CheckCircle2,
   Flag
 } from 'lucide-react';
 
 export default function Dashboard() {
-  const { user, me, canSeeAllTeams, activeTeamId, teams, canSeeResource } = useAuth();
+  const { user, me, canSeeAllTeams, activeTeamId, teams, canSeeResource, allMembers } = useAuth();
   const router = useRouter();
   const [tasks, setTasks] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
-  const [members, setMembers] = useState<any[]>([]);
-  const [channels, setChannels] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -26,17 +24,13 @@ export default function Dashboard() {
     Promise.all([
       getTasks(activeTeamId).catch(() => []),
       getDocuments(activeTeamId).catch(() => []),
-      getMembers().catch(() => []),
       getAuditLogs().catch(() => []),
-      getChannels(activeTeamId).catch(() => []),
-    ]).then(([t, d, m, l, c]) => {
+    ]).then(([t, d, l]) => {
       const filteredTasks = canSeeAllTeams ? t : (t as any[]).filter(tk => canSeeResource({ teamId: tk.teamId, createdBy: tk.createdBy, visibility: tk.visibility, assignees: tk.assignees }));
       const filteredDocs = canSeeAllTeams ? d : (d as any[]).filter(dc => canSeeResource({ teamId: dc.teamId, createdBy: dc.createdBy, visibility: dc.visibility }));
       setTasks(filteredTasks as any[]);
       setDocs(filteredDocs as any[]);
-      setMembers(m as any[]);
       setLogs(l as any[]);
-      setChannels(c as any[]);
       setLoading(false);
     });
   }, [activeTeamId, user, canSeeAllTeams, canSeeResource]);
@@ -92,8 +86,22 @@ export default function Dashboard() {
     { label: 'Completed', val: metrics.done, icon: TrendingUp, color: '#22C55E', bg: 'from-emerald-500/20 to-emerald-600/5' },
     { label: 'Overdue', val: metrics.overdue, icon: AlertTriangle, color: '#EF4444', bg: 'from-red-500/20 to-red-600/5' },
     { label: 'Documents', val: docs.length, icon: FileText, color: '#8B5CF6', bg: 'from-purple-500/20 to-purple-600/5' },
-    { label: 'Team', val: members.length, icon: Users, color: '#D4A843', bg: 'from-[#D4A843]/20 to-[#D4A843]/5' },
+    { label: 'Team', val: activeTeamId === '__all__' ? allMembers.length : allMembers.filter(m => m.teamId === activeTeamId || m.teamIds?.includes(activeTeamId)).length, icon: Users, color: '#D4A843', bg: 'from-[#D4A843]/20 to-[#D4A843]/5' },
   ];
+
+  const filteredLogs = useMemo(() => {
+    if (activeTeamId === '__all__') return logs;
+    const teamMemberIds = new Set(
+      allMembers
+        .filter(m => m.teamId === activeTeamId || m.teamIds?.includes(activeTeamId))
+        .map(m => m.userId)
+    );
+    return logs.filter((log: any) => {
+      if (log.actorId && teamMemberIds.has(log.actorId)) return true;
+      if (!log.actorId || log.actorId === 'system') return true;
+      return false;
+    });
+  }, [logs, activeTeamId, allMembers]);
 
   const priorityColors: Record<string, string> = { urgent: '#EF4444', high: '#F59E0B', medium: '#3B82F6', low: '#64748B' };
   const statusIcons: Record<string, any> = { todo: Circle, in_progress: Loader2, in_review: Eye, done: CheckCircle2, blocked: AlertTriangle };
@@ -108,7 +116,7 @@ export default function Dashboard() {
         </h1>
         <p className="text-[var(--text-muted)] text-sm">
           Here&apos;s what&apos;s happening in your workspace today.
-          {canSeeAllTeams && <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 font-semibold">ALL TEAMS VIEW</span>}
+          {canSeeAllTeams && activeTeamId === '__all__' && <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 font-semibold">GENERAL VIEW</span>}
         </p>
       </div>
 
@@ -286,9 +294,9 @@ export default function Dashboard() {
                 <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Activity className="h-4 w-4 text-[#D4A843]" /> Recent Activity</h2>
               </div>
               <div className="divide-y divide-[var(--border)] max-h-[240px] overflow-y-auto scrollbar-thin">
-                {logs.length === 0 ? (
+                {filteredLogs.length === 0 ? (
                   <p className="p-6 text-sm text-[var(--text-muted)] text-center">Actions will appear here.</p>
-                ) : logs.slice(0, 10).map((l: any) => (
+                ) : filteredLogs.slice(0, 10).map((l: any) => (
                   <div key={l.id} className="px-5 py-3 hover:bg-[var(--hover-bg)] transition">
                     <p className="text-sm">
                       <span className="text-[#D4A843] font-medium">{l.actorName || 'System'}</span>{' '}
@@ -302,26 +310,6 @@ export default function Dashboard() {
             </motion.div>
           </div>
 
-          {/* Quick Actions */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: 'New Task', icon: CheckSquare, color: '#3B82F6', href: '/app/tasks' },
-              { label: 'New Document', icon: FileText, color: '#8B5CF6', href: '/app/docs' },
-              { label: 'Open Chat', icon: MessageSquare, color: '#22C55E', href: '/app/chat' },
-              { label: 'Ask AI', icon: Bot, color: '#D4A843', href: '/app/ai' },
-            ].map(a => (
-              <motion.button key={a.label} whileHover={{ y: -2, transition: { duration: 0.15 } }} whileTap={{ scale: 0.98 }}
-                onClick={() => router.push(a.href)}
-                className="flex items-center gap-3 p-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] transition group">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${a.color}15` }}>
-                  <a.icon className="h-5 w-5" style={{ color: a.color }} />
-                </div>
-                <span className="text-sm font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition">{a.label}</span>
-                <ArrowRight className="h-4 w-4 text-[var(--text-muted)] ml-auto group-hover:text-[var(--text-secondary)] transition" />
-              </motion.button>
-            ))}
-          </motion.div>
         </>
       )}
     </motion.div>

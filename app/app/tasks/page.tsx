@@ -1,12 +1,15 @@
 'use client';
 import { useAuth } from '@/lib/auth';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { getTasks, createTask, updateTask, deleteTask, logAction, getTaskComments, addTaskComment, addTaskActivity, getTaskActivity, getMembers } from '@/lib/db';
+import { notifyMany } from '@/lib/notifications';
+import { uploadFile, isImageType, isVideoType, isAudioType, formatFileSize } from '@/lib/upload';
 import {
   Plus, Trash2, Check, X, CheckSquare, ChevronDown, ChevronRight, Calendar,
   Flag, Tag, MessageSquare, Search, LayoutList, LayoutGrid, Eye, AlertCircle,
   Loader2, Bug, Zap, Milestone, Target, Hash, Send, CheckCircle2, Circle,
-  Lock, Globe, Users, Filter, Clock, ArrowUpDown
+  Lock, Globe, Users, Filter, Clock, ArrowUpDown, Paperclip, FileText,
+  Image as ImageIcon, Video, Music, Download, ChevronUp
 } from 'lucide-react';
 
 // === CONSTANTS ===
@@ -36,6 +39,22 @@ const VIS = [
   { id: 'private', label: 'Private', icon: Lock, color: '#EF4444' },
 ];
 const priOrd: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+
+// === CUSTOM FIELDS (predefined) ===
+const CUSTOM_FIELDS: { id: string; label: string; type: string; options?: string[] }[] = [
+  { id: 'caseNumber', label: 'No. de Caso', type: 'text' },
+  { id: 'caseValue', label: 'Valor del Caso', type: 'currency' },
+  { id: 'filingDate', label: 'Fecha de Presentación', type: 'date' },
+  { id: 'caseType', label: 'Tipo de Caso', type: 'select', options: ['Civil', 'Criminal', 'Familia', 'Inmigración', 'Laboral', 'Otro'] },
+  { id: 'courtLocation', label: 'Ubicación del Juzgado', type: 'text' },
+  { id: 'retainerPaid', label: 'Anticipo Pagado', type: 'checkbox' },
+  { id: 'clientName', label: 'Nombre del Cliente', type: 'text' },
+  { id: 'clientPhone', label: 'Teléfono del Cliente', type: 'phone' },
+  { id: 'clientEmail', label: 'Email del Cliente', type: 'email' },
+  { id: 'referenceUrl', label: 'URL de Referencia', type: 'url' },
+];
+
+const ACCEPTED_FILES = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip';
 
 // === COLLAPSIBLE GROUP (extracted to avoid hooks-in-map bug) ===
 function TaskGroup({ group, children }: { group: { key: string; label: string; color: string; count: number }; children: React.ReactNode }) {
@@ -108,13 +127,29 @@ export default function TasksPage() {
 
   const doCreate = async (data: any) => {
     if (!can('task', 'create')) return alert('No permission to create tasks');
-    await createTask({
+    const taskRef = await createTask({
       ...data,
       teamId: data.teamId || (activeTeamId === '__all__' ? '' : activeTeamId),
       createdBy: user!.uid,
       visibility: data.visibility || 'team',
     });
     await logAction({ action: 'created', resource: 'task', detail: data.title, actorId: user!.uid, actorName: me!.displayName });
+
+    // Notify assignees (except creator)
+    const assigneeIds = (data.assignees || []).filter((id: string) => id !== user!.uid);
+    if (assigneeIds.length > 0) {
+      notifyMany(assigneeIds, {
+        type: 'task_assigned',
+        title: `${me!.displayName} te asignó una tarea`,
+        message: data.title || 'Nueva tarea',
+        entityType: 'task',
+        entityId: taskRef.id,
+        entityUrl: '/app/tasks',
+        actorId: user!.uid,
+        actorName: me!.displayName,
+      }).catch(() => {});
+    }
+
     setShowCreate(false);
     load();
   };
@@ -123,6 +158,25 @@ export default function TasksPage() {
     if (!can('task', 'update')) return;
     await updateTask(id, { [field]: val });
     try { await addTaskActivity(id, { action: 'updated', field, from: String(old || ''), to: String(val), actorId: user!.uid, actorName: me!.displayName }); } catch {}
+
+    // Notify newly assigned users
+    if (field === 'assignees' && Array.isArray(val) && Array.isArray(old)) {
+      const newAssignees = val.filter((uid: string) => !old.includes(uid) && uid !== user!.uid);
+      const task = tasks.find(t => t.id === id);
+      if (newAssignees.length > 0) {
+        notifyMany(newAssignees, {
+          type: 'task_assigned',
+          title: `${me!.displayName} te asignó a una tarea`,
+          message: task?.title || 'Tarea actualizada',
+          entityType: 'task',
+          entityId: id,
+          entityUrl: '/app/tasks',
+          actorId: user!.uid,
+          actorName: me!.displayName,
+        }).catch(() => {});
+      }
+    }
+
     load();
   };
 
@@ -460,6 +514,10 @@ function DetailPanel({ task, members, teams, uid, uname, canUpdate, canDelete, o
   const [descVal, setDescVal] = useState(task.description || '');
   const [editDesc, setEditDesc] = useState(false);
   const [newSub, setNewSub] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [showFieldPicker, setShowFieldPicker] = useState(false);
 
   useEffect(() => { setTitleVal(task.title); setDescVal(task.description || ''); }, [task.id, task.title, task.description]);
   useEffect(() => {
@@ -487,6 +545,44 @@ function DetailPanel({ task, members, teams, uid, uname, canUpdate, canDelete, o
   const saveDesc = () => { if (canUpdate) onUpdate(task.id, 'description', descVal, task.description); setEditDesc(false); };
   const toggleSub = (i: number) => { if (!canUpdate) return; const u = [...(task.subtasks || [])]; u[i] = { ...u[i], done: !u[i].done }; onUpdate(task.id, 'subtasks', u); };
   const addSub = () => { if (!newSub.trim() || !canUpdate) return; onUpdate(task.id, 'subtasks', [...(task.subtasks || []), { id: Date.now().toString(), title: newSub.trim(), done: false }]); setNewSub(''); };
+
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || !canUpdate) return;
+    for (const file of Array.from(files)) {
+      setUploading(true); setUploadPct(0);
+      try {
+        const result = await uploadFile(file, 'task-uploads', setUploadPct);
+        const att = { id: Date.now().toString(), ...result, uploadedBy: uid, uploadedAt: new Date() };
+        onUpdate(task.id, 'attachments', [...(task.attachments || []), att]);
+      } catch (err: any) { alert(err.message || 'Upload failed'); }
+      setUploading(false);
+    }
+  };
+
+  const removeAttachment = (attId: string) => {
+    if (!canUpdate) return;
+    onUpdate(task.id, 'attachments', (task.attachments || []).filter((a: any) => a.id !== attId));
+  };
+
+  const customFields = task.customFields || {};
+  const activeFieldIds = Object.keys(customFields);
+  const availableFields = CUSTOM_FIELDS.filter(f => !activeFieldIds.includes(f.id));
+
+  const setCustomField = (fieldId: string, value: any) => {
+    onUpdate(task.id, 'customFields', { ...customFields, [fieldId]: value });
+  };
+  const removeCustomField = (fieldId: string) => {
+    const updated = { ...customFields };
+    delete updated[fieldId];
+    onUpdate(task.id, 'customFields', updated);
+  };
+  const addCustomField = (fieldId: string) => {
+    const def = CUSTOM_FIELDS.find(f => f.id === fieldId);
+    if (!def) return;
+    const defaultVal = def.type === 'checkbox' ? false : def.type === 'currency' || def.type === 'number' ? '' : '';
+    setCustomField(fieldId, defaultVal);
+    setShowFieldPicker(false);
+  };
 
   return (
     <div className="w-[460px] shrink-0 bg-[var(--bg-base)] border-l border-[var(--border-subtle)] flex flex-col h-full overflow-hidden anim-slide">
