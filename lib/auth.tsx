@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, getDocs, collection, limit, query, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, getDocs, collection, limit, query, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
 // ============================================
@@ -137,6 +137,28 @@ const DEFAULT_TEAMS: Omit<Team, 'id'>[] = [
 const ORG_ID = 'solis-center';
 
 // ============================================
+// ROLE NORMALIZATION — maps any variation to canonical role
+// ============================================
+function normalizeRole(raw: string | undefined | null): Role {
+  if (!raw) return 'member';
+  const r = raw.toLowerCase().trim();
+  // Owner variations
+  if (['owner', 'dueño', 'dueña', 'propietario', 'ceo', 'fundador'].includes(r)) return 'owner';
+  // Admin variations
+  if (['admin', 'administrador', 'administradora', 'administrator', 'superadmin', 'super_admin', 'super-admin'].includes(r)) return 'admin';
+  // Manager variations
+  if (['manager', 'gerente', 'supervisor', 'lead', 'líder', 'lider', 'jefe', 'jefa', 'coordinador', 'coordinadora'].includes(r)) return 'manager';
+  // Guest variations
+  if (['guest', 'invitado', 'invitada', 'visitante', 'externo', 'externa'].includes(r)) return 'guest';
+  // Readonly variations
+  if (['readonly', 'read-only', 'read_only', 'solo_lectura', 'lectura', 'viewer', 'observador'].includes(r)) return 'readonly';
+  // If it's already a valid canonical role, return it
+  if (['owner', 'admin', 'manager', 'member', 'guest', 'readonly'].includes(r)) return r as Role;
+  // Default
+  return 'member';
+}
+
+// ============================================
 // PROVIDER
 // ============================================
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -241,7 +263,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Refresh members from Firestore — also updates `me` if current user's data changed
   const refreshMembers = useCallback(async () => {
     const membersSnap = await getDocs(collection(db, 'orgs', ORG_ID, 'members'));
-    const allMems = membersSnap.docs.map(d => ({ id: d.id, ...d.data() } as unknown as Member));
+    const allMems = membersSnap.docs.map(d => {
+      const data = { id: d.id, ...d.data() } as unknown as Member;
+      // Normalize role on read
+      const norm = normalizeRole(data.role);
+      if (norm !== data.role) data.role = norm;
+      return data;
+    });
     setAllMembers(allMems);
     // Sync `me` with latest Firestore data
     if (user) {
@@ -328,7 +356,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        const meData = (await getDoc(memRef)).data() as Member;
+        let meData = (await getDoc(memRef)).data() as Member;
 
         // Block inactive users
         if (meData.active === false) {
@@ -338,13 +366,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        if (!meData.teamIds) meData.teamIds = meData.teamId ? [meData.teamId] : [];
-        setMe(meData);
-
         // Load all members
         const allMembersSnap = await getDocs(collection(db, 'orgs', ORG_ID, 'members'));
         const allMems = allMembersSnap.docs.map(d => ({ id: d.id, ...d.data() } as unknown as Member));
-        setAllMembers(allMems);
+
+        // Normalize role: map variations like "administrador" → "admin"
+        const rawRole = meData.role;
+        const canonicalRole = normalizeRole(rawRole);
+        if (rawRole !== canonicalRole) {
+          console.warn(`[Auth] Role normalized: "${rawRole}" → "${canonicalRole}". Updating Firestore...`);
+          await updateDoc(memRef, { role: canonicalRole });
+          meData = { ...meData, role: canonicalRole };
+        }
+
+        // Self-heal: if this user is the only active member and not owner, promote to owner
+        const activeMems = allMems.filter(m => m.active !== false);
+        if (activeMems.length === 1 && (activeMems[0].userId === u.uid || (activeMems[0] as any).id === u.uid) && canonicalRole !== 'owner') {
+          console.warn('[Auth] Self-healing: promoting sole active member to owner.');
+          await updateDoc(memRef, { role: 'owner', hierarchyLevel: 'owner' });
+          meData = { ...meData, role: 'owner', hierarchyLevel: 'owner' };
+        }
+
+        // Also normalize roles for all other members in allMems (display only, don't write to Firestore for others here)
+        const normalizedAllMems = allMems.map(m => {
+          const norm = normalizeRole(m.role);
+          return norm !== m.role ? { ...m, role: norm } : m;
+        });
+
+        console.log('[Auth] User:', meData.displayName, '| Raw role:', rawRole, '| Normalized:', meData.role, '| isAdmin:', meData.role === 'owner' || meData.role === 'admin');
+
+        if (!meData.teamIds) meData.teamIds = meData.teamId ? [meData.teamId] : [];
+        setMe(meData);
+        setAllMembers(normalizedAllMems);
 
         // Load permissions matrix
         try {
@@ -354,10 +407,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         } catch { /* Use defaults */ }
 
-        // Set active team — must match derived state logic above
-        const r = (meData.role || '').toLowerCase().trim();
+        // Set active team
+        const userIsAdmin = meData.role === 'owner' || meData.role === 'admin';
         const h = (meData.hierarchyLevel || '').toLowerCase().trim();
-        const userIsAdmin = r === 'owner' || r === 'admin';
         const userIsDirector = userIsAdmin || h === 'director' || h === 'owner';
         const userCanSeeAll = userIsAdmin || userIsDirector;
         setActiveTeamIdRaw(userCanSeeAll ? '__all__' : (meData.teamId || meData.teamIds?.[0] || ''));

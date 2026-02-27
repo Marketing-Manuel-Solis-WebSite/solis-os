@@ -110,14 +110,23 @@ export async function createTask(data: any) {
 }
 export async function updateTask(id: string, data: any) { return updateAt(`tasks/${id}`, data); }
 export async function deleteTask(id: string) { return deleteAt(`tasks/${id}`); }
+export async function softDeleteTask(id: string) { return updateAt(`tasks/${id}`, { deleted: true, deletedAt: serverTimestamp() }); }
+export async function restoreTask(id: string) { return updateAt(`tasks/${id}`, { deleted: false, deletedAt: null }); }
 
 export async function getTaskComments(taskId: string) {
   const q = query(collection(db, `tasks/${taskId}/comments`), orderBy('createdAt', 'asc'));
   const s = await getDocs(q);
   return s.docs.map(d => ({ id: d.id, ...d.data() }));
 }
-export async function addTaskComment(taskId: string, data: { text: string; authorId: string; authorName: string }) {
-  return addTo(`tasks/${taskId}/comments`, data);
+export async function addTaskComment(taskId: string, data: { text: string; authorId: string; authorName: string; mentions?: string[]; attachments?: any[] }) {
+  return addTo(`tasks/${taskId}/comments`, { ...data, mentions: data.mentions || [], attachments: data.attachments || [] });
+}
+export async function getCustomFieldDefs() {
+  const data = await getOne(`orgs/${ORG}/settings/customFields`);
+  return (data as any)?.fields || [];
+}
+export async function saveCustomFieldDefs(fields: any[]) {
+  return setAt(`orgs/${ORG}/settings/customFields`, { fields });
 }
 export async function getTaskActivity(taskId: string) {
   const q = query(collection(db, `tasks/${taskId}/activity`), orderBy('createdAt', 'asc'));
