@@ -1,5 +1,5 @@
 import {
-  collection, doc, addDoc, setDoc, updateDoc, deleteDoc,
+  collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
   getDocs, getDoc, query, where, orderBy, limit,
   serverTimestamp, onSnapshot, DocumentData, arrayUnion, arrayRemove,
 } from 'firebase/firestore';
@@ -439,5 +439,71 @@ export async function deleteWorkspace(id: string) { return deleteAt(`workspaces/
 export async function getTemplates() { return getByOrg('templates'); }
 export async function createTemplate(data: any) { return addTo('templates', { ...data, orgId: ORG }); }
 export async function deleteTemplate(id: string) { return deleteAt(`templates/${id}`); }
+
+// ===== TYPING INDICATORS =====
+export async function setTyping(channelId: string, userId: string, displayName: string) {
+  const ref = doc(db, `channels/${channelId}/meta/typing`);
+  return setDoc(ref, { [`users.${userId}`]: { name: displayName, at: serverTimestamp() } }, { merge: true });
+}
+
+export async function clearTyping(channelId: string, userId: string) {
+  const ref = doc(db, `channels/${channelId}/meta/typing`);
+  return updateDoc(ref, { [`users.${userId}`]: deleteField() }).catch(() => {});
+}
+
+export function onTypingSnapshot(channelId: string, callback: (users: { id: string; name: string }[]) => void) {
+  const ref = doc(db, `channels/${channelId}/meta/typing`);
+  return onSnapshot(ref, (snap) => {
+    const data = snap.data() || {};
+    const now = Date.now() / 1000;
+    const active: { id: string; name: string }[] = [];
+    for (const [key, val] of Object.entries(data)) {
+      if (!key.startsWith('users.')) continue;
+      const uid = key.replace('users.', '');
+      const v = val as any;
+      if (v?.at?.seconds && (now - v.at.seconds) < 5) {
+        active.push({ id: uid, name: v.name || '' });
+      }
+    }
+    callback(active);
+  }, () => callback([]));
+}
+
+// ===== PRESENCE =====
+export function setPresence(userId: string, online: boolean) {
+  return setDoc(doc(db, `orgs/${ORG}/presence/${userId}`), { online, lastSeen: serverTimestamp() }, { merge: true });
+}
+
+export function onPresenceSnapshot(callback: (presence: Record<string, boolean>) => void) {
+  return onSnapshot(collection(db, `orgs/${ORG}/presence`), (snap) => {
+    const map: Record<string, boolean> = {};
+    const now = Date.now() / 1000;
+    snap.docs.forEach(d => {
+      const data = d.data();
+      const lastSeen = data.lastSeen?.seconds || 0;
+      map[d.id] = data.online && (now - lastSeen) < 120;
+    });
+    callback(map);
+  }, () => callback({}));
+}
+
+// ===== READ CURSORS =====
+export async function markChannelRead(userId: string, channelId: string) {
+  return setDoc(doc(db, `orgs/${ORG}/readCursors/${userId}`), { [`channels.${channelId}`]: serverTimestamp() }, { merge: true });
+}
+
+export function onReadCursorsSnapshot(userId: string, callback: (cursors: Record<string, any>) => void) {
+  return onSnapshot(doc(db, `orgs/${ORG}/readCursors/${userId}`), (snap) => {
+    const data = snap.data() || {};
+    // Flatten "channels.xxx" dot-notation keys
+    const cursors: Record<string, any> = {};
+    for (const [key, val] of Object.entries(data)) {
+      if (key.startsWith('channels.')) {
+        cursors[key.replace('channels.', '')] = val;
+      }
+    }
+    callback(cursors);
+  }, () => callback({}));
+}
 
 export { ORG, serverTimestamp };

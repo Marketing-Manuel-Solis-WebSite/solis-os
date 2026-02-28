@@ -7,6 +7,9 @@ import {
   pinMessage, unpinMessage, addReaction, removeReaction,
   addChannelMember, removeChannelMember, addChannelAdmin, removeChannelAdmin,
   findOrCreateDM, sendSystemMessage, onMessagesSnapshot, getMembers, logAction,
+  setTyping, clearTyping, onTypingSnapshot,
+  setPresence, onPresenceSnapshot,
+  markChannelRead, onReadCursorsSnapshot,
 } from '@/lib/db';
 import { notifyMany } from '@/lib/notifications';
 import ChannelSidebar from '@/components/chat/channel-sidebar';
@@ -17,7 +20,8 @@ import ChannelSettings from '@/components/chat/channel-settings';
 import CreateChannelModal from '@/components/chat/create-channel-modal';
 import MemberDrawer from '@/components/chat/member-drawer';
 import PinnedDrawer from '@/components/chat/pinned-drawer';
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, WifiOff } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ChatPage() {
   const { user, me, isAdmin, activeTeamId, teams, can, canSeeAllTeams } = useAuth();
@@ -25,6 +29,7 @@ export default function ChatPage() {
   const [members, setMembers] = useState<any[]>([]);
   const [active, setActive] = useState<any>(null);
   const [msgs, setMsgs] = useState<any[]>([]);
+  const [msgsLoading, setMsgsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -33,7 +38,29 @@ export default function ChatPage() {
   const [replyTo, setReplyTo] = useState<any>(null);
   const [editingMsg, setEditingMsg] = useState<any>(null);
   const [search, setSearch] = useState('');
+  const [isOffline, setIsOffline] = useState(false);
+  const [clearedChannels, setClearedChannels] = useState<Set<string>>(new Set());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<{ id: string; name: string }[]>([]);
+  const [onlineMap, setOnlineMap] = useState<Record<string, boolean>>({});
+  const [readCursors, setReadCursors] = useState<Record<string, any>>({});
   const unsubRef = useRef<(() => void) | null>(null);
+  const typingUnsubRef = useRef<(() => void) | null>(null);
+  const presenceUnsubRef = useRef<(() => void) | null>(null);
+  const readCursorUnsubRef = useRef<(() => void) | null>(null);
+
+  // Offline detection
+  useEffect(() => {
+    const goOffline = () => setIsOffline(true);
+    const goOnline = () => setIsOffline(false);
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    setIsOffline(!navigator.onLine);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', goOnline);
+    };
+  }, []);
 
   // Load channels + members
   const loadChannels = useCallback(async () => {
@@ -61,13 +88,59 @@ export default function ChatPage() {
   // Subscribe to real-time messages when channel changes
   useEffect(() => {
     if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
-    if (!active) { setMsgs([]); return; }
+    if (!active) { setMsgs([]); setMsgsLoading(false); return; }
+    setMsgsLoading(true);
     const unsub = onMessagesSnapshot(active.id, (newMsgs) => {
       setMsgs(newMsgs);
+      setMsgsLoading(false);
     });
     unsubRef.current = unsub;
     return () => { if (unsubRef.current) unsubRef.current(); };
   }, [active?.id]);
+
+  // Subscribe to typing indicators
+  useEffect(() => {
+    if (typingUnsubRef.current) { typingUnsubRef.current(); typingUnsubRef.current = null; }
+    if (!active) { setTypingUsers([]); return; }
+    const unsub = onTypingSnapshot(active.id, (users) => {
+      setTypingUsers(users.filter(u => u.id !== user?.uid));
+    });
+    typingUnsubRef.current = unsub;
+    return () => { if (typingUnsubRef.current) typingUnsubRef.current(); };
+  }, [active?.id, user?.uid]);
+
+  // Presence: set online + heartbeat + listen
+  useEffect(() => {
+    if (!user) return;
+    setPresence(user.uid, true);
+    const interval = setInterval(() => setPresence(user.uid, true), 60000);
+    const handleVisibility = () => setPresence(user.uid, !document.hidden);
+    document.addEventListener('visibilitychange', handleVisibility);
+    const handleUnload = () => setPresence(user.uid, false);
+    window.addEventListener('beforeunload', handleUnload);
+    const unsub = onPresenceSnapshot(setOnlineMap);
+    presenceUnsubRef.current = unsub;
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('beforeunload', handleUnload);
+      setPresence(user.uid, false);
+      if (presenceUnsubRef.current) presenceUnsubRef.current();
+    };
+  }, [user?.uid]);
+
+  // Read cursors listener
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onReadCursorsSnapshot(user.uid, setReadCursors);
+    readCursorUnsubRef.current = unsub;
+    return () => { if (readCursorUnsubRef.current) readCursorUnsubRef.current(); };
+  }, [user?.uid]);
+
+  // Mark active channel as read
+  useEffect(() => {
+    if (active && user) markChannelRead(user.uid, active.id);
+  }, [active?.id, user?.uid]);
 
   // Helpers
   const getDMName = (ch: any) => {
@@ -255,25 +328,66 @@ export default function ChatPage() {
   };
 
   const pinnedMsgs = msgs.filter(m => m.pinned);
+  const displayMsgs = active && clearedChannels.has(active.id) ? [] : msgs;
+
+  const handleClearView = () => {
+    if (!active) return;
+    if (!confirm('¿Limpiar la vista de esta conversación? Los mensajes no se eliminarán del servidor.')) return;
+    setClearedChannels(prev => new Set([...prev, active.id]));
+  };
 
   return (
-    <div className="flex h-[calc(100vh-64px)]">
+    <div className="flex h-[calc(100vh-64px)] relative">
+      {/* Mobile sidebar overlay */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Channel Sidebar */}
-      <ChannelSidebar
-        channels={channels}
-        active={active}
-        members={members}
-        userId={user?.uid || ''}
-        search={search}
-        onSearchChange={setSearch}
-        onSelect={setActive}
-        onCreate={() => setShowCreate(true)}
-        onStartDM={handleStartDM}
-        getDMName={getDMName}
-      />
+      <div className={`fixed inset-y-0 left-0 z-40 lg:static lg:z-auto transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <ChannelSidebar
+          channels={channels}
+          active={active}
+          members={members}
+          userId={user?.uid || ''}
+          search={search}
+          onlineMap={onlineMap}
+          readCursors={readCursors}
+          onSearchChange={setSearch}
+          onSelect={(ch) => { setActive(ch); setSidebarOpen(false); }}
+          onCreate={() => setShowCreate(true)}
+          onStartDM={(id) => { handleStartDM(id); setSidebarOpen(false); }}
+          getDMName={getDMName}
+        />
+      </div>
 
       {/* Main Area */}
       <div className="flex-1 flex flex-col min-w-0">
+        {/* Offline banner */}
+        <AnimatePresence>
+          {isOffline && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-red-500/10 border-b border-red-500/20 px-4 py-2 flex items-center gap-2 text-sm text-red-400 font-medium">
+                <WifiOff className="h-4 w-4 shrink-0" />
+                Sin conexión — los mensajes se enviarán cuando se restablezca
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {active ? (
           <>
             <ChannelHeader
@@ -283,29 +397,60 @@ export default function ChatPage() {
               pinnedCount={pinnedMsgs.length}
               memberCount={(active.members || []).length}
               canManage={canManageChannel(active)}
+              onlineMap={onlineMap}
               getDMName={getDMName}
               onShowSettings={() => setShowSettings(true)}
               onShowMembers={() => setShowMembers(true)}
               onShowPinned={() => setShowPinned(true)}
               onAddMember={handleAddMember}
+              onClearView={handleClearView}
+              onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
             />
             <MessageList
-              messages={msgs}
+              messages={displayMsgs}
               members={members}
               userId={user?.uid || ''}
               channelType={active.type}
               canManage={canManageChannel(active)}
+              loading={msgsLoading}
               onReply={setReplyTo}
               onEdit={setEditingMsg}
               onDelete={handleDelete}
               onPin={handlePin}
               onReaction={handleReaction}
             />
+            {/* Typing indicator */}
+            <AnimatePresence>
+              {typingUsers.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-5 py-1.5 text-xs text-[var(--text-muted)] flex items-center gap-2">
+                    <span className="flex gap-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4A843] animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4A843] animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4A843] animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </span>
+                    {typingUsers.length === 1
+                      ? `${typingUsers[0].name} está escribiendo...`
+                      : typingUsers.length === 2
+                        ? `${typingUsers[0].name} y ${typingUsers[1].name} están escribiendo...`
+                        : `${typingUsers.length} personas están escribiendo...`}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <MessageInput
               channelName={active.type === 'dm' ? getDMName(active) : active.name}
               members={members}
               replyTo={replyTo}
               editingMsg={editingMsg}
+              showSuggestions={msgs.length === 0 && !msgsLoading}
+              onTypingStart={() => active && user && me && setTyping(active.id, user.uid, me.displayName)}
+              onTypingStop={() => active && user && clearTyping(active.id, user.uid)}
               onSend={handleSend}
               onEdit={handleEdit}
               onCancelReply={() => setReplyTo(null)}
@@ -315,11 +460,14 @@ export default function ChatPage() {
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <div className="w-16 h-16 rounded-2xl bg-[#D4A843]/10 border border-[#D4A843]/20 flex items-center justify-center mx-auto mb-4">
+              <button onClick={() => setSidebarOpen(true)} className="lg:hidden w-16 h-16 rounded-2xl bg-[#D4A843]/10 border border-[#D4A843]/20 flex items-center justify-center mx-auto mb-4 hover:bg-[#D4A843]/20 transition">
+                <MessageSquare className="h-7 w-7 text-[#D4A843]/60" />
+              </button>
+              <div className="hidden lg:flex w-16 h-16 rounded-2xl bg-[#D4A843]/10 border border-[#D4A843]/20 items-center justify-center mx-auto mb-4">
                 <MessageSquare className="h-7 w-7 text-[#D4A843]/60" />
               </div>
-              <p className="text-lg font-semibold text-[var(--text-secondary)]">Select a channel</p>
-              <p className="text-sm text-[var(--text-muted)] mt-1">or create a new one to start chatting</p>
+              <p className="text-lg font-semibold text-[var(--text-secondary)]">Selecciona un canal</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">o crea uno nuevo para empezar a chatear</p>
             </div>
           </div>
         )}

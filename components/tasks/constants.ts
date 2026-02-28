@@ -2,7 +2,120 @@ import {
   Circle, Loader2, Eye, CheckCircle2, AlertCircle,
   CheckSquare, Bug, Zap, Milestone, Target,
   Users, Globe, Lock,
+  LayoutList, LayoutGrid, Calendar as CalendarIcon,
 } from 'lucide-react';
+
+// === TASK INTERFACE ===
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  status: string;
+  priority: string;
+  type: string;
+  visibility: string;
+  assignees: string[];
+  tags: string[];
+  teamId: string;
+  createdBy: string;
+  dueDate?: any;
+  startDate?: any;
+  createdAt?: any;
+  updatedAt?: any;
+  timeEstimate?: number | null;
+  timeSpent?: number;
+  points?: number | null;
+  subtasks: { id: string; title: string; done: boolean }[];
+  checklist: any[];
+  attachments: any[];
+  dependencies: string[];
+  customFields: Record<string, any>;
+  watchers: string[];
+  archived: boolean;
+  deleted?: boolean;
+  deletedAt?: any;
+}
+
+// === VIEW TYPES ===
+export type ViewType = 'list' | 'board' | 'calendar';
+
+export const VIEWS = [
+  { id: 'list' as ViewType, label: 'Lista', Icon: LayoutList, shortcut: '1' },
+  { id: 'board' as ViewType, label: 'Tablero', Icon: LayoutGrid, shortcut: '2' },
+  { id: 'calendar' as ViewType, label: 'Calendario', Icon: CalendarIcon, shortcut: '3' },
+] as const;
+
+// === FILTER STATE ===
+export interface FilterState {
+  status: string[];
+  priority: string[];
+  assignee: string[];
+  type: string[];
+  tags: string[];
+  dateRange: { from: string | null; to: string | null };
+  search: string;
+}
+
+export const EMPTY_FILTERS: FilterState = {
+  status: [],
+  priority: [],
+  assignee: [],
+  type: [],
+  tags: [],
+  dateRange: { from: null, to: null },
+  search: '',
+};
+
+// === SORT OPTIONS ===
+export const SORT_OPTIONS = [
+  { id: 'created', label: 'Más recientes', field: 'createdAt' },
+  { id: 'priority', label: 'Prioridad', field: 'priority' },
+  { id: 'due', label: 'Fecha límite', field: 'dueDate' },
+  { id: 'title', label: 'A-Z', field: 'title' },
+  { id: 'status', label: 'Estado', field: 'status' },
+  { id: 'points', label: 'Puntos', field: 'points' },
+] as const;
+
+// === GROUP OPTIONS ===
+export const GROUP_OPTIONS = [
+  { id: 'status', label: 'Estado' },
+  { id: 'priority', label: 'Prioridad' },
+  { id: 'type', label: 'Tipo' },
+  { id: 'assignee', label: 'Asignado' },
+  { id: 'none', label: 'Sin agrupar' },
+] as const;
+
+// === TASK GROUP ===
+export interface TaskGroup {
+  key: string;
+  label: string;
+  color: string;
+  tasks: Task[];
+  count: number;
+}
+
+// === KEYBOARD SHORTCUTS ===
+export const SHORTCUTS = {
+  newTask: 'n',
+  search: 'f',
+  viewList: '1',
+  viewBoard: '2',
+  viewCalendar: '3',
+  escape: 'Escape',
+  delete: 'Delete',
+} as const;
+
+// === SAVED VIEW ===
+export interface SavedView {
+  id: string;
+  name: string;
+  view: ViewType;
+  filters: FilterState;
+  sortBy: string;
+  groupBy: string;
+  createdBy: string;
+  createdAt?: any;
+}
 
 // === STATUSES ===
 export const STATUSES = [

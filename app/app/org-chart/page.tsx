@@ -5,7 +5,7 @@ import { getMembers, updateMember, logAction, getTeams } from '@/lib/db';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, ChevronDown, Crown, Shield, User, Eye, Briefcase, Star,
-  AlertTriangle, Edit2, Check, X, Network, Building2,
+  AlertTriangle, Edit2, Check, X, Network, Building2, ArrowRight,
 } from 'lucide-react';
 
 type HierarchyLevel = 'owner' | 'director' | 'manager' | 'lead' | 'member' | 'guest';
@@ -19,10 +19,10 @@ interface OrgMember {
 interface OrgNode extends OrgMember { children: OrgNode[]; }
 
 const LEVELS: { id: HierarchyLevel; label: string; icon: any; color: string; order: number }[] = [
-  { id: 'owner', label: 'CEO', icon: Crown, color: '#D4A843', order: 0 },
+  { id: 'owner', label: 'CEO / Owner', icon: Crown, color: '#D4A843', order: 0 },
   { id: 'director', label: 'Director', icon: Star, color: '#A855F7', order: 1 },
   { id: 'manager', label: 'Manager', icon: Shield, color: '#3B82F6', order: 2 },
-  { id: 'lead', label: 'Lead', icon: Briefcase, color: '#22C55E', order: 3 },
+  { id: 'lead', label: 'Team Lead', icon: Briefcase, color: '#22C55E', order: 3 },
   { id: 'member', label: 'Member', icon: User, color: '#64748B', order: 4 },
   { id: 'guest', label: 'Guest', icon: Eye, color: '#475569', order: 5 },
 ];
@@ -69,16 +69,91 @@ export default function OrgChartPage() {
   const buildTree = (list: OrgMember[]): OrgNode[] => {
     const map = new Map<string, OrgNode>();
     list.forEach(m => map.set(m.id, { ...m, children: [] }));
+
+    // Track who already has an explicit manager
+    const assigned = new Set<string>();
+    map.forEach(node => {
+      if (node.managerId && map.has(node.managerId) && node.managerId !== node.id) {
+        assigned.add(node.id);
+      }
+    });
+
+    // Auto-infer hierarchy for members WITHOUT explicit managerId
+    const unassigned = [...map.values()].filter(n => !assigned.has(n.id));
+
+    // Find global top-level people (owners/CEOs) — they stay as roots
+    const minOrder = Math.min(...unassigned.map(n => getLevelConfig(n.hierarchyLevel).order));
+    const globalRoots = unassigned.filter(n => getLevelConfig(n.hierarchyLevel).order === minOrder);
+    const globalRootIds = new Set(globalRoots.map(r => r.id));
+
+    // Group remaining unassigned by department (teamId)
+    const byTeam = new Map<string, OrgNode[]>();
+    unassigned.forEach(node => {
+      if (globalRootIds.has(node.id)) return; // skip roots
+      const key = node.teamId || '__none__';
+      if (!byTeam.has(key)) byTeam.set(key, []);
+      byTeam.get(key)!.push(node);
+    });
+
+    // For each department, build internal hierarchy chain
+    byTeam.forEach((teamMembers) => {
+      // Sort by hierarchy: highest level first
+      teamMembers.sort((a, b) => getLevelConfig(a.hierarchyLevel).order - getLevelConfig(b.hierarchyLevel).order);
+
+      // Group by level order
+      const levelBuckets: OrgNode[][] = [];
+      let currentOrder = -1;
+      let currentBucket: OrgNode[] = [];
+      for (const m of teamMembers) {
+        const order = getLevelConfig(m.hierarchyLevel).order;
+        if (order !== currentOrder) {
+          if (currentBucket.length > 0) levelBuckets.push(currentBucket);
+          currentBucket = [m];
+          currentOrder = order;
+        } else {
+          currentBucket.push(m);
+        }
+      }
+      if (currentBucket.length > 0) levelBuckets.push(currentBucket);
+
+      // Top level of this department → reports to first global root
+      if (levelBuckets.length > 0 && globalRoots.length > 0) {
+        for (const head of levelBuckets[0]) {
+          if (!globalRootIds.has(head.id)) {
+            head.managerId = globalRoots[0].id;
+            assigned.add(head.id);
+          }
+        }
+      }
+
+      // Each subsequent level → reports to members of the level above
+      // Distribute evenly among parents
+      for (let i = 1; i < levelBuckets.length; i++) {
+        const parents = levelBuckets[i - 1];
+        for (let j = 0; j < levelBuckets[i].length; j++) {
+          const child = levelBuckets[i][j];
+          child.managerId = parents[j % parents.length].id;
+          assigned.add(child.id);
+        }
+      }
+    });
+
+    // Build tree from all relationships (explicit + inferred)
     const roots: OrgNode[] = [];
     map.forEach(node => {
-      if (node.managerId && map.has(node.managerId)) {
+      if (node.managerId && map.has(node.managerId) && node.managerId !== node.id) {
         map.get(node.managerId)!.children.push(node);
       } else {
         roots.push(node);
       }
     });
+
     const sortNodes = (nodes: OrgNode[]) => {
       nodes.sort((a, b) => {
+        // Sort by department first so same-department nodes cluster together
+        const teamA = allTeams.findIndex(t => t.id === a.teamId);
+        const teamB = allTeams.findIndex(t => t.id === b.teamId);
+        if (teamA !== teamB) return teamA - teamB;
         const diff = getLevelConfig(a.hierarchyLevel).order - getLevelConfig(b.hierarchyLevel).order;
         return diff !== 0 ? diff : (a.displayName || '').localeCompare(b.displayName || '');
       });
@@ -96,6 +171,11 @@ export default function OrgChartPage() {
   })).filter(g => g.members.length > 0);
 
   const unassigned = members.filter(m => !m.teamId || m.teamId === '');
+
+  const getManagerName = (managerId: string) => {
+    const mgr = members.find(m => m.id === managerId);
+    return mgr ? mgr.displayName : null;
+  };
 
   const openEdit = (m: OrgMember) => {
     if (!canEdit) return;
@@ -156,27 +236,27 @@ export default function OrgChartPage() {
         <>
           {/* DEPARTMENT VIEW */}
           {view === 'department' && (
-            <div className="space-y-5">
+            <div className="space-y-6">
               {byDepartment.map((group, gi) => (
                 <DeptCard key={group.team.id} team={group.team} deptMembers={group.members} allMembers={members}
-                  index={gi} canEdit={canEdit} onEdit={openEdit} />
+                  index={gi} canEdit={canEdit} onEdit={openEdit} getManagerName={getManagerName} />
               ))}
               {unassigned.length > 0 && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: byDepartment.length * 0.08 }}
-                  className="rounded-2xl p-5 backdrop-blur-xl"
+                  className="rounded-2xl p-6 backdrop-blur-xl"
                   style={{
-                    background: 'rgba(245, 158, 11, 0.03)',
-                    border: '1px solid rgba(245, 158, 11, 0.12)',
+                    background: 'rgba(245, 158, 11, 0.04)',
+                    border: '1px solid rgba(245, 158, 11, 0.15)',
                     boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
                   }}>
-                  <div className="flex items-center gap-2 mb-4">
-                    <AlertTriangle className="h-4 w-4 text-amber-400" />
-                    <span className="text-sm font-bold text-amber-400">Unassigned</span>
-                    <span className="text-[10px] text-[var(--text-muted)]">{unassigned.length} members need a department</span>
+                  <div className="flex items-center gap-2.5 mb-5">
+                    <AlertTriangle className="h-5 w-5 text-amber-400" />
+                    <span className="text-base font-bold text-amber-400">Unassigned</span>
+                    <span className="text-xs text-[var(--text-muted)]">{unassigned.length} members need a department</span>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                  <div className="space-y-2">
                     {unassigned.map((m, i) => (
-                      <MemberCard key={m.id} member={m} index={i} canEdit={canEdit} onEdit={openEdit} />
+                      <MemberRow key={m.id} member={m} index={i} canEdit={canEdit} onEdit={openEdit} getManagerName={getManagerName} />
                     ))}
                   </div>
                 </motion.div>
@@ -187,7 +267,7 @@ export default function OrgChartPage() {
           {/* TREE VIEW */}
           {view === 'tree' && (
             <div className="overflow-x-auto pb-10">
-              <div className="flex flex-col items-center min-w-fit">
+              <div className="flex flex-col items-center min-w-fit pt-4">
                 {tree.map((root, i) => (
                   <TreeNode key={root.id} node={root} members={members} teams={allTeams}
                     canEdit={canEdit} onEdit={openEdit} isRoot index={i} />
@@ -210,51 +290,58 @@ export default function OrgChartPage() {
 }
 
 // =======================================
-// DEPARTMENT CARD
+// DEPARTMENT CARD - Hierarchical layout
 // =======================================
-function DeptCard({ team, deptMembers, allMembers, index, canEdit, onEdit }: {
+function DeptCard({ team, deptMembers, allMembers, index, canEdit, onEdit, getManagerName }: {
   team: Team; deptMembers: OrgMember[]; allMembers: OrgMember[]; index: number;
-  canEdit: boolean; onEdit: (m: OrgMember) => void;
+  canEdit: boolean; onEdit: (m: OrgMember) => void; getManagerName: (id: string) => string | null;
 }) {
   const [open, setOpen] = useState(true);
+
+  // Group members by hierarchy level
+  const levelGroups: { level: typeof LEVELS[number]; members: OrgMember[] }[] = [];
+  LEVELS.forEach(lv => {
+    const lvMembers = deptMembers.filter(m => m.hierarchyLevel === lv.id);
+    if (lvMembers.length > 0) levelGroups.push({ level: lv, members: lvMembers });
+  });
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.06, duration: 0.4 }}
-      className="rounded-2xl overflow-hidden backdrop-blur-xl"
+      className="rounded-2xl overflow-hidden"
       style={{
-        background: 'rgba(255,255,255,0.02)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)',
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.10)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08)',
       }}
     >
       {/* Gradient accent */}
-      <div className="h-[3px]" style={{ background: `linear-gradient(90deg, ${team.color}, ${team.color}40, transparent)` }} />
+      <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${team.color}, ${team.color}90, ${team.color}30)` }} />
 
       {/* Header */}
-      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-4 px-6 py-5 transition-all hover:bg-white/[0.01]">
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 backdrop-blur-sm"
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-4 px-6 py-5 transition-all hover:bg-white/[0.03]">
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0"
           style={{
-            background: `linear-gradient(135deg, ${team.color}15, ${team.color}05)`,
-            border: `1px solid ${team.color}20`,
-            boxShadow: `0 4px 16px ${team.color}10`,
+            background: `linear-gradient(135deg, ${team.color}30, ${team.color}12)`,
+            border: `1px solid ${team.color}35`,
+            boxShadow: `0 4px 16px ${team.color}20`,
           }}>
           {team.icon}
         </div>
         <div className="flex-1 text-left min-w-0">
           <p className="text-lg font-bold" style={{ color: team.color }}>{team.name}</p>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">
+          <p className="text-sm text-[rgba(255,255,255,0.5)] mt-0.5">
             {deptMembers.length} member{deptMembers.length !== 1 ? 's' : ''}{team.description ? ` · ${team.description}` : ''}
           </p>
         </div>
         <motion.div animate={{ rotate: open ? 0 : -90 }} transition={{ duration: 0.2 }}>
-          <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
+          <ChevronDown className="h-5 w-5 text-[rgba(255,255,255,0.4)]" />
         </motion.div>
       </button>
 
-      {/* Members */}
+      {/* Members grouped by level */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -264,12 +351,26 @@ function DeptCard({ team, deptMembers, allMembers, index, canEdit, onEdit }: {
             transition={{ duration: 0.3 }}
             className="overflow-hidden"
           >
-            <div className="px-5 pb-5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
-                {deptMembers.map((m, i) => (
-                  <MemberCard key={m.id} member={m} teamColor={team.color} index={i} canEdit={canEdit} onEdit={onEdit} />
-                ))}
-              </div>
+            <div className="px-6 pb-6 space-y-4">
+              {levelGroups.map((group, gi) => (
+                <div key={group.level.id}>
+                  {/* Level header */}
+                  <div className="flex items-center gap-2 mb-2.5">
+                    <group.level.icon className="h-3.5 w-3.5" style={{ color: group.level.color }} />
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: group.level.color }}>
+                      {group.level.label}{group.members.length > 1 ? 's' : ''}
+                    </span>
+                    <div className="flex-1 h-px" style={{ background: `linear-gradient(90deg, ${group.level.color}35, transparent)` }} />
+                  </div>
+                  {/* Members in this level */}
+                  <div className="space-y-1.5">
+                    {group.members.map((m, mi) => (
+                      <MemberRow key={m.id} member={m} teamColor={team.color} index={mi} canEdit={canEdit}
+                        onEdit={onEdit} getManagerName={getManagerName} />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </motion.div>
         )}
@@ -279,64 +380,70 @@ function DeptCard({ team, deptMembers, allMembers, index, canEdit, onEdit }: {
 }
 
 // =======================================
-// MEMBER CARD (glassmorphic)
+// MEMBER ROW - Clear, readable, shows reporting
 // =======================================
-function MemberCard({ member, teamColor, index = 0, canEdit, onEdit }: {
+function MemberRow({ member, teamColor, index = 0, canEdit, onEdit, getManagerName }: {
   member: OrgMember; teamColor?: string; index?: number;
   canEdit: boolean; onEdit: (m: OrgMember) => void;
+  getManagerName: (id: string) => string | null;
 }) {
   const lv = getLevelConfig(member.hierarchyLevel);
-  const color = teamColor || lv.color;
+  const managerName = member.managerId ? getManagerName(member.managerId) : null;
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.03, duration: 0.25 }}
-      whileHover={canEdit ? { scale: 1.03, y: -2 } : { scale: 1.01 }}
+      whileHover={canEdit ? { x: 4 } : {}}
       onClick={() => canEdit && onEdit(member)}
-      className={`relative rounded-xl p-3.5 backdrop-blur-xl group transition-all ${canEdit ? 'cursor-pointer' : ''}`}
+      className={`flex items-center gap-4 rounded-xl px-4 py-3.5 group transition-all ${canEdit ? 'cursor-pointer' : ''}`}
       style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.05), 0 1px 4px rgba(0,0,0,0.03)',
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.08)',
       }}
       onMouseEnter={e => {
-        (e.currentTarget as HTMLElement).style.borderColor = `${color}30`;
-        (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 32px rgba(0,0,0,0.1), 0 0 20px ${color}08`;
+        (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)';
+        (e.currentTarget as HTMLElement).style.borderColor = `${lv.color}40`;
       }}
       onMouseLeave={e => {
-        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)';
-        (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.05), 0 1px 4px rgba(0,0,0,0.03)';
+        (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)';
+        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)';
       }}
     >
-      {/* Edit icon */}
-      {canEdit && (
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Edit2 className="h-3 w-3 text-[var(--text-muted)]" />
-        </div>
-      )}
-
       {/* Avatar */}
-      <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mb-2.5 mx-auto"
+      <div className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold shrink-0"
         style={{
-          background: `linear-gradient(135deg, ${lv.color}30, ${lv.color}10)`,
-          color: lv.color,
-          boxShadow: `0 4px 12px ${lv.color}15`,
+          background: `linear-gradient(135deg, ${lv.color}, ${lv.color}90)`,
+          color: '#fff',
+          boxShadow: `0 4px 14px ${lv.color}35`,
         }}>
         {member.displayName?.[0]?.toUpperCase() || '?'}
       </div>
 
       {/* Info */}
-      <div className="text-center">
-        <p className="text-[12px] font-semibold text-[var(--text-primary)] truncate">{member.displayName}</p>
-        <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">{member.title || 'No title'}</p>
-        <div className="flex items-center justify-center gap-1 mt-2">
-          <span className="text-[8px] px-1.5 py-0.5 rounded-full font-bold inline-flex items-center gap-0.5"
-            style={{ background: `${lv.color}12`, color: lv.color }}>
-            <lv.icon className="h-2 w-2" />{lv.label}
-          </span>
-        </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-white truncate">{member.displayName}</p>
+        <p className="text-[13px] text-[rgba(255,255,255,0.65)] truncate">{member.title || 'No title assigned'}</p>
+        {managerName && (
+          <div className="flex items-center gap-1 mt-0.5">
+            <ArrowRight className="h-3 w-3 text-[rgba(255,255,255,0.35)]" />
+            <span className="text-xs text-[rgba(255,255,255,0.4)]">Reports to <span className="font-medium text-[rgba(255,255,255,0.7)]">{managerName}</span></span>
+          </div>
+        )}
+      </div>
+
+      {/* Level badge */}
+      <div className="shrink-0 flex items-center gap-2">
+        <span className="text-[11px] px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1"
+          style={{ background: `${lv.color}25`, color: lv.color, border: `1px solid ${lv.color}35` }}>
+          <lv.icon className="h-3 w-3" />{lv.label}
+        </span>
+        {canEdit && (
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+            <Edit2 className="h-3.5 w-3.5 text-[rgba(255,255,255,0.4)]" />
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -354,6 +461,7 @@ function TreeNode({ node, members, teams, canEdit, onEdit, isRoot = false, index
   const hasKids = node.children.length > 0;
   const lv = getLevelConfig(node.hierarchyLevel);
   const team = teams.find(t => t.id === node.teamId);
+  const teamColor = team?.color || lv.color;
 
   return (
     <motion.div
@@ -366,60 +474,74 @@ function TreeNode({ node, members, teams, canEdit, onEdit, isRoot = false, index
       <motion.div
         whileHover={canEdit ? { scale: 1.04, y: -2 } : { scale: 1.02 }}
         onClick={() => canEdit && onEdit(node)}
-        className={`relative rounded-xl px-5 py-3.5 backdrop-blur-xl text-center min-w-[160px] max-w-[200px] group ${canEdit ? 'cursor-pointer' : ''}`}
+        className={`relative rounded-2xl px-6 py-4 text-center min-w-[210px] max-w-[270px] group ${canEdit ? 'cursor-pointer' : ''}`}
         style={{
-          background: 'rgba(255,255,255,0.03)',
-          border: `1px solid ${lv.color}15`,
-          boxShadow: `0 8px 32px rgba(0,0,0,0.08), 0 0 0 1px ${lv.color}08`,
+          background: `linear-gradient(160deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)`,
+          border: `2px solid ${teamColor}50`,
+          boxShadow: `0 8px 32px rgba(0,0,0,0.2), 0 0 20px ${teamColor}08`,
         }}
         onMouseEnter={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = `${lv.color}35`;
-          (e.currentTarget as HTMLElement).style.boxShadow = `0 12px 40px rgba(0,0,0,0.12), 0 0 24px ${lv.color}10`;
+          (e.currentTarget as HTMLElement).style.borderColor = `${teamColor}80`;
+          (e.currentTarget as HTMLElement).style.boxShadow = `0 12px 48px rgba(0,0,0,0.25), 0 0 30px ${teamColor}20`;
         }}
         onMouseLeave={e => {
-          (e.currentTarget as HTMLElement).style.borderColor = `${lv.color}15`;
-          (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 32px rgba(0,0,0,0.08), 0 0 0 1px ${lv.color}08`;
+          (e.currentTarget as HTMLElement).style.borderColor = `${teamColor}50`;
+          (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 32px rgba(0,0,0,0.2), 0 0 20px ${teamColor}08`;
         }}
       >
         {canEdit && (
-          <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Edit2 className="h-2.5 w-2.5 text-[var(--text-muted)]" />
+          <div className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Edit2 className="h-3.5 w-3.5 text-[var(--text-muted)]" />
           </div>
         )}
-        <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold mx-auto mb-2"
+
+        {/* Avatar */}
+        <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold mx-auto mb-3"
           style={{
-            background: `linear-gradient(135deg, ${lv.color}30, ${lv.color}10)`,
-            color: lv.color,
-            boxShadow: `0 4px 14px ${lv.color}20`,
+            background: `linear-gradient(135deg, ${lv.color}, ${lv.color}90)`,
+            color: '#fff',
+            boxShadow: `0 6px 20px ${lv.color}40`,
           }}>
           {node.displayName?.[0]?.toUpperCase() || '?'}
         </div>
-        <p className="text-xs font-bold text-[var(--text-primary)] truncate">{node.displayName}</p>
-        <p className="text-[10px] text-[var(--text-muted)] truncate">{node.title || 'No title'}</p>
-        <div className="flex items-center justify-center gap-1 mt-1.5 flex-wrap">
-          <span className="text-[7px] px-1.5 py-0.5 rounded-full font-bold inline-flex items-center gap-0.5"
-            style={{ background: `${lv.color}12`, color: lv.color }}>
-            <lv.icon className="h-2 w-2" />{lv.label}
+
+        {/* Name */}
+        <p className="text-[15px] font-bold text-white truncate">{node.displayName}</p>
+        {/* Title */}
+        <p className="text-[13px] text-[rgba(255,255,255,0.7)] truncate mt-0.5">{node.title || 'No title'}</p>
+
+        {/* Badges */}
+        <div className="flex items-center justify-center gap-1.5 mt-2.5 flex-wrap">
+          <span className="text-[11px] px-2.5 py-1 rounded-lg font-bold inline-flex items-center gap-1"
+            style={{ background: `${lv.color}30`, color: lv.color }}>
+            <lv.icon className="h-3 w-3" />{lv.label}
           </span>
           {team && (
-            <span className="text-[7px] px-1.5 py-0.5 rounded-full font-medium"
-              style={{ background: `${team.color}10`, color: team.color }}>
-              {team.icon}
+            <span className="text-[11px] px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1"
+              style={{ background: `${team.color}25`, color: team.color }}>
+              {team.icon} {team.name}
             </span>
           )}
         </div>
 
+        {/* Direct reports count */}
+        {hasKids && (
+          <p className="text-[11px] text-[rgba(255,255,255,0.45)] mt-2.5">
+            {node.children.length} direct report{node.children.length !== 1 ? 's' : ''}
+          </p>
+        )}
+
         {/* Expand toggle */}
         {hasKids && (
           <button onClick={e => { e.stopPropagation(); setOpen(!open); }}
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full flex items-center justify-center z-10 transition-all"
+            className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full flex items-center justify-center z-10 transition-all"
             style={{
               background: 'var(--bg-base)',
-              border: `1.5px solid ${lv.color}30`,
-              boxShadow: `0 2px 8px rgba(0,0,0,0.1)`,
+              border: `2px solid ${teamColor}60`,
+              boxShadow: `0 2px 8px rgba(0,0,0,0.25)`,
             }}>
             <motion.div animate={{ rotate: open ? 0 : -90 }} transition={{ duration: 0.2 }}>
-              <ChevronDown className="h-3 w-3" style={{ color: lv.color }} />
+              <ChevronDown className="h-3.5 w-3.5" style={{ color: teamColor }} />
             </motion.div>
           </button>
         )}
@@ -436,30 +558,36 @@ function TreeNode({ node, members, teams, canEdit, onEdit, isRoot = false, index
             className="flex flex-col items-center overflow-visible"
           >
             {/* Vertical line down from parent */}
-            <div className="w-px h-8" style={{ background: `linear-gradient(to bottom, ${lv.color}30, ${lv.color}15)` }} />
+            <div className="w-[3px] h-10 rounded-full"
+              style={{ background: `linear-gradient(to bottom, ${teamColor}80, ${teamColor}50)` }} />
 
             {/* Children container */}
             {node.children.length === 1 ? (
               <TreeNode node={node.children[0]} members={members} teams={teams}
                 canEdit={canEdit} onEdit={onEdit} index={0} />
             ) : (
-              <div className="relative flex items-start gap-4">
+              <div className="relative flex items-start gap-10">
                 {/* Horizontal connector line */}
-                <div className="absolute top-0 h-px"
+                <div className="absolute top-0 h-[3px] rounded-full"
                   style={{
-                    left: `calc(${100 / (node.children.length * 2)}% - 0px)`,
-                    right: `calc(${100 / (node.children.length * 2)}% - 0px)`,
-                    background: `linear-gradient(90deg, transparent, ${lv.color}20, ${lv.color}20, transparent)`,
+                    left: `calc(${100 / (node.children.length * 2)}%)`,
+                    right: `calc(${100 / (node.children.length * 2)}%)`,
+                    background: `linear-gradient(90deg, ${teamColor}40, ${teamColor}70, ${teamColor}70, ${teamColor}40)`,
                   }} />
 
-                {node.children.map((child, ci) => (
-                  <div key={child.id} className="flex flex-col items-center">
-                    {/* Vertical line from horizontal to child */}
-                    <div className="w-px h-6" style={{ background: `${lv.color}20` }} />
-                    <TreeNode node={child} members={members} teams={teams}
-                      canEdit={canEdit} onEdit={onEdit} index={ci} />
-                  </div>
-                ))}
+                {node.children.map((child, ci) => {
+                  const childTeam = teams.find(t => t.id === child.teamId);
+                  const childColor = childTeam?.color || getLevelConfig(child.hierarchyLevel).color;
+                  return (
+                    <div key={child.id} className="flex flex-col items-center">
+                      {/* Vertical line from horizontal to child */}
+                      <div className="w-[3px] h-8 rounded-full"
+                        style={{ background: `linear-gradient(to bottom, ${teamColor}70, ${childColor}60)` }} />
+                      <TreeNode node={child} members={members} teams={teams}
+                        canEdit={canEdit} onEdit={onEdit} index={ci} />
+                    </div>
+                  );
+                })}
               </div>
             )}
           </motion.div>

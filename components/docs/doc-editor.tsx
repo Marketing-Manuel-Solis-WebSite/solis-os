@@ -3,11 +3,12 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Save, ArrowLeft, Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   List, ListOrdered, Heading1, Heading2, Heading3, Quote, Code,
-  Minus, Link, Image, AlignLeft, Eye, Edit2, Bot, Sparkles,
-  Lock, Globe, Users, Hash, Star, StarOff, Trash2, Clock, X,
-  ChevronDown, MoreHorizontal, Copy, Download, Type, Undo2, Redo2,
-  Maximize2, Minimize2, Table, CheckSquare
+  Minus, Link, Image, Eye, Edit2, Sparkles,
+  Lock, Globe, Users, X, Download, Type, Undo2, Redo2,
+  Maximize2, Minimize2, Table, CheckSquare, FileText, Upload, FileDown,
 } from 'lucide-react';
+import { renderMarkdown } from '@/lib/markdown';
+import { uploadFile, isImageType, formatFileSize } from '@/lib/upload';
 
 interface DocEditorProps {
   doc: any;
@@ -19,80 +20,6 @@ interface DocEditorProps {
   onBack: () => void;
   onToggleAI: () => void;
   showAI: boolean;
-}
-
-// ========== MARKDOWN RENDERER ==========
-function renderMarkdown(md: string): string {
-  if (!md) return '';
-  let html = md;
-
-  // Escape HTML
-  html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-  // Code blocks (```)
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, lang, code) => {
-    return `<pre class="doc-code-block"><code class="language-${lang}">${code.trim()}</code></pre>`;
-  });
-
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, '<code class="doc-inline-code">$1</code>');
-
-  // Headers
-  html = html.replace(/^######\s+(.+)$/gm, '<h6 class="doc-h6">$1</h6>');
-  html = html.replace(/^#####\s+(.+)$/gm, '<h5 class="doc-h5">$1</h5>');
-  html = html.replace(/^####\s+(.+)$/gm, '<h4 class="doc-h4">$1</h4>');
-  html = html.replace(/^###\s+(.+)$/gm, '<h3 class="doc-h3">$1</h3>');
-  html = html.replace(/^##\s+(.+)$/gm, '<h2 class="doc-h2">$1</h2>');
-  html = html.replace(/^#\s+(.+)$/gm, '<h1 class="doc-h1">$1</h1>');
-
-  // Bold, italic, strikethrough
-  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
-  html = html.replace(/__(.+?)__/g, '<u>$1</u>');
-
-  // Horizontal rule
-  html = html.replace(/^---$/gm, '<hr class="doc-hr" />');
-
-  // Blockquote
-  html = html.replace(/^>\s+(.+)$/gm, '<blockquote class="doc-blockquote">$1</blockquote>');
-
-  // Tables
-  html = html.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)*)/gm, (_m, header, _sep, body) => {
-    const heads = header.split('|').filter((c: string) => c.trim()).map((c: string) => `<th class="doc-th">${c.trim()}</th>`).join('');
-    const rows = body.trim().split('\n').map((row: string) => {
-      const cells = row.split('|').filter((c: string) => c.trim()).map((c: string) => `<td class="doc-td">${c.trim()}</td>`).join('');
-      return `<tr>${cells}</tr>`;
-    }).join('');
-    return `<table class="doc-table"><thead><tr>${heads}</tr></thead><tbody>${rows}</tbody></table>`;
-  });
-
-  // Checkbox lists
-  html = html.replace(/^- \[x\]\s+(.+)$/gm, '<div class="doc-checkbox checked"><span class="doc-check">✓</span> <span class="doc-check-text done">$1</span></div>');
-  html = html.replace(/^- \[ \]\s+(.+)$/gm, '<div class="doc-checkbox"><span class="doc-check-empty">○</span> <span class="doc-check-text">$1</span></div>');
-
-  // Unordered lists
-  html = html.replace(/^- (.+)$/gm, '<li class="doc-li">$1</li>');
-  html = html.replace(/((?:<li class="doc-li">.*<\/li>\n?)+)/g, '<ul class="doc-ul">$1</ul>');
-
-  // Ordered lists
-  html = html.replace(/^\d+\.\s+(.+)$/gm, '<li class="doc-oli">$1</li>');
-  html = html.replace(/((?:<li class="doc-oli">.*<\/li>\n?)+)/g, '<ol class="doc-ol">$1</ol>');
-
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="doc-link" target="_blank" rel="noopener">$1</a>');
-
-  // Images
-  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="doc-img" />');
-
-  // Paragraphs (lines that aren't already wrapped)
-  html = html.replace(/^(?!<[a-z]|$)(.+)$/gm, '<p class="doc-p">$1</p>');
-
-  // Clean up empty paragraphs
-  html = html.replace(/<p class="doc-p"><\/p>/g, '<br />');
-
-  return html;
 }
 
 // ========== TOOLBAR BUTTON ==========
@@ -127,6 +54,15 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [redoStack, setRedoStack] = useState<string[]>([]);
 
+  // Image upload state
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Download menu
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+
   // Sync doc changes
   useEffect(() => {
     setContent(doc.content || '');
@@ -159,6 +95,14 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
     return () => window.removeEventListener('keydown', handler);
   }, [content, undoStack, redoStack]);
 
+  // Close download menu on outside click
+  useEffect(() => {
+    if (!showDownloadMenu) return;
+    const close = () => setShowDownloadMenu(false);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [showDownloadMenu]);
+
   const pushUndo = useCallback((val: string) => {
     setUndoStack(prev => [...prev.slice(-50), val]);
     setRedoStack([]);
@@ -190,15 +134,19 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave(doc.id, {
-      title,
-      content,
-      contentHtml: renderMarkdown(content),
-      visibility,
-      category: category.trim(),
-      tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
-    });
-    setDirty(false);
+    try {
+      await onSave(doc.id, {
+        title,
+        content,
+        contentHtml: renderMarkdown(content),
+        visibility,
+        category: category.trim(),
+        tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
+      });
+      setDirty(false);
+    } catch (err) {
+      console.error('Save failed:', err);
+    }
     setSaving(false);
   };
 
@@ -254,6 +202,122 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
     setDirty(true);
   };
 
+  // ========== IMAGE UPLOAD ==========
+  const handleImageUpload = async (files: FileList | null) => {
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      if (!isImageType(file.type)) {
+        alert('Solo se permiten archivos de imagen (JPG, PNG, GIF, WebP, etc.)');
+        continue;
+      }
+      setUploading(true);
+      setUploadProgress(0);
+      try {
+        const result = await uploadFile(file, `docs/${doc.id}/images`, setUploadProgress);
+        const markdownImg = `\n![${result.name}](${result.url})\n`;
+        const el = editorRef.current;
+        if (el) {
+          const pos = el.selectionStart;
+          const before = content.slice(0, pos);
+          const after = content.slice(pos);
+          pushUndo(content);
+          setContent(before + markdownImg + after);
+        } else {
+          pushUndo(content);
+          setContent(content + markdownImg);
+        }
+        setDirty(true);
+      } catch (err: any) {
+        alert(err.message || 'Error al subir imagen');
+      }
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  // ========== DOWNLOAD ==========
+  const styledHtml = (forPrint = false) => {
+    return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>${title}</title>
+<style>
+body{font-family:'Segoe UI',system-ui,sans-serif;max-width:800px;margin:40px auto;padding:20px;color:#333;line-height:1.8;background:#fff}
+h1{border-bottom:2px solid #D4A843;padding-bottom:8px;color:#1a1a1a}
+h2{color:#D4A843;margin-top:2rem}
+h3{color:#555;margin-top:1.5rem}
+blockquote{border-left:3px solid #D4A843;padding-left:16px;color:#666;font-style:italic;margin:1rem 0}
+code{background:#f5f5f5;padding:2px 6px;border-radius:4px;font-size:0.9em}
+pre{background:#1a1a2e;color:#e0e0e0;padding:16px;border-radius:8px;overflow-x:auto}
+pre code{background:none;padding:0;color:inherit}
+table{border-collapse:collapse;width:100%;margin:1rem 0}
+th,td{border:1px solid #ddd;padding:8px 12px;text-align:left}
+th{background:#f5f5f5;font-weight:600}
+img{max-width:100%;border-radius:8px;margin:1rem 0}
+figure{text-align:center;margin:1.5rem 0}
+figcaption{font-size:0.75rem;color:#999;margin-top:0.5rem;font-style:italic}
+a{color:#D4A843}
+del{color:#999}
+hr{border:none;border-top:2px solid #eee;margin:2rem 0}
+ul,ol{padding-left:1.5rem}
+li{margin-bottom:0.25rem}
+${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''}
+</style></head><body>${renderMarkdown(content)}</body></html>`;
+  };
+
+  const triggerDownload = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const downloadAs = (format: 'markdown' | 'html' | 'text' | 'pdf') => {
+    setShowDownloadMenu(false);
+    const filename = (title || 'document').replace(/[^a-zA-Z0-9 ]/g, '').trim() || 'document';
+
+    switch (format) {
+      case 'markdown':
+        triggerDownload(new Blob([content], { type: 'text/markdown;charset=utf-8' }), `${filename}.md`);
+        break;
+      case 'html':
+        triggerDownload(new Blob([styledHtml()], { type: 'text/html;charset=utf-8' }), `${filename}.html`);
+        break;
+      case 'text': {
+        const plain = content
+          .replace(/```[\s\S]*?```/g, '')
+          .replace(/^#{1,6}\s+/gm, '')
+          .replace(/\*\*\*(.+?)\*\*\*/g, '$1')
+          .replace(/\*\*(.+?)\*\*/g, '$1')
+          .replace(/\*(.+?)\*/g, '$1')
+          .replace(/~~(.+?)~~/g, '$1')
+          .replace(/__(.+?)__/g, '$1')
+          .replace(/`([^`]+)`/g, '$1')
+          .replace(/!\[.*?\]\(.*?\)/g, '')
+          .replace(/\[([^\]]+)\]\(.*?\)/g, '$1')
+          .replace(/^[-*]\s+/gm, '  - ')
+          .replace(/^\d+\.\s+/gm, '  ')
+          .replace(/^>\s+/gm, '  ')
+          .replace(/^---$/gm, '')
+          .replace(/\n{3,}/g, '\n\n');
+        triggerDownload(new Blob([plain], { type: 'text/plain;charset=utf-8' }), `${filename}.txt`);
+        break;
+      }
+      case 'pdf': {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) { alert('Please allow pop-ups to download as PDF.'); return; }
+        printWindow.document.write(styledHtml(true));
+        printWindow.document.close();
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+        break;
+      }
+    }
+  };
+
   const wordCount = content.split(/\s+/).filter(Boolean).length;
   const charCount = content.length;
   const lineCount = content.split('\n').length;
@@ -266,6 +330,16 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
 
   return (
     <div className={containerClass}>
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => { handleImageUpload(e.target.files); e.target.value = ''; }}
+      />
+
       {/* Top Bar */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-base)] shrink-0">
         <button onClick={onBack} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition">
@@ -279,6 +353,14 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
         <div className="flex items-center gap-1.5">
           {dirty && <span className="text-[10px] text-amber-400 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">Unsaved</span>}
           {saving && <span className="text-[10px] text-blue-400 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20">Saving...</span>}
+          {uploading && (
+            <div className="flex items-center gap-2 px-2">
+              <div className="w-16 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                <div className="h-full bg-[#D4A843] rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
+              </div>
+              <span className="text-[10px] text-[#D4A843]">{uploadProgress}%</span>
+            </div>
+          )}
 
           <button onClick={() => setShowMeta(!showMeta)}
             className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition ${visColor}`}>
@@ -290,6 +372,32 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
             title="AI Assistant">
             <Sparkles className="h-4 w-4" />
           </button>
+
+          {/* Download dropdown */}
+          <div className="relative">
+            <button onClick={e => { e.stopPropagation(); setShowDownloadMenu(!showDownloadMenu); }}
+              className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition" title="Download">
+              <Download className="h-4 w-4" />
+            </button>
+            {showDownloadMenu && (
+              <div className="absolute right-0 top-full mt-1 w-48 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-xl z-20 py-1"
+                onClick={e => e.stopPropagation()}>
+                <button onClick={() => downloadAs('markdown')} className="w-full px-4 py-2 text-left text-xs text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
+                  <Type className="h-3.5 w-3.5" /> Markdown (.md)
+                </button>
+                <button onClick={() => downloadAs('html')} className="w-full px-4 py-2 text-left text-xs text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
+                  <Code className="h-3.5 w-3.5" /> HTML (.html)
+                </button>
+                <button onClick={() => downloadAs('text')} className="w-full px-4 py-2 text-left text-xs text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
+                  <FileText className="h-3.5 w-3.5" /> Plain Text (.txt)
+                </button>
+                <div className="mx-3 my-1 border-t border-[var(--border-subtle)]" />
+                <button onClick={() => downloadAs('pdf')} className="w-full px-4 py-2 text-left text-xs text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
+                  <FileDown className="h-3.5 w-3.5 text-red-400" /> PDF (Print)
+                </button>
+              </div>
+            )}
+          </div>
 
           <button onClick={handleSave} disabled={saving || !dirty}
             className="px-4 h-8 rounded-xl btn-gold text-xs flex items-center gap-1.5 disabled:opacity-40">
@@ -308,9 +416,9 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
           <div className="flex items-center gap-2">
             <label className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">Visibility</label>
             <select value={visibility} onChange={e => { setVisibility(e.target.value as any); setDirty(true); }} className="select-dark h-7 text-[11px] px-2">
-              <option value="team">🏢 Team</option>
-              <option value="private">🔒 Private</option>
-              <option value="public">🌐 Public</option>
+              <option value="team">Team</option>
+              <option value="private">Private</option>
+              <option value="public">Public</option>
             </select>
           </div>
           <div className="flex items-center gap-2">
@@ -330,15 +438,15 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
 
       {/* Toolbar */}
       <div className="flex items-center gap-0.5 px-4 py-1.5 border-b border-[var(--border-subtle)] bg-[var(--bg-base)] flex-wrap shrink-0">
-        <TBtn icon={Undo2} label="Undo (⌘Z)" onClick={undo} disabled={undoStack.length === 0} />
-        <TBtn icon={Redo2} label="Redo (⌘⇧Z)" onClick={redo} disabled={redoStack.length === 0} />
+        <TBtn icon={Undo2} label="Undo (Ctrl+Z)" onClick={undo} disabled={undoStack.length === 0} />
+        <TBtn icon={Redo2} label="Redo (Ctrl+Shift+Z)" onClick={redo} disabled={redoStack.length === 0} />
         <TSep />
         <TBtn icon={Heading1} label="Heading 1" onClick={() => insertAtLine('# ')} />
         <TBtn icon={Heading2} label="Heading 2" onClick={() => insertAtLine('## ')} />
         <TBtn icon={Heading3} label="Heading 3" onClick={() => insertAtLine('### ')} />
         <TSep />
-        <TBtn icon={Bold} label="Bold (⌘B)" onClick={() => insertFormat('**', '**')} />
-        <TBtn icon={Italic} label="Italic (⌘I)" onClick={() => insertFormat('*', '*')} />
+        <TBtn icon={Bold} label="Bold (Ctrl+B)" onClick={() => insertFormat('**', '**')} />
+        <TBtn icon={Italic} label="Italic (Ctrl+I)" onClick={() => insertFormat('*', '*')} />
         <TBtn icon={UnderlineIcon} label="Underline" onClick={() => insertFormat('__', '__')} />
         <TBtn icon={Strikethrough} label="Strikethrough" onClick={() => insertFormat('~~', '~~')} />
         <TSep />
@@ -352,7 +460,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
         <TBtn icon={Table} label="Table" onClick={() => insertBlock('| Column 1 | Column 2 | Column 3 |\n|----------|----------|----------|\n| Cell     | Cell     | Cell     |')} />
         <TSep />
         <TBtn icon={Link} label="Link" onClick={() => insertFormat('[', '](url)')} />
-        <TBtn icon={Image} label="Image" onClick={() => insertFormat('![alt](', ')')} />
+        <TBtn icon={Image} label="Upload Image" onClick={() => fileInputRef.current?.click()} />
 
         <div className="flex-1" />
 
@@ -371,20 +479,34 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
       </div>
 
       {/* Editor / Preview area */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Drag-and-drop overlay */}
+        {dragOver && (
+          <div className="absolute inset-0 z-10 bg-[#D4A843]/5 border-2 border-dashed border-[#D4A843]/40 rounded-xl flex items-center justify-center pointer-events-none">
+            <div className="text-center">
+              <Upload className="h-8 w-8 text-[#D4A843] mx-auto mb-2" />
+              <p className="text-sm text-[#D4A843] font-semibold">Drop image here to upload</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">Max 100MB per image</p>
+            </div>
+          </div>
+        )}
+
         {/* Editor */}
         {(mode === 'edit' || mode === 'split') && (
-          <div className={`${mode === 'split' ? 'w-1/2 border-r border-[var(--border-subtle)]' : 'w-full'} flex flex-col`}>
+          <div className={`${mode === 'split' ? 'w-1/2 border-r border-[var(--border-subtle)]' : 'w-full'} flex flex-col`}
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => { e.preventDefault(); setDragOver(false); handleImageUpload(e.dataTransfer.files); }}
+          >
             <textarea
               ref={editorRef}
               value={content}
               onChange={e => handleContentChange(e.target.value)}
-              placeholder="Start writing... Use markdown for formatting.&#10;&#10;# Heading 1&#10;## Heading 2&#10;### Heading 3&#10;&#10;**bold** *italic* ~~strikethrough~~&#10;&#10;- Bullet list&#10;- [ ] Checklist&#10;&#10;> Blockquote&#10;&#10;| Table | Header |&#10;|-------|--------|&#10;| Cell  | Cell   |"
+              placeholder="Start writing... Use markdown for formatting.&#10;&#10;# Heading 1&#10;## Heading 2&#10;### Heading 3&#10;&#10;**bold** *italic* ~~strikethrough~~&#10;&#10;- Bullet list&#10;- [ ] Checklist&#10;&#10;> Blockquote&#10;&#10;| Table | Header |&#10;|-------|--------|&#10;| Cell  | Cell   |&#10;&#10;Drag & drop images or click the image button to upload."
               className="flex-1 w-full bg-transparent text-gray-200 resize-none outline-none p-6 font-mono text-sm leading-relaxed placeholder:text-[var(--text-muted)]/60"
               style={{ tabSize: 2 }}
               spellCheck
               onKeyDown={e => {
-                // Tab inserts 2 spaces
                 if (e.key === 'Tab') {
                   e.preventDefault();
                   const el = editorRef.current!;
@@ -396,7 +518,6 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
                   setDirty(true);
                   setTimeout(() => { el.selectionStart = el.selectionEnd = start + 2; }, 0);
                 }
-                // Enter on list items continues the list
                 if (e.key === 'Enter') {
                   const el = editorRef.current!;
                   const pos = el.selectionStart;
@@ -449,7 +570,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
         </div>
         <div className="flex items-center gap-3">
           {doc.lastEditedByName && <span>Last edited by {doc.lastEditedByName}</span>}
-          <span>⌘S to save</span>
+          <span>Ctrl+S to save</span>
           <span>Markdown</span>
         </div>
       </div>

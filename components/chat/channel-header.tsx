@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Hash, Lock, Users, Pin, Settings, MessageCircle, UserPlus, Search, X, Check } from 'lucide-react';
+import { Hash, Lock, Users, Pin, Settings, MessageCircle, UserPlus, Search, X, Check, Eraser, Menu } from 'lucide-react';
 
 interface Props {
   channel: any;
@@ -10,14 +10,17 @@ interface Props {
   pinnedCount: number;
   memberCount: number;
   canManage: boolean;
+  onlineMap?: Record<string, boolean>;
   getDMName: (ch: any) => string;
   onShowSettings: () => void;
   onShowMembers: () => void;
   onShowPinned: () => void;
   onAddMember?: (userId: string) => void;
+  onClearView?: () => void;
+  onToggleSidebar?: () => void;
 }
 
-export default function ChannelHeader({ channel, members, userId, pinnedCount, memberCount, canManage, getDMName, onShowSettings, onShowMembers, onShowPinned, onAddMember }: Props) {
+export default function ChannelHeader({ channel, members, userId, pinnedCount, memberCount, canManage, onlineMap, getDMName, onShowSettings, onShowMembers, onShowPinned, onAddMember, onClearView, onToggleSidebar }: Props) {
   const isDM = channel.type === 'dm';
   const name = isDM ? getDMName(channel) : channel.name;
   const icon = isDM
@@ -49,13 +52,22 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
     : nonMembers;
 
   return (
-    <div className="h-14 border-b border-[var(--border)] glass flex items-center justify-between px-5 shrink-0">
+    <div role="banner" className="h-14 border-b border-[var(--border)] bg-[var(--bg-card)]/80 backdrop-blur-xl flex items-center justify-between px-5 shrink-0">
       <div className="flex items-center gap-3 min-w-0">
+        {onToggleSidebar && (
+          <button onClick={onToggleSidebar} className="lg:hidden p-2 -ml-2 mr-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition" aria-label="Abrir menú">
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
         {isDM && otherMember ? (
           <div className="w-8 h-8 rounded-full bg-[#D4A843]/10 border border-[#D4A843]/20 flex items-center justify-center text-sm font-bold text-[#D4A843] shrink-0">
             {otherMember.displayName?.[0]?.toUpperCase() || '?'}
           </div>
-        ) : icon}
+        ) : (
+          <div className="w-8 h-8 rounded-lg bg-[var(--bg-elevated)] flex items-center justify-center shrink-0">
+            {icon}
+          </div>
+        )}
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[var(--text-primary)] text-sm truncate">{name}</span>
@@ -63,24 +75,32 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">PRIVATE</span>
             )}
           </div>
+          {isDM && otherId && (
+            <p className={`text-[11px] flex items-center gap-1 ${onlineMap?.[otherId] ? 'text-[#22C55E]' : 'text-[var(--text-muted)]'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full inline-block ${onlineMap?.[otherId] ? 'bg-[#22C55E]' : 'bg-[var(--text-muted)]/40'}`} />
+              {onlineMap?.[otherId] ? 'En línea' : 'Desconectado'}
+            </p>
+          )}
           {channel.description && !isDM && (
             <p className="text-[11px] text-[var(--text-muted)] truncate">{channel.description}</p>
           )}
         </div>
       </div>
-      <div className="flex items-center gap-1">
-        {pinnedCount > 0 && (
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-            onClick={onShowPinned} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] text-[var(--text-muted)] hover:text-[#D4A843] hover:bg-[#D4A843]/5 transition" title="Pinned messages">
-            <Pin className="h-3.5 w-3.5" /><span>{pinnedCount}</span>
-          </motion.button>
-        )}
-        {!isDM && (
-          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-            onClick={onShowMembers} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition" title="Members">
-            <Users className="h-3.5 w-3.5" /><span>{memberCount}</span>
-          </motion.button>
-        )}
+      <div className="flex items-center gap-1.5">
+        <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--bg-base)]/50 overflow-hidden divide-x divide-[var(--border)]">
+          {pinnedCount > 0 && (
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+              onClick={onShowPinned} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[#D4A843] hover:bg-[#D4A843]/5 transition" title="Pinned messages">
+              <Pin className="h-3.5 w-3.5" /><span>{pinnedCount}</span>
+            </motion.button>
+          )}
+          {!isDM && (
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+              onClick={onShowMembers} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition" title="Members">
+              <Users className="h-3.5 w-3.5" /><span>{memberCount}</span>
+            </motion.button>
+          )}
+        </div>
 
         {/* Quick Add Member Button */}
         {canManage && !isDM && onAddMember && (
@@ -135,6 +155,12 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
           </div>
         )}
 
+        {onClearView && (
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+            onClick={onClearView} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition" title="Limpiar vista">
+            <Eraser className="h-4 w-4" />
+          </motion.button>
+        )}
         {canManage && !isDM && (
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
             onClick={onShowSettings} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition" title="Channel settings">

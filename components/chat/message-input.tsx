@@ -1,31 +1,52 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, Reply, Edit2, Paperclip, Image as ImageIcon, FileVideo, Loader2 } from 'lucide-react';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
+import { Send, X, Reply, Edit2, Paperclip, FileVideo, Loader2 } from 'lucide-react';
+import { uploadFile as sharedUploadFile, isImageType, isVideoType, formatFileSize } from '@/lib/upload';
+
+const QUICK_SUGGESTIONS = [
+  { label: 'Hola a todos', icon: '👋' },
+  { label: 'Buenos días', icon: '☀️' },
+  { label: 'Listo', icon: '✅' },
+  { label: 'Gracias', icon: '🙏' },
+  { label: 'De acuerdo', icon: '👍' },
+  { label: 'Entendido', icon: '📝' },
+];
 
 interface Props {
   channelName: string;
   members: any[];
   replyTo: any;
   editingMsg: any;
+  showSuggestions?: boolean;
+  onTypingStart?: () => void;
+  onTypingStop?: () => void;
   onSend: (content: string, mentions: string[]) => void;
   onEdit: (msgId: string, content: string) => void;
   onCancelReply: () => void;
   onCancelEdit: () => void;
 }
 
-export default function MessageInput({ channelName, members, replyTo, editingMsg, onSend, onEdit, onCancelReply, onCancelEdit }: Props) {
+export default function MessageInput({ channelName, members, replyTo, editingMsg, showSuggestions, onTypingStart, onTypingStop, onSend, onEdit, onCancelReply, onCancelEdit }: Props) {
   const [txt, setTxt] = useState('');
   const [showMentions, setShowMentions] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentions, setMentions] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [sending, setSending] = useState(false);
   const [previews, setPreviews] = useState<{ file: File; url: string; type: string }[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const emitTyping = useCallback(() => {
+    onTypingStart?.();
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      onTypingStop?.();
+    }, 4000);
+  }, [onTypingStart, onTypingStop]);
 
   useEffect(() => {
     if (editingMsg) {
@@ -38,29 +59,12 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
     if (replyTo) inputRef.current?.focus();
   }, [replyTo?.id]);
 
-  const uploadFile = async (file: File): Promise<string> => {
-    const path = `chat-uploads/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-    const storageRef = ref(storage, path);
-    const task = uploadBytesResumable(storageRef, file);
-
-    return new Promise((resolve, reject) => {
-      task.on('state_changed',
-        (snap) => setUploadProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-        (err) => reject(err),
-        async () => {
-          const url = await getDownloadURL(task.snapshot.ref);
-          resolve(url);
-        }
-      );
-    });
-  };
-
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
     const newPreviews: { file: File; url: string; type: string }[] = [];
     Array.from(files).forEach(file => {
-      if (file.size > 25 * 1024 * 1024) {
-        alert(`"${file.name}" es demasiado grande. Máximo 25MB.`);
+      if (file.size > 100 * 1024 * 1024) {
+        alert(`"${file.name}" es demasiado grande. Máximo 100MB.`);
         return;
       }
       const url = URL.createObjectURL(file);
@@ -78,6 +82,9 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
 
   const handleSubmit = async () => {
     if (!txt.trim() && previews.length === 0) return;
+    if (sending || uploading) return; // Prevent double send
+    onTypingStop?.();
+    if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
 
     if (editingMsg) {
       onEdit(editingMsg.id, txt.trim());
@@ -85,14 +92,16 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
       return;
     }
 
+    setSending(true);
+
     // Upload files first
     if (previews.length > 0) {
       setUploading(true);
       try {
         const urls: string[] = [];
         for (const p of previews) {
-          const url = await uploadFile(p.file);
-          urls.push(url);
+          const result = await sharedUploadFile(p.file, 'chat-uploads', (pct) => setUploadProgress(pct));
+          urls.push(result.url);
         }
         const fullContent = [txt.trim(), ...urls].filter(Boolean).join('\n');
         onSend(fullContent, mentions);
@@ -108,6 +117,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
     }
     setTxt('');
     setMentions([]);
+    setTimeout(() => setSending(false), 300);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -123,6 +133,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
 
   const handleChange = (val: string) => {
     setTxt(val);
+    if (val.trim()) emitTyping();
     const atMatch = val.match(/@(\w*)$/);
     if (atMatch) {
       setShowMentions(true);
@@ -212,19 +223,21 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="flex gap-2 px-5 pt-3 pb-1 flex-wrap">
+            <div className="flex gap-2.5 px-5 pt-3 pb-1 flex-wrap">
               {previews.map((p, i) => (
                 <div key={i} className="relative group">
-                  {p.type.startsWith('image/') ? (
-                    <img src={p.url} alt="Preview" className="h-20 w-20 object-cover rounded-xl border border-[var(--border)]" />
-                  ) : p.type.startsWith('video/') ? (
-                    <div className="h-20 w-20 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] flex items-center justify-center">
-                      <FileVideo className="h-6 w-6 text-[var(--text-muted)]" />
+                  {isImageType(p.type) ? (
+                    <img src={p.url} alt="Preview" className="h-24 w-24 object-cover rounded-xl border border-[var(--border)]" />
+                  ) : isVideoType(p.type) ? (
+                    <div className="h-24 w-24 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] flex flex-col items-center justify-center gap-1">
+                      <FileVideo className="h-6 w-6 text-blue-400" />
+                      <span className="text-[9px] text-[var(--text-muted)] truncate max-w-[70px]">{p.file.name}</span>
                     </div>
                   ) : (
-                    <div className="h-20 px-3 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] flex items-center gap-2">
-                      <Paperclip className="h-4 w-4 text-[var(--text-muted)]" />
-                      <span className="text-xs text-[var(--text-secondary)] truncate max-w-[80px]">{p.file.name}</span>
+                    <div className="h-24 px-4 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] flex flex-col items-center justify-center gap-1">
+                      <Paperclip className="h-5 w-5 text-[var(--text-muted)]" />
+                      <span className="text-[10px] text-[var(--text-secondary)] truncate max-w-[100px] text-center">{p.file.name}</span>
+                      <span className="text-[9px] text-[var(--text-muted)]">{formatFileSize(p.file.size)}</span>
                     </div>
                   )}
                   <button onClick={() => removePreview(i)}
@@ -262,16 +275,34 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
                 whileHover={{ backgroundColor: 'var(--hover-bg)' }}
                 onClick={() => insertMention(m)}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[var(--text-secondary)] transition">
-                <div className="w-6 h-6 rounded-full bg-[#D4A843]/10 flex items-center justify-center text-[10px] font-bold text-[#D4A843]">
+                <div className="w-7 h-7 rounded-full bg-[#D4A843]/10 flex items-center justify-center text-[10px] font-bold text-[#D4A843]">
                   {m.displayName?.[0]?.toUpperCase()}
                 </div>
-                <span>{m.displayName}</span>
+                <span className="font-medium">{m.displayName}</span>
                 {m.role && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[var(--bg-base)] border border-[var(--border)] text-[var(--text-muted)] ml-auto">{m.role}</span>}
               </motion.button>
             ))}
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Quick suggestion chips */}
+      {showSuggestions && !editingMsg && !replyTo && (
+        <div className="flex gap-2 px-5 pt-3 pb-1 overflow-x-auto scrollbar-thin">
+          {QUICK_SUGGESTIONS.map(s => (
+            <motion.button
+              key={s.label}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => onSend(s.label, [])}
+              className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] text-xs text-[var(--text-secondary)] hover:border-[#D4A843]/30 hover:text-[#D4A843] transition-all flex items-center gap-1.5"
+            >
+              <span>{s.icon}</span>
+              {s.label}
+            </motion.button>
+          ))}
+        </div>
+      )}
 
       {/* Input area */}
       <div className="p-4">
@@ -284,8 +315,8 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
             whileTap={{ scale: 0.9 }}
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
-            className="h-[42px] w-[42px] rounded-xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--gold)] hover:border-[var(--gold)]/30 hover:bg-[var(--gold)]/5 transition shrink-0"
-            title="Adjuntar archivo"
+            className="h-[42px] w-[42px] rounded-2xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--gold)] hover:border-[var(--gold)]/30 hover:bg-[var(--gold)]/5 transition shrink-0"
+            title="Adjuntar archivo (máx 100MB)"
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
           </motion.button>
@@ -297,9 +328,10 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
               onChange={e => handleChange(e.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder={`Mensaje ${channelName ? '#' + channelName : ''}... (@ para mencionar)`}
+              aria-label="Escribe un mensaje"
+              placeholder={`Escribe un mensaje en ${channelName ? '#' + channelName : ''}...`}
               rows={1}
-              className="w-full px-4 py-2.5 rounded-xl bg-[var(--bg-base)] border border-[var(--border)] text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[#D4A843]/40 focus:ring-1 focus:ring-[#D4A843]/10 resize-none max-h-32 transition-all"
+              className="w-full px-4 py-2.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[#D4A843]/50 focus:ring-2 focus:ring-[#D4A843]/15 focus:shadow-[0_0_12px_rgba(212,168,67,0.08)] resize-none max-h-32 transition-all"
               style={{ minHeight: '42px' }}
               onInput={(e) => {
                 const t = e.target as HTMLTextAreaElement;
@@ -311,15 +343,17 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
           <motion.button
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.95 }}
+            animate={sending ? { scale: [1, 1.15, 1], rotate: [0, -10, 0] } : {}}
+            transition={{ duration: 0.3 }}
             onClick={handleSubmit}
-            disabled={(!txt.trim() && previews.length === 0) || uploading}
-            className={`h-[42px] px-5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all ${
+            disabled={(!txt.trim() && previews.length === 0) || uploading || sending}
+            className={`h-[42px] px-5 rounded-2xl text-sm font-semibold flex items-center gap-2 transition-all ${
               editingMsg
                 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20 hover:bg-blue-500/30'
                 : 'btn-gold disabled:opacity-30'
             }`}>
             <Send className="h-4 w-4" />
-            {editingMsg ? 'Editar' : 'Enviar'}
+            <span className="hidden sm:inline">{editingMsg ? 'Editar' : 'Enviar'}</span>
           </motion.button>
         </div>
         <div className="flex items-center gap-3 mt-1.5 px-1">

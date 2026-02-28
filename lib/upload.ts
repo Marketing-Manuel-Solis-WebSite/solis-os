@@ -8,7 +8,7 @@ export interface UploadResult {
   size: number;
 }
 
-const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_SIZE = 100 * 1024 * 1024; // 100MB
 
 export async function uploadFile(
   file: File,
@@ -16,7 +16,7 @@ export async function uploadFile(
   onProgress?: (pct: number) => void,
 ): Promise<UploadResult> {
   if (file.size > MAX_SIZE) {
-    throw new Error(`"${file.name}" es demasiado grande. Máximo 50MB.`);
+    throw new Error(`"${file.name}" es demasiado grande. Máximo 100MB.`);
   }
 
   const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');

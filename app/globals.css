@@ -55,7 +55,7 @@
   --skeleton-from: #111827;
   --skeleton-via: #1F2937;
   --skeleton-to: #111827;
-  --hover-bg: rgba(255,255,255,0.01);
+  --hover-bg: rgba(255,255,255,0.04);
   --card-hover-bg: #171F2E;
   --card-hover-border: rgba(212,168,67,0.15);
   --card-hover-shadow: 0 8px 30px rgba(0,0,0,0.3);
@@ -187,7 +187,9 @@ body { background: var(--bg-base); color: var(--text-secondary); transition: bac
 .doc-table tbody tr:hover .doc-td { background: var(--hover-bg); }
 .doc-link { color: #D4A843; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: rgba(212,168,67,0.3); transition: all 0.2s; }
 .doc-link:hover { color: #E8C85A; text-decoration-color: rgba(212,168,67,0.6); }
-.doc-img { max-width: 100%; border-radius: 0.75rem; border: 1px solid var(--border); margin: 1rem 0; }
+.doc-img { max-width: 100%; border-radius: 0.75rem; border: 1px solid var(--border); margin: 0; display: inline-block; }
+.doc-figure { margin: 1.5rem 0; text-align: center; }
+.doc-figcaption { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; font-style: italic; }
 
 /* ============================================
    AI CONTENT STYLES

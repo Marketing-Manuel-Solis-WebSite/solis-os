@@ -1,7 +1,8 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Reply, Pin, Trash2, Edit2, SmilePlus, Image as ImageIcon, FileText, Play } from 'lucide-react';
+import { Reply, Pin, Trash2, Edit2, SmilePlus, Image as ImageIcon, FileText, Play, Download, ArrowRight, ChevronDown } from 'lucide-react';
+import { formatFileSize } from '@/lib/upload';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '🔥', '👀', '✅', '💯'];
 
@@ -11,12 +12,36 @@ interface Props {
   userId: string;
   channelType: string;
   canManage: boolean;
+  loading?: boolean;
   onReply: (msg: any) => void;
   onEdit: (msg: any) => void;
   onDelete: (msgId: string) => void;
   onPin: (msgId: string, isPinned: boolean) => void;
   onReaction: (msgId: string, emoji: string) => void;
 }
+
+// ========== SKELETON ==========
+function MessageSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="px-4 py-4 space-y-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="flex gap-3.5 animate-pulse">
+          <div className="w-10 h-10 rounded-full skeleton shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="flex gap-2">
+              <div className="h-3.5 w-24 skeleton rounded" />
+              <div className="h-3 w-12 skeleton rounded" />
+            </div>
+            <div className="h-4 skeleton rounded" style={{ width: `${50 + Math.random() * 40}%` }} />
+            {i % 3 === 0 && <div className="h-4 skeleton rounded" style={{ width: `${30 + Math.random() * 30}%` }} />}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ========== HELPERS ==========
 
 function isImageUrl(url: string) {
   return /\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?.*)?$/i.test(url);
@@ -35,32 +60,135 @@ function extractMediaUrls(content: string) {
   return { images, videos, textContent, hasMedia: images.length > 0 || videos.length > 0 };
 }
 
-export default function MessageList({ messages, members, userId, channelType, canManage, onReply, onEdit, onDelete, onPin, onReaction }: Props) {
+function formatDateSeparator(date: Date): string {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const msgDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (msgDate.getTime() === today.getTime()) return 'Hoy';
+  if (msgDate.getTime() === yesterday.getTime()) return 'Ayer';
+  return date.toLocaleDateString('es-MX', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function renderMessageText(text: string, members: any[]): React.ReactNode {
+  const parts = text.split(/(@[A-Za-záéíóúñüÁÉÍÓÚÑÜ]+(?:\s[A-Za-záéíóúñüÁÉÍÓÚÑÜ]+)?)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('@')) {
+      const name = part.slice(1);
+      const isMember = members.some(m =>
+        m.displayName?.toLowerCase() === name.toLowerCase() ||
+        m.displayName?.toLowerCase().startsWith(name.toLowerCase())
+      );
+      if (isMember) {
+        return (
+          <span key={i} className="bg-[#D4A843]/15 text-[#D4A843] px-1 rounded font-medium">
+            {part}
+          </span>
+        );
+      }
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
+// ========== GROUPED ITEM TYPES ==========
+type GroupedItem =
+  | { type: 'date'; label: string; id: string }
+  | { type: 'group'; messages: any[]; id: string };
+
+// ========== COMPONENT ==========
+export default function MessageList({ messages, members, userId, channelType, canManage, loading, onReply, onEdit, onDelete, onPin, onReaction }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [showEmoji, setShowEmoji] = useState<string | null>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const prevMsgCountRef = useRef(messages.length);
+
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    setIsAtBottom(atBottom);
+    if (atBottom) setHasNewMessages(false);
+  }, []);
 
   useEffect(() => {
+    if (messages.length > prevMsgCountRef.current) {
+      if (isAtBottom) {
+        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        setHasNewMessages(true);
+      }
+    } else if (messages.length > 0 && prevMsgCountRef.current === 0) {
+      // Initial load — scroll to bottom immediately
+      bottomRef.current?.scrollIntoView({ behavior: 'auto' });
+    }
+    prevMsgCountRef.current = messages.length;
+  }, [messages.length, isAtBottom]);
+
+  const scrollToBottom = () => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    setHasNewMessages(false);
+  };
 
   const getMember = (uid: string) => members.find(m => m.id === uid);
 
-  // Group consecutive messages by same user within 5min
-  const grouped: any[][] = [];
+  // Build grouped items with date separators
+  const grouped: GroupedItem[] = [];
+  let currentDay: string | null = null;
+  let currentGroup: any[] = [];
+
+  const flushGroup = () => {
+    if (currentGroup.length > 0) {
+      grouped.push({ type: 'group', messages: [...currentGroup], id: currentGroup[0].id });
+      currentGroup = [];
+    }
+  };
+
   messages.forEach((msg, i) => {
+    const msgDate = msg.createdAt?.toDate?.();
+    const dayKey = msgDate ? `${msgDate.getFullYear()}-${msgDate.getMonth()}-${msgDate.getDate()}` : null;
+
+    // Insert date separator if day changed
+    if (dayKey && dayKey !== currentDay) {
+      flushGroup();
+      currentDay = dayKey;
+      grouped.push({ type: 'date', label: formatDateSeparator(msgDate), id: `date-${dayKey}` });
+    }
+
     const prev = i > 0 ? messages[i - 1] : null;
     const sameUser = prev && prev.userId === msg.userId && msg.type !== 'system' && prev.type !== 'system';
     const within5min = prev && msg.createdAt?.seconds && prev.createdAt?.seconds && (msg.createdAt.seconds - prev.createdAt.seconds) < 300;
-    if (sameUser && within5min) {
-      grouped[grouped.length - 1].push(msg);
+    const prevDate = prev?.createdAt?.toDate?.();
+    const sameDay2 = msgDate && prevDate && isSameDay(msgDate, prevDate);
+
+    if (sameUser && within5min && sameDay2) {
+      currentGroup.push(msg);
     } else {
-      grouped.push([msg]);
+      flushGroup();
+      currentGroup = [msg];
     }
   });
+  flushGroup();
+
+  // Show skeletons while loading
+  if (loading && messages.length === 0) {
+    return (
+      <div className="flex-1 overflow-y-auto scrollbar-thin">
+        <MessageSkeleton />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex-1 overflow-y-auto px-5 py-6 space-y-1 scrollbar-thin" onClick={() => { setShowEmoji(null); }}>
+    <div ref={containerRef} onScroll={handleScroll} role="log" aria-live="polite" aria-label="Mensajes del canal" className="flex-1 overflow-y-auto px-4 py-4 space-y-0.5 scrollbar-thin relative" onClick={() => setShowEmoji(null)}>
       {messages.length === 0 && (
         <div className="flex-1 flex items-center justify-center py-16">
           <div className="text-center">
@@ -73,229 +201,318 @@ export default function MessageList({ messages, members, userId, channelType, ca
         </div>
       )}
 
-      {grouped.map((group, gi) => {
+      {grouped.map((item) => {
+        // Date separator
+        if (item.type === 'date') {
+          return (
+            <div key={item.id} className="flex items-center gap-4 py-3 px-2 my-2">
+              <div className="flex-1 h-px bg-[var(--border)]" />
+              <span className="text-[11px] font-semibold text-[var(--text-muted)] tracking-wider">{item.label}</span>
+              <div className="flex-1 h-px bg-[var(--border)]" />
+            </div>
+          );
+        }
+
+        // Message group
+        const group = item.messages;
         const first = group[0];
         const isSystem = first.type === 'system';
         const isMine = first.userId === userId;
         const member = getMember(first.userId);
         const time = first.createdAt?.toDate?.();
 
+        // System message — divider style
         if (isSystem) {
           return (
-            <motion.div
-              key={first.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex justify-center py-3"
-            >
-              <span className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] px-4 py-1.5 rounded-full border border-[var(--border)]">
+            <div key={item.id} className="flex items-center gap-3 py-1.5 px-2 my-1">
+              <div className="flex-1 h-px bg-[var(--border)]" />
+              <span className="text-[11px] text-[var(--text-muted)] whitespace-nowrap flex items-center gap-1.5">
+                <ArrowRight className="h-3 w-3" />
                 {first.content}
               </span>
-            </motion.div>
+              <div className="flex-1 h-px bg-[var(--border)]" />
+            </div>
           );
         }
 
         return (
-          <motion.div
-            key={first.id}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-            className={`flex gap-3.5 group/msg py-2.5 rounded-2xl hover:bg-[var(--hover-bg)] px-3 -mx-3 transition-colors ${isMine ? 'flex-row-reverse' : ''}`}
-            onMouseEnter={() => setHoverId(first.id)}
-            onMouseLeave={() => setHoverId(null)}
-          >
-            {/* Avatar */}
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 ${
-              isMine
-                ? 'bg-[var(--gold)]/15 border border-[var(--gold)]/25 text-[var(--gold)]'
-                : 'bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-muted)]'
-            }`}>
-              {(first.displayName || '?')[0].toUpperCase()}
-            </div>
-            <div className={`flex-1 min-w-0 max-w-[75%] ${isMine ? 'items-end' : ''}`}>
-              {/* Name + Time */}
-              <div className={`flex items-baseline gap-2 mb-1 ${isMine ? 'flex-row-reverse' : ''}`}>
-                <span className="text-sm font-semibold text-[var(--text-primary)]">{first.displayName}</span>
-                {member?.role && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-muted)]">{member.role}</span>
-                )}
-                {time && (
-                  <span className="text-[11px] text-[var(--text-muted)]">
-                    {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {time.toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                  </span>
-                )}
+          <div key={item.id} role="article" aria-label={`${first.displayName}: ${(first.content || '').slice(0, 80)}`}>
+            {/* First message — with avatar */}
+            <div
+              className={`flex gap-3.5 group/msg py-1.5 hover:bg-[var(--hover-bg)] px-4 -mx-4 transition-colors relative ${isMine ? 'border-l-2 border-l-[#D4A843]/20 hover:bg-[#D4A843]/[0.03]' : ''}`}
+              onMouseEnter={() => setHoverId(first.id)}
+              onMouseLeave={() => setHoverId(null)}
+            >
+              {/* Avatar */}
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-muted)]"
+                style={member?.teamId ? { backgroundColor: 'rgba(212,168,67,0.1)', color: '#D4A843', borderColor: 'rgba(212,168,67,0.2)' } : undefined}>
+                {(first.displayName || '?')[0].toUpperCase()}
               </div>
-              {/* Messages in group */}
-              {group.map(msg => {
-                const media = extractMediaUrls(msg.content || '');
-                return (
-                  <div key={msg.id}
-                    className={`relative group/single mb-1.5 ${msg.deleted ? 'opacity-50' : ''}`}
-                    onMouseEnter={() => setHoverId(msg.id)}
-                    onMouseLeave={() => { if (hoverId === msg.id) setHoverId(null); }}>
-
-                    {/* Reply indicator */}
-                    {msg.replyTo && (
-                      <div className={`flex items-center gap-1.5 mb-1.5 ${isMine ? 'justify-end' : ''}`}>
-                        <Reply className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                        <span className="text-xs text-[var(--gold)] font-medium">{msg.replyAuthor}</span>
-                        <span className="text-xs text-[var(--text-muted)] truncate max-w-[200px]">{msg.replyPreview}</span>
-                      </div>
-                    )}
-
-                    {/* Pin indicator */}
-                    {msg.pinned && (
-                      <div className={`flex items-center gap-1 mb-1 ${isMine ? 'justify-end' : ''}`}>
-                        <Pin className="h-3.5 w-3.5 text-[var(--gold)]" />
-                        <span className="text-[10px] text-[var(--gold)] font-semibold">Fijado</span>
-                      </div>
-                    )}
-
-                    {/* Message bubble */}
-                    <div className={`inline-block rounded-2xl px-4 py-2.5 max-w-full ${
-                      isMine
-                        ? 'bg-[var(--gold)]/10 border border-[var(--gold)]/15 ml-auto'
-                        : 'bg-[var(--bg-card)] border border-[var(--border)]'
-                    } ${isMine ? 'float-right clear-both' : ''}`}>
-                      {/* Text content */}
-                      {(media.textContent || !media.hasMedia) && (
-                        <div className={`text-[15px] leading-relaxed whitespace-pre-wrap ${msg.deleted ? 'italic text-[var(--text-muted)]' : 'text-[var(--text-secondary)]'}`}>
-                          {media.hasMedia ? media.textContent : msg.content}
-                          {msg.edited && !msg.deleted && <span className="text-[10px] text-[var(--text-muted)] ml-2">(editado)</span>}
-                        </div>
-                      )}
-
-                      {/* Image attachments */}
-                      {media.images.length > 0 && (
-                        <div className={`${media.textContent ? 'mt-2' : ''} space-y-2`}>
-                          {media.images.map((url, idx) => (
-                            <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block">
-                              <img src={url} alt="Shared image" className="max-w-full max-h-80 rounded-xl border border-[var(--border)] hover:opacity-90 transition" loading="lazy" />
-                            </a>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Video attachments */}
-                      {media.videos.length > 0 && (
-                        <div className={`${media.textContent ? 'mt-2' : ''} space-y-2`}>
-                          {media.videos.map((url, idx) => (
-                            <video key={idx} controls className="max-w-full max-h-80 rounded-xl border border-[var(--border)]" preload="metadata">
-                              <source src={url} />
-                            </video>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* File attachments from msg.attachments */}
-                      {msg.attachments?.length > 0 && (
-                        <div className={`${msg.content ? 'mt-2' : ''} space-y-1.5`}>
-                          {msg.attachments.map((att: any, idx: number) => (
-                            <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer"
-                              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--gold)]/30 transition text-sm">
-                              {att.type?.startsWith('image/') ? <ImageIcon className="h-4 w-4 text-[var(--gold)]" /> :
-                               att.type?.startsWith('video/') ? <Play className="h-4 w-4 text-blue-400" /> :
-                               <FileText className="h-4 w-4 text-[var(--text-muted)]" />}
-                              <span className="truncate text-[var(--text-secondary)]">{att.name || 'Archivo'}</span>
-                              <span className="text-[10px] text-[var(--text-muted)] ml-auto shrink-0">{att.size ? `${(att.size / 1024).toFixed(0)}KB` : ''}</span>
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className="clear-both" />
-
-                    {/* Reactions */}
-                    {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                      <div className={`flex gap-1.5 mt-2 flex-wrap ${isMine ? 'justify-end' : ''}`}>
-                        {Object.entries(msg.reactions).map(([emoji, users]: [string, any]) => {
-                          const reacted = users.includes(userId);
-                          return (
-                            <motion.button
-                              key={emoji}
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={e => { e.stopPropagation(); onReaction(msg.id, emoji); }}
-                              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-sm transition border ${
-                                reacted
-                                  ? 'bg-[var(--gold)]/10 border-[var(--gold)]/20 text-[var(--gold)]'
-                                  : 'bg-[var(--bg-card)] border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--text-muted)]'
-                              }`}>
-                              <span>{emoji}</span>
-                              <span className="text-xs font-semibold">{users.length}</span>
-                            </motion.button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Hover actions */}
-                    <AnimatePresence>
-                      {hoverId === msg.id && !msg.deleted && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 4, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 4, scale: 0.95 }}
-                          transition={{ duration: 0.12 }}
-                          className={`absolute -top-4 ${isMine ? 'left-0' : 'right-0'} flex items-center gap-0.5 px-1 py-0.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-lg z-10`}
-                          onClick={e => e.stopPropagation()}>
-                          <button onClick={() => setShowEmoji(showEmoji === msg.id ? null : msg.id)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--gold)] rounded-lg hover:bg-[var(--hover-bg)] transition" title="Reaccionar">
-                            <SmilePlus className="h-4 w-4" />
-                          </button>
-                          <button onClick={() => onReply(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg hover:bg-[var(--hover-bg)] transition" title="Responder">
-                            <Reply className="h-4 w-4" />
-                          </button>
-                          {(canManage || msg.userId === userId) && (
-                            <button onClick={() => onPin(msg.id, msg.pinned)} className={`p-1.5 rounded-lg hover:bg-[var(--hover-bg)] transition ${msg.pinned ? 'text-[var(--gold)]' : 'text-[var(--text-muted)] hover:text-[var(--gold)]'}`} title={msg.pinned ? 'Desfijar' : 'Fijar'}>
-                              <Pin className="h-4 w-4" />
-                            </button>
-                          )}
-                          {msg.userId === userId && (
-                            <button onClick={() => onEdit(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-blue-400 rounded-lg hover:bg-[var(--hover-bg)] transition" title="Editar">
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-                          )}
-                          {(canManage || msg.userId === userId) && (
-                            <button onClick={() => { if (confirm('¿Eliminar este mensaje?')) onDelete(msg.id); }} className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-lg hover:bg-[var(--hover-bg)] transition" title="Eliminar">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {/* Emoji picker */}
-                    <AnimatePresence>
-                      {showEmoji === msg.id && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.9, y: 4 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.9, y: 4 }}
-                          transition={{ duration: 0.15 }}
-                          className={`absolute -top-14 ${isMine ? 'left-0' : 'right-0'} flex gap-0.5 p-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-xl z-20`}
-                          onClick={e => e.stopPropagation()}>
-                          {QUICK_EMOJIS.map(em => (
-                            <motion.button
-                              key={em}
-                              whileHover={{ scale: 1.2 }}
-                              whileTap={{ scale: 0.8 }}
-                              onClick={() => { onReaction(msg.id, em); setShowEmoji(null); }}
-                              className="w-8 h-8 rounded-lg hover:bg-[var(--hover-bg)] flex items-center justify-center text-base transition">
-                              {em}
-                            </motion.button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                );
-              })}
+              <div className="flex-1 min-w-0">
+                {/* Name + Role + Time */}
+                <div className="flex items-baseline gap-2 mb-0.5">
+                  <span className="text-[14px] font-semibold text-[var(--text-primary)]">{first.displayName}</span>
+                  {member?.role && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-muted)]">{member.role}</span>
+                  )}
+                  {time && (
+                    <span className="text-[11px] text-[var(--text-muted)]">
+                      {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+                {/* First message content */}
+                <MessageContent
+                  msg={first}
+                  members={members}
+                  userId={userId}
+                  canManage={canManage}
+                  hoverId={hoverId}
+                  showEmoji={showEmoji}
+                  setHoverId={setHoverId}
+                  setShowEmoji={setShowEmoji}
+                  onReply={onReply}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onPin={onPin}
+                  onReaction={onReaction}
+                />
+              </div>
             </div>
-          </motion.div>
+
+            {/* Subsequent messages — no avatar, indented */}
+            {group.slice(1).map(msg => (
+              <div
+                key={msg.id}
+                className={`group/msg hover:bg-[var(--hover-bg)] px-4 -mx-4 transition-colors relative ${isMine ? 'border-l-2 border-l-[#D4A843]/20 hover:bg-[#D4A843]/[0.03]' : ''}`}
+                onMouseEnter={() => setHoverId(msg.id)}
+                onMouseLeave={() => setHoverId(null)}
+              >
+                {/* Hover timestamp where avatar would be */}
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-muted)] opacity-0 group-hover/msg:opacity-100 transition w-[40px] text-center">
+                  {msg.createdAt?.toDate?.()?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                <div className="pl-[54px] py-0.5">
+                  <MessageContent
+                    msg={msg}
+                    members={members}
+                    userId={userId}
+                    canManage={canManage}
+                    hoverId={hoverId}
+                    showEmoji={showEmoji}
+                    setHoverId={setHoverId}
+                    setShowEmoji={setShowEmoji}
+                    onReply={onReply}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onPin={onPin}
+                    onReaction={onReaction}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         );
       })}
       <div ref={bottomRef} />
+
+      {/* New messages jump button */}
+      <AnimatePresence>
+        {hasNewMessages && (
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            onClick={scrollToBottom}
+            className="sticky bottom-4 left-1/2 -translate-x-1/2 mx-auto block px-4 py-2 rounded-full bg-[#D4A843] text-[#06080F] text-sm font-semibold shadow-lg hover:bg-[#E0B84F] transition-colors flex items-center gap-2 z-10"
+          >
+            Nuevos mensajes
+            <ChevronDown className="h-4 w-4" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ========== MESSAGE CONTENT ==========
+function MessageContent({
+  msg, members, userId, canManage, hoverId, showEmoji, setHoverId, setShowEmoji,
+  onReply, onEdit, onDelete, onPin, onReaction,
+}: {
+  msg: any; members: any[]; userId: string; canManage: boolean;
+  hoverId: string | null; showEmoji: string | null;
+  setHoverId: (id: string | null) => void; setShowEmoji: (id: string | null) => void;
+  onReply: (msg: any) => void; onEdit: (msg: any) => void;
+  onDelete: (msgId: string) => void; onPin: (msgId: string, isPinned: boolean) => void;
+  onReaction: (msgId: string, emoji: string) => void;
+}) {
+  const media = extractMediaUrls(msg.content || '');
+
+  return (
+    <div className={`relative ${msg.deleted ? 'opacity-50' : ''}`}>
+      {/* Reply indicator */}
+      {msg.replyTo && (
+        <div className="flex items-center gap-1.5 mb-1">
+          <Reply className="h-3 w-3 text-[var(--text-muted)]" />
+          <span className="text-xs text-[var(--gold)] font-medium">{msg.replyAuthor}</span>
+          <span className="text-xs text-[var(--text-muted)] truncate max-w-[250px]">{msg.replyPreview}</span>
+        </div>
+      )}
+
+      {/* Pin indicator */}
+      {msg.pinned && (
+        <div className="flex items-center gap-1 mb-1">
+          <Pin className="h-3 w-3 text-[var(--gold)]" />
+          <span className="text-[10px] text-[var(--gold)] font-semibold">Fijado</span>
+        </div>
+      )}
+
+      {/* Text content — flat, no bubble */}
+      {(media.textContent || !media.hasMedia) && (
+        <div className={`text-[15px] leading-relaxed whitespace-pre-wrap ${msg.deleted ? 'italic text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
+          {renderMessageText(media.hasMedia ? media.textContent : (msg.content || ''), members)}
+          {msg.edited && !msg.deleted && <span className="text-[10px] text-[var(--text-muted)] ml-2">(editado)</span>}
+        </div>
+      )}
+
+      {/* Images — gallery grid */}
+      {media.images.length === 1 && (
+        <a href={media.images[0]} target="_blank" rel="noopener noreferrer" className="block mt-1.5">
+          <img src={media.images[0]} alt="" className="max-w-full max-h-[300px] rounded-xl border border-[var(--border)] object-cover hover:opacity-90 transition" loading="lazy" />
+        </a>
+      )}
+      {media.images.length > 1 && (
+        <div className="grid grid-cols-2 gap-1.5 mt-1.5 max-w-[400px]">
+          {media.images.map((url, idx) => (
+            <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-xl border border-[var(--border)]">
+              <img src={url} alt="" className="w-full h-[150px] object-cover hover:scale-105 transition-transform duration-200" loading="lazy" />
+            </a>
+          ))}
+        </div>
+      )}
+
+      {/* Videos */}
+      {media.videos.length > 0 && (
+        <div className="space-y-2 mt-1.5">
+          {media.videos.map((url, idx) => (
+            <video key={idx} controls className="max-w-full max-h-[300px] rounded-xl border border-[var(--border)]" preload="metadata">
+              <source src={url} />
+            </video>
+          ))}
+        </div>
+      )}
+
+      {/* File attachments */}
+      {msg.attachments?.length > 0 && (
+        <div className={`${msg.content ? 'mt-2' : ''} space-y-1.5`}>
+          {msg.attachments.map((att: any, idx: number) => {
+            const isImg = att.type?.startsWith('image/');
+            const isVid = att.type?.startsWith('video/');
+            const ext = att.name?.split('.').pop()?.toUpperCase() || 'FILE';
+            return (
+              <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--gold)]/30 hover:bg-[var(--bg-card)] transition group/file max-w-sm">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                  isImg ? 'bg-[var(--gold)]/10' : isVid ? 'bg-blue-500/10' : 'bg-[var(--bg-card)]'
+                }`}>
+                  {isImg ? <ImageIcon className="h-5 w-5 text-[var(--gold)]" /> :
+                   isVid ? <Play className="h-5 w-5 text-blue-400" /> :
+                   <FileText className="h-5 w-5 text-[var(--text-muted)]" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">{att.name || 'Archivo'}</p>
+                  <p className="text-[11px] text-[var(--text-muted)]">{ext} {att.size ? `· ${formatFileSize(att.size)}` : ''}</p>
+                </div>
+                <Download className="h-4 w-4 text-[var(--text-muted)] group-hover/file:text-[var(--gold)] transition shrink-0" />
+              </a>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Reactions */}
+      {msg.reactions && Object.keys(msg.reactions).length > 0 && (
+        <div className="flex gap-1.5 mt-1.5 flex-wrap">
+          {Object.entries(msg.reactions).map(([emoji, users]: [string, any]) => {
+            const reacted = users.includes(userId);
+            return (
+              <motion.button
+                key={emoji}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={e => { e.stopPropagation(); onReaction(msg.id, emoji); }}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-sm transition border ${
+                  reacted
+                    ? 'bg-[var(--gold)]/10 border-[var(--gold)]/20 text-[var(--gold)]'
+                    : 'bg-[var(--bg-card)] border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--text-muted)]'
+                }`}>
+                <span>{emoji}</span>
+                <span className="text-xs font-semibold">{users.length}</span>
+              </motion.button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Hover actions — always top-right */}
+      <AnimatePresence>
+        {hoverId === msg.id && !msg.deleted && (
+          <motion.div
+            initial={{ opacity: 0, y: 4, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.95 }}
+            transition={{ duration: 0.12 }}
+            className="absolute -top-3 right-0 flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] shadow-lg z-10"
+            onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowEmoji(showEmoji === msg.id ? null : msg.id)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--gold)] rounded-md hover:bg-[var(--hover-bg)] transition" title="Reaccionar" aria-label="Reaccionar">
+              <SmilePlus className="h-4 w-4" />
+            </button>
+            <button onClick={() => onReply(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-md hover:bg-[var(--hover-bg)] transition" title="Responder" aria-label="Responder">
+              <Reply className="h-4 w-4" />
+            </button>
+            {(canManage || msg.userId === userId) && (
+              <button onClick={() => onPin(msg.id, msg.pinned)} className={`p-1.5 rounded-md hover:bg-[var(--hover-bg)] transition ${msg.pinned ? 'text-[var(--gold)]' : 'text-[var(--text-muted)] hover:text-[var(--gold)]'}`} title={msg.pinned ? 'Desfijar' : 'Fijar'}>
+                <Pin className="h-4 w-4" />
+              </button>
+            )}
+            {msg.userId === userId && (
+              <button onClick={() => onEdit(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-blue-400 rounded-md hover:bg-[var(--hover-bg)] transition" title="Editar">
+                <Edit2 className="h-4 w-4" />
+              </button>
+            )}
+            {(canManage || msg.userId === userId) && (
+              <button onClick={() => { if (confirm('¿Eliminar este mensaje?')) onDelete(msg.id); }} className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-md hover:bg-[var(--hover-bg)] transition" title="Eliminar">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Emoji picker */}
+      <AnimatePresence>
+        {showEmoji === msg.id && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute -top-12 right-0 flex gap-0.5 p-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-xl z-20"
+            onClick={e => e.stopPropagation()}>
+            {QUICK_EMOJIS.map(em => (
+              <motion.button
+                key={em}
+                whileHover={{ scale: 1.2 }}
+                whileTap={{ scale: 0.8 }}
+                onClick={() => { onReaction(msg.id, em); setShowEmoji(null); }}
+                className="w-8 h-8 rounded-lg hover:bg-[var(--hover-bg)] flex items-center justify-center text-base transition">
+                {em}
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
