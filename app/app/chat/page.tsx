@@ -467,7 +467,7 @@ export default function ChatPage() {
                 <MessageSquare className="h-7 w-7 text-[var(--accent)]/60" />
               </div>
               <p className="text-lg font-semibold text-[var(--text-secondary)]">Selecciona un canal</p>
-              <p className="text-sm text-[var(--text-muted)] mt-1">o crea uno nuevo para empezar a chatear</p>
+              <p className="text-base text-[var(--text-muted)] mt-1">o crea uno nuevo para empezar a chatear</p>
             </div>
           </div>
         )}

@@ -83,7 +83,7 @@ export default function TaskCalendarView({ tasks, members, selectedTask, onSelec
             {MESES[month]} {year}
           </h2>
           <button onClick={goToday}
-            className="text-[11px] px-2.5 py-1 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--accent)] transition-all duration-200">
+            className="text-[13px] px-2.5 py-1 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--accent)] transition-all duration-200">
             Hoy
           </button>
         </div>
@@ -100,7 +100,7 @@ export default function TaskCalendarView({ tasks, members, selectedTask, onSelec
       {/* Day headers */}
       <div className="grid grid-cols-7 mb-1">
         {DIAS.map(dia => (
-          <div key={dia} className="text-center text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] py-2">
+          <div key={dia} className="text-center text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)] py-2">
             {dia}
           </div>
         ))}
@@ -120,7 +120,7 @@ export default function TaskCalendarView({ tasks, members, selectedTask, onSelec
               } ${day.isToday ? 'bg-[var(--accent)]/5' : ''}`}
             >
               {/* Date number */}
-              <div className={`text-[11px] font-semibold mb-1 flex items-center justify-center w-6 h-6 rounded-full ${
+              <div className={`text-[13px] font-semibold mb-1 flex items-center justify-center w-6 h-6 rounded-full ${
                 day.isToday
                   ? 'bg-[var(--accent)] text-[var(--accent-text)]'
                   : day.isCurrentMonth

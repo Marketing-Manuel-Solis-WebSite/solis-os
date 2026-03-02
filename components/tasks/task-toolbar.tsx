@@ -89,7 +89,7 @@ export default function TaskToolbar({
                 </span>
               )}
               {canSeeAllTeams && activeTeamId === '__all__' && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] font-semibold">VISTA GENERAL</span>
+                <span className="text-[12px] px-2 py-0.5 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] font-semibold">VISTA GENERAL</span>
               )}
             </h1>
             <p className="text-sm text-[var(--text-muted)] mt-1">{taskCount} tareas · {doneCount} completadas</p>
@@ -118,7 +118,7 @@ export default function TaskToolbar({
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="flex items-center gap-4 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] shadow-card text-[11px] text-[var(--text-muted)]">
+            className="flex items-center gap-4 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] shadow-card text-[13px] text-[var(--text-muted)]">
             <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">N</kbd> Nueva</span>
             <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">F</kbd> Buscar</span>
             <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">1-3</kbd> Vistas</span>
@@ -152,7 +152,7 @@ export default function TaskToolbar({
         <div className="flex rounded-xl bg-[var(--bg-elevated)] shadow-card overflow-hidden">
           {VIEWS.map(v => (
             <button key={v.id} onClick={() => onViewChange(v.id)}
-              className={`px-3 py-1.5 text-xs flex items-center gap-1.5 transition ${
+              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 transition ${
                 view === v.id
                   ? 'bg-[var(--accent-subtle)] text-[var(--accent)]'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
@@ -163,14 +163,14 @@ export default function TaskToolbar({
         </div>
 
         {/* Group */}
-        <select value={groupBy} onChange={e => onGroupByChange(e.target.value)} className="select-dark h-9 text-xs">
+        <select value={groupBy} onChange={e => onGroupByChange(e.target.value)} className="select-dark h-9 text-sm">
           {GROUP_OPTIONS.map(g => (
             <option key={g.id} value={g.id}>Grupo: {g.label}</option>
           ))}
         </select>
 
         {/* Sort */}
-        <select value={sortBy} onChange={e => onSortByChange(e.target.value)} className="select-dark h-9 text-xs">
+        <select value={sortBy} onChange={e => onSortByChange(e.target.value)} className="select-dark h-9 text-sm">
           {SORT_OPTIONS.map(s => (
             <option key={s.id} value={s.id}>Orden: {s.label}</option>
           ))}
@@ -180,16 +180,16 @@ export default function TaskToolbar({
       {/* Row 3: Active filter chips */}
       {activeChips.length > 0 && (
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-semibold">Filtros:</span>
+          <span className="text-[12px] text-[var(--text-muted)] uppercase tracking-wider font-semibold">Filtros:</span>
           {activeChips.map((chip, i) => (
-            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--accent-subtle)] text-[var(--accent)] text-[11px] font-medium">
+            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--accent-subtle)] text-[var(--accent)] text-[13px] font-medium">
               {chip.label}
               <button onClick={chip.onRemove} className="hover:text-[var(--accent)]/70">
                 <X className="h-3 w-3" />
               </button>
             </span>
           ))}
-          <button onClick={onClearFilters} className="text-[11px] text-red-400 hover:text-red-300 ml-1">
+          <button onClick={onClearFilters} className="text-[13px] text-red-400 hover:text-red-300 ml-1">
             Limpiar todo
           </button>
         </div>

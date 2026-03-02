@@ -185,7 +185,7 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
           </div>
           <div>
             <p className="text-sm font-bold text-[var(--text-primary)]">Solis AI</p>
-            <p className="text-[10px] text-[var(--text-muted)]">Document Assistant</p>
+            <p className="text-[12px] text-[var(--text-muted)]">Document Assistant</p>
           </div>
         </div>
         <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg"><X className="h-4 w-4" /></button>
@@ -197,20 +197,20 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
           <div className="p-3 rounded-xl bg-[var(--accent-subtle)]">
             <div className="flex items-center gap-2 mb-2">
               <BookOpen className="h-4 w-4 text-[var(--accent)]" />
-              <span className="text-xs font-bold text-[var(--accent)]">Generate Full Document</span>
+              <span className="text-sm font-bold text-[var(--accent)]">Generate Full Document</span>
             </div>
-            <p className="text-[10px] text-[var(--text-muted)] mb-2">Describe what you want and AI will create the full document.</p>
+            <p className="text-[12px] text-[var(--text-muted)] mb-2">Describe what you want and AI will create the full document.</p>
             <textarea
               value={generatePrompt}
               onChange={e => setGeneratePrompt(e.target.value)}
               placeholder="E.g. Write a client engagement letter for immigration consultation..."
               rows={3}
-              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-elevated)] text-xs text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40 resize-none"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-elevated)] text-sm text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40 resize-none"
             />
             <button
               onClick={handleGenerateDoc}
               disabled={generating || !generatePrompt.trim()}
-              className="mt-2 w-full h-8 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"
+              className="mt-2 w-full h-8 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center justify-center gap-1.5 disabled:opacity-40"
             >
               {generating ? (
                 <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating...</>
@@ -231,7 +231,7 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold transition ${
+                className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-[12px] font-semibold transition ${
                   activeTab === tab.id
                     ? 'text-[var(--accent)] bg-[var(--accent-subtle)]'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-white/3'
@@ -247,7 +247,7 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
           <div className="grid grid-cols-2 gap-1.5">
             {tabPrompts.map(p => (
               <button key={p.id} onClick={() => handleQuickPrompt(p)}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-medium bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-gray-200 hover:bg-[var(--bg-hover)] transition-all duration-200 text-left">
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] font-medium bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-gray-200 hover:bg-[var(--bg-hover)] transition-all duration-200 text-left">
                 <p.icon className="h-3.5 w-3.5 shrink-0" style={{ color: p.color }} />
                 <span className="truncate">{p.label}</span>
               </button>
@@ -261,8 +261,8 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
         {messages.length === 0 && !generating && (
           <div className="text-center py-8">
             <Bot className="h-10 w-10 text-gray-800 mx-auto mb-3" />
-            <p className="text-xs text-[var(--text-muted)]">Ask me anything about this document,</p>
-            <p className="text-xs text-[var(--text-muted)]">or use a quick action above.</p>
+            <p className="text-sm text-[var(--text-muted)]">Ask me anything about this document,</p>
+            <p className="text-sm text-[var(--text-muted)]">or use a quick action above.</p>
           </div>
         )}
 
@@ -277,32 +277,32 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
           <div key={i} className={`${msg.role === 'user' ? 'flex justify-end' : ''}`}>
             {msg.role === 'user' ? (
               <div className="max-w-[85%] px-3.5 py-2.5 rounded-lg rounded-tr-md bg-[var(--accent-subtle)]">
-                <p className="text-xs text-[var(--accent)]">{msg.text.length > 80 ? msg.text.slice(0, 80) + '...' : msg.text}</p>
+                <p className="text-sm text-[var(--accent)]">{msg.text.length > 80 ? msg.text.slice(0, 80) + '...' : msg.text}</p>
               </div>
             ) : (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 mb-1">
                   <Bot className="h-3.5 w-3.5 text-[var(--accent)]" />
-                  <span className="text-[10px] font-semibold text-[var(--accent)]">Solis AI</span>
+                  <span className="text-[12px] font-semibold text-[var(--accent)]">Solis AI</span>
                 </div>
                 <div className="px-3.5 py-3 rounded-lg rounded-tl-md bg-[var(--bg-elevated)]">
-                  <p className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+                  <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                 </div>
                 <div className="flex items-center gap-1.5 pl-1 flex-wrap">
                   <button onClick={() => handleCopy(msg.text, i)}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-white/5 transition">
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-white/5 transition">
                     {copied === i ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
                     {copied === i ? 'Copied' : 'Copy'}
                   </button>
                   {msg.isApplicable && (
                     <>
                       <button onClick={() => handleApply(msg.text)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-[var(--accent)] hover:bg-[var(--accent-subtle)] transition">
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] text-[var(--accent)] hover:bg-[var(--accent-subtle)] transition">
                         <ArrowRight className="h-3 w-3" />
                         Replace Doc
                       </button>
                       <button onClick={() => handleInsert(msg.text)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-emerald-400 hover:bg-emerald-500/10 transition">
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] text-emerald-400 hover:bg-emerald-500/10 transition">
                         <ArrowDownToLine className="h-3 w-3" />
                         Insert at End
                       </button>
@@ -317,7 +317,7 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
         {loading && (
           <div className="flex items-center gap-2 px-3 py-3">
             <Loader2 className="h-4 w-4 text-[var(--accent)] animate-spin" />
-            <span className="text-xs text-[var(--text-muted)]">Analyzing document...</span>
+            <span className="text-sm text-[var(--text-muted)]">Analyzing document...</span>
           </div>
         )}
       </div>
@@ -328,7 +328,7 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
           <div className="flex gap-1.5 mb-2 overflow-x-auto pb-1">
             {PROMPTS.filter(p => p.tab === activeTab).slice(0, 4).map(p => (
               <button key={p.id} onClick={() => handleQuickPrompt(p)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-all duration-200 whitespace-nowrap shrink-0">
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-all duration-200 whitespace-nowrap shrink-0">
                 <p.icon className="h-3 w-3" style={{ color: p.color }} />
                 {p.label}
               </button>
@@ -338,11 +338,11 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
         <div className="flex gap-2">
           <input value={input} onChange={e => setInput(e.target.value)}
             placeholder="Ask about this document..."
-            className="input-dark h-9 text-xs flex-1"
+            className="input-dark h-9 text-sm flex-1"
             onKeyDown={e => e.key === 'Enter' && handleCustomQuestion()}
             disabled={loading} />
           <button onClick={handleCustomQuestion} disabled={loading || !input.trim()}
-            className="h-9 px-4 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-xs disabled:opacity-40">
+            className="h-9 px-4 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40">
             <Send className="h-3.5 w-3.5" />
           </button>
         </div>

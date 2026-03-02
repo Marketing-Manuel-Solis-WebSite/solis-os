@@ -106,7 +106,7 @@ export default function StatsDashboard({ data }: Props) {
       <div className="flex gap-1 mb-6 p-1 rounded-xl bg-[var(--bg-base)] shadow-card w-fit anim-slide" style={{ animationDelay: '80ms' }}>
         {NAV.map(n => (
           <button key={n.id} onClick={() => setSection(n.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition ${section === n.id ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition ${section === n.id ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             <n.icon className="h-3.5 w-3.5" /> {n.label}
           </button>
         ))}
@@ -123,16 +123,16 @@ export default function StatsDashboard({ data }: Props) {
                 <div key={dp.team.id} className="flex items-center gap-4">
                   <div className="w-28 flex items-center gap-2 shrink-0">
                     <span className="text-sm">{dp.team.icon}</span>
-                    <span className="text-xs font-medium truncate" style={{ color: dp.team.color }}>{dp.team.name}</span>
+                    <span className="text-sm font-medium truncate" style={{ color: dp.team.color }}>{dp.team.name}</span>
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <div className="flex-1 h-5 rounded-full bg-[var(--bg-base)] overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${dp.rate}%`, backgroundColor: dp.team.color, opacity: 0.7 }} />
                       </div>
-                      <span className="text-xs font-bold w-10 text-right" style={{ color: dp.team.color }}>{dp.rate}%</span>
+                      <span className="text-sm font-bold w-10 text-right" style={{ color: dp.team.color }}>{dp.rate}%</span>
                     </div>
-                    <div className="flex gap-4 text-[10px] text-[var(--text-muted)]">
+                    <div className="flex gap-4 text-[12px] text-[var(--text-muted)]">
                       <span>{dp.tasks} tasks</span>
                       <span>{dp.completed} done</span>
                       <span>{dp.docs} docs</span>
@@ -164,7 +164,7 @@ export default function StatsDashboard({ data }: Props) {
                     </div>
                   </div>
                 </div>
-                <div className="space-y-2 text-xs">
+                <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span className="text-[var(--text-secondary)]">{completedTasks} completed</span></div>
                   <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-blue-500" /><span className="text-[var(--text-secondary)]">{tasks.length - completedTasks - overdueTasks} in progress</span></div>
                   <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-red-500" /><span className="text-[var(--text-secondary)]">{overdueTasks} overdue</span></div>
@@ -194,19 +194,19 @@ export default function StatsDashboard({ data }: Props) {
           {/* Content metrics */}
           <div className="grid grid-cols-3 gap-4 anim-slide" style={{ animationDelay: '240ms' }}>
             <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-5">
-              <p className="text-[10px] text-[var(--text-muted)] uppercase font-semibold mb-1">Total Words Written</p>
+              <p className="text-[12px] text-[var(--text-muted)] uppercase font-semibold mb-1">Total Words Written</p>
               <p className="text-3xl font-bold text-[var(--text-primary)]">{totalWords.toLocaleString()}</p>
-              <p className="text-[10px] text-[var(--text-muted)] mt-1">across {docs.length} documents</p>
+              <p className="text-[12px] text-[var(--text-muted)] mt-1">across {docs.length} documents</p>
             </div>
             <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-5">
-              <p className="text-[10px] text-[var(--text-muted)] uppercase font-semibold mb-1">Avg Words/Doc</p>
+              <p className="text-[12px] text-[var(--text-muted)] uppercase font-semibold mb-1">Avg Words/Doc</p>
               <p className="text-3xl font-bold text-[var(--text-primary)]">{docs.length > 0 ? Math.round(totalWords / docs.length).toLocaleString() : 0}</p>
-              <p className="text-[10px] text-[var(--text-muted)] mt-1">per document average</p>
+              <p className="text-[12px] text-[var(--text-muted)] mt-1">per document average</p>
             </div>
             <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-5">
-              <p className="text-[10px] text-[var(--text-muted)] uppercase font-semibold mb-1">Tasks/Member</p>
+              <p className="text-[12px] text-[var(--text-muted)] uppercase font-semibold mb-1">Tasks/Member</p>
               <p className="text-3xl font-bold text-[var(--text-primary)]">{members.length > 0 ? (tasks.length / members.length).toFixed(1) : 0}</p>
-              <p className="text-[10px] text-[var(--text-muted)] mt-1">average workload</p>
+              <p className="text-[12px] text-[var(--text-muted)] mt-1">average workload</p>
             </div>
           </div>
         </div>
@@ -226,11 +226,11 @@ export default function StatsDashboard({ data }: Props) {
                   const color = colors[status] || '#6B7280';
                   return (
                     <div key={status} className="flex items-center gap-3">
-                      <span className="text-xs text-[var(--text-secondary)] w-24 capitalize truncate">{status.replace(/[-_]/g, ' ')}</span>
+                      <span className="text-sm text-[var(--text-secondary)] w-24 capitalize truncate">{status.replace(/[-_]/g, ' ')}</span>
                       <div className="flex-1 h-4 rounded-full bg-[var(--bg-base)] overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
                       </div>
-                      <span className="text-xs font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
+                      <span className="text-sm font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
                     </div>
                   );
                 })}
@@ -247,11 +247,11 @@ export default function StatsDashboard({ data }: Props) {
                   const colors: Record<string, string> = { urgent: '#EF4444', high: '#F59E0B', medium: '#3B82F6', low: '#6B7280' };
                   return (
                     <div key={p} className="flex items-center gap-3">
-                      <span className="text-xs text-[var(--text-secondary)] w-24 capitalize">{p}</span>
+                      <span className="text-sm text-[var(--text-secondary)] w-24 capitalize">{p}</span>
                       <div className="flex-1 h-4 rounded-full bg-[var(--bg-base)] overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: colors[p] }} />
                       </div>
-                      <span className="text-xs font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
+                      <span className="text-sm font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
                     </div>
                   );
                 })}
@@ -269,10 +269,10 @@ export default function StatsDashboard({ data }: Props) {
                   <div key={dept} className="p-4 rounded-xl bg-[var(--bg-base)]">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-sm">{team?.icon || '📁'}</span>
-                      <span className="text-xs font-medium" style={{ color: team?.color || '#6B7280' }}>{dept}</span>
+                      <span className="text-sm font-medium" style={{ color: team?.color || '#6B7280' }}>{dept}</span>
                     </div>
                     <p className="text-xl font-bold text-[var(--text-primary)]">{count}</p>
-                    <p className="text-[10px] text-[var(--text-muted)]">tasks assigned</p>
+                    <p className="text-[12px] text-[var(--text-muted)]">tasks assigned</p>
                   </div>
                 );
               })}
@@ -293,11 +293,11 @@ export default function StatsDashboard({ data }: Props) {
                   const pct = docs.length > 0 ? Math.round((count / docs.length) * 100) : 0;
                   return (
                     <div key={dept} className="flex items-center gap-3">
-                      <span className="text-xs text-[var(--text-secondary)] w-24 truncate">{team?.icon || ''} {dept}</span>
+                      <span className="text-sm text-[var(--text-secondary)] w-24 truncate">{team?.icon || ''} {dept}</span>
                       <div className="flex-1 h-4 rounded-full bg-[var(--bg-base)] overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: team?.color || '#6B7280' }} />
                       </div>
-                      <span className="text-xs font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
+                      <span className="text-sm font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
                     </div>
                   );
                 })}
@@ -311,11 +311,11 @@ export default function StatsDashboard({ data }: Props) {
                   const pct = docs.length > 0 ? Math.round((count / docs.length) * 100) : 0;
                   return (
                     <div key={vis} className="flex items-center gap-3">
-                      <span className="text-xs text-[var(--text-secondary)] w-24 capitalize">{vis}</span>
+                      <span className="text-sm text-[var(--text-secondary)] w-24 capitalize">{vis}</span>
                       <div className="flex-1 h-4 rounded-full bg-[var(--bg-base)] overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: colors[vis] || '#6B7280' }} />
                       </div>
-                      <span className="text-xs font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
+                      <span className="text-sm font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
                     </div>
                   );
                 })}
@@ -331,11 +331,11 @@ export default function StatsDashboard({ data }: Props) {
                 const team = teams.find((t: any) => t.id === d.teamId);
                 return (
                   <div key={d.id} className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/[0.01]">
-                    <span className="text-[10px] text-[var(--text-muted)] w-5">{i + 1}.</span>
+                    <span className="text-[12px] text-[var(--text-muted)] w-5">{i + 1}.</span>
                     <FileText className="h-3.5 w-3.5 text-[var(--accent)]" />
-                    <span className="text-xs text-[var(--text-secondary)] flex-1 truncate">{d.title || 'Untitled'}</span>
+                    <span className="text-sm text-[var(--text-secondary)] flex-1 truncate">{d.title || 'Untitled'}</span>
                     {team && <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ backgroundColor: `${team.color}10`, color: team.color }}>{team.icon} {team.name}</span>}
-                    <span className="text-xs text-[var(--text-muted)] font-mono">{(d.wordCount || 0).toLocaleString()}w</span>
+                    <span className="text-sm text-[var(--text-muted)] font-mono">{(d.wordCount || 0).toLocaleString()}w</span>
                   </div>
                 );
               })}
@@ -356,11 +356,11 @@ export default function StatsDashboard({ data }: Props) {
                   const pct = members.length > 0 ? Math.round((count / members.length) * 100) : 0;
                   return (
                     <div key={dept} className="flex items-center gap-3">
-                      <span className="text-xs text-[var(--text-secondary)] w-24 truncate">{team?.icon || ''} {dept}</span>
+                      <span className="text-sm text-[var(--text-secondary)] w-24 truncate">{team?.icon || ''} {dept}</span>
                       <div className="flex-1 h-4 rounded-full bg-[var(--bg-base)] overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: team?.color || '#6B7280' }} />
                       </div>
-                      <span className="text-xs font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
+                      <span className="text-sm font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
                     </div>
                   );
                 })}
@@ -374,11 +374,11 @@ export default function StatsDashboard({ data }: Props) {
                   const pct = members.length > 0 ? Math.round((count / members.length) * 100) : 0;
                   return (
                     <div key={role} className="flex items-center gap-3">
-                      <span className="text-xs text-[var(--text-secondary)] w-24 capitalize">{role}</span>
+                      <span className="text-sm text-[var(--text-secondary)] w-24 capitalize">{role}</span>
                       <div className="flex-1 h-4 rounded-full bg-[var(--bg-base)] overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: colors[role] || '#6B7280' }} />
                       </div>
-                      <span className="text-xs font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
+                      <span className="text-sm font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
                     </div>
                   );
                 })}
@@ -399,11 +399,11 @@ export default function StatsDashboard({ data }: Props) {
                   const colors: Record<string, string> = { created: '#22C55E', updated: '#3B82F6', deleted: '#EF4444', role_changed: '#F59E0B', assigned: '#8B5CF6' };
                   return (
                     <div key={action} className="flex items-center gap-3">
-                      <span className="text-xs text-[var(--text-secondary)] w-28 capitalize">{action.replace(/_/g, ' ')}</span>
+                      <span className="text-sm text-[var(--text-secondary)] w-28 capitalize">{action.replace(/_/g, ' ')}</span>
                       <div className="flex-1 h-4 rounded-full bg-[var(--bg-base)] overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${(count / Math.max(...Object.values(activityByAction), 1)) * 100}%`, backgroundColor: colors[action] || '#6B7280' }} />
                       </div>
-                      <span className="text-xs font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
+                      <span className="text-sm font-bold w-10 text-right text-[var(--text-secondary)]">{count}</span>
                     </div>
                   );
                 })}
@@ -413,7 +413,7 @@ export default function StatsDashboard({ data }: Props) {
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Recent Events</h3>
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {logs.slice(0, 20).map((l: any) => (
-                  <div key={l.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px]">
+                  <div key={l.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-[13px]">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${l.action === 'created' ? 'bg-emerald-400' : l.action === 'deleted' ? 'bg-red-400' : 'bg-blue-400'}`} />
                     <span className="text-[var(--text-muted)]">{l.actorName}</span>
                     <span className="text-[var(--text-secondary)] font-medium">{l.action}</span>

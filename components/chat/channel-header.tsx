@@ -76,13 +76,13 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
             )}
           </div>
           {isDM && otherId && (
-            <p className={`text-[11px] flex items-center gap-1 ${onlineMap?.[otherId] ? 'text-[#22C55E]' : 'text-[var(--text-muted)]'}`}>
+            <p className={`text-[13px] flex items-center gap-1 ${onlineMap?.[otherId] ? 'text-[#22C55E]' : 'text-[var(--text-muted)]'}`}>
               <span className={`w-1.5 h-1.5 rounded-full inline-block ${onlineMap?.[otherId] ? 'bg-[#22C55E]' : 'bg-[var(--text-muted)]/40'}`} />
               {onlineMap?.[otherId] ? 'En línea' : 'Desconectado'}
             </p>
           )}
           {channel.description && !isDM && (
-            <p className="text-[11px] text-[var(--text-muted)] truncate">{channel.description}</p>
+            <p className="text-[13px] text-[var(--text-muted)] truncate">{channel.description}</p>
           )}
         </div>
       </div>
@@ -90,13 +90,13 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
         <div className="flex items-center rounded-md bg-[var(--bg-base)]/50 shadow-card overflow-hidden divide-x divide-[var(--border-subtle)]">
           {pinnedCount > 0 && (
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-              onClick={onShowPinned} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 transition" title="Pinned messages">
+              onClick={onShowPinned} className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 transition" title="Pinned messages">
               <Pin className="h-3.5 w-3.5" /><span>{pinnedCount}</span>
             </motion.button>
           )}
           {!isDM && (
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-              onClick={onShowMembers} className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition" title="Members">
+              onClick={onShowMembers} className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition" title="Members">
               <Users className="h-3.5 w-3.5" /><span>{memberCount}</span>
             </motion.button>
           )}
@@ -107,7 +107,7 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
           <div ref={addRef} className="relative">
             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
               onClick={() => setShowAdd(!showAdd)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition ${showAdd ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[#22C55E] hover:bg-[#22C55E]/5'}`}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition ${showAdd ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[#22C55E] hover:bg-[#22C55E]/5'}`}
               title="Add member">
               <UserPlus className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Add</span>
@@ -126,24 +126,24 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
                       <input value={addSearch} onChange={e => setAddSearch(e.target.value)} placeholder="Search members..."
-                        autoFocus className="w-full h-8 pl-9 pr-3 rounded-lg bg-[var(--bg-elevated)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30" />
+                        autoFocus className="w-full h-8 pl-9 pr-3 rounded-lg bg-[var(--bg-elevated)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30" />
                     </div>
                   </div>
                   <div className="max-h-48 overflow-y-auto p-1.5">
                     {filtered.length === 0 ? (
-                      <p className="text-xs text-[var(--text-muted)] text-center py-4">
+                      <p className="text-sm text-[var(--text-muted)] text-center py-4">
                         {nonMembers.length === 0 ? 'Everyone is already a member' : 'No matches found'}
                       </p>
                     ) : filtered.slice(0, 10).map(m => (
                       <motion.button key={m.id} whileHover={{ backgroundColor: 'var(--bg-hover)' }}
                         onClick={() => { onAddMember(m.id); setShowAdd(false); setAddSearch(''); }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-left transition">
-                        <div className="w-7 h-7 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center text-[10px] font-bold text-[var(--accent)] shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center text-[12px] font-bold text-[var(--accent)] shrink-0">
                           {m.displayName?.[0]?.toUpperCase() || '?'}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-[var(--text-primary)] truncate">{m.displayName}</p>
-                          <p className="text-[10px] text-[var(--text-muted)] truncate">{m.role} {m.department ? `· ${m.department}` : ''}</p>
+                          <p className="text-sm font-medium text-[var(--text-primary)] truncate">{m.displayName}</p>
+                          <p className="text-[12px] text-[var(--text-muted)] truncate">{m.role} {m.department ? `· ${m.department}` : ''}</p>
                         </div>
                         <UserPlus className="h-3.5 w-3.5 text-[#22C55E] shrink-0" />
                       </motion.button>

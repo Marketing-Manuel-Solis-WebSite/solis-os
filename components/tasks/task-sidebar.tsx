@@ -39,11 +39,11 @@ function FilterSection({ label, items, selected, onChange }: {
   };
   return (
     <div className="px-2 py-1.5">
-      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">{label}</p>
+      <p className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">{label}</p>
       <div className="flex flex-wrap gap-1">
         {items.map(item => (
           <button key={item.id} onClick={() => toggle(item.id)}
-            className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all duration-200 ${
+            className={`px-2 py-1 rounded-md text-[12px] font-medium transition-all duration-200 ${
               selected.includes(item.id)
                 ? 'ring-1 ring-current'
                 : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
@@ -92,7 +92,7 @@ export default function TaskSidebar({
       <div className="flex-1 overflow-y-auto scrollbar-thin">
         {/* View Switcher */}
         <div className="p-2 space-y-0.5">
-          <p className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Vistas</p>
+          <p className="px-2 py-1.5 text-[12px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Vistas</p>
           {VIEWS.map(v => (
             <button key={v.id} onClick={() => onViewChange(v.id)}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] transition-all ${
@@ -102,7 +102,7 @@ export default function TaskSidebar({
               }`}>
               <v.Icon className="h-4 w-4" />
               {v.label}
-              <span className="ml-auto text-[10px] opacity-50">{v.shortcut}</span>
+              <span className="ml-auto text-[12px] opacity-50">{v.shortcut}</span>
             </button>
           ))}
         </div>
@@ -112,7 +112,7 @@ export default function TaskSidebar({
         {/* Filters Section */}
         <div className="p-2">
           <button onClick={() => setShowFilters(!showFilters)}
-            className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
+            className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[12px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
             <motion.span animate={{ rotate: showFilters ? 0 : -90 }} transition={{ duration: 0.2 }}>
               <ChevronDown className="h-3 w-3" />
             </motion.span>
@@ -155,20 +155,20 @@ export default function TaskSidebar({
 
                 {/* Date range */}
                 <div className="px-2 py-1.5">
-                  <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">Fecha límite</p>
+                  <p className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">Fecha límite</p>
                   <div className="flex gap-1">
                     <input type="date" value={filters.dateRange.from || ''}
                       onChange={e => onFiltersChange({ ...filters, dateRange: { ...filters.dateRange, from: e.target.value || null } })}
-                      className="input-dark h-7 text-[10px] flex-1" />
+                      className="input-dark h-7 text-[12px] flex-1" />
                     <input type="date" value={filters.dateRange.to || ''}
                       onChange={e => onFiltersChange({ ...filters, dateRange: { ...filters.dateRange, to: e.target.value || null } })}
-                      className="input-dark h-7 text-[10px] flex-1" />
+                      className="input-dark h-7 text-[12px] flex-1" />
                   </div>
                 </div>
 
                 {activeFilterCount > 0 && (
                   <button onClick={() => onFiltersChange(EMPTY_FILTERS)}
-                    className="w-full px-3 py-1.5 text-[11px] text-red-400 hover:bg-red-400/5 rounded-lg flex items-center gap-1.5 transition">
+                    className="w-full px-3 py-1.5 text-[13px] text-red-400 hover:bg-red-400/5 rounded-lg flex items-center gap-1.5 transition">
                     <X className="h-3 w-3" /> Limpiar filtros
                   </button>
                 )}
@@ -181,14 +181,14 @@ export default function TaskSidebar({
 
         {/* Sort & Group */}
         <div className="p-2 space-y-2">
-          <p className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Ordenar y Agrupar</p>
+          <p className="px-2 py-1.5 text-[12px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Ordenar y Agrupar</p>
           <div className="px-2 space-y-1.5">
-            <select value={sortBy} onChange={e => onSortByChange(e.target.value)} className="select-dark h-7 text-[11px] w-full">
+            <select value={sortBy} onChange={e => onSortByChange(e.target.value)} className="select-dark h-7 text-[13px] w-full">
               {SORT_OPTIONS.map(s => (
                 <option key={s.id} value={s.id}>{s.label}</option>
               ))}
             </select>
-            <select value={groupBy} onChange={e => onGroupByChange(e.target.value)} className="select-dark h-7 text-[11px] w-full">
+            <select value={groupBy} onChange={e => onGroupByChange(e.target.value)} className="select-dark h-7 text-[13px] w-full">
               {GROUP_OPTIONS.map(g => (
                 <option key={g.id} value={g.id}>Agrupar: {g.label}</option>
               ))}
@@ -201,7 +201,7 @@ export default function TaskSidebar({
         {/* Saved Views */}
         <div className="p-2">
           <button onClick={() => setShowSaved(!showSaved)}
-            className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
+            className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[12px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
             <motion.span animate={{ rotate: showSaved ? 0 : -90 }} transition={{ duration: 0.2 }}>
               <ChevronDown className="h-3 w-3" />
             </motion.span>

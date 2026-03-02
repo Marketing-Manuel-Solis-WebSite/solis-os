@@ -51,7 +51,7 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
         <div className="flex items-center justify-between p-5">
           <div>
             <h2 className="text-lg font-bold text-[var(--text-primary)]">Create Channel</h2>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">Set up a new conversation space</p>
+            <p className="text-sm text-[var(--text-muted)] mt-0.5">Set up a new conversation space</p>
           </div>
           <motion.button whileTap={{ scale: 0.9 }} onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg hover:bg-[var(--bg-hover)] transition">
             <X className="h-5 w-5" />
@@ -61,7 +61,7 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
         <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin">
           {/* Name */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Channel Name *</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Channel Name *</label>
             <input value={name} onChange={e => setName(e.target.value.replace(/\s+/g, '-').toLowerCase())}
               placeholder="e.g. general, marketing-updates"
               autoFocus className="input-dark" onKeyDown={e => e.key === 'Enter' && submit()} />
@@ -69,13 +69,13 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
 
           {/* Description */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Description</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Description</label>
             <input value={description} onChange={e => setDescription(e.target.value)} placeholder="What's this channel about?" className="input-dark" />
           </div>
 
           {/* Type */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Type</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Type</label>
             <div className="flex gap-2">
               {[
                 { value: 'public' as const, label: 'Public', desc: 'Anyone can join and see messages', icon: Hash, activeClass: 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]/30 text-[var(--accent)]' },
@@ -91,7 +91,7 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
                   <opt.icon className="h-5 w-5" />
                   <div className="text-left">
                     <p className="text-sm font-semibold">{opt.label}</p>
-                    <p className="text-[10px] opacity-60">{opt.desc}</p>
+                    <p className="text-[12px] opacity-60">{opt.desc}</p>
                   </div>
                 </motion.button>
               ))}
@@ -100,7 +100,7 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
 
           {/* Members */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">
               {type === 'private' ? 'Add Members *' : 'Add Members (optional)'}
             </label>
 
@@ -133,7 +133,7 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
             <div className="relative mb-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
               <input value={memberSearch} onChange={e => setMemberSearch(e.target.value)} placeholder="Search members..."
-                className="w-full h-9 pl-9 pr-3 rounded-lg bg-[var(--bg-base)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30 transition-all duration-200" />
+                className="w-full h-9 pl-9 pr-3 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30 transition-all duration-200" />
             </div>
 
             <div className="max-h-40 overflow-y-auto space-y-0.5 rounded-xl bg-[var(--bg-base)] shadow-card p-2 scrollbar-thin">
@@ -144,14 +144,14 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
                     key={m.id}
                     whileHover={{ x: 2 }}
                     onClick={() => toggleMember(m.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all ${sel ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${sel ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
                   >
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0 ${sel ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : 'bg-[var(--accent)]/10 text-[var(--accent)]/70'}`}>
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[12px] font-bold shrink-0 ${sel ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : 'bg-[var(--accent)]/10 text-[var(--accent)]/70'}`}>
                       {m.displayName?.[0]?.toUpperCase()}
                     </div>
                     <div className="flex-1 text-left min-w-0">
                       <span className="block truncate">{m.displayName}</span>
-                      {m.department && <span className="block text-[10px] text-[var(--text-muted)] truncate">{m.department}</span>}
+                      {m.department && <span className="block text-[12px] text-[var(--text-muted)] truncate">{m.department}</span>}
                     </div>
                     {sel && (
                       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
@@ -167,7 +167,7 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
 
         {/* Footer */}
         <div className="flex items-center justify-between p-5">
-          <span className="text-xs text-[var(--text-muted)]">
+          <span className="text-sm text-[var(--text-muted)]">
             {selectedMembers.length > 0 ? `${selectedMembers.length} member${selectedMembers.length !== 1 ? 's' : ''} selected` : ''}
           </span>
           <div className="flex gap-2">

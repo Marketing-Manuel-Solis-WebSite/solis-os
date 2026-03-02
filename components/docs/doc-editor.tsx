@@ -353,19 +353,19 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
           placeholder="Untitled Document" />
 
         <div className="flex items-center gap-1.5">
-          {dirty && <span className="text-[10px] text-amber-400 px-2 py-0.5 rounded-full bg-amber-500/10">Unsaved</span>}
-          {saving && <span className="text-[10px] text-blue-400 px-2 py-0.5 rounded-full bg-blue-500/10">Saving...</span>}
+          {dirty && <span className="text-[12px] text-amber-400 px-2 py-0.5 rounded-full bg-amber-500/10">Unsaved</span>}
+          {saving && <span className="text-[12px] text-blue-400 px-2 py-0.5 rounded-full bg-blue-500/10">Saving...</span>}
           {uploading && (
             <div className="flex items-center gap-2 px-2">
               <div className="w-16 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                 <div className="h-full bg-[var(--accent)] rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
               </div>
-              <span className="text-[10px] text-[var(--accent)]">{uploadProgress}%</span>
+              <span className="text-[12px] text-[var(--accent)]">{uploadProgress}%</span>
             </div>
           )}
 
           <button onClick={() => setShowMeta(!showMeta)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all duration-200 ${visColor}`}>
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-semibold transition-all duration-200 ${visColor}`}>
             {visIcon} {visibility}
           </button>
 
@@ -384,17 +384,17 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
             {showDownloadMenu && (
               <div className="absolute right-0 top-full mt-1 w-48 bg-[var(--bg-elevated)] rounded-xl shadow-dropdown z-20 py-1"
                 onClick={e => e.stopPropagation()}>
-                <button onClick={() => downloadAs('markdown')} className="w-full px-4 py-2 text-left text-xs text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
+                <button onClick={() => downloadAs('markdown')} className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
                   <Type className="h-3.5 w-3.5" /> Markdown (.md)
                 </button>
-                <button onClick={() => downloadAs('html')} className="w-full px-4 py-2 text-left text-xs text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
+                <button onClick={() => downloadAs('html')} className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
                   <Code className="h-3.5 w-3.5" /> HTML (.html)
                 </button>
-                <button onClick={() => downloadAs('text')} className="w-full px-4 py-2 text-left text-xs text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
+                <button onClick={() => downloadAs('text')} className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
                   <FileText className="h-3.5 w-3.5" /> Plain Text (.txt)
                 </button>
                 <div className="mx-3 my-1 border-t border-[var(--border-subtle)]" />
-                <button onClick={() => downloadAs('pdf')} className="w-full px-4 py-2 text-left text-xs text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
+                <button onClick={() => downloadAs('pdf')} className="w-full px-4 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
                   <FileDown className="h-3.5 w-3.5 text-red-400" /> PDF (Print)
                 </button>
               </div>
@@ -402,7 +402,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
           </div>
 
           <button onClick={handleSave} disabled={saving || !dirty}
-            className="px-4 h-8 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-xs flex items-center gap-1.5 disabled:opacity-40">
+            className="px-4 h-8 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-1.5 disabled:opacity-40">
             <Save className="h-3.5 w-3.5" /> Save
           </button>
 
@@ -416,22 +416,22 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
       {showMeta && (
         <div className="px-5 py-3 bg-[#0A0E16] flex items-center gap-4 flex-wrap anim-fade">
           <div className="flex items-center gap-2">
-            <label className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">Visibility</label>
-            <select value={visibility} onChange={e => { setVisibility(e.target.value as any); setDirty(true); }} className="select-dark h-7 text-[11px] px-2">
+            <label className="text-[12px] text-[var(--text-muted)] uppercase font-semibold">Visibility</label>
+            <select value={visibility} onChange={e => { setVisibility(e.target.value as any); setDirty(true); }} className="select-dark h-7 text-[13px] px-2">
               <option value="team">Team</option>
               <option value="private">Private</option>
               <option value="public">Public</option>
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">Category</label>
-            <input value={category} onChange={e => { setCategory(e.target.value); setDirty(true); }} placeholder="Category" className="input-dark h-7 text-[11px] w-28 px-2" />
+            <label className="text-[12px] text-[var(--text-muted)] uppercase font-semibold">Category</label>
+            <input value={category} onChange={e => { setCategory(e.target.value); setDirty(true); }} placeholder="Category" className="input-dark h-7 text-[13px] w-28 px-2" />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">Tags</label>
-            <input value={tags} onChange={e => { setTags(e.target.value); setDirty(true); }} placeholder="tag1, tag2" className="input-dark h-7 text-[11px] w-40 px-2" />
+            <label className="text-[12px] text-[var(--text-muted)] uppercase font-semibold">Tags</label>
+            <input value={tags} onChange={e => { setTags(e.target.value); setDirty(true); }} placeholder="tag1, tag2" className="input-dark h-7 text-[13px] w-40 px-2" />
           </div>
-          <div className="flex items-center gap-3 ml-auto text-[10px] text-[var(--text-muted)]">
+          <div className="flex items-center gap-3 ml-auto text-[12px] text-[var(--text-muted)]">
             <span>By {doc.createdByName || 'Unknown'}</span>
             {doc.createdAt?.toDate && <span>{doc.createdAt.toDate().toLocaleDateString()}</span>}
           </div>
@@ -468,13 +468,13 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
 
         {/* View mode */}
         <div className="flex rounded-xl bg-[var(--bg-tertiary)] overflow-hidden">
-          <button onClick={() => setMode('edit')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'edit' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+          <button onClick={() => setMode('edit')} className={`px-2.5 py-1 text-[12px] font-semibold transition ${mode === 'edit' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             <Edit2 className="h-3 w-3" />
           </button>
-          <button onClick={() => setMode('split')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'split' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+          <button onClick={() => setMode('split')} className={`px-2.5 py-1 text-[12px] font-semibold transition ${mode === 'split' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             Split
           </button>
-          <button onClick={() => setMode('preview')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'preview' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+          <button onClick={() => setMode('preview')} className={`px-2.5 py-1 text-[12px] font-semibold transition ${mode === 'preview' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             <Eye className="h-3 w-3" />
           </button>
         </div>
@@ -488,7 +488,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
             <div className="text-center">
               <Upload className="h-8 w-8 text-[var(--accent)] mx-auto mb-2" />
               <p className="text-sm text-[var(--accent)] font-semibold">Drop image here to upload</p>
-              <p className="text-xs text-[var(--text-muted)] mt-1">Max 100MB per image</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">Max 100MB per image</p>
             </div>
           </div>
         )}
@@ -563,7 +563,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
       </div>
 
       {/* Status Bar */}
-      <div className="flex items-center justify-between px-4 py-1.5 bg-[var(--bg-base)] text-[10px] text-[var(--text-muted)] shrink-0">
+      <div className="flex items-center justify-between px-4 py-1.5 bg-[var(--bg-base)] text-[12px] text-[var(--text-muted)] shrink-0">
         <div className="flex items-center gap-4">
           <span>{wordCount} words</span>
           <span>{charCount} chars</span>

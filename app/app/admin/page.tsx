@@ -61,7 +61,7 @@ export default function Admin() {
             </div>
             <div>
               <p className="font-semibold text-sm text-[var(--text-primary)]">{x.l}</p>
-              <p className="text-xs text-[var(--text-muted)]">{x.d}</p>
+              <p className="text-sm text-[var(--text-muted)]">{x.d}</p>
             </div>
             <ChevronRight className="h-4 w-4 text-[var(--text-muted)] mt-1 ml-auto" />
           </button>
@@ -214,18 +214,18 @@ function DepartmentsS() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Name *</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Name *</label>
               <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Department name" className="input-dark" autoFocus />
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Description</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Description</label>
               <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="What does this team do?" className="input-dark" />
             </div>
           </div>
 
           {/* Icon Picker */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Icon</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Icon</label>
             <div className="flex gap-1.5 flex-wrap">
               {ICONS.map(ic => (
                 <button key={ic} onClick={() => setForm({ ...form, icon: ic })}
@@ -238,7 +238,7 @@ function DepartmentsS() {
 
           {/* Color Picker */}
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Color</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Color</label>
             <div className="flex gap-1.5 flex-wrap items-center">
               {COLORS.map(c => (
                 <button key={c} onClick={() => setForm({ ...form, color: c })}
@@ -257,7 +257,7 @@ function DepartmentsS() {
             <span className="text-lg">{form.icon}</span>
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: form.color }} />
             <span className="text-sm font-semibold" style={{ color: form.color }}>{form.name || 'Preview'}</span>
-            <span className="text-xs text-[var(--text-muted)]">{form.description}</span>
+            <span className="text-sm text-[var(--text-muted)]">{form.description}</span>
           </div>
 
           <div className="flex gap-2">
@@ -288,11 +288,11 @@ function DepartmentsS() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold" style={{ color: dept.color }}>{dept.name}</p>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor: `${dept.color}15`, color: dept.color, border: `1px solid ${dept.color}25` }}>
+                    <span className="text-[12px] px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor: `${dept.color}15`, color: dept.color, border: `1px solid ${dept.color}25` }}>
                       {deptMembers.length} member{deptMembers.length !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  <p className="text-xs text-[var(--text-muted)] mt-0.5">{dept.description || 'No description'}</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-0.5">{dept.description || 'No description'}</p>
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setAssignDeptId(isAssigning ? null : dept.id)}
@@ -317,11 +317,11 @@ function DepartmentsS() {
                   <div className="flex flex-wrap gap-2 pt-3">
                     {deptMembers.map(m => (
                       <div key={m.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-tertiary)] group/member">
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold" style={{ backgroundColor: `${dept.color}15`, color: dept.color }}>
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold" style={{ backgroundColor: `${dept.color}15`, color: dept.color }}>
                           {m.displayName?.[0]?.toUpperCase() || '?'}
                         </div>
-                        <span className="text-xs text-[var(--text-secondary)]">{m.displayName}</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--bg-elevated)] text-[var(--text-muted)]">{m.role}</span>
+                        <span className="text-sm text-[var(--text-secondary)]">{m.displayName}</span>
+                        <span className="text-[12px] px-1.5 py-0.5 rounded-md bg-[var(--bg-elevated)] text-[var(--text-muted)]">{m.role}</span>
                         <button onClick={() => handleRemoveFromDept(m.id)}
                           className="opacity-0 group-hover/member:opacity-100 p-0.5 text-[var(--text-muted)] hover:text-red-400 transition"
                           title="Remove from department">
@@ -336,14 +336,14 @@ function DepartmentsS() {
               {/* Assign Members Panel */}
               {isAssigning && (
                 <div className="px-5 pb-4 border-t border-[var(--accent)]/20 bg-[var(--accent-subtle)]">
-                  <p className="text-[10px] text-[var(--accent)] uppercase font-semibold tracking-wider py-3">Assign Members to {dept.name}</p>
+                  <p className="text-[12px] text-[var(--accent)] uppercase font-semibold tracking-wider py-3">Assign Members to {dept.name}</p>
                   {unassigned.length === 0 && members.filter(m => m.teamId !== dept.id).length === 0 ? (
-                    <p className="text-xs text-[var(--text-muted)] pb-2">All members are already assigned to this department.</p>
+                    <p className="text-sm text-[var(--text-muted)] pb-2">All members are already assigned to this department.</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {members.filter(m => m.teamId !== dept.id).map(m => (
                         <button key={m.id} onClick={() => handleAssignMember(m.id, dept.id)}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-base)] hover:bg-emerald-500/5 hover:shadow-card-hover transition-all duration-200 text-xs text-[var(--text-secondary)] hover:text-gray-200">
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-base)] hover:bg-emerald-500/5 hover:shadow-card-hover transition-all duration-200 text-sm text-[var(--text-secondary)] hover:text-gray-200">
                           <div className="w-5 h-5 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center text-[9px] font-bold text-[var(--text-muted)]">
                             {m.displayName?.[0]?.toUpperCase() || '?'}
                           </div>
@@ -375,18 +375,18 @@ function DepartmentsS() {
               <AlertTriangle className="h-4 w-4 text-amber-400" />
               <span className="text-sm font-semibold text-amber-400">Unassigned Members ({unassigned.length})</span>
             </div>
-            <p className="text-xs text-[var(--text-muted)] mb-3">These members have not been assigned to a department yet.</p>
+            <p className="text-sm text-[var(--text-muted)] mb-3">These members have not been assigned to a department yet.</p>
             <div className="flex flex-wrap gap-2">
               {unassigned.map(m => (
                 <div key={m.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-tertiary)]">
-                  <div className="w-6 h-6 rounded-full bg-amber-500/10 flex items-center justify-center text-[10px] font-bold text-amber-400">
+                  <div className="w-6 h-6 rounded-full bg-amber-500/10 flex items-center justify-center text-[12px] font-bold text-amber-400">
                     {m.displayName?.[0]?.toUpperCase() || '?'}
                   </div>
-                  <span className="text-xs text-[var(--text-secondary)]">{m.displayName}</span>
+                  <span className="text-sm text-[var(--text-secondary)]">{m.displayName}</span>
                   <select
                     onChange={e => { if (e.target.value) handleAssignMember(m.id, e.target.value); }}
                     value=""
-                    className="select-dark h-7 text-[10px] px-2 ml-1">
+                    className="select-dark h-7 text-[12px] px-2 ml-1">
                     <option value="">Assign to...</option>
                     {depts.map(d => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
                   </select>
@@ -432,14 +432,14 @@ function OrgS() {
         <I l="Timezone" v={d.timezone || ''} c={v => setD({ ...d, timezone: v })} />
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs text-[var(--text-muted)] mb-1">Primary Color</label>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Primary Color</label>
             <div className="flex gap-2">
               <input type="color" value={d.primaryColor || '#3B82F6'} onChange={e => setD({ ...d, primaryColor: e.target.value })} className="w-10 h-10 rounded-lg bg-transparent cursor-pointer" />
               <input value={d.primaryColor || ''} onChange={e => setD({ ...d, primaryColor: e.target.value })} className="input-dark flex-1" />
             </div>
           </div>
           <div>
-            <label className="block text-xs text-[var(--text-muted)] mb-1">Secondary</label>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">Secondary</label>
             <div className="flex gap-2">
               <input type="color" value={d.secondaryColor || '#0C1017'} onChange={e => setD({ ...d, secondaryColor: e.target.value })} className="w-10 h-10 rounded-lg bg-transparent cursor-pointer" />
               <input value={d.secondaryColor || ''} onChange={e => setD({ ...d, secondaryColor: e.target.value })} className="input-dark flex-1" />
@@ -564,27 +564,27 @@ function UsersS() {
           {createErr && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{createErr}</div>}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Nombre Completo *</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Nombre Completo *</label>
               <input value={newUser.displayName} onChange={e => setNewUser({ ...newUser, displayName: e.target.value })} placeholder="Juan Pérez" className="input-dark" autoFocus />
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Email *</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Email *</label>
               <input type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} placeholder="juan@ejemplo.com" className="input-dark" />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Contraseña *</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Contraseña *</label>
               <input type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} placeholder="Min 6 caracteres" minLength={6} className="input-dark" />
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Rol</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Rol</label>
               <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value as Role })} className="select-dark h-[42px]">
                 {(['admin', 'manager', 'member', 'guest', 'readonly'] as Role[]).map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Departamento</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Departamento</label>
               <select value={newUser.teamId} onChange={e => setNewUser({ ...newUser, teamId: e.target.value })} className="select-dark h-[42px]">
                 <option value="">Sin Departamento</option>
                 {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
@@ -608,11 +608,11 @@ function UsersS() {
         <table className="w-full text-sm">
           <thead>
             <tr>
-              <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Usuario</th>
-              <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Rol</th>
-              <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Departamento</th>
-              <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Estado</th>
-              <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Acciones</th>
+              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Usuario</th>
+              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Rol</th>
+              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Departamento</th>
+              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Estado</th>
+              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -629,18 +629,18 @@ function UsersS() {
                       </div>
                       <div>
                         <p className="font-medium text-[var(--text-primary)]">{m.displayName}</p>
-                        <p className="text-[11px] text-[var(--text-muted)]">{m.email}</p>
+                        <p className="text-[13px] text-[var(--text-muted)]">{m.email}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-5 py-3">
-                    <select value={m.role} onChange={e => cR(m.id, e.target.value as Role)} className="select-dark text-xs h-8">
+                    <select value={m.role} onChange={e => cR(m.id, e.target.value as Role)} className="select-dark text-sm h-8">
                       {['owner', 'admin', 'manager', 'member', 'guest', 'readonly'].map(r => <option key={r}>{r}</option>)}
                     </select>
                   </td>
                   <td className="px-5 py-3">
                     <select value={m.teamId || ''} onChange={e => cT(m.id, e.target.value)}
-                      className="select-dark text-xs h-8"
+                      className="select-dark text-sm h-8"
                       style={{ borderColor: tm ? `${tm.color}30` : undefined, color: tm ? tm.color : undefined }}>
                       <option value="">Sin Departamento</option>
                       {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
@@ -655,19 +655,19 @@ function UsersS() {
                     {m.id !== user!.uid && m.role !== 'owner' && (
                       isInactive ? (
                         <button onClick={() => handleReactivate(m.id)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-[11px] font-semibold hover:bg-emerald-500/20 transition"
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-[13px] font-semibold hover:bg-emerald-500/20 transition"
                           title="Reactivar usuario">
                           <RotateCcw className="h-3 w-3" /> Reactivar
                         </button>
                       ) : deleteTarget === m.id ? (
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-red-400">Confirmar?</span>
+                          <span className="text-[12px] text-red-400">Confirmar?</span>
                           <button onClick={() => handleDeactivate(m.id)} disabled={deleting}
-                            className="px-2 py-1 rounded-lg bg-red-500/10 text-red-400 text-[10px] font-semibold hover:bg-red-500/20 transition">
+                            className="px-2 py-1 rounded-lg bg-red-500/10 text-red-400 text-[12px] font-semibold hover:bg-red-500/20 transition">
                             {deleting ? '...' : 'Sí'}
                           </button>
                           <button onClick={() => setDeleteTarget(null)}
-                            className="px-2 py-1 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-secondary)] text-[10px] hover:bg-[var(--bg-elevated)] transition">
+                            className="px-2 py-1 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-secondary)] text-[12px] hover:bg-[var(--bg-elevated)] transition">
                             No
                           </button>
                         </div>
@@ -738,7 +738,7 @@ function PermsS() {
         <button onClick={save} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2"><Save className="h-4 w-4" />Save</button>
       </div>
       <div className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-sm">
           <thead>
             <tr>
               <th className="text-left px-3 py-2 text-[var(--text-muted)]">Res</th>
@@ -793,23 +793,23 @@ function AuditS() {
           <table className="w-full text-sm">
             <thead>
               <tr>
-                <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Actor</th>
-                <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Action</th>
-                <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Resource</th>
-                <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Detail</th>
-                <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Time</th>
+                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Actor</th>
+                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Action</th>
+                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Resource</th>
+                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Detail</th>
+                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Time</th>
               </tr>
             </thead>
             <tbody>
               {f.map(l => (
                 <tr key={l.id} className="border-b border-[var(--border-subtle)] hover:bg-white/[0.01]">
-                  <td className="px-5 py-2.5 text-xs text-[var(--accent)]">{l.actorName || '—'}</td>
+                  <td className="px-5 py-2.5 text-sm text-[var(--accent)]">{l.actorName || '—'}</td>
                   <td className="px-5 py-2.5">
-                    <span className={`text-[10px] px-2 py-0.5 rounded-lg font-semibold ${l.action === 'deleted' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : l.action === 'created' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>{l.action}</span>
+                    <span className={`text-[12px] px-2 py-0.5 rounded-lg font-semibold ${l.action === 'deleted' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : l.action === 'created' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>{l.action}</span>
                   </td>
-                  <td className="px-5 py-2.5 text-xs text-[var(--text-secondary)]">{l.resource}</td>
-                  <td className="px-5 py-2.5 text-xs text-[var(--text-muted)]">{l.detail || '—'}</td>
-                  <td className="px-5 py-2.5 text-xs text-[var(--text-muted)]">{l.createdAt?.toDate?.()?.toLocaleString?.() || '—'}</td>
+                  <td className="px-5 py-2.5 text-sm text-[var(--text-secondary)]">{l.resource}</td>
+                  <td className="px-5 py-2.5 text-sm text-[var(--text-muted)]">{l.detail || '—'}</td>
+                  <td className="px-5 py-2.5 text-sm text-[var(--text-muted)]">{l.createdAt?.toDate?.()?.toLocaleString?.() || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -869,7 +869,7 @@ function CrudS({ label, fields, gFn, cFn, dFn }: { label: string; fields: string
             <div key={it.id} className="flex items-center gap-3 px-5 py-3.5 rounded-xl bg-[var(--bg-secondary)] shadow-card group">
               <div className="flex-1">
                 <p className="text-sm font-medium text-[var(--text-primary)]">{it.name || it.title || it.id}</p>
-                <p className="text-xs text-[var(--text-muted)]">{fields.filter(f => f !== 'name' && f !== 'title').map(f => `${f}: ${it[f] || '—'}`).join(' · ')}</p>
+                <p className="text-sm text-[var(--text-muted)]">{fields.filter(f => f !== 'name' && f !== 'title').map(f => `${f}: ${it[f] || '—'}`).join(' · ')}</p>
               </div>
               <button onClick={() => del(it.id)} className="opacity-0 group-hover:opacity-100 p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg">
                 <Trash2 className="h-4 w-4" />
@@ -911,7 +911,7 @@ function SetS({ k, label, fs }: { k: string; label: string; fs: string[] }) {
           const isBool = f.toLowerCase().includes('enabled') || f.toLowerCase().includes('digest') || f.toLowerCase().includes('report') || f.toLowerCase().includes('alert');
           return (
             <div key={f}>
-              <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 capitalize">{f.replace(/([A-Z])/g, ' $1')}</label>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-1.5 capitalize">{f.replace(/([A-Z])/g, ' $1')}</label>
               {isBool ? (
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input type="checkbox" checked={!!d[f]} onChange={e => setD({ ...d, [f]: e.target.checked })} className="w-4 h-4 rounded bg-[var(--bg-elevated)] border-[var(--border)] accent-[var(--accent)]" />
@@ -934,7 +934,7 @@ function SetS({ k, label, fs }: { k: string; label: string; fs: string[] }) {
 function I({ l, v, c }: { l: string; v: string; c: (v: string) => void }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5">{l}</label>
+      <label className="block text-sm font-medium text-[var(--text-muted)] mb-1.5">{l}</label>
       <input value={v} onChange={e => c(e.target.value)} className="input-dark" />
     </div>
   );

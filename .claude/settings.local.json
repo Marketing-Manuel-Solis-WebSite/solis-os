@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npx next:*)",
       "Bash(xargs grep:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(find components:*)"
     ]
   }
 }

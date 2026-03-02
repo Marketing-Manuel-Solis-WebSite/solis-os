@@ -114,9 +114,9 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-1">
           Welcome back{me?.displayName ? `, ${me.displayName.split(' ')[0]}` : ''}
         </h1>
-        <p className="text-[var(--text-muted)] text-sm">
+        <p className="text-[var(--text-muted)] text-base">
           Here&apos;s what&apos;s happening in your workspace today.
-          {canSeeAllTeams && activeTeamId === '__all__' && <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">GENERAL VIEW</span>}
+          {canSeeAllTeams && activeTeamId === '__all__' && <span className="ml-2 text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">GENERAL VIEW</span>}
         </p>
       </div>
 
@@ -136,7 +136,7 @@ export default function Dashboard() {
                     <s.icon className="h-5 w-5" style={{ color: s.color }} />
                   </div>
                   <p className="text-3xl font-bold text-[var(--text-primary)]">{s.val}</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">{s.label}</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-1">{s.label}</p>
                 </div>
               </motion.div>
             ))}
@@ -153,7 +153,7 @@ export default function Dashboard() {
               <motion.div initial={{ width: 0 }} animate={{ width: `${metrics.rate}%` }} transition={{ duration: 1, ease: 'easeOut' }}
                 className="h-full rounded-full bg-[var(--accent)]" />
             </div>
-            <div className="flex items-center gap-6 mt-3 text-[11px]">
+            <div className="flex items-center gap-6 mt-3 text-[13px]">
               <span className="flex items-center gap-1.5 text-emerald-400"><CheckCircle2 className="h-3 w-3" /> {metrics.done} done</span>
               <span className="flex items-center gap-1.5 text-blue-400"><Loader2 className="h-3 w-3" /> {metrics.inProgress} in progress</span>
               <span className="flex items-center gap-1.5 text-purple-400"><Eye className="h-3 w-3" /> {metrics.inReview} in review</span>
@@ -172,7 +172,7 @@ export default function Dashboard() {
                     className="flex items-center gap-4">
                     <div className="w-28 flex items-center gap-2 shrink-0">
                       <span className="text-sm">{dp.team.icon}</span>
-                      <span className="text-xs font-medium truncate" style={{ color: dp.team.color }}>{dp.team.name}</span>
+                      <span className="text-sm font-medium truncate" style={{ color: dp.team.color }}>{dp.team.name}</span>
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -180,9 +180,9 @@ export default function Dashboard() {
                           <motion.div initial={{ width: 0 }} animate={{ width: `${dp.rate}%` }} transition={{ duration: 0.8, delay: 0.5 + di * 0.05 }}
                             className="h-full rounded-full" style={{ backgroundColor: dp.team.color, opacity: 0.7 }} />
                         </div>
-                        <span className="text-xs font-bold w-10 text-right" style={{ color: dp.team.color }}>{dp.rate}%</span>
+                        <span className="text-sm font-bold w-10 text-right" style={{ color: dp.team.color }}>{dp.rate}%</span>
                       </div>
-                      <div className="flex gap-4 text-[10px] text-[var(--text-muted)] mt-0.5">
+                      <div className="flex gap-4 text-[12px] text-[var(--text-muted)] mt-0.5">
                         <span>{dp.total} tasks</span><span>{dp.done} done</span>
                       </div>
                     </div>
@@ -199,8 +199,8 @@ export default function Dashboard() {
               <div className="p-5 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Target className="h-4 w-4 text-[var(--accent)]" /> My Tasks</h2>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">{metrics.myPending.length} pending</span>
-                  {metrics.myOverdue.length > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">{metrics.myOverdue.length} overdue</span>}
+                  <span className="text-[12px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">{metrics.myPending.length} pending</span>
+                  {metrics.myOverdue.length > 0 && <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">{metrics.myOverdue.length} overdue</span>}
                 </div>
               </div>
               <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto scrollbar-thin">
@@ -217,14 +217,14 @@ export default function Dashboard() {
                         <p className="text-sm text-[var(--text-primary)] truncate">{t.title}</p>
                         {team && <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: `${team.color}10`, color: team.color }}>{team.icon} {team.name}</span>}
                       </div>
-                      <span className="text-[10px] px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: `${priorityColors[t.priority] || '#64748B'}15`, color: priorityColors[t.priority] || '#64748B', border: `1px solid ${priorityColors[t.priority] || '#64748B'}25` }}>{t.priority}</span>
+                      <span className="text-[12px] px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: `${priorityColors[t.priority] || '#64748B'}15`, color: priorityColors[t.priority] || '#64748B', border: `1px solid ${priorityColors[t.priority] || '#64748B'}25` }}>{t.priority}</span>
                     </div>
                   );
                 })}
               </div>
               {metrics.myPending.length > 8 && (
                 <div className="p-3 text-center">
-                  <button onClick={() => router.push('/app/tasks')} className="text-xs text-[var(--accent)] hover:underline flex items-center gap-1 mx-auto">View all <ArrowRight className="h-3 w-3" /></button>
+                  <button onClick={() => router.push('/app/tasks')} className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1 mx-auto">View all <ArrowRight className="h-3 w-3" /></button>
                 </div>
               )}
             </motion.div>
@@ -234,7 +234,7 @@ export default function Dashboard() {
               className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
               <div className="p-5 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Calendar className="h-4 w-4 text-[var(--accent)]" /> Upcoming Deadlines</h2>
-                <span className="text-[10px] text-[var(--text-muted)]">Next 7 days</span>
+                <span className="text-[12px] text-[var(--text-muted)]">Next 7 days</span>
               </div>
               <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto scrollbar-thin">
                 {metrics.upcoming.length === 0 ? (
@@ -250,10 +250,10 @@ export default function Dashboard() {
                         <p className="text-sm text-[var(--text-primary)] truncate">{t.title}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           {team && <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: `${team.color}10`, color: team.color }}>{team.icon}</span>}
-                          <span className="text-[10px] text-[var(--text-muted)]">{due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                          <span className="text-[12px] text-[var(--text-muted)]">{due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                         </div>
                       </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${daysLeft <= 1 ? 'bg-red-500/10 text-red-400' : daysLeft <= 3 ? 'bg-amber-500/10 text-amber-400' : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)]'}`}>
+                      <span className={`text-[12px] px-2 py-0.5 rounded-full font-semibold ${daysLeft <= 1 ? 'bg-red-500/10 text-red-400' : daysLeft <= 3 ? 'bg-amber-500/10 text-amber-400' : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)]'}`}>
                         {daysLeft === 0 ? 'Today' : daysLeft === 1 ? 'Tomorrow' : `${daysLeft}d left`}
                       </span>
                     </div>
@@ -275,12 +275,12 @@ export default function Dashboard() {
                   const pct = openTotal > 0 ? Math.round((count / openTotal) * 100) : 0;
                   return (
                     <div key={p} className="flex items-center gap-3">
-                      <span className="text-xs text-[var(--text-secondary)] w-16 capitalize">{p}</span>
+                      <span className="text-sm text-[var(--text-secondary)] w-16 capitalize">{p}</span>
                       <div className="flex-1 h-3.5 rounded-full bg-[var(--bg-base)] overflow-hidden">
                         <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.7, delay: 0.65 }}
                           className="h-full rounded-full" style={{ backgroundColor: priorityColors[p] }} />
                       </div>
-                      <span className="text-xs font-bold w-8 text-right text-[var(--text-secondary)]">{count}</span>
+                      <span className="text-sm font-bold w-8 text-right text-[var(--text-secondary)]">{count}</span>
                     </div>
                   );
                 })}
@@ -303,7 +303,7 @@ export default function Dashboard() {
                       <span className="text-[var(--text-muted)]">{l.action}</span>{' '}
                       <span className="text-[var(--text-secondary)]">{l.resource}</span>
                     </p>
-                    {l.detail && <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{l.detail}</p>}
+                    {l.detail && <p className="text-[13px] text-[var(--text-muted)] mt-0.5 truncate">{l.detail}</p>}
                   </div>
                 ))}
               </div>

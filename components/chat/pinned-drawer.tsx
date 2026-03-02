@@ -33,7 +33,7 @@ export default function PinnedDrawer({ messages, members, onClose, onUnpin }: Pr
             <div className="w-12 h-12 rounded-md bg-[var(--accent)]/10 flex items-center justify-center mx-auto mb-3">
               <Pin className="h-5 w-5 text-[var(--accent)]/50" />
             </div>
-            <p className="text-xs text-[var(--text-muted)]">No pinned messages</p>
+            <p className="text-sm text-[var(--text-muted)]">No pinned messages</p>
           </div>
         ) : messages.map((msg, i) => {
           const time = msg.createdAt?.toDate?.();
@@ -49,14 +49,14 @@ export default function PinnedDrawer({ messages, members, onClose, onUnpin }: Pr
                 <div className="w-6 h-6 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center text-[9px] font-bold text-[var(--accent)]">
                   {msg.displayName?.[0]?.toUpperCase()}
                 </div>
-                <span className="text-xs font-semibold text-[var(--text-primary)]">{msg.displayName}</span>
-                {time && <span className="text-[10px] text-[var(--text-muted)] ml-auto">{time.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>}
+                <span className="text-sm font-semibold text-[var(--text-primary)]">{msg.displayName}</span>
+                {time && <span className="text-[12px] text-[var(--text-muted)] ml-auto">{time.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>}
               </div>
               <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{msg.content}</p>
               <motion.button
                 whileTap={{ scale: 0.9 }}
                 onClick={() => onUnpin(msg.id)}
-                className="mt-2 text-[10px] text-[var(--text-muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition flex items-center gap-1">
+                className="mt-2 text-[12px] text-[var(--text-muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition flex items-center gap-1">
                 <Pin className="h-3 w-3" /> Unpin
               </motion.button>
             </motion.div>

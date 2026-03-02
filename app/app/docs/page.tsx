@@ -246,12 +246,12 @@ export default function DocsPage() {
           <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
             Documents
             {canSeeAllTeams && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">
+              <span className="text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">
                 ALL ACCESS
               </span>
             )}
           </h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">
+          <p className="text-base text-[var(--text-muted)] mt-1">
             {visible.length} document{visible.length !== 1 ? 's' : ''}
             {hasActiveFilters && <span className="text-[var(--accent)]"> (filtered)</span>}
           </p>
@@ -272,7 +272,7 @@ export default function DocsPage() {
 
         {/* Department filter */}
         {canSeeAllTeams && teams.length > 0 && (
-          <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="select-dark h-9 text-xs">
+          <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="select-dark h-9 text-sm">
             <option value="all">All Departments</option>
             {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
             <option value="">No Department</option>
@@ -281,13 +281,13 @@ export default function DocsPage() {
 
         {/* Author filter */}
         {uniqueAuthors.length > 1 && (
-          <select value={filterAuthor} onChange={e => setFilterAuthor(e.target.value)} className="select-dark h-9 text-xs">
+          <select value={filterAuthor} onChange={e => setFilterAuthor(e.target.value)} className="select-dark h-9 text-sm">
             <option value="all">All Authors</option>
             {uniqueAuthors.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         )}
 
-        <select value={filterVisibility} onChange={e => setFilterVisibility(e.target.value as any)} className="select-dark h-9 text-xs">
+        <select value={filterVisibility} onChange={e => setFilterVisibility(e.target.value as any)} className="select-dark h-9 text-sm">
           <option value="all">All Visibility</option>
           <option value="team">Team Only</option>
           <option value="private">Private</option>
@@ -295,14 +295,14 @@ export default function DocsPage() {
         </select>
 
         {categories.length > 0 && (
-          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="select-dark h-9 text-xs">
+          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="select-dark h-9 text-sm">
             <option value="all">All Categories</option>
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
 
         {/* Date range filter */}
-        <select value={filterDate} onChange={e => setFilterDate(e.target.value as any)} className="select-dark h-9 text-xs">
+        <select value={filterDate} onChange={e => setFilterDate(e.target.value as any)} className="select-dark h-9 text-sm">
           <option value="all">Any Time</option>
           <option value="7">Last 7 Days</option>
           <option value="30">Last 30 Days</option>
@@ -310,7 +310,7 @@ export default function DocsPage() {
           <option value="365">Last Year</option>
         </select>
 
-        <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="select-dark h-9 text-xs">
+        <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="select-dark h-9 text-sm">
           <option value="updated">Last Modified</option>
           <option value="created">Newest First</option>
           <option value="title">A → Z</option>
@@ -319,7 +319,7 @@ export default function DocsPage() {
 
         {/* Starred toggle */}
         <button onClick={() => setFilterStarred(!filterStarred)}
-          className={`h-9 px-3 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all duration-200 ${
+          className={`h-9 px-3 rounded-xl text-sm font-medium flex items-center gap-1.5 transition-all duration-200 ${
             filterStarred
               ? 'bg-[var(--accent-subtle)] text-[var(--accent)]'
               : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:shadow-card-hover'
@@ -330,7 +330,7 @@ export default function DocsPage() {
 
         {hasActiveFilters && (
           <button onClick={clearFilters}
-            className="h-9 px-3 rounded-xl border border-red-500/20 text-xs text-red-400 hover:bg-red-500/10 transition flex items-center gap-1">
+            className="h-9 px-3 rounded-xl border border-red-500/20 text-sm text-red-400 hover:bg-red-500/10 transition flex items-center gap-1">
             <X className="h-3 w-3" /> Clear
           </button>
         )}
@@ -433,11 +433,11 @@ function DocCard({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }
             <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{doc.title || 'Untitled'}</p>
             <div className="flex items-center gap-2 mt-0.5">
               {team && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: `${team.color}15`, color: team.color }}>
+                <span className="text-[12px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: `${team.color}15`, color: team.color }}>
                   {team.icon} {team.name}
                 </span>
               )}
-              <span className="text-[10px] text-[var(--text-muted)]">{doc.createdByName}</span>
+              <span className="text-[12px] text-[var(--text-muted)]">{doc.createdByName}</span>
             </div>
           </div>
         </div>
@@ -452,12 +452,12 @@ function DocCard({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }
           )}
         </div>
       </div>
-      <p className="text-xs text-[var(--text-muted)] line-clamp-3 mb-4 min-h-[3rem] leading-relaxed">{preview || 'Empty document...'}</p>
+      <p className="text-sm text-[var(--text-muted)] line-clamp-3 mb-4 min-h-[3rem] leading-relaxed">{preview || 'Empty document...'}</p>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`flex items-center gap-1 text-[10px] ${visColor}`}>{visIcon}{doc.visibility}</span>
+          <span className={`flex items-center gap-1 text-[12px] ${visColor}`}>{visIcon}{doc.visibility}</span>
           {imgCount > 0 && (
-            <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+            <span className="flex items-center gap-1 text-[12px] text-[var(--text-muted)]">
               <Paperclip className="h-2.5 w-2.5" />{imgCount}
             </span>
           )}
@@ -466,8 +466,8 @@ function DocCard({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }
           ))}
         </div>
         <div className="flex items-center gap-2">
-          {doc.wordCount > 0 && <span className="text-[10px] text-[var(--text-muted)]">{doc.wordCount}w</span>}
-          {updated && <span className="text-[10px] text-[var(--text-muted)]">{updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+          {doc.wordCount > 0 && <span className="text-[12px] text-[var(--text-muted)]">{doc.wordCount}w</span>}
+          {updated && <span className="text-[12px] text-[var(--text-muted)]">{updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
         </div>
       </div>
     </div>
@@ -500,18 +500,18 @@ function DocListItem({ doc, index, teams, onClick, onDelete, onToggleStar, isOwn
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{doc.title || 'Untitled'}</p>
-        <p className="text-[11px] text-[var(--text-muted)] truncate">{(doc.content || '').replace(/[#*_`>\-\[\]!()]/g, '').replace(/\n+/g, ' ').slice(0, 80) || 'Empty'}</p>
+        <p className="text-[13px] text-[var(--text-muted)] truncate">{(doc.content || '').replace(/[#*_`>\-\[\]!()]/g, '').replace(/\n+/g, ' ').slice(0, 80) || 'Empty'}</p>
       </div>
-      {team && <span className="text-[10px] px-2 py-0.5 rounded-md font-medium shrink-0" style={{ backgroundColor: `${team.color}15`, color: team.color }}>{team.icon} {team.name}</span>}
-      <span className={`flex items-center gap-1 text-[10px] shrink-0 ${visColor}`}>{visIcon}</span>
+      {team && <span className="text-[12px] px-2 py-0.5 rounded-md font-medium shrink-0" style={{ backgroundColor: `${team.color}15`, color: team.color }}>{team.icon} {team.name}</span>}
+      <span className={`flex items-center gap-1 text-[12px] shrink-0 ${visColor}`}>{visIcon}</span>
       {imgCount > 0 && (
-        <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] shrink-0">
+        <span className="flex items-center gap-1 text-[12px] text-[var(--text-muted)] shrink-0">
           <Paperclip className="h-2.5 w-2.5" />{imgCount}
         </span>
       )}
-      {doc.wordCount > 0 && <span className="text-[10px] text-[var(--text-muted)] shrink-0">{doc.wordCount}w</span>}
-      {updated && <span className="text-[10px] text-[var(--text-muted)] shrink-0">{updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
-      <span className="text-[10px] text-[var(--text-muted)] shrink-0">{doc.createdByName}</span>
+      {doc.wordCount > 0 && <span className="text-[12px] text-[var(--text-muted)] shrink-0">{doc.wordCount}w</span>}
+      {updated && <span className="text-[12px] text-[var(--text-muted)] shrink-0">{updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+      <span className="text-[12px] text-[var(--text-muted)] shrink-0">{doc.createdByName}</span>
       {isOwner && (
         <button onClick={e => { e.stopPropagation(); onDelete(); }} className="opacity-0 group-hover:opacity-100 p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition shrink-0">
           <Trash2 className="h-3.5 w-3.5" />
@@ -601,18 +601,18 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Title</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Document title..."
               autoFocus className="w-full h-12 px-4 rounded-xl bg-[var(--bg-elevated)] text-[var(--text-primary)] text-lg font-semibold placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30"
               onKeyDown={e => e.key === 'Enter' && template !== 'ai' && submit()} />
           </div>
 
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Template</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Template</label>
             <div className="grid grid-cols-3 gap-2">
               {templates.map(t => (
                 <button key={t.id} onClick={() => setTemplate(t.id)}
-                  className={`text-left px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${
+                  className={`text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${
                     template === t.id
                       ? t.id === 'ai'
                         ? 'bg-[var(--accent-subtle)] text-[var(--accent)] shadow-card'
@@ -629,7 +629,7 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
           {/* AI prompt when AI template selected */}
           {template === 'ai' && (
             <div className="anim-fade">
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">
                 Describe the document for AI
               </label>
               <textarea
@@ -644,14 +644,14 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Department</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Department</label>
               <select value={deptId} onChange={e => setDeptId(e.target.value)} className="select-dark w-full">
                 <option value="">No Department</option>
                 {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Visibility</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Visibility</label>
               <select value={visibility} onChange={e => setVisibility(e.target.value as any)} className="select-dark w-full">
                 <option value="team">Team</option>
                 <option value="private">Private</option>
@@ -659,13 +659,13 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
               </select>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Category</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Category</label>
               <input value={category} onChange={e => setCategory(e.target.value)} placeholder="Legal, HR..." className="input-dark h-[38px] text-sm" />
             </div>
           </div>
 
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Tags (comma-separated)</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Tags (comma-separated)</label>
             <input value={tags} onChange={e => setTags(e.target.value)} placeholder="immigration, filing, urgent" className="input-dark h-9 text-sm" />
           </div>
         </div>

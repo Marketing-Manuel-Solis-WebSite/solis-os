@@ -90,9 +90,9 @@ export default function AnalyticsPage() {
             <div>
               <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
                 Analytics
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">AI-POWERED</span>
+                <span className="text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">AI-POWERED</span>
               </h1>
-              <p className="text-sm text-[var(--text-muted)] mt-1">
+              <p className="text-base text-[var(--text-muted)] mt-1">
                 {data ? `Last updated: ${data.loadedAt.toLocaleTimeString()}` : 'Loading platform data...'}
               </p>
             </div>
@@ -103,11 +103,11 @@ export default function AnalyticsPage() {
               </button>
               <div className="flex rounded-md bg-[var(--bg-tertiary)] overflow-hidden">
                 <button onClick={() => setView('dashboard')}
-                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition ${view === 'dashboard' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition ${view === 'dashboard' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
                   <BarChart3 className="h-3.5 w-3.5" /> Dashboard
                 </button>
                 <button onClick={() => setView('ai')}
-                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition ${view === 'ai' ? 'bg-purple-500/10 text-purple-400' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition ${view === 'ai' ? 'bg-purple-500/10 text-purple-400' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
                   <Brain className="h-3.5 w-3.5" /> AI Analysis
                 </button>
               </div>
@@ -131,7 +131,7 @@ export default function AnalyticsPage() {
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full font-semibold" style={{ backgroundColor: `${s.color}10`, color: s.color }}>{s.sub}</span>
                   </div>
                   <p className="text-2xl font-bold text-[var(--text-primary)]">{s.value}</p>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{s.label}</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-0.5">{s.label}</p>
                 </div>
               ))}
             </div>

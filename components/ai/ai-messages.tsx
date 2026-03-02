@@ -65,7 +65,7 @@ export default function AIMessages({ messages, loading, streamingText }: Props) 
           if (isSystem) {
             return (
               <motion.div key={msg.id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center py-2">
-                <span className="text-[11px] text-[var(--text-muted)] bg-[var(--bg-elevated)] px-3 py-1 rounded-full">{msg.content}</span>
+                <span className="text-[13px] text-[var(--text-muted)] bg-[var(--bg-elevated)] px-3 py-1 rounded-full">{msg.content}</span>
               </motion.div>
             );
           }
@@ -105,7 +105,7 @@ export default function AIMessages({ messages, loading, streamingText }: Props) 
                   <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <motion.button whileTap={{ scale: 0.9 }}
                       onClick={() => copyText(msg.content, i)}
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
                       {copiedIdx === i ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
                       {copiedIdx === i ? 'Copied' : 'Copy'}
                     </motion.button>
@@ -157,7 +157,7 @@ export default function AIMessages({ messages, loading, streamingText }: Props) 
                     <span className="w-2 h-2 rounded-full bg-[var(--accent)]/60 animate-bounce" style={{ animationDelay: '150ms' }} />
                     <span className="w-2 h-2 rounded-full bg-[var(--accent)]/60 animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
-                  <span className="text-xs text-[var(--text-muted)]">Thinking...</span>
+                  <span className="text-sm text-[var(--text-muted)]">Thinking...</span>
                 </div>
               </div>
             </div>

@@ -300,7 +300,7 @@ function LoginForm() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
-            className="text-center text-[11px] mt-6"
+            className="text-center text-[13px] mt-6"
             style={{ color: 'var(--text-muted)', opacity: 0.4 }}
           >
             Powered by <span className="font-medium" style={{ color: 'var(--accent)', opacity: 0.6 }}>Nora</span>

@@ -183,7 +183,7 @@ function WelcomeScreen({ onQuickStart }: { onQuickStart: (question: string) => v
             <Sparkles className="h-8 w-8 text-[var(--accent-text)]" />
           </motion.div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1.5">How can I help you today?</h1>
-          <p className="text-sm text-[var(--text-muted)]">Ask me anything about legal research, documents, or business operations.</p>
+          <p className="text-base text-[var(--text-muted)]">Ask me anything about legal research, documents, or business operations.</p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }} className="grid grid-cols-2 gap-3">
@@ -201,7 +201,7 @@ function WelcomeScreen({ onQuickStart }: { onQuickStart: (question: string) => v
               <span className="text-lg shrink-0 mt-0.5">{s.icon}</span>
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">{s.title}</p>
-                <p className="text-[11px] text-[var(--text-muted)] mt-0.5 line-clamp-2">{s.question}</p>
+                <p className="text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2">{s.question}</p>
               </div>
             </motion.button>
           ))}

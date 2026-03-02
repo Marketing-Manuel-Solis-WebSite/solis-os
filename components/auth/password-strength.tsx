@@ -62,10 +62,10 @@ export default function PasswordStrength({ password }: Props) {
 
       {/* Label */}
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium" style={{ color }}>
+        <span className="text-[13px] font-medium" style={{ color }}>
           {LEVEL_LABELS[level]}
         </span>
-        <span className="text-[11px] text-[var(--text-muted)]">{score}/5</span>
+        <span className="text-[13px] text-[var(--text-muted)]">{score}/5</span>
       </div>
 
       {/* Checklist */}
@@ -85,7 +85,7 @@ export default function PasswordStrength({ password }: Props) {
               )}
             </div>
             <span
-              className="text-[11px] transition-colors duration-200"
+              className="text-[13px] transition-colors duration-200"
               style={{ color: r.pass ? 'var(--text-secondary)' : 'var(--text-muted)' }}
             >
               {r.label}

@@ -64,7 +64,7 @@ export default function TaskListView({
   return (
     <div className="h-full overflow-y-auto px-6 py-3">
       {/* Column Headers */}
-      <div className="flex items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-semibold sticky top-0 bg-[var(--bg-base)] z-10">
+      <div className="flex items-center gap-2 px-4 py-2 text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold sticky top-0 bg-[var(--bg-base)] z-10">
         {COLUMNS.map(col => (
           <div key={col.id}
             className={`flex items-center gap-1 ${col.width} shrink-0 ${col.sortable ? 'cursor-pointer hover:text-[var(--text-secondary)] select-none' : ''}`}
@@ -87,7 +87,7 @@ export default function TaskListView({
               : <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />}
             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color, boxShadow: `0 0 8px ${group.color}40` }} />
             <span className="text-sm font-semibold text-[var(--text-secondary)]">{group.label}</span>
-            <span className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] px-1.5 py-0.5 rounded-md">{group.count}</span>
+            <span className="text-sm text-[var(--text-muted)] bg-[var(--bg-elevated)] px-1.5 py-0.5 rounded-md">{group.count}</span>
             <button onClick={e => { e.stopPropagation(); selectAllInGroup(group.tasks); }}
               className="ml-2 opacity-0 group-hover:opacity-100 transition text-[var(--text-muted)] hover:text-[var(--accent)]"
               title="Seleccionar todas">
@@ -170,7 +170,7 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
         <div className={`w-4 h-4 rounded-md flex items-center justify-center transition-all duration-200 cursor-pointer ${
           isChecked ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] hover:bg-[var(--accent)]/20'
         }`}>
-          {isChecked && <span className="text-[var(--accent-text)] text-[10px] font-bold">&#10003;</span>}
+          {isChecked && <span className="text-[var(--accent-text)] text-[12px] font-bold">&#10003;</span>}
         </div>
       </div>
 
@@ -197,7 +197,7 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
           )}
         </div>
         {task.description && (
-          <p className="text-[11px] text-[var(--text-muted)] truncate mt-0.5 ml-5">{task.description}</p>
+          <p className="text-[13px] text-[var(--text-muted)] truncate mt-0.5 ml-5">{task.description}</p>
         )}
       </div>
 
@@ -229,7 +229,7 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
       {/* Due date */}
       <div className="w-28 shrink-0">
         {due && (
-          <span className={`text-[11px] flex items-center gap-1 px-2 py-0.5 rounded-md ${
+          <span className={`text-[13px] flex items-center gap-1 px-2 py-0.5 rounded-md ${
             overdue ? 'bg-red-500/10 text-red-400' : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)]'
           }`}>
             <Calendar className="h-3 w-3" />
@@ -241,13 +241,13 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
       {/* Tags */}
       <div className="w-32 hidden lg:flex gap-1 shrink-0">
         {task.tags?.slice(0, 2).map((tg: string) => (
-          <span key={tg} className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">{tg}</span>
+          <span key={tg} className="text-[12px] px-2 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">{tg}</span>
         ))}
       </div>
 
       {/* Points */}
       <div className="w-14 shrink-0 text-center">
-        {task.points && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-muted)] font-mono">{task.points}pt</span>}
+        {task.points && <span className="text-[12px] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-muted)] font-mono">{task.points}pt</span>}
       </div>
 
       {/* Hover actions */}
@@ -292,7 +292,7 @@ function InlinePrioritySelect({ value, canUpdate, onChange }: { value: string; c
             className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-[var(--bg-base)] rounded-xl shadow-dropdown z-30 p-1 min-w-[120px]">
             {PRIORITIES.map(pri => (
               <button key={pri.id} onClick={e => { e.stopPropagation(); onChange(pri.id); setOpen(false); }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs w-full hover:bg-[var(--bg-hover)] transition ${value === pri.id ? 'bg-[var(--bg-hover)]' : ''}`}>
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm w-full hover:bg-[var(--bg-hover)] transition ${value === pri.id ? 'bg-[var(--bg-hover)]' : ''}`}>
                 {pri.icon} {pri.label}
               </button>
             ))}

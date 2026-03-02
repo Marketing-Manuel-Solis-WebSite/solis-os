@@ -351,7 +351,7 @@ export default function TasksPage() {
           ) : filteredTasks.length === 0 ? (
             <div className="text-center py-20">
               <CheckSquare className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
-              <p className="text-[var(--text-muted)] text-sm">No se encontraron tareas.</p>
+              <p className="text-[var(--text-muted)] text-base">No se encontraron tareas.</p>
               {canCreate && (
                 <button onClick={() => setShowCreate(true)} className="text-sm text-[var(--accent)] hover:underline mt-2">
                   Crea tu primera tarea

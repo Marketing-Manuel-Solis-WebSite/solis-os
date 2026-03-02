@@ -194,9 +194,9 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
               {replyTo && (
                 <>
                   <Reply className="h-3.5 w-3.5 text-[var(--accent)]" />
-                  <span className="text-xs text-[var(--text-muted)]">Respondiendo a</span>
-                  <span className="text-xs text-[var(--accent)] font-semibold">{replyTo.displayName}</span>
-                  <span className="text-xs text-[var(--text-muted)] truncate flex-1">{replyTo.content?.slice(0, 50)}</span>
+                  <span className="text-sm text-[var(--text-muted)]">Respondiendo a</span>
+                  <span className="text-sm text-[var(--accent)] font-semibold">{replyTo.displayName}</span>
+                  <span className="text-sm text-[var(--text-muted)] truncate flex-1">{replyTo.content?.slice(0, 50)}</span>
                   <motion.button whileTap={{ scale: 0.85 }} onClick={onCancelReply} className="p-1 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-md transition">
                     <X className="h-3.5 w-3.5" />
                   </motion.button>
@@ -205,7 +205,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
               {editingMsg && (
                 <>
                   <Edit2 className="h-3.5 w-3.5 text-blue-400" />
-                  <span className="text-xs text-blue-400 font-semibold flex-1">Editando mensaje</span>
+                  <span className="text-sm text-blue-400 font-semibold flex-1">Editando mensaje</span>
                   <motion.button whileTap={{ scale: 0.85 }} onClick={() => { onCancelEdit(); setTxt(''); }} className="p-1 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-md transition">
                     <X className="h-3.5 w-3.5" />
                   </motion.button>
@@ -238,7 +238,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
                   ) : (
                     <div className="h-24 px-4 rounded-xl shadow-card bg-[var(--bg-elevated)] flex flex-col items-center justify-center gap-1">
                       <Paperclip className="h-5 w-5 text-[var(--text-muted)]" />
-                      <span className="text-[10px] text-[var(--text-secondary)] truncate max-w-[100px] text-center">{p.file.name}</span>
+                      <span className="text-[12px] text-[var(--text-secondary)] truncate max-w-[100px] text-center">{p.file.name}</span>
                       <span className="text-[9px] text-[var(--text-muted)]">{formatFileSize(p.file.size)}</span>
                     </div>
                   )}
@@ -254,7 +254,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
                 <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                   <motion.div className="h-full bg-[var(--accent)] rounded-full" animate={{ width: `${uploadProgress}%` }} />
                 </div>
-                <span className="text-[10px] text-[var(--text-muted)] mt-0.5">Subiendo... {uploadProgress}%</span>
+                <span className="text-[12px] text-[var(--text-muted)] mt-0.5">Subiendo... {uploadProgress}%</span>
               </div>
             )}
           </motion.div>
@@ -277,7 +277,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
                 whileHover={{ backgroundColor: 'var(--bg-hover)' }}
                 onClick={() => insertMention(m)}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[var(--text-secondary)] transition">
-                <div className="w-7 h-7 rounded-full bg-[var(--accent)]/10 flex items-center justify-center text-[10px] font-bold text-[var(--accent)]">
+                <div className="w-7 h-7 rounded-full bg-[var(--accent)]/10 flex items-center justify-center text-[12px] font-bold text-[var(--accent)]">
                   {m.displayName?.[0]?.toUpperCase()}
                 </div>
                 <span className="font-medium">{m.displayName}</span>
@@ -297,7 +297,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => onSend(s.label, [])}
-              className="shrink-0 px-3 py-1.5 rounded-full bg-[var(--bg-elevated)] shadow-card text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all duration-200 flex items-center gap-1.5"
+              className="shrink-0 px-3 py-1.5 rounded-full bg-[var(--bg-elevated)] shadow-card text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all duration-200 flex items-center gap-1.5"
             >
               <span>{s.icon}</span>
               {s.label}
@@ -359,9 +359,9 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
           </motion.button>
         </div>
         <div className="flex items-center gap-3 mt-1.5 px-1">
-          <span className="text-[11px] text-[var(--text-muted)]">Shift+Enter nueva línea</span>
-          <span className="text-[11px] text-[var(--text-muted)]">@ para mencionar</span>
-          <span className="text-[11px] text-[var(--text-muted)]">Pega imágenes del portapapeles</span>
+          <span className="text-[13px] text-[var(--text-muted)]">Shift+Enter nueva línea</span>
+          <span className="text-[13px] text-[var(--text-muted)]">@ para mencionar</span>
+          <span className="text-[13px] text-[var(--text-muted)]">Pega imágenes del portapapeles</span>
         </div>
       </div>
     </div>

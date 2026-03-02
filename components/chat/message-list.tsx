@@ -207,7 +207,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
           return (
             <div key={item.id} className="flex items-center gap-4 py-3 px-2 my-2">
               <div className="flex-1 h-px bg-[var(--border)]" />
-              <span className="text-[11px] font-semibold text-[var(--text-muted)] tracking-wider">{item.label}</span>
+              <span className="text-[13px] font-semibold text-[var(--text-muted)] tracking-wider">{item.label}</span>
               <div className="flex-1 h-px bg-[var(--border)]" />
             </div>
           );
@@ -226,7 +226,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
           return (
             <div key={item.id} className="flex items-center gap-3 py-1.5 px-2 my-1">
               <div className="flex-1 h-px bg-[var(--border)]" />
-              <span className="text-[11px] text-[var(--text-muted)] whitespace-nowrap flex items-center gap-1.5">
+              <span className="text-[13px] text-[var(--text-muted)] whitespace-nowrap flex items-center gap-1.5">
                 <ArrowRight className="h-3 w-3" />
                 {first.content}
               </span>
@@ -253,10 +253,10 @@ export default function MessageList({ messages, members, userId, channelType, ca
                 <div className="flex items-baseline gap-2 mb-0.5">
                   <span className="text-[14px] font-semibold text-[var(--text-primary)]">{first.displayName}</span>
                   {member?.role && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-muted)]">{member.role}</span>
+                    <span className="text-[12px] px-1.5 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-muted)]">{member.role}</span>
                   )}
                   {time && (
-                    <span className="text-[11px] text-[var(--text-muted)]">
+                    <span className="text-[13px] text-[var(--text-muted)]">
                       {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   )}
@@ -289,7 +289,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
                 onMouseLeave={() => setHoverId(null)}
               >
                 {/* Hover timestamp where avatar would be */}
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] text-[var(--text-muted)] opacity-0 group-hover/msg:opacity-100 transition w-[40px] text-center">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] text-[var(--text-muted)] opacity-0 group-hover/msg:opacity-100 transition w-[40px] text-center">
                   {msg.createdAt?.toDate?.()?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 <div className="pl-[54px] py-0.5">
@@ -355,8 +355,8 @@ function MessageContent({
       {msg.replyTo && (
         <div className="flex items-center gap-1.5 mb-1">
           <Reply className="h-3 w-3 text-[var(--text-muted)]" />
-          <span className="text-xs text-[var(--accent)] font-medium">{msg.replyAuthor}</span>
-          <span className="text-xs text-[var(--text-muted)] truncate max-w-[250px]">{msg.replyPreview}</span>
+          <span className="text-sm text-[var(--accent)] font-medium">{msg.replyAuthor}</span>
+          <span className="text-sm text-[var(--text-muted)] truncate max-w-[250px]">{msg.replyPreview}</span>
         </div>
       )}
 
@@ -364,7 +364,7 @@ function MessageContent({
       {msg.pinned && (
         <div className="flex items-center gap-1 mb-1">
           <Pin className="h-3 w-3 text-[var(--accent)]" />
-          <span className="text-[10px] text-[var(--accent)] font-semibold">Fijado</span>
+          <span className="text-[12px] text-[var(--accent)] font-semibold">Fijado</span>
         </div>
       )}
 
@@ -372,7 +372,7 @@ function MessageContent({
       {(media.textContent || !media.hasMedia) && (
         <div className={`text-[15px] leading-relaxed whitespace-pre-wrap ${msg.deleted ? 'italic text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
           {renderMessageText(media.hasMedia ? media.textContent : (msg.content || ''), members)}
-          {msg.edited && !msg.deleted && <span className="text-[10px] text-[var(--text-muted)] ml-2">(editado)</span>}
+          {msg.edited && !msg.deleted && <span className="text-[12px] text-[var(--text-muted)] ml-2">(editado)</span>}
         </div>
       )}
 
@@ -422,7 +422,7 @@ function MessageContent({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[var(--text-primary)] truncate">{att.name || 'Archivo'}</p>
-                  <p className="text-[11px] text-[var(--text-muted)]">{ext} {att.size ? `· ${formatFileSize(att.size)}` : ''}</p>
+                  <p className="text-[13px] text-[var(--text-muted)]">{ext} {att.size ? `· ${formatFileSize(att.size)}` : ''}</p>
                 </div>
                 <Download className="h-4 w-4 text-[var(--text-muted)] group-hover/file:text-[var(--accent)] transition shrink-0" />
               </a>

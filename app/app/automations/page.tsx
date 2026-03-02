@@ -145,11 +145,11 @@ export default function AutomationsPage() {
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
             Automations
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-semibold">
+            <span className="text-[12px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-semibold">
               {activeCount} ACTIVE
             </span>
           </h1>
-          <p className="text-sm text-[var(--text-muted)] mt-1">{rules.length} rules · {totalRuns} total runs</p>
+          <p className="text-base text-[var(--text-muted)] mt-1">{rules.length} rules · {totalRuns} total runs</p>
         </div>
         {canManage && (
           <button onClick={() => { setEditingRule(null); setShowBuilder(true); }} className="flex items-center gap-2 px-5 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">
@@ -168,7 +168,7 @@ export default function AutomationsPage() {
         ].map(s => (
           <div key={s.label} className="p-4 rounded-xl bg-[var(--bg-secondary)] shadow-card">
             <p className="text-2xl font-bold text-[var(--text-primary)]">{s.val}</p>
-            <p className="text-[10px] mt-0.5" style={{ color: s.color }}>{s.label}</p>
+            <p className="text-sm mt-0.5" style={{ color: s.color }}>{s.label}</p>
           </div>
         ))}
       </div>
@@ -179,7 +179,7 @@ export default function AutomationsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search automations..." className="input-dark pl-10 h-9 text-sm" />
         </div>
-        <select value={filterEnabled} onChange={e => setFilterEnabled(e.target.value as any)} className="select-dark h-9 text-xs">
+        <select value={filterEnabled} onChange={e => setFilterEnabled(e.target.value as any)} className="select-dark h-9 text-sm">
           <option value="all">All Rules</option>
           <option value="active">Active Only</option>
           <option value="inactive">Inactive Only</option>
@@ -221,18 +221,18 @@ export default function AutomationsPage() {
                       <p className={`text-sm font-semibold ${rule.enabled !== false ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>{rule.name}</p>
                       {rule.enabled === false && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] font-semibold">DISABLED</span>}
                     </div>
-                    {rule.description && <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{rule.description}</p>}
+                    {rule.description && <p className="text-[13px] text-[var(--text-muted)] mt-0.5 truncate">{rule.description}</p>}
 
                     {/* Flow visualization */}
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className="text-[10px] px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 font-medium">
+                      <span className="text-[12px] px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 font-medium">
                         {triggerConf?.label || rule.trigger}
                       </span>
 
                       {(rule.conditions || []).length > 0 && (
                         <>
                           <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
-                          <span className="text-[10px] px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 font-medium">
+                          <span className="text-[12px] px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 font-medium">
                             {rule.conditions.length} condition{rule.conditions.length !== 1 ? 's' : ''}
                           </span>
                         </>
@@ -241,7 +241,7 @@ export default function AutomationsPage() {
                       {(rule.actions || []).map((action, ai) => (
                         <span key={ai} className="flex items-center gap-1">
                           <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
-                          <span className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-medium">
+                          <span className="text-[12px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-medium">
                             {ACTIONS.find(a => a.id === action.type)?.label || action.type}
                           </span>
                         </span>
@@ -251,7 +251,7 @@ export default function AutomationsPage() {
                       {!(rule.actions || []).length && rule.trigger && (
                         <>
                           <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
-                          <span className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-medium">
+                          <span className="text-[12px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-medium">
                             {(rule as any).action || 'Action'}
                           </span>
                         </>
@@ -262,8 +262,8 @@ export default function AutomationsPage() {
                   {/* Meta */}
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {ruleTeam && <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: `${ruleTeam.color}15`, color: ruleTeam.color }}>{ruleTeam.icon} {ruleTeam.name}</span>}
-                    {rule.runCount > 0 && <span className="text-[10px] text-[var(--text-muted)]">{rule.runCount} runs</span>}
-                    {rule.lastRunAt && <span className="text-[10px] text-[var(--text-muted)]">Last: {rule.lastRunAt?.toDate?.()?.toLocaleDateString?.() || '—'}</span>}
+                    {rule.runCount > 0 && <span className="text-[12px] text-[var(--text-muted)]">{rule.runCount} runs</span>}
+                    {rule.lastRunAt && <span className="text-[12px] text-[var(--text-muted)]">Last: {rule.lastRunAt?.toDate?.()?.toLocaleDateString?.() || '—'}</span>}
                   </div>
 
                   {/* Actions */}
@@ -349,7 +349,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
             <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center"><Zap className="h-4 w-4 text-amber-400" /></div>
             <div>
               <h2 className="text-lg font-bold text-[var(--text-primary)]">Automation Builder</h2>
-              <p className="text-[11px] text-[var(--text-muted)]">When → If → Then</p>
+              <p className="text-[13px] text-[var(--text-muted)]">When → If → Then</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg"><X className="h-5 w-5" /></button>
@@ -359,8 +359,8 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
         <div className="flex items-center gap-2 px-5 py-3">
           {['Trigger', 'Conditions', 'Actions', 'Review'].map((s, i) => (
             <button key={s} onClick={() => setStep(i)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${step === i ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : step > i ? 'text-emerald-400' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === i ? 'bg-[var(--accent)] text-[var(--accent-text)]' : step > i ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)]'}`}>{step > i ? '✓' : i + 1}</span>
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${step === i ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : step > i ? 'text-emerald-400' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[12px] font-bold ${step === i ? 'bg-[var(--accent)] text-[var(--accent-text)]' : step > i ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)]'}`}>{step > i ? '✓' : i + 1}</span>
               {s}
             </button>
           ))}
@@ -370,11 +370,11 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
           {/* Name + Description (always visible) */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Rule Name *</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Rule Name *</label>
               <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g., Auto-assign urgent tasks" autoFocus className="input-dark text-sm" />
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Department</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Department</label>
               <select value={teamId} onChange={e => setTeamId(e.target.value)} className="select-dark w-full">
                 <option value="">All Departments</option>
                 {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
@@ -382,14 +382,14 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
             </div>
           </div>
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Description</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Description</label>
             <input value={description} onChange={e => setDescription(e.target.value)} placeholder="What does this rule do?" className="input-dark text-sm" />
           </div>
 
           {/* STEP 0: TRIGGER */}
           {step === 0 && (
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[#3B82F6] mb-2 font-semibold">WHEN (Trigger)</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[#3B82F6] mb-2 font-semibold">WHEN (Trigger)</label>
               <div className="grid grid-cols-2 gap-2">
                 {TRIGGERS.map(t => (
                   <button key={t.id} onClick={() => setTrigger(t.id)}
@@ -397,8 +397,8 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                     style={trigger === t.id ? { backgroundColor: `${t.color}08`, borderColor: `${t.color}30` } : {}}>
                     <t.icon className="h-5 w-5 shrink-0 mt-0.5" style={{ color: t.color }} />
                     <div>
-                      <p className={`text-xs font-semibold ${trigger === t.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{t.label}</p>
-                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{t.desc}</p>
+                      <p className={`text-sm font-semibold ${trigger === t.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{t.label}</p>
+                      <p className="text-sm text-[var(--text-muted)] mt-0.5">{t.desc}</p>
                     </div>
                   </button>
                 ))}
@@ -410,37 +410,37 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
           {step === 1 && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">IF (Conditions) — Optional</label>
-                <button onClick={addCondition} className="flex items-center gap-1 px-3 h-7 rounded-lg bg-amber-500/10 text-amber-400 text-[11px] font-medium hover:bg-amber-500/20 transition-all duration-200">
+                <label className="text-[12px] uppercase tracking-wider text-amber-400 font-semibold">IF (Conditions) — Optional</label>
+                <button onClick={addCondition} className="flex items-center gap-1 px-3 h-7 rounded-lg bg-amber-500/10 text-amber-400 text-[13px] font-medium hover:bg-amber-500/20 transition-all duration-200">
                   <Plus className="h-3 w-3" /> Add Condition
                 </button>
               </div>
               {conditions.length === 0 ? (
                 <div className="text-center py-8 rounded-xl bg-[var(--bg-elevated)]/50">
                   <Filter className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2" />
-                  <p className="text-xs text-[var(--text-muted)]">No conditions. Rule will trigger for all matching events.</p>
-                  <button onClick={addCondition} className="text-xs text-amber-400 hover:underline mt-2">Add a filter condition</button>
+                  <p className="text-sm text-[var(--text-muted)]">No conditions. Rule will trigger for all matching events.</p>
+                  <button onClick={addCondition} className="text-sm text-amber-400 hover:underline mt-2">Add a filter condition</button>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {conditions.map((cond, ci) => (
                     <div key={cond.id} className="flex items-center gap-2 p-3 rounded-xl bg-[var(--bg-elevated)]">
-                      {ci > 0 && <span className="text-[10px] text-amber-400 font-bold px-2">AND</span>}
-                      <select value={cond.field} onChange={e => updateCondition(cond.id, 'field', e.target.value)} className="select-dark h-8 text-[11px] flex-1">
+                      {ci > 0 && <span className="text-[12px] text-amber-400 font-bold px-2">AND</span>}
+                      <select value={cond.field} onChange={e => updateCondition(cond.id, 'field', e.target.value)} className="select-dark h-8 text-[13px] flex-1">
                         {CONDITION_FIELDS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
                       </select>
-                      <select value={cond.operator} onChange={e => updateCondition(cond.id, 'operator', e.target.value)} className="select-dark h-8 text-[11px] w-32">
+                      <select value={cond.operator} onChange={e => updateCondition(cond.id, 'operator', e.target.value)} className="select-dark h-8 text-[13px] w-32">
                         {CONDITION_OPS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
                       </select>
                       {(() => {
                         const fieldConf = CONDITION_FIELDS.find(f => f.id === cond.field);
                         if (fieldConf?.options) {
-                          return <select value={cond.value} onChange={e => updateCondition(cond.id, 'value', e.target.value)} className="select-dark h-8 text-[11px] flex-1">
+                          return <select value={cond.value} onChange={e => updateCondition(cond.id, 'value', e.target.value)} className="select-dark h-8 text-[13px] flex-1">
                             <option value="">Select...</option>
                             {fieldConf.options.map(o => <option key={o} value={o}>{o}</option>)}
                           </select>;
                         }
-                        return <input value={cond.value} onChange={e => updateCondition(cond.id, 'value', e.target.value)} placeholder="Value..." className="input-dark h-8 text-[11px] flex-1" />;
+                        return <input value={cond.value} onChange={e => updateCondition(cond.id, 'value', e.target.value)} placeholder="Value..." className="input-dark h-8 text-[13px] flex-1" />;
                       })()}
                       <button onClick={() => removeCondition(cond.id)} className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-lg"><X className="h-3.5 w-3.5" /></button>
                     </div>
@@ -453,7 +453,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
           {/* STEP 2: ACTIONS */}
           {step === 2 && (
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-emerald-400 mb-2 font-semibold">THEN (Actions)</label>
+              <label className="block text-[12px] uppercase tracking-wider text-emerald-400 mb-2 font-semibold">THEN (Actions)</label>
               {actions.length > 0 && (
                 <div className="space-y-2 mb-4">
                   {actions.map((action, ai) => {
@@ -461,23 +461,23 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                     return (
                       <div key={action.id} className="p-3 rounded-xl bg-[var(--bg-elevated)]">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="text-[10px] font-bold text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10">{ai + 1}</span>
+                          <span className="text-[12px] font-bold text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10">{ai + 1}</span>
                           {actionConf && <actionConf.icon className="h-4 w-4" style={{ color: actionConf.color }} />}
-                          <span className="text-xs font-semibold text-[var(--text-secondary)]">{actionConf?.label || action.type}</span>
+                          <span className="text-sm font-semibold text-[var(--text-secondary)]">{actionConf?.label || action.type}</span>
                           <div className="flex-1" />
                           <button onClick={() => removeAction(action.id)} className="p-1 text-[var(--text-muted)] hover:text-red-400 rounded"><X className="h-3.5 w-3.5" /></button>
                         </div>
                         {/* Config fields */}
                         {actionConf?.configFields?.map(field => (
                           <div key={field.key} className="mt-2">
-                            <label className="block text-[10px] text-[var(--text-muted)] mb-1">{field.label}</label>
+                            <label className="block text-[12px] text-[var(--text-muted)] mb-1">{field.label}</label>
                             {(field as any).options ? (
-                              <select value={action.config[field.key] || ''} onChange={e => updateActionConfig(action.id, field.key, e.target.value)} className="select-dark h-8 text-[11px] w-full">
+                              <select value={action.config[field.key] || ''} onChange={e => updateActionConfig(action.id, field.key, e.target.value)} className="select-dark h-8 text-[13px] w-full">
                                 <option value="">Select...</option>
                                 {(field as any).options.map((o: string) => <option key={o} value={o}>{o}</option>)}
                               </select>
                             ) : (
-                              <input value={action.config[field.key] || ''} onChange={e => updateActionConfig(action.id, field.key, e.target.value)} placeholder={`Enter ${field.label.toLowerCase()}...`} className="input-dark h-8 text-[11px]" />
+                              <input value={action.config[field.key] || ''} onChange={e => updateActionConfig(action.id, field.key, e.target.value)} placeholder={`Enter ${field.label.toLowerCase()}...`} className="input-dark h-8 text-[13px]" />
                             )}
                           </div>
                         ))}
@@ -492,8 +492,8 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                     className="flex items-center gap-2 p-3 rounded-xl bg-[var(--bg-elevated)] hover:shadow-card-hover text-left transition-all duration-200">
                     <a.icon className="h-4 w-4 shrink-0" style={{ color: a.color }} />
                     <div>
-                      <p className="text-xs font-medium text-[var(--text-secondary)]">{a.label}</p>
-                      <p className="text-[10px] text-[var(--text-muted)]">{a.desc}</p>
+                      <p className="text-sm font-medium text-[var(--text-secondary)]">{a.label}</p>
+                      <p className="text-sm text-[var(--text-muted)]">{a.desc}</p>
                     </div>
                     <Plus className="h-3 w-3 text-[var(--text-muted)] ml-auto shrink-0" />
                   </button>
@@ -505,26 +505,26 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
           {/* STEP 3: REVIEW */}
           {step === 3 && (
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--accent)] mb-3 font-semibold">REVIEW</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--accent)] mb-3 font-semibold">REVIEW</label>
               <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-subtle)] p-5 space-y-4">
                 <div>
                   <p className="text-lg font-bold text-[var(--text-primary)]">{name || 'Unnamed Rule'}</p>
-                  {description && <p className="text-xs text-[var(--text-muted)] mt-1">{description}</p>}
+                  {description && <p className="text-sm text-[var(--text-muted)] mt-1">{description}</p>}
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-[11px] px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 font-semibold">WHEN: {triggerConf?.label || trigger}</span>
-                  {conditions.length > 0 && <span className="text-[11px] px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 font-semibold">IF: {conditions.length} condition{conditions.length !== 1 ? 's' : ''}</span>}
+                  <span className="text-[13px] px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 font-semibold">WHEN: {triggerConf?.label || trigger}</span>
+                  {conditions.length > 0 && <span className="text-[13px] px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 font-semibold">IF: {conditions.length} condition{conditions.length !== 1 ? 's' : ''}</span>}
                   {actions.map((a, i) => {
                     const ac = ACTIONS.find(x => x.id === a.type);
-                    return <span key={i} className="text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 font-semibold">THEN: {ac?.label || a.type}</span>;
+                    return <span key={i} className="text-[13px] px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 font-semibold">THEN: {ac?.label || a.type}</span>;
                   })}
                 </div>
 
                 {!canSubmit && (
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/5 border border-red-500/20">
                     <AlertTriangle className="h-4 w-4 text-red-400" />
-                    <p className="text-xs text-red-400">Missing required fields: {!name.trim() ? 'Name, ' : ''}{!trigger ? 'Trigger, ' : ''}{actions.length === 0 ? 'At least one action' : ''}</p>
+                    <p className="text-sm text-red-400">Missing required fields: {!name.trim() ? 'Name, ' : ''}{!trigger ? 'Trigger, ' : ''}{actions.length === 0 ? 'At least one action' : ''}</p>
                   </div>
                 )}
               </div>

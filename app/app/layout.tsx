@@ -98,7 +98,7 @@ function TeamSelector() {
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all duration-200 ${activeTeamId === '__all__' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'hover:bg-[var(--bg-hover)] text-[var(--text-primary)]'}`}
               >
                 <span className="text-sm font-medium">General</span>
-                <span className="text-[10px] text-[var(--text-muted)] ml-auto">All depts</span>
+                <span className="text-[12px] text-[var(--text-muted)] ml-auto">All depts</span>
               </button>
               <div className="h-px bg-[var(--border-subtle)] my-1 mx-2" />
               {teams.map(t => (
@@ -109,7 +109,7 @@ function TeamSelector() {
                 >
                   <span className="text-sm">{t.icon}</span>
                   <span className="text-sm font-medium text-[var(--text-primary)]">{t.name}</span>
-                  <span className="text-[10px] text-[var(--text-muted)] ml-auto">{getMemberCount(t.id)}</span>
+                  <span className="text-[12px] text-[var(--text-muted)] ml-auto">{getMemberCount(t.id)}</span>
                 </button>
               ))}
             </div>
@@ -132,9 +132,9 @@ function ThemeToggle() {
       aria-label="Toggle theme"
     >
       {resolved === 'dark' ? (
-        <Sun className="h-[18px] w-[18px]" strokeWidth={1.75} />
+        <Sun className="h-5 w-5" strokeWidth={1.75} />
       ) : (
-        <Moon className="h-[18px] w-[18px]" strokeWidth={1.75} />
+        <Moon className="h-5 w-5" strokeWidth={1.75} />
       )}
     </button>
   );
@@ -182,8 +182,8 @@ function UserMenu() {
           >
             <div className="px-3 py-3">
               <p className="text-sm font-semibold text-[var(--text-primary)]">{me.displayName}</p>
-              <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{me.email}</p>
-              <span className="inline-block mt-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] font-medium uppercase tracking-wider">
+              <p className="text-[13px] text-[var(--text-muted)] mt-0.5">{me.email}</p>
+              <span className="inline-block mt-1.5 text-[12px] px-1.5 py-0.5 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] font-medium uppercase tracking-wider">
                 {me.role}
               </span>
             </div>
@@ -242,14 +242,11 @@ function Shell({ children }: { children: React.ReactNode }) {
       >
         {/* Logo */}
         <div className="h-14 flex items-center px-3 gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#7B68EE] to-[#5B8DEF] flex items-center justify-center shrink-0 shadow-glow">
-            <Zap className="h-4 w-4 text-white" strokeWidth={2} />
-          </div>
+          <img src="/solis-logo.png" alt="Solis" className="w-8 h-8 rounded-lg object-contain shrink-0" />
           <AnimatePresence>
             {open && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }} className="min-w-0">
-                <p className="text-sm font-bold text-[var(--sidebar-text-active)] tracking-wide">SOLIS</p>
-                <p className="text-[10px] text-[var(--sidebar-text)] tracking-widest uppercase">center</p>
+                <p className="text-sm font-bold text-[var(--sidebar-text-active)] tracking-wide">SOLIS CENTER</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -269,7 +266,7 @@ function Shell({ children }: { children: React.ReactNode }) {
               <button
                 key={n.href}
                 onClick={() => router.push(n.href)}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-all duration-200 relative ${
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-200 relative ${
                   active
                     ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
                     : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
@@ -282,7 +279,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                   />
                 )}
-                <n.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+                <n.icon className="h-5 w-5 shrink-0" strokeWidth={1.75} />
                 <AnimatePresence>
                   {open && (
                     <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
@@ -300,14 +297,14 @@ function Shell({ children }: { children: React.ReactNode }) {
               <AnimatePresence>
                 {open && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pt-4 pb-1 px-2.5">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--sidebar-text)]">Administration</p>
+                    <p className="text-[12px] font-semibold uppercase tracking-[0.15em] text-[var(--sidebar-text)]">Administration</p>
                   </motion.div>
                 )}
               </AnimatePresence>
               {!open && <div className="pt-2 mt-2"><div className="h-px bg-[var(--sidebar-divider)] mx-2" /></div>}
               <button
                 onClick={() => router.push('/app/admin')}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] transition-all duration-200 relative ${
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-200 relative ${
                   path.startsWith('/app/admin')
                     ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
                     : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
@@ -316,7 +313,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 {path.startsWith('/app/admin') && (
                   <motion.div layoutId="nav-indicator" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]" />
                 )}
-                <Shield className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+                <Shield className="h-5 w-5 shrink-0" strokeWidth={1.75} />
                 <AnimatePresence>{open && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>Admin Console</motion.span>}</AnimatePresence>
               </button>
             </>
@@ -333,7 +330,7 @@ function Shell({ children }: { children: React.ReactNode }) {
               {open && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[var(--sidebar-text-active)] truncate">{me.displayName}</p>
-                  <p className="text-[10px] text-[var(--sidebar-text)] truncate uppercase tracking-wider">{me.role}</p>
+                  <p className="text-[12px] text-[var(--sidebar-text)] truncate uppercase tracking-wider">{me.role}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -367,7 +364,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             </button>
             <TeamSelector />
             {canSeeAllTeams && (
-              <span className="hidden sm:inline text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] font-medium tracking-wider text-[var(--text-muted)] uppercase">
+              <span className="hidden sm:inline text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] font-medium tracking-wider text-[var(--text-muted)] uppercase">
                 {path === '/app' ? 'DASHBOARD' : path.split('/').pop()?.toUpperCase().replace(/-/g, ' ')}
               </span>
             )}

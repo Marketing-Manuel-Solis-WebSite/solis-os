@@ -58,21 +58,21 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
             className="overflow-hidden"
           >
             <div className="p-3 bg-[var(--bg-base)]/50">
-              <p className="text-[10px] text-[#22C55E] uppercase font-semibold tracking-wider mb-2">Add Members</p>
+              <p className="text-[12px] text-[#22C55E] uppercase font-semibold tracking-wider mb-2">Add Members</p>
               <div className="relative mb-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-muted)]" />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
-                  className="w-full h-8 pl-8 pr-3 rounded-lg bg-[var(--bg-elevated)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30 transition-all duration-200" />
+                  className="w-full h-8 pl-8 pr-3 rounded-lg bg-[var(--bg-elevated)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30 transition-all duration-200" />
               </div>
               <div className="max-h-36 overflow-y-auto space-y-0.5 scrollbar-thin">
                 {nonMembers.length === 0 ? (
-                  <p className="text-xs text-[var(--text-muted)] text-center py-3">No more members to add</p>
+                  <p className="text-sm text-[var(--text-muted)] text-center py-3">No more members to add</p>
                 ) : nonMembers.map(m => (
                   <motion.button
                     key={m.id}
                     whileHover={{ x: 2 }}
                     onClick={() => onAdd(m.id)}
-                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
                     <div className="w-6 h-6 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center text-[9px] font-bold text-[var(--accent)]">
                       {m.displayName?.[0]?.toUpperCase()}
                     </div>
@@ -109,7 +109,7 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium text-[var(--text-primary)] truncate">{m.displayName}</span>
+                  <span className="text-sm font-medium text-[var(--text-primary)] truncate">{m.displayName}</span>
                   {isSelf && <span className="text-[9px] text-[var(--text-muted)]">(you)</span>}
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">

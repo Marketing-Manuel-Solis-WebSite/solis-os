@@ -71,7 +71,7 @@ export default function TaskBoardView({ groups, members, teams, selectedTask, ca
           <div className="flex items-center gap-2 mb-3 px-1">
             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color, boxShadow: `0 0 8px ${group.color}40` }} />
             <span className="text-sm font-semibold text-[var(--text-secondary)]">{group.label}</span>
-            <span className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] px-1.5 py-0.5 rounded-md">{group.tasks.length}</span>
+            <span className="text-sm text-[var(--text-muted)] bg-[var(--bg-elevated)] px-1.5 py-0.5 rounded-md">{group.tasks.length}</span>
           </div>
 
           {/* Cards */}

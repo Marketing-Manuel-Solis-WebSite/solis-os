@@ -95,7 +95,7 @@ export default function NotificationBell() {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0 }}
-              className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-[var(--error)] text-white text-[10px] font-semibold"
+              className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-[var(--error)] text-white text-[12px] font-semibold"
             >
               {unread > 9 ? '9+' : unread}
             </motion.span>
@@ -120,7 +120,7 @@ export default function NotificationBell() {
                 {unread > 0 && (
                   <button
                     onClick={handleMarkAll}
-                    className="text-xs px-2 py-1 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-200 font-medium flex items-center gap-1"
+                    className="text-sm px-2 py-1 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-200 font-medium flex items-center gap-1"
                   >
                     <CheckCheck className="h-3 w-3" /> Mark all read
                   </button>
@@ -160,7 +160,7 @@ function NotifGroup({ label, items, onClick }: { label: string; items: AppNotifi
   return (
     <div>
       <div className="px-4 py-2 sticky top-0 bg-[var(--bg-elevated)]">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
+        <p className="text-[12px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
       </div>
       {items.map(n => (
         <button
@@ -169,17 +169,17 @@ function NotifGroup({ label, items, onClick }: { label: string; items: AppNotifi
           className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-all duration-200 hover:bg-[var(--bg-hover)] ${!n.read ? 'bg-[var(--accent-subtle)]' : ''}`}
         >
           {/* Type badge */}
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] shrink-0 mt-0.5">
+          <span className="text-[12px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] shrink-0 mt-0.5">
             {TYPE_LABELS[n.type] || 'Notif'}
           </span>
           <div className="flex-1 min-w-0">
-            <p className={`text-xs leading-tight ${!n.read ? 'text-[var(--text-primary)] font-semibold' : 'text-[var(--text-secondary)]'}`}>
+            <p className={`text-sm leading-tight ${!n.read ? 'text-[var(--text-primary)] font-semibold' : 'text-[var(--text-secondary)]'}`}>
               {n.title}
             </p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{n.message}</p>
+            <p className="text-[13px] text-[var(--text-muted)] mt-0.5 truncate">{n.message}</p>
             <div className="flex items-center gap-2 mt-1">
-              {n.actorName && <span className="text-[10px] text-[var(--text-tertiary)] font-medium">{n.actorName}</span>}
-              <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(n.createdAt)}</span>
+              {n.actorName && <span className="text-[12px] text-[var(--text-tertiary)] font-medium">{n.actorName}</span>}
+              <span className="text-[12px] text-[var(--text-muted)]">{timeAgo(n.createdAt)}</span>
             </div>
           </div>
           {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0 mt-2" />}

@@ -114,14 +114,14 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
             {toast.title}
           </p>
           {toast.message && (
-            <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-relaxed">
+            <p className="text-sm text-[var(--text-tertiary)] mt-1 leading-relaxed">
               {toast.message}
             </p>
           )}
           {toast.action && (
             <button
               onClick={toast.action.onClick}
-              className="mt-2 text-xs font-medium px-2.5 py-1 rounded bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-200"
+              className="mt-2 text-sm font-medium px-2.5 py-1 rounded bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-200"
             >
               {toast.action.label}
             </button>

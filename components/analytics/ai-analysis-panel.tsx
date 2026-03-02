@@ -273,18 +273,18 @@ ${deptContext}${docContext}
       <div className="flex items-center gap-3 flex-wrap anim-slide" style={{ animationDelay: '80ms' }}>
         <div className="flex items-center gap-2">
           <Brain className="h-4 w-4 text-purple-400" />
-          <span className="text-xs font-semibold text-[var(--text-secondary)]">Focus:</span>
+          <span className="text-sm font-semibold text-[var(--text-secondary)]">Focus:</span>
         </div>
-        <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)} className="select-dark h-8 text-xs">
+        <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)} className="select-dark h-8 text-sm">
           <option value="all">All Departments</option>
           {data.teams.map((t: any) => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
         </select>
-        <select value={selectedDoc} onChange={e => setSelectedDoc(e.target.value)} className="select-dark h-8 text-xs max-w-xs">
+        <select value={selectedDoc} onChange={e => setSelectedDoc(e.target.value)} className="select-dark h-8 text-sm max-w-xs">
           <option value="">All Documents</option>
           {data.docs.map((d: any) => <option key={d.id} value={d.id}>📄 {d.title || 'Untitled'}</option>)}
         </select>
         {(selectedDept !== 'all' || selectedDoc) && (
-          <button onClick={() => { setSelectedDept('all'); setSelectedDoc(''); }} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)]">Clear filters</button>
+          <button onClick={() => { setSelectedDept('all'); setSelectedDoc(''); }} className="text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)]">Clear filters</button>
         )}
       </div>
 
@@ -296,7 +296,7 @@ ${deptContext}${docContext}
               className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-white/[0.01] transition">
               <span className="text-lg">{cat.label.split(' ')[0]}</span>
               <span className="text-sm font-semibold" style={{ color: cat.color }}>{cat.label.split(' ').slice(1).join(' ')}</span>
-              <span className="text-[10px] text-[var(--text-muted)] ml-2">{cat.analyses.length} analyses</span>
+              <span className="text-[12px] text-[var(--text-muted)] ml-2">{cat.analyses.length} analyses</span>
               <ChevronDown className={`h-4 w-4 text-[var(--text-muted)] ml-auto transition-transform ${expandedCategory === cat.id ? 'rotate-180' : ''}`} />
             </button>
             {expandedCategory === cat.id && (
@@ -306,8 +306,8 @@ ${deptContext}${docContext}
                     className="flex items-start gap-3 p-4 rounded-xl bg-[var(--bg-base)] hover:bg-[var(--bg-hover)] text-left transition-all duration-200 group disabled:opacity-50">
                     <a.icon className="h-5 w-5 shrink-0 mt-0.5" style={{ color: cat.color }} />
                     <div>
-                      <p className="text-xs font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition">{a.label}</p>
-                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5 line-clamp-2">{a.prompt.slice(0, 80)}...</p>
+                      <p className="text-sm font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition">{a.label}</p>
+                      <p className="text-[12px] text-[var(--text-muted)] mt-0.5 line-clamp-2">{a.prompt.slice(0, 80)}...</p>
                     </div>
                   </button>
                 ))}
@@ -341,7 +341,7 @@ ${deptContext}${docContext}
             'Analiza nuestra estrategia de marketing vs competidores',
             'Recommend process automations',
           ].map((q, i) => (
-            <button key={i} onClick={() => { setCustomQ(q); }} className="text-[10px] px-2 py-1 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-all duration-200">
+            <button key={i} onClick={() => { setCustomQ(q); }} className="text-[12px] px-2 py-1 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-all duration-200">
               {q}
             </button>
           ))}
@@ -361,11 +361,11 @@ ${deptContext}${docContext}
               <div className="px-5 py-3 bg-[#0A0E16] flex items-center gap-3">
                 <Brain className="h-4 w-4 text-purple-400 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-[var(--text-secondary)] truncate">{a.question.slice(0, 120)}</p>
+                  <p className="text-sm text-[var(--text-secondary)] truncate">{a.question.slice(0, 120)}</p>
                   <p className="text-[9px] text-[var(--text-muted)] mt-0.5">{a.timestamp.toLocaleTimeString()}</p>
                 </div>
                 <button onClick={() => copyResult(a.answer, a.id)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-white/5 transition shrink-0">
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-white/5 transition shrink-0">
                   {copiedId === a.id ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
                   {copiedId === a.id ? 'Copied!' : 'Copy'}
                 </button>
@@ -383,7 +383,7 @@ ${deptContext}${docContext}
           <Loader2 className="h-5 w-5 text-purple-400 animate-spin shrink-0" />
           <div>
             <p className="text-sm text-purple-400 font-semibold">Analyzing platform data...</p>
-            <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{currentQ.slice(0, 80)}{currentQ.length > 80 ? '...' : ''}</p>
+            <p className="text-[13px] text-[var(--text-muted)] mt-0.5">{currentQ.slice(0, 80)}{currentQ.length > 80 ? '...' : ''}</p>
           </div>
         </div>
       )}

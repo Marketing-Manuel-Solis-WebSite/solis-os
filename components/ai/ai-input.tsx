@@ -63,7 +63,7 @@ export default function AIInput({ loading, onSend }: Props) {
             <ArrowUp className="h-4 w-4" style={{ color: canSend ? 'var(--accent-text)' : 'var(--text-muted)' }} />
           </motion.button>
         </div>
-        <p className="text-[10px] text-[var(--text-muted)] text-center mt-2">
+        <p className="text-[12px] text-[var(--text-muted)] text-center mt-2">
           Solis AI can make mistakes. Verify important information.
         </p>
       </div>

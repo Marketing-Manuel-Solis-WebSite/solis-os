@@ -211,7 +211,7 @@ export default function OrgChartPage() {
             Organization
             {canEdit && <span className="text-[9px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-bold tracking-wider">ADMIN</span>}
           </h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">{members.length} members across {allTeams.length} departments</p>
+          <p className="text-base text-[var(--text-muted)] mt-0.5">{members.length} members across {allTeams.length} departments</p>
         </div>
         <div className="flex items-center rounded-xl p-1 bg-[var(--bg-elevated)] shadow-card">
           {[
@@ -219,7 +219,7 @@ export default function OrgChartPage() {
             { id: 'tree' as const, label: 'Tree', icon: Network },
           ].map(v => (
             <button key={v.id} onClick={() => setView(v.id)}
-              className={`relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${view === v.id ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+              className={`relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${view === v.id ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
               {view === v.id && <motion.div layoutId="org-view" className="absolute inset-0 rounded-lg bg-[var(--accent-subtle)]" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />}
               <span className="relative flex items-center gap-1.5"><v.icon className="h-3.5 w-3.5" />{v.label}</span>
             </button>
@@ -251,7 +251,7 @@ export default function OrgChartPage() {
                   <div className="flex items-center gap-2.5 mb-5">
                     <AlertTriangle className="h-5 w-5 text-amber-400" />
                     <span className="text-base font-bold text-amber-400">Unassigned</span>
-                    <span className="text-xs text-[var(--text-muted)]">{unassigned.length} members need a department</span>
+                    <span className="text-sm text-[var(--text-muted)]">{unassigned.length} members need a department</span>
                   </div>
                   <div className="space-y-2">
                     {unassigned.map((m, i) => (
@@ -326,7 +326,7 @@ function DeptCard({ team, deptMembers, allMembers, index, canEdit, onEdit, getMa
         </div>
         <div className="flex-1 text-left min-w-0">
           <p className="text-lg font-bold" style={{ color: team.color }}>{team.name}</p>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+          <p className="text-base text-[var(--text-muted)] mt-0.5">
             {deptMembers.length} member{deptMembers.length !== 1 ? 's' : ''}{team.description ? ` · ${team.description}` : ''}
           </p>
         </div>
@@ -416,14 +416,14 @@ function MemberRow({ member, teamColor, index = 0, canEdit, onEdit, getManagerNa
         {managerName && (
           <div className="flex items-center gap-1 mt-0.5">
             <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
-            <span className="text-xs text-[var(--text-muted)]">Reports to <span className="font-medium text-[var(--text-secondary)]">{managerName}</span></span>
+            <span className="text-sm text-[var(--text-muted)]">Reports to <span className="font-medium text-[var(--text-secondary)]">{managerName}</span></span>
           </div>
         )}
       </div>
 
       {/* Level badge */}
       <div className="shrink-0 flex items-center gap-2">
-        <span className="text-[11px] px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1"
+        <span className="text-[13px] px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1"
           style={{ background: `${lv.color}25`, color: lv.color, border: `1px solid ${lv.color}35` }}>
           <lv.icon className="h-3 w-3" />{lv.label}
         </span>
@@ -496,12 +496,12 @@ function TreeNode({ node, members, teams, canEdit, onEdit, isRoot = false, index
 
         {/* Badges */}
         <div className="flex items-center justify-center gap-1.5 mt-2.5 flex-wrap">
-          <span className="text-[11px] px-2.5 py-1 rounded-lg font-bold inline-flex items-center gap-1"
+          <span className="text-[13px] px-2.5 py-1 rounded-lg font-bold inline-flex items-center gap-1"
             style={{ background: `${lv.color}30`, color: lv.color }}>
             <lv.icon className="h-3 w-3" />{lv.label}
           </span>
           {team && (
-            <span className="text-[11px] px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1"
+            <span className="text-[13px] px-2.5 py-1 rounded-lg font-semibold inline-flex items-center gap-1"
               style={{ background: `${team.color}25`, color: team.color }}>
               {team.icon} {team.name}
             </span>
@@ -510,7 +510,7 @@ function TreeNode({ node, members, teams, canEdit, onEdit, isRoot = false, index
 
         {/* Direct reports count */}
         {hasKids && (
-          <p className="text-[11px] text-[var(--text-muted)] mt-2.5">
+          <p className="text-[13px] text-[var(--text-muted)] mt-2.5">
             {node.children.length} direct report{node.children.length !== 1 ? 's' : ''}
           </p>
         )}
@@ -626,7 +626,7 @@ function EditModal({ member, editData, setEditData, teams, members, onSave, onCl
             </div>
             <div>
               <p className="text-base font-bold text-[var(--text-primary)]">{member.displayName}</p>
-              <p className="text-xs text-[var(--text-muted)]">{member.email}</p>
+              <p className="text-sm text-[var(--text-muted)]">{member.email}</p>
             </div>
           </div>
         </div>
@@ -634,7 +634,7 @@ function EditModal({ member, editData, setEditData, teams, members, onSave, onCl
         {/* Fields */}
         <div className="px-6 pb-6 space-y-4">
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">Job Title</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">Job Title</label>
             <input value={editData.title} onChange={e => setEditData({ ...editData, title: e.target.value })}
               placeholder="e.g. Marketing Manager"
               className="input-dark" />
@@ -642,14 +642,14 @@ function EditModal({ member, editData, setEditData, teams, members, onSave, onCl
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">Level</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">Level</label>
               <select value={editData.hierarchyLevel} onChange={e => setEditData({ ...editData, hierarchyLevel: e.target.value })}
                 className="select-dark h-[42px]">
                 {LEVELS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">Department</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">Department</label>
               <select value={editData.teamId} onChange={e => setEditData({ ...editData, teamId: e.target.value })}
                 className="select-dark h-[42px]">
                 <option value="">None</option>
@@ -659,7 +659,7 @@ function EditModal({ member, editData, setEditData, teams, members, onSave, onCl
           </div>
 
           <div>
-            <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">Reports To</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">Reports To</label>
             <select value={editData.managerId} onChange={e => setEditData({ ...editData, managerId: e.target.value })}
               className="select-dark h-[42px]">
               <option value="">No Manager (Top Level)</option>

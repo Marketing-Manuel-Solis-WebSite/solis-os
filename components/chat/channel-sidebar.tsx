@@ -52,7 +52,7 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
           <input value={search} onChange={e => onSearchChange(e.target.value)} placeholder="Search channels..."
-            className="w-full h-8 pl-8 pr-8 rounded-lg bg-[var(--bg-base)] text-xs text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30 focus:bg-[var(--bg-elevated)] focus:shadow-sm transition-all duration-200" />
+            className="w-full h-8 pl-8 pr-8 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30 focus:bg-[var(--bg-elevated)] focus:shadow-sm transition-all duration-200" />
           {search && (
             <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
               <X className="h-3 w-3" />
@@ -65,7 +65,7 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
         {/* Channels Section */}
         {!filtered && (
           <div className="px-2 pt-3 pb-1">
-            <button onClick={() => setShowChannels(!showChannels)} className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
+            <button onClick={() => setShowChannels(!showChannels)} className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[12px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
               <motion.span animate={{ rotate: showChannels ? 0 : -90 }} transition={{ duration: 0.2 }}>
                 <ChevronDown className="h-3 w-3" />
               </motion.span>
@@ -121,7 +121,7 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
         {!filtered && dmChannels.length > 0 && (
           <>
             <div className="px-2 pt-4 pb-1">
-              <button onClick={() => setShowDMs(!showDMs)} className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
+              <button onClick={() => setShowDMs(!showDMs)} className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[12px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
                 <motion.span animate={{ rotate: showDMs ? 0 : -90 }} transition={{ duration: 0.2 }}>
                   <ChevronDown className="h-3 w-3" />
                 </motion.span>
@@ -158,7 +158,7 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
                               : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md'
                         }`}>
                         <div className="relative shrink-0">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold ${isActive ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : 'bg-[var(--accent)]/10 text-[var(--accent)]/70'}`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold ${isActive ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : 'bg-[var(--accent)]/10 text-[var(--accent)]/70'}`}>
                             {name?.[0]?.toUpperCase() || '?'}
                           </div>
                           <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[var(--bg-elevated)] ${isOnline ? 'bg-[#22C55E]' : 'bg-[var(--text-muted)]/40'}`} />
@@ -166,7 +166,7 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
                         <div className="flex-1 min-w-0 text-left">
                           <span className="block truncate">{name}</span>
                           {ch.lastMessagePreview && (
-                            <span className="block text-[10px] text-[var(--text-muted)] truncate opacity-60">{ch.lastMessagePreview}</span>
+                            <span className="block text-[12px] text-[var(--text-muted)] truncate opacity-60">{ch.lastMessagePreview}</span>
                           )}
                         </div>
                         {isUnread && <span className="w-2 h-2 rounded-full bg-[var(--accent)] shrink-0" />}

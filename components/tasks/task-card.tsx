@@ -26,7 +26,7 @@ export default function TaskCard({ task, members, teams, isSelected, isDragging,
   if (compact) {
     return (
       <div onClick={onSelect}
-        className={`px-2 py-1 rounded-md text-[10px] cursor-pointer truncate border-l-2 transition ${
+        className={`px-2 py-1 rounded-md text-[12px] cursor-pointer truncate border-l-2 transition ${
           isSelected ? 'bg-[var(--accent-subtle)] text-[var(--text-primary)]' : 'bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]'
         }`}
         style={{ borderLeftColor: pri?.color || '#64748B' }}>
@@ -59,13 +59,13 @@ export default function TaskCard({ task, members, teams, isSelected, isDragging,
 
       {/* Description preview */}
       {task.description && (
-        <p className="text-[11px] text-[var(--text-muted)] mb-2.5 line-clamp-2 ml-5">{task.description}</p>
+        <p className="text-[13px] text-[var(--text-muted)] mb-2.5 line-clamp-2 ml-5">{task.description}</p>
       )}
 
       {/* Subtask progress */}
       {totalSub > 0 && (
         <div className="mb-2.5 ml-5">
-          <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] mb-1">
+          <div className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)] mb-1">
             <span>{doneSub}/{totalSub} subtareas</span>
           </div>
           <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
@@ -88,7 +88,7 @@ export default function TaskCard({ task, members, teams, isSelected, isDragging,
           <span key={tg} className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-muted)]">{tg}</span>
         ))}
         {due && (
-          <span className={`text-[10px] flex items-center gap-1 ${overdue ? 'text-red-400' : 'text-[var(--text-muted)]'}`}>
+          <span className={`text-[12px] flex items-center gap-1 ${overdue ? 'text-red-400' : 'text-[var(--text-muted)]'}`}>
             <Calendar className="h-3 w-3" />
             {due.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })}
           </span>

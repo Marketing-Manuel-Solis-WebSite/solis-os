@@ -26,7 +26,7 @@ function DropUp({ icon, label, children }: { icon: React.ReactNode; label: strin
   return (
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] transition">
+        className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition">
         {icon} {label}
       </button>
       {open && (
@@ -54,7 +54,7 @@ export default function TaskBulkActions({ count, onStatusChange, onPriorityChang
       <DropUp icon={<ArrowRight className="h-3.5 w-3.5" />} label="Mover a">
         {STATUSES.map(s => (
           <button key={s.id} onClick={() => onStatusChange(s.id)}
-            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition">
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
             {s.label}
           </button>
@@ -65,14 +65,14 @@ export default function TaskBulkActions({ count, onStatusChange, onPriorityChang
       <DropUp icon={<Flag className="h-3.5 w-3.5" />} label="Prioridad">
         {PRIORITIES.map(p => (
           <button key={p.id} onClick={() => onPriorityChange(p.id)}
-            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs hover:bg-[var(--bg-hover)] transition">
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm hover:bg-[var(--bg-hover)] transition">
             {p.icon} {p.label}
           </button>
         ))}
       </DropUp>
 
       {/* Delete */}
-      <button onClick={onDelete} className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition">
+      <button onClick={onDelete} className="flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition">
         <Trash2 className="h-3.5 w-3.5" /> Eliminar
       </button>
 
