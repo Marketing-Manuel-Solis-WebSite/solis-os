@@ -28,9 +28,9 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: 320, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-      className="w-[320px] shrink-0 bg-[var(--bg-card)] border-l border-[var(--border)] flex flex-col h-full overflow-hidden"
+      className="w-[320px] shrink-0 bg-[var(--bg-elevated)] shadow-panel flex flex-col h-full overflow-hidden"
     >
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border)]">
+      <div className="flex items-center justify-between px-5 py-3.5">
         <h3 className="text-sm font-bold text-[var(--text-primary)]">Members ({channelMembers.length})</h3>
         <div className="flex items-center gap-1">
           {canManage && (
@@ -57,12 +57,12 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="p-3 border-b border-[var(--border)] bg-[var(--bg-base)]/50">
+            <div className="p-3 bg-[var(--bg-base)]/50">
               <p className="text-[10px] text-[#22C55E] uppercase font-semibold tracking-wider mb-2">Add Members</p>
               <div className="relative mb-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-muted)]" />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
-                  className="w-full h-8 pl-8 pr-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[#D4A843]/40 transition-colors" />
+                  className="w-full h-8 pl-8 pr-3 rounded-lg bg-[var(--bg-elevated)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30 transition-all duration-200" />
               </div>
               <div className="max-h-36 overflow-y-auto space-y-0.5 scrollbar-thin">
                 {nonMembers.length === 0 ? (
@@ -72,8 +72,8 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
                     key={m.id}
                     whileHover={{ x: 2 }}
                     onClick={() => onAdd(m.id)}
-                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition">
-                    <div className="w-6 h-6 rounded-lg bg-[#D4A843]/10 flex items-center justify-center text-[9px] font-bold text-[#D4A843]">
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
+                    <div className="w-6 h-6 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center text-[9px] font-bold text-[var(--accent)]">
                       {m.displayName?.[0]?.toUpperCase()}
                     </div>
                     <div className="flex-1 text-left min-w-0">
@@ -102,9 +102,9 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
               initial={{ opacity: 0, x: 12 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.03, duration: 0.2 }}
-              className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-[var(--hover-bg)] group transition"
+              className="flex items-center gap-2.5 px-3 py-2.5 rounded-md hover:bg-[var(--bg-hover)] group transition"
             >
-              <div className="w-8 h-8 rounded-xl bg-[#D4A843]/10 border border-[#D4A843]/20 flex items-center justify-center text-xs font-bold text-[#D4A843] shrink-0">
+              <div className="w-8 h-8 rounded-md bg-[var(--accent)]/10 border border-[var(--accent)]/20 flex items-center justify-center text-xs font-bold text-[var(--accent)] shrink-0">
                 {m.displayName?.[0]?.toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -114,7 +114,7 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {isCreator && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[#D4A843]/10 text-[#D4A843] font-semibold flex items-center gap-0.5">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[var(--accent)]/10 text-[var(--accent)] font-semibold flex items-center gap-0.5">
                       <Crown className="h-2.5 w-2.5" />Owner
                     </span>
                   )}
@@ -129,7 +129,7 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition">
                 {!isSelf && (
                   <motion.button whileTap={{ scale: 0.85 }}
-                    onClick={() => onStartDM(m.id)} className="p-1.5 text-[var(--text-muted)] hover:text-[#D4A843] rounded-lg transition" title="Direct message">
+                    onClick={() => onStartDM(m.id)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] rounded-lg transition" title="Direct message">
                     <MessageCircle className="h-3.5 w-3.5" />
                   </motion.button>
                 )}

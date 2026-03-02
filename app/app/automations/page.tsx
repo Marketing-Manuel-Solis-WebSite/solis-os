@@ -44,7 +44,7 @@ const ACTIONS = [
   { id: 'add_tag', label: 'Add Tag', icon: Tag, color: '#22C55E', desc: 'Add a tag to the task', configFields: [{ key: 'tagName', label: 'Tag', type: 'text' }] },
   { id: 'post_comment', label: 'Post Comment', icon: MessageSquare, color: '#06B6D4', desc: 'Auto-comment on the task', configFields: [{ key: 'commentText', label: 'Comment', type: 'text' }] },
   { id: 'send_notification', label: 'Send Notification', icon: Bell, color: '#EC4899', desc: 'Notify team members', configFields: [{ key: 'message', label: 'Message', type: 'text' }] },
-  { id: 'ai_summary', label: 'AI Summary', icon: Bot, color: '#D4A843', desc: 'Generate an AI summary', configFields: [] },
+  { id: 'ai_summary', label: 'AI Summary', icon: Bot, color: '#3B82F6', desc: 'Generate an AI summary', configFields: [] },
 ];
 
 interface Condition {
@@ -145,14 +145,14 @@ export default function AutomationsPage() {
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
             Automations
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-semibold">
               {activeCount} ACTIVE
             </span>
           </h1>
           <p className="text-sm text-[var(--text-muted)] mt-1">{rules.length} rules · {totalRuns} total runs</p>
         </div>
         {canManage && (
-          <button onClick={() => { setEditingRule(null); setShowBuilder(true); }} className="flex items-center gap-2 px-5 h-10 rounded-xl btn-gold text-sm shadow-lg shadow-[#D4A843]/10">
+          <button onClick={() => { setEditingRule(null); setShowBuilder(true); }} className="flex items-center gap-2 px-5 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">
             <Plus className="h-4 w-4" /> New Rule
           </button>
         )}
@@ -164,9 +164,9 @@ export default function AutomationsPage() {
           { label: 'Total Rules', val: rules.length, color: '#3B82F6' },
           { label: 'Active', val: activeCount, color: '#22C55E' },
           { label: 'Inactive', val: rules.length - activeCount, color: '#64748B' },
-          { label: 'Total Runs', val: totalRuns, color: '#D4A843' },
+          { label: 'Total Runs', val: totalRuns, color: 'var(--accent)' },
         ].map(s => (
-          <div key={s.label} className="p-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)]">
+          <div key={s.label} className="p-4 rounded-xl bg-[var(--bg-secondary)] shadow-card">
             <p className="text-2xl font-bold text-[var(--text-primary)]">{s.val}</p>
             <p className="text-[10px] mt-0.5" style={{ color: s.color }}>{s.label}</p>
           </div>
@@ -188,12 +188,12 @@ export default function AutomationsPage() {
 
       {/* Rules list */}
       {loading ? (
-        <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-24 skeleton rounded-2xl" />)}</div>
+        <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-24 skeleton rounded-lg" />)}</div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-20">
           <Zap className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
           <p className="text-[var(--text-muted)] text-sm mb-2">No automations found.</p>
-          {canManage && <button onClick={() => setShowBuilder(true)} className="text-sm text-[#D4A843] hover:underline">Create your first automation</button>}
+          {canManage && <button onClick={() => setShowBuilder(true)} className="text-sm text-[var(--accent)] hover:underline">Create your first automation</button>}
         </div>
       ) : (
         <div className="space-y-3">
@@ -203,10 +203,10 @@ export default function AutomationsPage() {
             const ruleTeam = teams.find(t => t.id === rule.teamId);
 
             return (
-              <div key={rule.id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] overflow-hidden card-hover group anim-slide" style={{ animationDelay: `${i * 40}ms` }}>
+              <div key={rule.id} className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden group anim-slide" style={{ animationDelay: `${i * 40}ms` }}>
                 <div className="flex items-center gap-4 px-5 py-4">
                   {/* Enable/Disable toggle */}
-                  <button onClick={() => toggleEnabled(rule)} className={`w-10 h-6 rounded-full flex items-center transition-colors shrink-0 ${rule.enabled !== false ? 'bg-emerald-500/20 border border-emerald-500/30' : 'bg-[var(--bg-elevated)] border border-[var(--border)]'}`}>
+                  <button onClick={() => toggleEnabled(rule)} className={`w-10 h-6 rounded-full flex items-center transition-all duration-200 shrink-0 ${rule.enabled !== false ? 'bg-emerald-500/20' : 'bg-[var(--bg-tertiary)]'}`}>
                     <div className={`w-5 h-5 rounded-full transition-all shadow ${rule.enabled !== false ? 'translate-x-[18px] bg-emerald-400' : 'translate-x-[2px] bg-gray-600'}`} />
                   </button>
 
@@ -225,14 +225,14 @@ export default function AutomationsPage() {
 
                     {/* Flow visualization */}
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className="text-[10px] px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
+                      <span className="text-[10px] px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 font-medium">
                         {triggerConf?.label || rule.trigger}
                       </span>
 
                       {(rule.conditions || []).length > 0 && (
                         <>
                           <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
-                          <span className="text-[10px] px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium">
+                          <span className="text-[10px] px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 font-medium">
                             {rule.conditions.length} condition{rule.conditions.length !== 1 ? 's' : ''}
                           </span>
                         </>
@@ -241,7 +241,7 @@ export default function AutomationsPage() {
                       {(rule.actions || []).map((action, ai) => (
                         <span key={ai} className="flex items-center gap-1">
                           <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
-                          <span className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                          <span className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-medium">
                             {ACTIONS.find(a => a.id === action.type)?.label || action.type}
                           </span>
                         </span>
@@ -251,7 +251,7 @@ export default function AutomationsPage() {
                       {!(rule.actions || []).length && rule.trigger && (
                         <>
                           <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
-                          <span className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                          <span className="text-[10px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-medium">
                             {(rule as any).action || 'Action'}
                           </span>
                         </>
@@ -342,11 +342,11 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[var(--bg-base)] border border-[var(--border)] rounded-2xl shadow-2xl anim-slide">
-        <div className="flex items-center justify-between p-5 border-b border-[var(--border-subtle)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[var(--bg-base)] rounded-xl shadow-modal anim-slide">
+        <div className="flex items-center justify-between p-5">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center"><Zap className="h-4 w-4 text-amber-400" /></div>
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center"><Zap className="h-4 w-4 text-amber-400" /></div>
             <div>
               <h2 className="text-lg font-bold text-[var(--text-primary)]">Automation Builder</h2>
               <p className="text-[11px] text-[var(--text-muted)]">When → If → Then</p>
@@ -356,11 +356,11 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
         </div>
 
         {/* Steps indicator */}
-        <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-2 px-5 py-3">
           {['Trigger', 'Conditions', 'Actions', 'Review'].map((s, i) => (
             <button key={s} onClick={() => setStep(i)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${step === i ? 'bg-[#D4A843]/10 text-[#D4A843]' : step > i ? 'text-emerald-400' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === i ? 'bg-[#D4A843] text-[#06080F]' : step > i ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)]'}`}>{step > i ? '✓' : i + 1}</span>
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${step === i ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : step > i ? 'text-emerald-400' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step === i ? 'bg-[var(--accent)] text-[var(--accent-text)]' : step > i ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)]'}`}>{step > i ? '✓' : i + 1}</span>
               {s}
             </button>
           ))}
@@ -393,7 +393,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
               <div className="grid grid-cols-2 gap-2">
                 {TRIGGERS.map(t => (
                   <button key={t.id} onClick={() => setTrigger(t.id)}
-                    className={`flex items-start gap-3 p-4 rounded-xl border text-left transition ${trigger === t.id ? '' : 'bg-[var(--bg-card)] border-[var(--border)] hover:border-gray-600'}`}
+                    className={`flex items-start gap-3 p-4 rounded-xl text-left transition-all duration-200 ${trigger === t.id ? 'shadow-card' : 'bg-[var(--bg-elevated)] hover:shadow-card-hover'}`}
                     style={trigger === t.id ? { backgroundColor: `${t.color}08`, borderColor: `${t.color}30` } : {}}>
                     <t.icon className="h-5 w-5 shrink-0 mt-0.5" style={{ color: t.color }} />
                     <div>
@@ -411,12 +411,12 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">IF (Conditions) — Optional</label>
-                <button onClick={addCondition} className="flex items-center gap-1 px-3 h-7 rounded-lg bg-amber-500/10 text-amber-400 text-[11px] font-medium border border-amber-500/20 hover:bg-amber-500/20 transition">
+                <button onClick={addCondition} className="flex items-center gap-1 px-3 h-7 rounded-lg bg-amber-500/10 text-amber-400 text-[11px] font-medium hover:bg-amber-500/20 transition-all duration-200">
                   <Plus className="h-3 w-3" /> Add Condition
                 </button>
               </div>
               {conditions.length === 0 ? (
-                <div className="text-center py-8 rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-card)]/50">
+                <div className="text-center py-8 rounded-xl bg-[var(--bg-elevated)]/50">
                   <Filter className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2" />
                   <p className="text-xs text-[var(--text-muted)]">No conditions. Rule will trigger for all matching events.</p>
                   <button onClick={addCondition} className="text-xs text-amber-400 hover:underline mt-2">Add a filter condition</button>
@@ -424,7 +424,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
               ) : (
                 <div className="space-y-2">
                   {conditions.map((cond, ci) => (
-                    <div key={cond.id} className="flex items-center gap-2 p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]">
+                    <div key={cond.id} className="flex items-center gap-2 p-3 rounded-xl bg-[var(--bg-elevated)]">
                       {ci > 0 && <span className="text-[10px] text-amber-400 font-bold px-2">AND</span>}
                       <select value={cond.field} onChange={e => updateCondition(cond.id, 'field', e.target.value)} className="select-dark h-8 text-[11px] flex-1">
                         {CONDITION_FIELDS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
@@ -459,7 +459,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                   {actions.map((action, ai) => {
                     const actionConf = ACTIONS.find(a => a.id === action.type);
                     return (
-                      <div key={action.id} className="p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border)]">
+                      <div key={action.id} className="p-3 rounded-xl bg-[var(--bg-elevated)]">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-[10px] font-bold text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10">{ai + 1}</span>
                           {actionConf && <actionConf.icon className="h-4 w-4" style={{ color: actionConf.color }} />}
@@ -489,7 +489,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
               <div className="grid grid-cols-2 gap-2">
                 {ACTIONS.map(a => (
                   <button key={a.id} onClick={() => addAction(a.id)}
-                    className="flex items-center gap-2 p-3 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] hover:border-gray-600 text-left transition">
+                    className="flex items-center gap-2 p-3 rounded-xl bg-[var(--bg-elevated)] hover:shadow-card-hover text-left transition-all duration-200">
                     <a.icon className="h-4 w-4 shrink-0" style={{ color: a.color }} />
                     <div>
                       <p className="text-xs font-medium text-[var(--text-secondary)]">{a.label}</p>
@@ -505,19 +505,19 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
           {/* STEP 3: REVIEW */}
           {step === 3 && (
             <div>
-              <label className="block text-[10px] uppercase tracking-wider text-[#D4A843] mb-3 font-semibold">REVIEW</label>
-              <div className="rounded-xl border border-[#D4A843]/20 bg-[#D4A843]/[0.02] p-5 space-y-4">
+              <label className="block text-[10px] uppercase tracking-wider text-[var(--accent)] mb-3 font-semibold">REVIEW</label>
+              <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-subtle)] p-5 space-y-4">
                 <div>
                   <p className="text-lg font-bold text-[var(--text-primary)]">{name || 'Unnamed Rule'}</p>
                   {description && <p className="text-xs text-[var(--text-muted)] mt-1">{description}</p>}
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-[11px] px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">WHEN: {triggerConf?.label || trigger}</span>
-                  {conditions.length > 0 && <span className="text-[11px] px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">IF: {conditions.length} condition{conditions.length !== 1 ? 's' : ''}</span>}
+                  <span className="text-[11px] px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 font-semibold">WHEN: {triggerConf?.label || trigger}</span>
+                  {conditions.length > 0 && <span className="text-[11px] px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 font-semibold">IF: {conditions.length} condition{conditions.length !== 1 ? 's' : ''}</span>}
                   {actions.map((a, i) => {
                     const ac = ACTIONS.find(x => x.id === a.type);
-                    return <span key={i} className="text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">THEN: {ac?.label || a.type}</span>;
+                    return <span key={i} className="text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 font-semibold">THEN: {ac?.label || a.type}</span>;
                   })}
                 </div>
 
@@ -533,15 +533,15 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-5 border-t border-[var(--border-subtle)]">
-          <button onClick={() => step > 0 ? setStep(step - 1) : onClose} className="px-5 h-10 rounded-xl border border-[var(--border)] text-sm text-[var(--text-secondary)]">
+        <div className="flex items-center justify-between p-5">
+          <button onClick={() => step > 0 ? setStep(step - 1) : onClose} className="px-5 h-10 rounded-md bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">
             {step > 0 ? '← Back' : 'Cancel'}
           </button>
           <div className="flex gap-2">
             {step < 3 ? (
-              <button onClick={() => setStep(step + 1)} className="px-6 h-10 rounded-xl btn-gold text-sm">Next →</button>
+              <button onClick={() => setStep(step + 1)} className="px-6 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">Next →</button>
             ) : (
-              <button onClick={submit} disabled={!canSubmit} className="px-6 h-10 rounded-xl btn-gold text-sm disabled:opacity-40">Create Automation</button>
+              <button onClick={submit} disabled={!canSubmit} className="px-6 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40">Create Automation</button>
             )}
           </div>
         </div>

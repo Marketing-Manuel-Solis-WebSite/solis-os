@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, Reply, Edit2, Paperclip, FileVideo, Loader2 } from 'lucide-react';
 import { uploadFile as sharedUploadFile, isImageType, isVideoType, formatFileSize } from '@/lib/upload';
+import { useToast } from '@/components/notifications/toast-provider';
 
 const QUICK_SUGGESTIONS = [
   { label: 'Hola a todos', icon: '👋' },
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export default function MessageInput({ channelName, members, replyTo, editingMsg, showSuggestions, onTypingStart, onTypingStop, onSend, onEdit, onCancelReply, onCancelEdit }: Props) {
+  const toast = useToast();
   const [txt, setTxt] = useState('');
   const [showMentions, setShowMentions] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
@@ -64,7 +66,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
     const newPreviews: { file: File; url: string; type: string }[] = [];
     Array.from(files).forEach(file => {
       if (file.size > 100 * 1024 * 1024) {
-        alert(`"${file.name}" es demasiado grande. Máximo 100MB.`);
+        toast.warning('Archivo muy grande', `"${file.name}" excede el limite de 100MB.`);
         return;
       }
       const url = URL.createObjectURL(file);
@@ -108,7 +110,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
         previews.forEach(p => URL.revokeObjectURL(p.url));
         setPreviews([]);
       } catch (err: any) {
-        alert('Error al subir archivo: ' + (err.message || 'Error'));
+        toast.error('Error al subir archivo', err.message || 'Ocurrio un error al subir el archivo.');
       }
       setUploading(false);
       setUploadProgress(0);
@@ -177,7 +179,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
   };
 
   return (
-    <div className="border-t border-[var(--border)] bg-[var(--bg-card)]/50 backdrop-blur-sm shrink-0">
+    <div className="bg-[var(--bg-elevated)]/50 shrink-0">
       {/* Reply / Edit banner */}
       <AnimatePresence>
         {(replyTo || editingMsg) && (
@@ -188,12 +190,12 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
             transition={{ duration: 0.15 }}
             className="overflow-hidden"
           >
-            <div className="flex items-center gap-2 px-5 py-2 border-b border-[var(--border)] bg-[var(--bg-base)]/50">
+            <div className="flex items-center gap-2 px-5 py-2 bg-[var(--bg-base)]/50">
               {replyTo && (
                 <>
-                  <Reply className="h-3.5 w-3.5 text-[#D4A843]" />
+                  <Reply className="h-3.5 w-3.5 text-[var(--accent)]" />
                   <span className="text-xs text-[var(--text-muted)]">Respondiendo a</span>
-                  <span className="text-xs text-[#D4A843] font-semibold">{replyTo.displayName}</span>
+                  <span className="text-xs text-[var(--accent)] font-semibold">{replyTo.displayName}</span>
                   <span className="text-xs text-[var(--text-muted)] truncate flex-1">{replyTo.content?.slice(0, 50)}</span>
                   <motion.button whileTap={{ scale: 0.85 }} onClick={onCancelReply} className="p-1 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-md transition">
                     <X className="h-3.5 w-3.5" />
@@ -227,14 +229,14 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
               {previews.map((p, i) => (
                 <div key={i} className="relative group">
                   {isImageType(p.type) ? (
-                    <img src={p.url} alt="Preview" className="h-24 w-24 object-cover rounded-xl border border-[var(--border)]" />
+                    <img src={p.url} alt="Preview" className="h-24 w-24 object-cover rounded-xl shadow-card" />
                   ) : isVideoType(p.type) ? (
-                    <div className="h-24 w-24 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] flex flex-col items-center justify-center gap-1">
+                    <div className="h-24 w-24 rounded-xl shadow-card bg-[var(--bg-elevated)] flex flex-col items-center justify-center gap-1">
                       <FileVideo className="h-6 w-6 text-blue-400" />
                       <span className="text-[9px] text-[var(--text-muted)] truncate max-w-[70px]">{p.file.name}</span>
                     </div>
                   ) : (
-                    <div className="h-24 px-4 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] flex flex-col items-center justify-center gap-1">
+                    <div className="h-24 px-4 rounded-xl shadow-card bg-[var(--bg-elevated)] flex flex-col items-center justify-center gap-1">
                       <Paperclip className="h-5 w-5 text-[var(--text-muted)]" />
                       <span className="text-[10px] text-[var(--text-secondary)] truncate max-w-[100px] text-center">{p.file.name}</span>
                       <span className="text-[9px] text-[var(--text-muted)]">{formatFileSize(p.file.size)}</span>
@@ -250,7 +252,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
             {uploading && (
               <div className="px-5 pb-2">
                 <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                  <motion.div className="h-full bg-[#D4A843] rounded-full" animate={{ width: `${uploadProgress}%` }} />
+                  <motion.div className="h-full bg-[var(--accent)] rounded-full" animate={{ width: `${uploadProgress}%` }} />
                 </div>
                 <span className="text-[10px] text-[var(--text-muted)] mt-0.5">Subiendo... {uploadProgress}%</span>
               </div>
@@ -267,19 +269,19 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.15 }}
-            className="mx-5 mb-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-xl overflow-hidden"
+            className="mx-5 mb-1 rounded-xl bg-[var(--bg-elevated)] shadow-dropdown overflow-hidden"
           >
             {filteredMembers.map(m => (
               <motion.button
                 key={m.id}
-                whileHover={{ backgroundColor: 'var(--hover-bg)' }}
+                whileHover={{ backgroundColor: 'var(--bg-hover)' }}
                 onClick={() => insertMention(m)}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[var(--text-secondary)] transition">
-                <div className="w-7 h-7 rounded-full bg-[#D4A843]/10 flex items-center justify-center text-[10px] font-bold text-[#D4A843]">
+                <div className="w-7 h-7 rounded-full bg-[var(--accent)]/10 flex items-center justify-center text-[10px] font-bold text-[var(--accent)]">
                   {m.displayName?.[0]?.toUpperCase()}
                 </div>
                 <span className="font-medium">{m.displayName}</span>
-                {m.role && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[var(--bg-base)] border border-[var(--border)] text-[var(--text-muted)] ml-auto">{m.role}</span>}
+                {m.role && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-muted)] ml-auto">{m.role}</span>}
               </motion.button>
             ))}
           </motion.div>
@@ -295,7 +297,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => onSend(s.label, [])}
-              className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] text-xs text-[var(--text-secondary)] hover:border-[#D4A843]/30 hover:text-[#D4A843] transition-all flex items-center gap-1.5"
+              className="shrink-0 px-3 py-1.5 rounded-full bg-[var(--bg-elevated)] shadow-card text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all duration-200 flex items-center gap-1.5"
             >
               <span>{s.icon}</span>
               {s.label}
@@ -315,7 +317,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
             whileTap={{ scale: 0.9 }}
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
-            className="h-[42px] w-[42px] rounded-2xl border border-[var(--border)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--gold)] hover:border-[var(--gold)]/30 hover:bg-[var(--gold)]/5 transition shrink-0"
+            className="h-[42px] w-[42px] rounded-lg bg-[var(--bg-elevated)] shadow-card flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 transition-all duration-200 shrink-0"
             title="Adjuntar archivo (máx 100MB)"
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
@@ -331,7 +333,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
               aria-label="Escribe un mensaje"
               placeholder={`Escribe un mensaje en ${channelName ? '#' + channelName : ''}...`}
               rows={1}
-              className="w-full px-4 py-2.5 rounded-2xl bg-[var(--bg-elevated)] border border-[var(--border)] text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[#D4A843]/50 focus:ring-2 focus:ring-[#D4A843]/15 focus:shadow-[0_0_12px_rgba(212,168,67,0.08)] resize-none max-h-32 transition-all"
+              className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-elevated)] text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-2 focus:ring-[var(--accent)]/15 focus:shadow-none resize-none max-h-32 transition-all duration-200"
               style={{ minHeight: '42px' }}
               onInput={(e) => {
                 const t = e.target as HTMLTextAreaElement;
@@ -347,10 +349,10 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
             transition={{ duration: 0.3 }}
             onClick={handleSubmit}
             disabled={(!txt.trim() && previews.length === 0) || uploading || sending}
-            className={`h-[42px] px-5 rounded-2xl text-sm font-semibold flex items-center gap-2 transition-all ${
+            className={`h-[42px] px-5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all ${
               editingMsg
                 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20 hover:bg-blue-500/30'
-                : 'btn-gold disabled:opacity-30'
+                : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition disabled:opacity-30'
             }`}>
             <Send className="h-4 w-4" />
             <span className="hidden sm:inline">{editingMsg ? 'Editar' : 'Enviar'}</span>

@@ -103,10 +103,10 @@ export default function StatsDashboard({ data }: Props) {
   return (
     <div>
       {/* Section tabs */}
-      <div className="flex gap-1 mb-6 p-1 rounded-xl bg-[var(--bg-base)] border border-[var(--border-subtle)] w-fit anim-slide" style={{ animationDelay: '80ms' }}>
+      <div className="flex gap-1 mb-6 p-1 rounded-xl bg-[var(--bg-base)] shadow-card w-fit anim-slide" style={{ animationDelay: '80ms' }}>
         {NAV.map(n => (
           <button key={n.id} onClick={() => setSection(n.id)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition ${section === n.id ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition ${section === n.id ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             <n.icon className="h-3.5 w-3.5" /> {n.label}
           </button>
         ))}
@@ -116,8 +116,8 @@ export default function StatsDashboard({ data }: Props) {
       {section === 'overview' && (
         <div className="space-y-6">
           {/* Department Performance */}
-          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide" style={{ animationDelay: '120ms' }}>
-            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-[#D4A843]" /> Department Performance</h3>
+          <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '120ms' }}>
+            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-[var(--accent)]" /> Department Performance</h3>
             <div className="space-y-4">
               {deptPerformance.map(dp => (
                 <div key={dp.team.id} className="flex items-center gap-4">
@@ -147,13 +147,13 @@ export default function StatsDashboard({ data }: Props) {
           {/* Two-column grid */}
           <div className="grid grid-cols-2 gap-6">
             {/* Completion Rate Ring */}
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide" style={{ animationDelay: '160ms' }}>
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '160ms' }}>
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Task Completion</h3>
               <div className="flex items-center gap-6">
                 <div className="relative w-32 h-32">
                   <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                     <circle cx="50" cy="50" r="40" fill="none" stroke="#1F2937" strokeWidth="8" />
-                    <circle cx="50" cy="50" r="40" fill="none" stroke="#D4A843" strokeWidth="8"
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="var(--accent)" strokeWidth="8"
                       strokeDasharray={`${completionRate * 2.51} ${251 - completionRate * 2.51}`}
                       strokeLinecap="round" className="transition-all duration-1000" />
                   </svg>
@@ -173,7 +173,7 @@ export default function StatsDashboard({ data }: Props) {
             </div>
 
             {/* Activity chart */}
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide" style={{ animationDelay: '200ms' }}>
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '200ms' }}>
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Weekly Activity</h3>
               <div className="flex items-end gap-2 h-32">
                 {Object.entries(activityByDay).map(([day, count]) => {
@@ -182,7 +182,7 @@ export default function StatsDashboard({ data }: Props) {
                   return (
                     <div key={day} className="flex-1 flex flex-col items-center gap-1">
                       <span className="text-[9px] text-[var(--text-muted)]">{count}</span>
-                      <div className="w-full rounded-t-lg transition-all duration-700 bg-gradient-to-t from-[#D4A843]/60 to-[#D4A843]/20" style={{ height: `${Math.max(height, 4)}%` }} />
+                      <div className="w-full rounded-t-lg transition-all duration-700 bg-[var(--accent)]" style={{ height: `${Math.max(height, 4)}%`, opacity: 0.6 }} />
                       <span className="text-[9px] text-[var(--text-muted)]">{day}</span>
                     </div>
                   );
@@ -193,17 +193,17 @@ export default function StatsDashboard({ data }: Props) {
 
           {/* Content metrics */}
           <div className="grid grid-cols-3 gap-4 anim-slide" style={{ animationDelay: '240ms' }}>
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5">
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-5">
               <p className="text-[10px] text-[var(--text-muted)] uppercase font-semibold mb-1">Total Words Written</p>
               <p className="text-3xl font-bold text-[var(--text-primary)]">{totalWords.toLocaleString()}</p>
               <p className="text-[10px] text-[var(--text-muted)] mt-1">across {docs.length} documents</p>
             </div>
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5">
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-5">
               <p className="text-[10px] text-[var(--text-muted)] uppercase font-semibold mb-1">Avg Words/Doc</p>
               <p className="text-3xl font-bold text-[var(--text-primary)]">{docs.length > 0 ? Math.round(totalWords / docs.length).toLocaleString() : 0}</p>
               <p className="text-[10px] text-[var(--text-muted)] mt-1">per document average</p>
             </div>
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5">
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-5">
               <p className="text-[10px] text-[var(--text-muted)] uppercase font-semibold mb-1">Tasks/Member</p>
               <p className="text-3xl font-bold text-[var(--text-primary)]">{members.length > 0 ? (tasks.length / members.length).toFixed(1) : 0}</p>
               <p className="text-[10px] text-[var(--text-muted)] mt-1">average workload</p>
@@ -217,7 +217,7 @@ export default function StatsDashboard({ data }: Props) {
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-6">
             {/* By Status */}
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide">
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide">
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Tasks by Status</h3>
               <div className="space-y-3">
                 {Object.entries(tasksByStatus).sort((a, b) => b[1] - a[1]).map(([status, count]) => {
@@ -238,7 +238,7 @@ export default function StatsDashboard({ data }: Props) {
             </div>
 
             {/* By Priority */}
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide" style={{ animationDelay: '40ms' }}>
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '40ms' }}>
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Tasks by Priority</h3>
               <div className="space-y-3">
                 {['urgent', 'high', 'medium', 'low'].map(p => {
@@ -260,13 +260,13 @@ export default function StatsDashboard({ data }: Props) {
           </div>
 
           {/* By Department */}
-          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide" style={{ animationDelay: '80ms' }}>
+          <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '80ms' }}>
             <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Tasks by Department</h3>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {Object.entries(tasksByDept).sort((a, b) => b[1] - a[1]).map(([dept, count]) => {
                 const team = teams.find((t: any) => t.name === dept);
                 return (
-                  <div key={dept} className="p-4 rounded-xl bg-[var(--bg-base)] border border-[var(--border-subtle)]">
+                  <div key={dept} className="p-4 rounded-xl bg-[var(--bg-base)]">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-sm">{team?.icon || '📁'}</span>
                       <span className="text-xs font-medium" style={{ color: team?.color || '#6B7280' }}>{dept}</span>
@@ -285,7 +285,7 @@ export default function StatsDashboard({ data }: Props) {
       {section === 'docs' && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-6">
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide">
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide">
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Documents by Department</h3>
               <div className="space-y-3">
                 {Object.entries(docsByDept).sort((a, b) => b[1] - a[1]).map(([dept, count]) => {
@@ -303,7 +303,7 @@ export default function StatsDashboard({ data }: Props) {
                 })}
               </div>
             </div>
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide" style={{ animationDelay: '40ms' }}>
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '40ms' }}>
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Visibility Distribution</h3>
               <div className="space-y-3">
                 {Object.entries(docsByVisibility).map(([vis, count]) => {
@@ -324,7 +324,7 @@ export default function StatsDashboard({ data }: Props) {
           </div>
 
           {/* Top documents */}
-          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide" style={{ animationDelay: '80ms' }}>
+          <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '80ms' }}>
             <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Top Documents by Word Count</h3>
             <div className="space-y-2">
               {docs.sort((a: any, b: any) => (b.wordCount || 0) - (a.wordCount || 0)).slice(0, 8).map((d: any, i: number) => {
@@ -332,7 +332,7 @@ export default function StatsDashboard({ data }: Props) {
                 return (
                   <div key={d.id} className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/[0.01]">
                     <span className="text-[10px] text-[var(--text-muted)] w-5">{i + 1}.</span>
-                    <FileText className="h-3.5 w-3.5 text-[#D4A843]" />
+                    <FileText className="h-3.5 w-3.5 text-[var(--accent)]" />
                     <span className="text-xs text-[var(--text-secondary)] flex-1 truncate">{d.title || 'Untitled'}</span>
                     {team && <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ backgroundColor: `${team.color}10`, color: team.color }}>{team.icon} {team.name}</span>}
                     <span className="text-xs text-[var(--text-muted)] font-mono">{(d.wordCount || 0).toLocaleString()}w</span>
@@ -348,7 +348,7 @@ export default function StatsDashboard({ data }: Props) {
       {section === 'team' && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-6">
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide">
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide">
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Members by Department</h3>
               <div className="space-y-3">
                 {Object.entries(membersByDept).sort((a, b) => b[1] - a[1]).map(([dept, count]) => {
@@ -366,11 +366,11 @@ export default function StatsDashboard({ data }: Props) {
                 })}
               </div>
             </div>
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide" style={{ animationDelay: '40ms' }}>
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '40ms' }}>
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Members by Role</h3>
               <div className="space-y-3">
                 {Object.entries(membersByRole).sort((a, b) => b[1] - a[1]).map(([role, count]) => {
-                  const colors: Record<string, string> = { owner: '#D4A843', admin: '#A855F7', manager: '#3B82F6', member: '#6B7280', guest: '#475569' };
+                  const colors: Record<string, string> = { owner: '#3B82F6', admin: '#A855F7', manager: '#3B82F6', member: '#6B7280', guest: '#475569' };
                   const pct = members.length > 0 ? Math.round((count / members.length) * 100) : 0;
                   return (
                     <div key={role} className="flex items-center gap-3">
@@ -392,7 +392,7 @@ export default function StatsDashboard({ data }: Props) {
       {section === 'activity' && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-6">
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide">
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide">
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Actions (Last 7 Days)</h3>
               <div className="space-y-3">
                 {Object.entries(activityByAction).sort((a, b) => b[1] - a[1]).map(([action, count]) => {
@@ -409,7 +409,7 @@ export default function StatsDashboard({ data }: Props) {
                 })}
               </div>
             </div>
-            <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6 anim-slide" style={{ animationDelay: '40ms' }}>
+            <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '40ms' }}>
               <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Recent Events</h3>
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {logs.slice(0, 20).map((l: any) => (

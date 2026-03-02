@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const isAdmin = membership.role === 'owner' || membership.role === 'admin';
         setState({ user: firebaseUser, membership, orgId, orgData, loading: false, isAdmin });
       } catch (err) {
-        console.error('Auth bootstrap error:', err);
+        // Auth bootstrap error handled silently
         setState({ user: firebaseUser, membership: null, orgId: null, orgData: null, loading: false, isAdmin: false });
       }
     });

@@ -2,6 +2,9 @@
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useEffect, useState, useRef } from 'react';
 
+const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+const DURATION = 0.3;
+
 // ============================================
 // PAGE TRANSITION
 // ============================================
@@ -10,7 +13,7 @@ export function PageTransition({ children, className = '' }: { children: React.R
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+      transition={{ duration: DURATION, ease: EASE }}
       className={className}
     >
       {children}
@@ -25,13 +28,13 @@ const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.05, delayChildren: 0.05 },
+    transition: { staggerChildren: 0.06, delayChildren: 0.02 },
   },
 };
 
 const staggerItem: Variants = {
   hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] } },
+  show: { opacity: 1, y: 0, transition: { duration: DURATION, ease: EASE } },
 };
 
 export function StaggerContainer({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -60,14 +63,14 @@ export function ModalOverlay({ children, onClose }: { children: React.ReactNode;
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
       onClick={onClose}
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 8 }}
-        transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+        transition={{ duration: DURATION, ease: EASE }}
         onClick={e => e.stopPropagation()}
       >
         {children}
@@ -92,7 +95,7 @@ export function SlidePanel({ children, side = 'right', width = 360, onClose, cla
       initial={{ x, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x, opacity: 0 }}
-      transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+      transition={{ duration: 0.25, ease: EASE }}
       className={`shrink-0 ${className}`}
       style={{ width }}
     >
@@ -112,12 +115,26 @@ export function HoverCard({ children, className = '', onClick, style }: {
 }) {
   return (
     <motion.div
-      whileHover={{ y: -2, boxShadow: '0 12px 40px rgba(0,0,0,0.25)' }}
-      whileTap={onClick ? { scale: 0.985 } : undefined}
-      transition={{ duration: 0.2 }}
+      whileHover={{ y: -3, transition: { type: 'spring', stiffness: 400, damping: 25 } }}
+      whileTap={onClick ? { scale: 0.98 } : undefined}
       className={className}
       onClick={onClick}
       style={style}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// ============================================
+// SCALE ON HOVER
+// ============================================
+export function ScaleOnHover({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <motion.div
+      whileHover={{ scale: 1.02, transition: { type: 'spring', stiffness: 400, damping: 25 } }}
+      whileTap={{ scale: 0.98 }}
+      className={className}
     >
       {children}
     </motion.div>
@@ -147,7 +164,6 @@ export function AnimatedCounter({ value, duration = 0.8, className = '' }: {
     const tick = () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / durationMs, 1);
-      // Ease out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
       setDisplay(Math.round(start + diff * eased));
       if (progress < 1) requestAnimationFrame(tick);
@@ -170,7 +186,7 @@ export function FadeIn({ children, delay = 0, className = '' }: {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay, ease: [0.25, 0.46, 0.45, 0.94] }}
+      transition={{ duration: DURATION, delay, ease: EASE }}
       className={className}
     >
       {children}

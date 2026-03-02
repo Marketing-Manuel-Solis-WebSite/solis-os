@@ -27,7 +27,7 @@ export default function TaskCard({ task, members, teams, isSelected, isDragging,
     return (
       <div onClick={onSelect}
         className={`px-2 py-1 rounded-md text-[10px] cursor-pointer truncate border-l-2 transition ${
-          isSelected ? 'bg-[#D4A843]/10 text-[var(--text-primary)]' : 'bg-[var(--bg-card)] hover:bg-[var(--bg-elevated)] text-[var(--text-secondary)]'
+          isSelected ? 'bg-[var(--accent-subtle)] text-[var(--text-primary)]' : 'bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]'
         }`}
         style={{ borderLeftColor: pri?.color || '#64748B' }}>
         {task.title}
@@ -41,12 +41,12 @@ export default function TaskCard({ task, members, teams, isSelected, isDragging,
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={onSelect}
-      className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-200 ${
+      className={`p-3.5 rounded-xl cursor-pointer transition-all duration-200 ${
         isDragging ? 'opacity-50 scale-95' : ''
       } ${
         isSelected
-          ? 'bg-[#D4A843]/5 border-[#D4A843]/30 shadow-lg shadow-[#D4A843]/5'
-          : 'bg-[var(--bg-card)] border-[var(--border)]/50 hover:border-[var(--bg-elevated)] hover:shadow-md'
+          ? 'bg-[var(--accent)]/5 shadow-lg shadow-[var(--accent)]/5 ring-1 ring-[var(--accent)]/30'
+          : 'bg-[var(--bg-elevated)] shadow-card hover:shadow-md'
       }`}
     >
       {/* Priority + Title */}
@@ -69,7 +69,7 @@ export default function TaskCard({ task, members, teams, isSelected, isDragging,
             <span>{doneSub}/{totalSub} subtareas</span>
           </div>
           <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-[#D4A843] to-[#E8C85A] transition-all"
+            <div className="h-full rounded-full bg-[var(--accent)] transition-all"
               style={{ width: `${totalSub > 0 ? (doneSub / totalSub * 100) : 0}%` }} />
           </div>
         </div>
@@ -99,13 +99,13 @@ export default function TaskCard({ task, members, teams, isSelected, isDragging,
           {task.assignees?.slice(0, 3).map((uid: string) => {
             const m = members.find((x: any) => x.id === uid);
             return (
-              <div key={uid} className="w-5 h-5 rounded-full bg-[#D4A843]/15 border border-[var(--bg-card)] flex items-center justify-center text-[8px] font-bold text-[#D4A843]">
+              <div key={uid} className="w-5 h-5 rounded-full bg-[var(--accent-subtle)] border border-[var(--bg-elevated)] flex items-center justify-center text-[8px] font-bold text-[var(--accent)]">
                 {m?.displayName?.[0]?.toUpperCase() || '?'}
               </div>
             );
           })}
           {(task.assignees?.length || 0) > 3 && (
-            <div className="w-5 h-5 rounded-full bg-[var(--bg-elevated)] border border-[var(--bg-card)] flex items-center justify-center text-[7px] text-[var(--text-muted)]">
+            <div className="w-5 h-5 rounded-full bg-[var(--bg-elevated)] border border-[var(--bg-elevated)] flex items-center justify-center text-[7px] text-[var(--text-muted)]">
               +{task.assignees.length - 3}
             </div>
           )}

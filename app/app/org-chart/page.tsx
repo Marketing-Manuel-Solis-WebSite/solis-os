@@ -19,7 +19,7 @@ interface OrgMember {
 interface OrgNode extends OrgMember { children: OrgNode[]; }
 
 const LEVELS: { id: HierarchyLevel; label: string; icon: any; color: string; order: number }[] = [
-  { id: 'owner', label: 'CEO / Owner', icon: Crown, color: '#D4A843', order: 0 },
+  { id: 'owner', label: 'CEO / Owner', icon: Crown, color: 'var(--accent)', order: 0 },
   { id: 'director', label: 'Director', icon: Star, color: '#A855F7', order: 1 },
   { id: 'manager', label: 'Manager', icon: Shield, color: '#3B82F6', order: 2 },
   { id: 'lead', label: 'Team Lead', icon: Briefcase, color: '#22C55E', order: 3 },
@@ -198,7 +198,7 @@ export default function OrgChartPage() {
 
   if (loading) return (
     <div className="p-6 max-w-7xl mx-auto space-y-4">
-      {[1, 2, 3].map(i => <div key={i} className="h-32 skeleton rounded-2xl" />)}
+      {[1, 2, 3].map(i => <div key={i} className="h-32 skeleton rounded-lg" />)}
     </div>
   );
 
@@ -209,18 +209,18 @@ export default function OrgChartPage() {
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
             Organization
-            {canEdit && <span className="text-[9px] px-2 py-0.5 rounded-full bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 font-bold tracking-wider">ADMIN</span>}
+            {canEdit && <span className="text-[9px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-bold tracking-wider">ADMIN</span>}
           </h1>
           <p className="text-sm text-[var(--text-muted)] mt-0.5">{members.length} members across {allTeams.length} departments</p>
         </div>
-        <div className="flex items-center rounded-xl p-1" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex items-center rounded-xl p-1 bg-[var(--bg-elevated)] shadow-card">
           {[
             { id: 'department' as const, label: 'Departments', icon: Building2 },
             { id: 'tree' as const, label: 'Tree', icon: Network },
           ].map(v => (
             <button key={v.id} onClick={() => setView(v.id)}
-              className={`relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${view === v.id ? 'text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-              {view === v.id && <motion.div layoutId="org-view" className="absolute inset-0 rounded-lg" style={{ background: 'rgba(212,168,67,0.08)', boxShadow: '0 0 20px rgba(212,168,67,0.05)' }} transition={{ type: 'spring', stiffness: 400, damping: 30 }} />}
+              className={`relative flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all ${view === v.id ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+              {view === v.id && <motion.div layoutId="org-view" className="absolute inset-0 rounded-lg bg-[var(--accent-subtle)]" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />}
               <span className="relative flex items-center gap-1.5"><v.icon className="h-3.5 w-3.5" />{v.label}</span>
             </button>
           ))}
@@ -243,11 +243,10 @@ export default function OrgChartPage() {
               ))}
               {unassigned.length > 0 && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: byDepartment.length * 0.08 }}
-                  className="rounded-2xl p-6 backdrop-blur-xl"
+                  className="rounded-lg p-6"
                   style={{
                     background: 'rgba(245, 158, 11, 0.04)',
                     border: '1px solid rgba(245, 158, 11, 0.15)',
-                    boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
                   }}>
                   <div className="flex items-center gap-2.5 mb-5">
                     <AlertTriangle className="h-5 w-5 text-amber-400" />
@@ -310,19 +309,14 @@ function DeptCard({ team, deptMembers, allMembers, index, canEdit, onEdit, getMa
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.06, duration: 0.4 }}
-      className="rounded-2xl overflow-hidden"
-      style={{
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.10)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08)',
-      }}
+      className="rounded-xl overflow-hidden bg-[var(--bg-secondary)] shadow-card"
     >
       {/* Gradient accent */}
       <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${team.color}, ${team.color}90, ${team.color}30)` }} />
 
       {/* Header */}
-      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-4 px-6 py-5 transition-all hover:bg-white/[0.03]">
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0"
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-4 px-6 py-5 transition-all hover:bg-[var(--bg-hover)]">
+        <div className="w-14 h-14 rounded-lg flex items-center justify-center text-3xl shrink-0"
           style={{
             background: `linear-gradient(135deg, ${team.color}30, ${team.color}12)`,
             border: `1px solid ${team.color}35`,
@@ -332,12 +326,12 @@ function DeptCard({ team, deptMembers, allMembers, index, canEdit, onEdit, getMa
         </div>
         <div className="flex-1 text-left min-w-0">
           <p className="text-lg font-bold" style={{ color: team.color }}>{team.name}</p>
-          <p className="text-sm text-[rgba(255,255,255,0.5)] mt-0.5">
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">
             {deptMembers.length} member{deptMembers.length !== 1 ? 's' : ''}{team.description ? ` · ${team.description}` : ''}
           </p>
         </div>
         <motion.div animate={{ rotate: open ? 0 : -90 }} transition={{ duration: 0.2 }}>
-          <ChevronDown className="h-5 w-5 text-[rgba(255,255,255,0.4)]" />
+          <ChevronDown className="h-5 w-5 text-[var(--text-muted)]" />
         </motion.div>
       </button>
 
@@ -397,18 +391,12 @@ function MemberRow({ member, teamColor, index = 0, canEdit, onEdit, getManagerNa
       transition={{ delay: index * 0.03, duration: 0.25 }}
       whileHover={canEdit ? { x: 4 } : {}}
       onClick={() => canEdit && onEdit(member)}
-      className={`flex items-center gap-4 rounded-xl px-4 py-3.5 group transition-all ${canEdit ? 'cursor-pointer' : ''}`}
-      style={{
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.08)',
-      }}
+      className={`flex items-center gap-4 rounded-xl px-4 py-3.5 group transition-all duration-200 bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] hover:shadow-card-hover ${canEdit ? 'cursor-pointer' : ''}`}
       onMouseEnter={e => {
-        (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)';
         (e.currentTarget as HTMLElement).style.borderColor = `${lv.color}40`;
       }}
       onMouseLeave={e => {
-        (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)';
-        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)';
+        (e.currentTarget as HTMLElement).style.borderColor = '';
       }}
     >
       {/* Avatar */}
@@ -423,12 +411,12 @@ function MemberRow({ member, teamColor, index = 0, canEdit, onEdit, getManagerNa
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-white truncate">{member.displayName}</p>
-        <p className="text-[13px] text-[rgba(255,255,255,0.65)] truncate">{member.title || 'No title assigned'}</p>
+        <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{member.displayName}</p>
+        <p className="text-[13px] text-[var(--text-secondary)] truncate">{member.title || 'No title assigned'}</p>
         {managerName && (
           <div className="flex items-center gap-1 mt-0.5">
-            <ArrowRight className="h-3 w-3 text-[rgba(255,255,255,0.35)]" />
-            <span className="text-xs text-[rgba(255,255,255,0.4)]">Reports to <span className="font-medium text-[rgba(255,255,255,0.7)]">{managerName}</span></span>
+            <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
+            <span className="text-xs text-[var(--text-muted)]">Reports to <span className="font-medium text-[var(--text-secondary)]">{managerName}</span></span>
           </div>
         )}
       </div>
@@ -441,7 +429,7 @@ function MemberRow({ member, teamColor, index = 0, canEdit, onEdit, getManagerNa
         </span>
         {canEdit && (
           <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-            <Edit2 className="h-3.5 w-3.5 text-[rgba(255,255,255,0.4)]" />
+            <Edit2 className="h-3.5 w-3.5 text-[var(--text-muted)]" />
           </div>
         )}
       </div>
@@ -474,19 +462,15 @@ function TreeNode({ node, members, teams, canEdit, onEdit, isRoot = false, index
       <motion.div
         whileHover={canEdit ? { scale: 1.04, y: -2 } : { scale: 1.02 }}
         onClick={() => canEdit && onEdit(node)}
-        className={`relative rounded-2xl px-6 py-4 text-center min-w-[210px] max-w-[270px] group ${canEdit ? 'cursor-pointer' : ''}`}
+        className={`relative rounded-lg px-6 py-4 text-center min-w-[210px] max-w-[270px] group bg-[var(--bg-elevated)] ${canEdit ? 'cursor-pointer' : ''}`}
         style={{
-          background: `linear-gradient(160deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)`,
           border: `2px solid ${teamColor}50`,
-          boxShadow: `0 8px 32px rgba(0,0,0,0.2), 0 0 20px ${teamColor}08`,
         }}
         onMouseEnter={e => {
           (e.currentTarget as HTMLElement).style.borderColor = `${teamColor}80`;
-          (e.currentTarget as HTMLElement).style.boxShadow = `0 12px 48px rgba(0,0,0,0.25), 0 0 30px ${teamColor}20`;
         }}
         onMouseLeave={e => {
           (e.currentTarget as HTMLElement).style.borderColor = `${teamColor}50`;
-          (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 32px rgba(0,0,0,0.2), 0 0 20px ${teamColor}08`;
         }}
       >
         {canEdit && (
@@ -506,9 +490,9 @@ function TreeNode({ node, members, teams, canEdit, onEdit, isRoot = false, index
         </div>
 
         {/* Name */}
-        <p className="text-[15px] font-bold text-white truncate">{node.displayName}</p>
+        <p className="text-[15px] font-bold text-[var(--text-primary)] truncate">{node.displayName}</p>
         {/* Title */}
-        <p className="text-[13px] text-[rgba(255,255,255,0.7)] truncate mt-0.5">{node.title || 'No title'}</p>
+        <p className="text-[13px] text-[var(--text-secondary)] truncate mt-0.5">{node.title || 'No title'}</p>
 
         {/* Badges */}
         <div className="flex items-center justify-center gap-1.5 mt-2.5 flex-wrap">
@@ -526,7 +510,7 @@ function TreeNode({ node, members, teams, canEdit, onEdit, isRoot = false, index
 
         {/* Direct reports count */}
         {hasKids && (
-          <p className="text-[11px] text-[rgba(255,255,255,0.45)] mt-2.5">
+          <p className="text-[11px] text-[var(--text-muted)] mt-2.5">
             {node.children.length} direct report{node.children.length !== 1 ? 's' : ''}
           </p>
         )}
@@ -618,7 +602,7 @@ function EditModal({ member, editData, setEditData, teams, members, onSave, onCl
       onClick={onClose}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/50" />
 
       {/* Modal */}
       <motion.div
@@ -627,12 +611,7 @@ function EditModal({ member, editData, setEditData, teams, members, onSave, onCl
         exit={{ scale: 0.95, y: 10 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         onClick={e => e.stopPropagation()}
-        className="relative w-full max-w-md rounded-2xl backdrop-blur-xl overflow-hidden"
-        style={{
-          background: 'rgba(var(--bg-card-rgb, 15,18,25), 0.95)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.2)',
-        }}
+        className="relative w-full max-w-md rounded-xl overflow-hidden bg-[var(--bg-elevated)] shadow-modal"
       >
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
@@ -695,18 +674,16 @@ function EditModal({ member, editData, setEditData, teams, members, onSave, onCl
           <div className="flex gap-2 pt-2">
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={onSave}
-              className="flex-1 h-10 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all"
+              className="flex-1 h-10 rounded-md text-sm font-semibold flex items-center justify-center gap-2 transition-all"
               style={{
-                background: 'linear-gradient(135deg, #D4A843, #9A7B2F)',
-                color: '#06080F',
-                boxShadow: '0 4px 14px rgba(212,168,67,0.25)',
+                background: 'var(--accent)',
+                color: 'var(--accent-text)',
               }}>
               <Check className="h-4 w-4" /> Save Changes
             </motion.button>
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={onClose}
-              className="h-10 px-5 rounded-xl text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              className="h-10 px-5 rounded-md text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-all duration-200 bg-[var(--bg-tertiary)]">
               Cancel
             </motion.button>
           </div>

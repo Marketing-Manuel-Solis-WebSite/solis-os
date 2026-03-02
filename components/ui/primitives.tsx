@@ -15,7 +15,7 @@ const Label = React.forwardRef<
   <LabelPrimitive.Root
     ref={ref}
     className={cn(
-      'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
+      'text-sm font-medium text-[var(--text-primary)] leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
       className
     )}
     {...props}
@@ -28,7 +28,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttribu
   ({ className, ...props }, ref) => (
     <textarea
       className={cn(
-        'flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+        'flex min-h-[80px] w-full rounded-lg border-[1.5px] border-[var(--border)] bg-[var(--bg-input)] px-3 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] shadow-inner transition-all duration-200 hover:bg-[var(--bg-elevated)] hover:border-[var(--border-strong)] focus-visible:outline-none focus-visible:border-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent)]/20 focus-visible:bg-[var(--bg-elevated)] focus-visible:shadow-sm disabled:cursor-not-allowed disabled:opacity-50',
         className
       )}
       ref={ref}
@@ -45,7 +45,7 @@ const Switch = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SwitchPrimitive.Root
     className={cn(
-      'peer inline-flex h-[24px] w-[44px] shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input',
+      'peer inline-flex h-[22px] w-[40px] shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/30 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-[var(--accent)] data-[state=unchecked]:bg-[var(--bg-tertiary)]',
       className
     )}
     {...props}
@@ -53,7 +53,7 @@ const Switch = React.forwardRef<
   >
     <SwitchPrimitive.Thumb
       className={cn(
-        'pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0'
+        'pointer-events-none block h-[18px] w-[18px] rounded-full bg-white shadow-sm ring-0 transition-transform duration-150 data-[state=checked]:translate-x-[18px] data-[state=unchecked]:translate-x-[1px]'
       )}
     />
   </SwitchPrimitive.Root>
@@ -70,8 +70,8 @@ const Separator = React.forwardRef<
     decorative={decorative}
     orientation={orientation}
     className={cn(
-      'shrink-0 bg-border',
-      orientation === 'horizontal' ? 'h-[1px] w-full' : 'h-full w-[1px]',
+      'shrink-0 bg-[var(--border)]',
+      orientation === 'horizontal' ? 'h-px w-full' : 'h-full w-px',
       className
     )}
     {...props}
@@ -86,7 +86,7 @@ const Avatar = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AvatarPrimitive.Root
     ref={ref}
-    className={cn('relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full', className)}
+    className={cn('relative flex h-9 w-9 shrink-0 overflow-hidden rounded-lg ring-2 ring-[var(--bg-base)]', className)}
     {...props}
   />
 ));
@@ -111,7 +111,7 @@ const AvatarFallback = React.forwardRef<
   <AvatarPrimitive.Fallback
     ref={ref}
     className={cn(
-      'flex h-full w-full items-center justify-center rounded-full bg-muted text-sm font-medium',
+      'flex h-full w-full items-center justify-center rounded-md bg-[var(--bg-secondary)] text-sm font-medium text-[var(--text-secondary)]',
       className
     )}
     {...props}

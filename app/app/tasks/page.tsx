@@ -14,6 +14,7 @@ import TaskCalendarView from '@/components/tasks/task-calendar-view';
 import TaskDetailDrawer from '@/components/tasks/task-detail-drawer';
 import TaskCreateModal from '@/components/tasks/task-create-modal';
 import TaskBulkActions from '@/components/tasks/task-bulk-actions';
+import { useToast } from '@/components/notifications/toast-provider';
 
 import {
   Task, ViewType, FilterState, EMPTY_FILTERS, SavedView, TaskGroup,
@@ -22,6 +23,7 @@ import {
 
 export default function TasksPage() {
   const { user, me, activeTeamId, teams, can, canSeeResource, allMembers, canSeeAllTeams } = useAuth();
+  const toast = useToast();
 
   // Core data
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -148,7 +150,7 @@ export default function TasksPage() {
     if (groupBy === 'assignee') {
       const grouped: TaskGroup[] = members.map(m => {
         const t = filteredTasks.filter(x => x.assignees?.includes(m.id));
-        return { key: m.id, label: m.displayName || m.email, tasks: t, color: '#D4A843', count: t.length };
+        return { key: m.id, label: m.displayName || m.email, tasks: t, color: '#3B82F6', count: t.length };
       });
       const unassigned = filteredTasks.filter(x => !x.assignees?.length);
       if (unassigned.length > 0) grouped.push({ key: '__none__', label: 'Sin asignar', tasks: unassigned, color: '#64748B', count: unassigned.length });
@@ -171,7 +173,7 @@ export default function TasksPage() {
 
   // CRUD handlers
   const doCreate = async (data: any) => {
-    if (!can('task', 'create')) return alert('Sin permisos para crear tareas');
+    if (!can('task', 'create')) return toast.warning('Sin permisos', 'No tienes permisos para crear tareas.');
     const taskRef = await createTask({
       ...data,
       teamId: data.teamId || (activeTeamId === '__all__' ? '' : activeTeamId),
@@ -210,7 +212,7 @@ export default function TasksPage() {
   };
 
   const doDelete = async (t: any) => {
-    if (!can('task', 'delete') && t.createdBy !== user?.uid) return alert('Sin permisos para eliminar esta tarea');
+    if (!can('task', 'delete') && t.createdBy !== user?.uid) return toast.warning('Sin permisos', 'No tienes permisos para eliminar esta tarea.');
     if (!confirm(`¿Eliminar "${t.title}"? Se moverá a la papelera.`)) return;
     await softDeleteTask(t.id);
     await logAction({ action: 'deleted', resource: 'task', detail: t.title, actorId: user!.uid, actorName: me!.displayName });
@@ -351,7 +353,7 @@ export default function TasksPage() {
               <CheckSquare className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
               <p className="text-[var(--text-muted)] text-sm">No se encontraron tareas.</p>
               {canCreate && (
-                <button onClick={() => setShowCreate(true)} className="text-sm text-[#D4A843] hover:underline mt-2">
+                <button onClick={() => setShowCreate(true)} className="text-sm text-[var(--accent)] hover:underline mt-2">
                   Crea tu primera tarea
                 </button>
               )}

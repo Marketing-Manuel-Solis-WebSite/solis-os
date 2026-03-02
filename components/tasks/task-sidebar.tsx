@@ -43,10 +43,10 @@ function FilterSection({ label, items, selected, onChange }: {
       <div className="flex flex-wrap gap-1">
         {items.map(item => (
           <button key={item.id} onClick={() => toggle(item.id)}
-            className={`px-2 py-1 rounded-md text-[10px] font-medium transition border ${
+            className={`px-2 py-1 rounded-md text-[10px] font-medium transition-all duration-200 ${
               selected.includes(item.id)
-                ? 'border-current'
-                : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                ? 'ring-1 ring-current'
+                : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
             }`}
             style={selected.includes(item.id) ? { color: item.color, backgroundColor: `${item.color}15`, borderColor: `${item.color}30` } : {}}>
             {item.label}
@@ -79,12 +79,12 @@ export default function TaskSidebar({
     <motion.aside
       animate={{ width: open ? 240 : 0, opacity: open ? 1 : 0 }}
       transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="h-full bg-[var(--bg-card)] border-r border-[var(--border)] flex flex-col overflow-hidden shrink-0"
+      className="h-full bg-[var(--bg-elevated)] shadow-panel flex flex-col overflow-hidden shrink-0"
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-[var(--border-subtle)]">
+      <div className="flex items-center justify-between p-3">
         <span className="text-sm font-bold text-[var(--text-primary)]">Tareas</span>
-        <button onClick={onToggle} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition">
+        <button onClick={onToggle} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
           <ChevronLeft className="h-4 w-4" />
         </button>
       </div>
@@ -97,8 +97,8 @@ export default function TaskSidebar({
             <button key={v.id} onClick={() => onViewChange(v.id)}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] transition-all ${
                 view === v.id
-                  ? 'bg-[#D4A843]/10 text-[#D4A843] font-semibold'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
+                  ? 'bg-[var(--accent-subtle)] text-[var(--accent)] font-semibold'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
               }`}>
               <v.Icon className="h-4 w-4" />
               {v.label}
@@ -118,7 +118,7 @@ export default function TaskSidebar({
             </motion.span>
             Filtros
             {activeFilterCount > 0 && (
-              <span className="ml-auto px-1.5 py-0.5 rounded-full bg-[#D4A843]/15 text-[#D4A843] text-[9px] font-bold">
+              <span className="ml-auto px-1.5 py-0.5 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] text-[9px] font-bold">
                 {activeFilterCount}
               </span>
             )}
@@ -149,7 +149,7 @@ export default function TaskSidebar({
                   onChange={(ids) => onFiltersChange({ ...filters, type: ids })} />
 
                 <FilterSection label="Asignado"
-                  items={members.map(m => ({ id: m.id, label: m.displayName || m.email, color: '#D4A843' }))}
+                  items={members.map(m => ({ id: m.id, label: m.displayName || m.email, color: '#3B82F6' }))}
                   selected={filters.assignee}
                   onChange={(ids) => onFiltersChange({ ...filters, assignee: ids })} />
 
@@ -222,13 +222,13 @@ export default function TaskSidebar({
               >
                 {savedViews.map(sv => (
                   <button key={sv.id} onClick={() => onLoadView(sv)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition">
-                    <Bookmark className="h-3 w-3 text-[#D4A843]" />
+                    className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
+                    <Bookmark className="h-3 w-3 text-[var(--accent)]" />
                     <span className="truncate">{sv.name}</span>
                   </button>
                 ))}
                 <button onClick={onSaveView}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-[#D4A843] hover:bg-[#D4A843]/5 transition">
+                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-[var(--accent)] hover:bg-[var(--accent-subtle)] transition">
                   <Save className="h-3 w-3" />
                   Guardar vista actual
                 </button>

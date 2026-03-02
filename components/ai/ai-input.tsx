@@ -39,7 +39,7 @@ export default function AIInput({ loading, onSend }: Props) {
       <div className="max-w-3xl mx-auto">
         <div className="relative rounded-2xl transition-all"
           style={{
-            background: 'var(--bg-card)',
+            background: 'var(--bg-elevated)',
             boxShadow: '0 2px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)',
           }}>
           <textarea ref={textareaRef} value={text}
@@ -57,10 +57,10 @@ export default function AIInput({ loading, onSend }: Props) {
             disabled={!canSend}
             className="absolute right-2.5 bottom-2.5 w-8 h-8 rounded-lg flex items-center justify-center transition-all"
             style={{
-              background: canSend ? 'linear-gradient(135deg, #D4A843, #9A7B2F)' : 'var(--bg-elevated)',
-              boxShadow: canSend ? '0 2px 8px rgba(212, 168, 67, 0.3)' : 'none',
+              background: canSend ? 'var(--accent)' : 'var(--bg-elevated)',
+              boxShadow: 'none',
             }}>
-            <ArrowUp className="h-4 w-4" style={{ color: canSend ? '#06080F' : 'var(--text-muted)' }} />
+            <ArrowUp className="h-4 w-4" style={{ color: canSend ? 'var(--accent-text)' : 'var(--text-muted)' }} />
           </motion.button>
         </div>
         <p className="text-[10px] text-[var(--text-muted)] text-center mt-2">

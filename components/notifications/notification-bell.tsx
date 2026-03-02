@@ -1,21 +1,21 @@
 'use client';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Check, CheckCheck, ExternalLink, X } from 'lucide-react';
+import { Bell, CheckCheck, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { onNotificationsSnapshot, markNotificationRead, markAllRead, type AppNotification } from '@/lib/notifications';
 import { useRouter } from 'next/navigation';
 
-const TYPE_ICONS: Record<string, string> = {
-  task_assigned: '📋',
-  task_mentioned: '💬',
-  task_completed: '✅',
-  task_due_soon: '⏰',
-  task_comment: '💬',
-  channel_mention: '📣',
-  channel_message: '📨',
-  doc_mentioned: '📄',
-  system: '⚙️',
+const TYPE_LABELS: Record<string, string> = {
+  task_assigned: 'Task',
+  task_mentioned: 'Mention',
+  task_completed: 'Done',
+  task_due_soon: 'Due',
+  task_comment: 'Comment',
+  channel_mention: 'Channel',
+  channel_message: 'Message',
+  doc_mentioned: 'Doc',
+  system: 'System',
 };
 
 function timeAgo(date: any): string {
@@ -40,14 +40,12 @@ export default function NotificationBell() {
   const ref = useRef<HTMLDivElement>(null);
   const unread = notifs.filter(n => !n.read).length;
 
-  // Real-time listener
   useEffect(() => {
     if (!user) return;
     const unsub = onNotificationsSnapshot(user.uid, setNotifs);
     return () => unsub();
   }, [user?.uid]);
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -70,7 +68,6 @@ export default function NotificationBell() {
     await markAllRead(user.uid);
   };
 
-  // Group by date
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today);
@@ -87,48 +84,52 @@ export default function NotificationBell() {
   return (
     <div ref={ref} className="relative">
       {/* Bell button */}
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+      <button
         onClick={() => setOpen(!open)}
-        className="relative p-2.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-card)] transition"
+        className="relative p-2 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-200"
       >
-        <Bell className="h-[18px] w-[18px]" />
+        <Bell className="h-[18px] w-[18px]" strokeWidth={1.75} />
         <AnimatePresence>
           {unread > 0 && (
             <motion.span
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0 }}
-              className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-[#D4A843] text-[#06080F] text-[10px] font-bold shadow-[0_0_8px_rgba(212,168,67,0.5)]"
+              className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full bg-[var(--error)] text-white text-[10px] font-semibold"
             >
               {unread > 9 ? '9+' : unread}
             </motion.span>
           )}
         </AnimatePresence>
-      </motion.button>
+      </button>
 
       {/* Dropdown */}
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.95 }}
+            initial={{ opacity: 0, y: 4, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="absolute right-0 top-full mt-2 w-[380px] max-h-[480px] rounded-2xl border border-[var(--border)] bg-[var(--bg-base)] shadow-2xl shadow-black/40 overflow-hidden z-50"
+            exit={{ opacity: 0, y: 4, scale: 0.97 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full mt-2 w-[380px] max-h-[480px] rounded-xl bg-[var(--bg-elevated)] shadow-dropdown overflow-hidden z-50"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--border)]">
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">Notifications</h3>
+            <div className="flex items-center justify-between px-4 py-3">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Notifications</h3>
               <div className="flex items-center gap-2">
                 {unread > 0 && (
-                  <button onClick={handleMarkAll} className="text-[10px] px-2.5 py-1 rounded-lg bg-[#D4A843]/10 text-[#D4A843] hover:bg-[#D4A843]/20 transition font-medium flex items-center gap-1">
+                  <button
+                    onClick={handleMarkAll}
+                    className="text-xs px-2 py-1 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-200 font-medium flex items-center gap-1"
+                  >
                     <CheckCheck className="h-3 w-3" /> Mark all read
                   </button>
                 )}
-                <button onClick={() => setOpen(false)} className="p-1 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg">
-                  <X className="h-4 w-4" />
+                <button
+                  onClick={() => setOpen(false)}
+                  className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded transition-all duration-200"
+                >
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
@@ -137,7 +138,7 @@ export default function NotificationBell() {
             <div className="overflow-y-auto max-h-[400px]">
               {notifs.length === 0 ? (
                 <div className="py-12 text-center">
-                  <Bell className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2 opacity-40" />
+                  <Bell className="h-6 w-6 text-[var(--text-muted)] mx-auto mb-2" strokeWidth={1.5} />
                   <p className="text-sm text-[var(--text-muted)]">No notifications yet</p>
                 </div>
               ) : (
@@ -158,27 +159,31 @@ export default function NotificationBell() {
 function NotifGroup({ label, items, onClick }: { label: string; items: AppNotification[]; onClick: (n: AppNotification) => void }) {
   return (
     <div>
-      <div className="px-5 py-2 sticky top-0 bg-[var(--bg-base)]/90 backdrop-blur-sm">
+      <div className="px-4 py-2 sticky top-0 bg-[var(--bg-elevated)]">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{label}</p>
       </div>
       {items.map(n => (
-        <motion.button
+        <button
           key={n.id}
-          whileHover={{ backgroundColor: 'rgba(255,255,255,0.02)' }}
           onClick={() => onClick(n)}
-          className={`w-full flex items-start gap-3 px-5 py-3 text-left transition ${!n.read ? 'bg-[#D4A843]/[0.03]' : ''}`}
+          className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-all duration-200 hover:bg-[var(--bg-hover)] ${!n.read ? 'bg-[var(--accent-subtle)]' : ''}`}
         >
-          <span className="text-base mt-0.5 shrink-0">{TYPE_ICONS[n.type] || '🔔'}</span>
+          {/* Type badge */}
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] shrink-0 mt-0.5">
+            {TYPE_LABELS[n.type] || 'Notif'}
+          </span>
           <div className="flex-1 min-w-0">
-            <p className={`text-xs leading-tight ${!n.read ? 'text-[var(--text-primary)] font-semibold' : 'text-[var(--text-secondary)]'}`}>{n.title}</p>
+            <p className={`text-xs leading-tight ${!n.read ? 'text-[var(--text-primary)] font-semibold' : 'text-[var(--text-secondary)]'}`}>
+              {n.title}
+            </p>
             <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{n.message}</p>
             <div className="flex items-center gap-2 mt-1">
-              {n.actorName && <span className="text-[10px] text-[#D4A843]">{n.actorName}</span>}
+              {n.actorName && <span className="text-[10px] text-[var(--text-tertiary)] font-medium">{n.actorName}</span>}
               <span className="text-[10px] text-[var(--text-muted)]">{timeAgo(n.createdAt)}</span>
             </div>
           </div>
-          {!n.read && <span className="w-2 h-2 rounded-full bg-[#D4A843] shrink-0 mt-1.5 shadow-[0_0_6px_rgba(212,168,67,0.5)]" />}
-        </motion.button>
+          {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0 mt-2" />}
+        </button>
       ))}
     </div>
   );

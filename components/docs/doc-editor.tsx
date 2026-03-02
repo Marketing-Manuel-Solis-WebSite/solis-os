@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { renderMarkdown } from '@/lib/markdown';
 import { uploadFile, isImageType, formatFileSize } from '@/lib/upload';
+import { useToast } from '@/components/notifications/toast-provider';
 
 interface DocEditorProps {
   doc: any;
@@ -28,7 +29,7 @@ function TBtn({ icon: Icon, label, onClick, active, disabled }: {
 }) {
   return (
     <button onClick={onClick} disabled={disabled} title={label}
-      className={`w-8 h-8 rounded-lg flex items-center justify-center transition text-xs ${active ? 'bg-[#D4A843]/15 text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-white/5'} ${disabled ? 'opacity-30 pointer-events-none' : ''}`}>
+      className={`w-8 h-8 rounded-lg flex items-center justify-center transition text-xs ${active ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'} ${disabled ? 'opacity-30 pointer-events-none' : ''}`}>
       <Icon className="h-3.5 w-3.5" />
     </button>
   );
@@ -40,6 +41,7 @@ function TSep() {
 
 // ========== MAIN EDITOR ==========
 export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDelete, onBack, onToggleAI, showAI }: DocEditorProps) {
+  const toast = useToast();
   const [content, setContent] = useState(doc.content || '');
   const [title, setTitle] = useState(doc.title || '');
   const [mode, setMode] = useState<'edit' | 'preview' | 'split'>('edit');
@@ -145,7 +147,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
       });
       setDirty(false);
     } catch (err) {
-      console.error('Save failed:', err);
+      toast.error('Error al guardar', 'No se pudo guardar el documento. Intenta de nuevo.');
     }
     setSaving(false);
   };
@@ -207,7 +209,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
     if (!files) return;
     for (const file of Array.from(files)) {
       if (!isImageType(file.type)) {
-        alert('Solo se permiten archivos de imagen (JPG, PNG, GIF, WebP, etc.)');
+        toast.warning('Formato no soportado', 'Solo se permiten archivos de imagen (JPG, PNG, GIF, WebP).');
         continue;
       }
       setUploading(true);
@@ -228,7 +230,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
         }
         setDirty(true);
       } catch (err: any) {
-        alert(err.message || 'Error al subir imagen');
+        toast.error('Error al subir imagen', err.message || 'Ocurrio un error al subir la imagen.');
       }
       setUploading(false);
       setUploadProgress(0);
@@ -241,10 +243,10 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
 <html><head><meta charset="UTF-8"><title>${title}</title>
 <style>
 body{font-family:'Segoe UI',system-ui,sans-serif;max-width:800px;margin:40px auto;padding:20px;color:#333;line-height:1.8;background:#fff}
-h1{border-bottom:2px solid #D4A843;padding-bottom:8px;color:#1a1a1a}
-h2{color:#D4A843;margin-top:2rem}
+h1{border-bottom:2px solid #2563EB;padding-bottom:8px;color:#1a1a1a}
+h2{color:#2563EB;margin-top:2rem}
 h3{color:#555;margin-top:1.5rem}
-blockquote{border-left:3px solid #D4A843;padding-left:16px;color:#666;font-style:italic;margin:1rem 0}
+blockquote{border-left:3px solid #2563EB;padding-left:16px;color:#666;font-style:italic;margin:1rem 0}
 code{background:#f5f5f5;padding:2px 6px;border-radius:4px;font-size:0.9em}
 pre{background:#1a1a2e;color:#e0e0e0;padding:16px;border-radius:8px;overflow-x:auto}
 pre code{background:none;padding:0;color:inherit}
@@ -254,7 +256,7 @@ th{background:#f5f5f5;font-weight:600}
 img{max-width:100%;border-radius:8px;margin:1rem 0}
 figure{text-align:center;margin:1.5rem 0}
 figcaption{font-size:0.75rem;color:#999;margin-top:0.5rem;font-style:italic}
-a{color:#D4A843}
+a{color:#2563EB}
 del{color:#999}
 hr{border:none;border-top:2px solid #eee;margin:2rem 0}
 ul,ol{padding-left:1.5rem}
@@ -307,7 +309,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
       }
       case 'pdf': {
         const printWindow = window.open('', '_blank');
-        if (!printWindow) { alert('Please allow pop-ups to download as PDF.'); return; }
+        if (!printWindow) { toast.warning('Pop-ups bloqueados', 'Permite las ventanas emergentes para descargar como PDF.'); return; }
         printWindow.document.write(styledHtml(true));
         printWindow.document.close();
         printWindow.onload = () => {
@@ -324,9 +326,9 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
   const readTime = Math.max(1, Math.ceil(wordCount / 200));
 
   const visIcon = visibility === 'private' ? <Lock className="h-3 w-3" /> : visibility === 'public' ? <Globe className="h-3 w-3" /> : <Users className="h-3 w-3" />;
-  const visColor = visibility === 'private' ? 'text-red-400 bg-red-500/10 border-red-500/20' : visibility === 'public' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+  const visColor = visibility === 'private' ? 'text-red-400 bg-red-500/10' : visibility === 'public' ? 'text-emerald-400 bg-emerald-500/10' : 'text-blue-400 bg-blue-500/10';
 
-  const containerClass = fullscreen ? 'fixed inset-0 z-50 bg-[#06080F] flex flex-col' : 'flex flex-col h-full';
+  const containerClass = fullscreen ? 'fixed inset-0 z-50 bg-[var(--bg-base)] flex flex-col' : 'flex flex-col h-full';
 
   return (
     <div className={containerClass}>
@@ -341,7 +343,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
       />
 
       {/* Top Bar */}
-      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-base)] shrink-0">
+      <div className="flex items-center gap-3 px-4 py-2.5 bg-[var(--bg-base)] shrink-0">
         <button onClick={onBack} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition">
           <ArrowLeft className="h-4 w-4" />
         </button>
@@ -351,24 +353,24 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
           placeholder="Untitled Document" />
 
         <div className="flex items-center gap-1.5">
-          {dirty && <span className="text-[10px] text-amber-400 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">Unsaved</span>}
-          {saving && <span className="text-[10px] text-blue-400 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20">Saving...</span>}
+          {dirty && <span className="text-[10px] text-amber-400 px-2 py-0.5 rounded-full bg-amber-500/10">Unsaved</span>}
+          {saving && <span className="text-[10px] text-blue-400 px-2 py-0.5 rounded-full bg-blue-500/10">Saving...</span>}
           {uploading && (
             <div className="flex items-center gap-2 px-2">
               <div className="w-16 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                <div className="h-full bg-[#D4A843] rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
+                <div className="h-full bg-[var(--accent)] rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
               </div>
-              <span className="text-[10px] text-[#D4A843]">{uploadProgress}%</span>
+              <span className="text-[10px] text-[var(--accent)]">{uploadProgress}%</span>
             </div>
           )}
 
           <button onClick={() => setShowMeta(!showMeta)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold border transition ${visColor}`}>
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold transition-all duration-200 ${visColor}`}>
             {visIcon} {visibility}
           </button>
 
           <button onClick={onToggleAI}
-            className={`p-2 rounded-lg transition ${showAI ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[#D4A843] hover:bg-[#D4A843]/5'}`}
+            className={`p-2 rounded-lg transition ${showAI ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-subtle)]'}`}
             title="AI Assistant">
             <Sparkles className="h-4 w-4" />
           </button>
@@ -380,7 +382,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
               <Download className="h-4 w-4" />
             </button>
             {showDownloadMenu && (
-              <div className="absolute right-0 top-full mt-1 w-48 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl shadow-xl z-20 py-1"
+              <div className="absolute right-0 top-full mt-1 w-48 bg-[var(--bg-elevated)] rounded-xl shadow-dropdown z-20 py-1"
                 onClick={e => e.stopPropagation()}>
                 <button onClick={() => downloadAs('markdown')} className="w-full px-4 py-2 text-left text-xs text-[var(--text-secondary)] hover:bg-white/5 transition flex items-center gap-2">
                   <Type className="h-3.5 w-3.5" /> Markdown (.md)
@@ -400,7 +402,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
           </div>
 
           <button onClick={handleSave} disabled={saving || !dirty}
-            className="px-4 h-8 rounded-xl btn-gold text-xs flex items-center gap-1.5 disabled:opacity-40">
+            className="px-4 h-8 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-xs flex items-center gap-1.5 disabled:opacity-40">
             <Save className="h-3.5 w-3.5" /> Save
           </button>
 
@@ -412,7 +414,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
 
       {/* Metadata panel */}
       {showMeta && (
-        <div className="px-5 py-3 border-b border-[var(--border-subtle)] bg-[#0A0E16] flex items-center gap-4 flex-wrap anim-fade">
+        <div className="px-5 py-3 bg-[#0A0E16] flex items-center gap-4 flex-wrap anim-fade">
           <div className="flex items-center gap-2">
             <label className="text-[10px] text-[var(--text-muted)] uppercase font-semibold">Visibility</label>
             <select value={visibility} onChange={e => { setVisibility(e.target.value as any); setDirty(true); }} className="select-dark h-7 text-[11px] px-2">
@@ -437,7 +439,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center gap-0.5 px-4 py-1.5 border-b border-[var(--border-subtle)] bg-[var(--bg-base)] flex-wrap shrink-0">
+      <div className="flex items-center gap-0.5 px-4 py-1.5 bg-[var(--bg-base)] flex-wrap shrink-0">
         <TBtn icon={Undo2} label="Undo (Ctrl+Z)" onClick={undo} disabled={undoStack.length === 0} />
         <TBtn icon={Redo2} label="Redo (Ctrl+Shift+Z)" onClick={redo} disabled={redoStack.length === 0} />
         <TSep />
@@ -465,14 +467,14 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
         <div className="flex-1" />
 
         {/* View mode */}
-        <div className="flex rounded-lg border border-[var(--border-subtle)] overflow-hidden">
-          <button onClick={() => setMode('edit')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'edit' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+        <div className="flex rounded-xl bg-[var(--bg-tertiary)] overflow-hidden">
+          <button onClick={() => setMode('edit')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'edit' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             <Edit2 className="h-3 w-3" />
           </button>
-          <button onClick={() => setMode('split')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'split' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+          <button onClick={() => setMode('split')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'split' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             Split
           </button>
-          <button onClick={() => setMode('preview')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'preview' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+          <button onClick={() => setMode('preview')} className={`px-2.5 py-1 text-[10px] font-semibold transition ${mode === 'preview' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             <Eye className="h-3 w-3" />
           </button>
         </div>
@@ -482,10 +484,10 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
       <div className="flex-1 flex overflow-hidden relative">
         {/* Drag-and-drop overlay */}
         {dragOver && (
-          <div className="absolute inset-0 z-10 bg-[#D4A843]/5 border-2 border-dashed border-[#D4A843]/40 rounded-xl flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 z-10 bg-[var(--accent)]/5 border-2 border-dashed border-[var(--accent)]/40 rounded-xl flex items-center justify-center pointer-events-none">
             <div className="text-center">
-              <Upload className="h-8 w-8 text-[#D4A843] mx-auto mb-2" />
-              <p className="text-sm text-[#D4A843] font-semibold">Drop image here to upload</p>
+              <Upload className="h-8 w-8 text-[var(--accent)] mx-auto mb-2" />
+              <p className="text-sm text-[var(--accent)] font-semibold">Drop image here to upload</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">Max 100MB per image</p>
             </div>
           </div>
@@ -493,7 +495,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
 
         {/* Editor */}
         {(mode === 'edit' || mode === 'split') && (
-          <div className={`${mode === 'split' ? 'w-1/2 border-r border-[var(--border-subtle)]' : 'w-full'} flex flex-col`}
+          <div className={`${mode === 'split' ? 'w-1/2' : 'w-full'} flex flex-col`}
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={e => { e.preventDefault(); setDragOver(false); handleImageUpload(e.dataTransfer.files); }}
@@ -561,7 +563,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
       </div>
 
       {/* Status Bar */}
-      <div className="flex items-center justify-between px-4 py-1.5 border-t border-[var(--border-subtle)] bg-[var(--bg-base)] text-[10px] text-[var(--text-muted)] shrink-0">
+      <div className="flex items-center justify-between px-4 py-1.5 bg-[var(--bg-base)] text-[10px] text-[var(--text-muted)] shrink-0">
         <div className="flex items-center gap-4">
           <span>{wordCount} words</span>
           <span>{charCount} chars</span>

@@ -64,7 +64,7 @@ export default function TaskListView({
   return (
     <div className="h-full overflow-y-auto px-6 py-3">
       {/* Column Headers */}
-      <div className="flex items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-semibold border-b border-[var(--border-subtle)] sticky top-0 bg-[var(--bg-base)] z-10">
+      <div className="flex items-center gap-2 px-4 py-2 text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-semibold sticky top-0 bg-[var(--bg-base)] z-10">
         {COLUMNS.map(col => (
           <div key={col.id}
             className={`flex items-center gap-1 ${col.width} shrink-0 ${col.sortable ? 'cursor-pointer hover:text-[var(--text-secondary)] select-none' : ''}`}
@@ -89,7 +89,7 @@ export default function TaskListView({
             <span className="text-sm font-semibold text-[var(--text-secondary)]">{group.label}</span>
             <span className="text-xs text-[var(--text-muted)] bg-[var(--bg-elevated)] px-1.5 py-0.5 rounded-md">{group.count}</span>
             <button onClick={e => { e.stopPropagation(); selectAllInGroup(group.tasks); }}
-              className="ml-2 opacity-0 group-hover:opacity-100 transition text-[var(--text-muted)] hover:text-[#D4A843]"
+              className="ml-2 opacity-0 group-hover:opacity-100 transition text-[var(--text-muted)] hover:text-[var(--accent)]"
               title="Seleccionar todas">
               <CheckSquare className="h-3.5 w-3.5" />
             </button>
@@ -158,19 +158,19 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
       onClick={onSelect}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer group transition relative anim-slide ${
-        isSelected ? 'bg-[#D4A843]/5 border-[#D4A843]/20'
-        : isChecked ? 'bg-[#D4A843]/3 border-[#D4A843]/10'
-        : 'bg-[var(--bg-card)] border-[var(--border)]/50 hover:border-[var(--bg-elevated)] hover:bg-[var(--bg-card-hover,#151D2E)]'
+      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer group transition-all duration-200 relative anim-slide ${
+        isSelected ? 'bg-[var(--accent)]/5 ring-1 ring-[var(--accent)]/20'
+        : isChecked ? 'bg-[var(--accent)]/3 ring-1 ring-[var(--accent)]/10'
+        : 'bg-[var(--bg-elevated)] shadow-card hover:shadow-md hover:bg-[var(--bg-hover)]'
       }`}
       style={{ animationDelay: `${Math.min(index, 20) * 15}ms` }}
     >
       {/* Checkbox */}
       <div className="w-10 shrink-0 flex justify-center" onClick={e => { e.stopPropagation(); onCheck(); }}>
-        <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition cursor-pointer ${
-          isChecked ? 'bg-[#D4A843] border-[#D4A843]' : 'border-[var(--border)] hover:border-[#D4A843]/50'
+        <div className={`w-4 h-4 rounded-md flex items-center justify-center transition-all duration-200 cursor-pointer ${
+          isChecked ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] hover:bg-[var(--accent)]/20'
         }`}>
-          {isChecked && <span className="text-[#06080F] text-[10px] font-bold">&#10003;</span>}
+          {isChecked && <span className="text-[var(--accent-text)] text-[10px] font-bold">&#10003;</span>}
         </div>
       </div>
 
@@ -213,7 +213,7 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
           {task.assignees?.slice(0, 3).map((uid: string) => {
             const m = members.find((x: any) => x.id === uid);
             return (
-              <div key={uid} className="w-6 h-6 rounded-full bg-[#D4A843]/15 border-2 border-[var(--bg-base)] flex items-center justify-center text-[9px] font-bold text-[#D4A843]">
+              <div key={uid} className="w-6 h-6 rounded-full bg-[var(--accent-subtle)] border-2 border-[var(--bg-base)] flex items-center justify-center text-[9px] font-bold text-[var(--accent)]">
                 {m?.displayName?.[0]?.toUpperCase() || '?'}
               </div>
             );
@@ -230,7 +230,7 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
       <div className="w-28 shrink-0">
         {due && (
           <span className={`text-[11px] flex items-center gap-1 px-2 py-0.5 rounded-md ${
-            overdue ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border border-[var(--border-subtle)]'
+            overdue ? 'bg-red-500/10 text-red-400' : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)]'
           }`}>
             <Calendar className="h-3 w-3" />
             {due.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })}
@@ -241,7 +241,7 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
       {/* Tags */}
       <div className="w-32 hidden lg:flex gap-1 shrink-0">
         {task.tags?.slice(0, 2).map((tg: string) => (
-          <span key={tg} className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--bg-elevated)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">{tg}</span>
+          <span key={tg} className="text-[10px] px-2 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">{tg}</span>
         ))}
       </div>
 
@@ -254,7 +254,7 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
       {hovered && canUpdate && (
         <div className="absolute right-3 flex items-center gap-1 z-10">
           <button onClick={e => { e.stopPropagation(); onDelete(); }}
-            className="p-1.5 rounded-lg bg-[var(--bg-base)] text-[var(--text-muted)] hover:text-red-400 border border-[var(--border)] transition"
+            className="p-1.5 rounded-lg bg-[var(--bg-base)] text-[var(--text-muted)] hover:text-red-400 shadow-card transition-all duration-200"
             title="Eliminar">
             <Trash2 className="h-3 w-3" />
           </button>
@@ -289,10 +289,10 @@ function InlinePrioritySelect({ value, canUpdate, onChange }: { value: string; c
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-[var(--bg-base)] border border-[var(--border)] rounded-xl shadow-xl z-30 p-1 min-w-[120px]">
+            className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-[var(--bg-base)] rounded-xl shadow-dropdown z-30 p-1 min-w-[120px]">
             {PRIORITIES.map(pri => (
               <button key={pri.id} onClick={e => { e.stopPropagation(); onChange(pri.id); setOpen(false); }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs w-full hover:bg-[var(--hover-bg)] transition ${value === pri.id ? 'bg-[var(--hover-bg)]' : ''}`}>
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs w-full hover:bg-[var(--bg-hover)] transition ${value === pri.id ? 'bg-[var(--bg-hover)]' : ''}`}>
                 {pri.icon} {pri.label}
               </button>
             ))}

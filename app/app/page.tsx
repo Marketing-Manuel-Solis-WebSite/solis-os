@@ -86,7 +86,7 @@ export default function Dashboard() {
     { label: 'Completed', val: metrics.done, icon: TrendingUp, color: '#22C55E', bg: 'from-emerald-500/20 to-emerald-600/5' },
     { label: 'Overdue', val: metrics.overdue, icon: AlertTriangle, color: '#EF4444', bg: 'from-red-500/20 to-red-600/5' },
     { label: 'Documents', val: docs.length, icon: FileText, color: '#8B5CF6', bg: 'from-purple-500/20 to-purple-600/5' },
-    { label: 'Team', val: activeTeamId === '__all__' ? allMembers.length : allMembers.filter(m => m.teamId === activeTeamId || m.teamIds?.includes(activeTeamId)).length, icon: Users, color: '#D4A843', bg: 'from-[#D4A843]/20 to-[#D4A843]/5' },
+    { label: 'Team', val: activeTeamId === '__all__' ? allMembers.length : allMembers.filter(m => m.teamId === activeTeamId || m.teamIds?.includes(activeTeamId)).length, icon: Users, color: '#3B82F6', bg: 'from-blue-500/20 to-blue-600/5' },
   ];
 
   const filteredLogs = useMemo(() => {
@@ -116,12 +116,12 @@ export default function Dashboard() {
         </h1>
         <p className="text-[var(--text-muted)] text-sm">
           Here&apos;s what&apos;s happening in your workspace today.
-          {canSeeAllTeams && activeTeamId === '__all__' && <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 font-semibold">GENERAL VIEW</span>}
+          {canSeeAllTeams && activeTeamId === '__all__' && <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">GENERAL VIEW</span>}
         </p>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">{[1,2,3,4,5,6].map(i => <div key={i} className="h-28 skeleton rounded-2xl" />)}</div>
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">{[1,2,3,4,5,6].map(i => <div key={i} className="h-28 skeleton rounded-lg" />)}</div>
       ) : (
         <>
           {/* Stats */}
@@ -129,7 +129,7 @@ export default function Dashboard() {
             {stats.map((s, i) => (
               <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.3 }}
                 whileHover={{ y: -2, transition: { duration: 0.15 } }}
-                className="relative rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5 overflow-hidden cursor-default">
+                className="relative rounded-xl bg-[var(--bg-secondary)] shadow-card p-5 overflow-hidden cursor-default">
                 <div className={`absolute inset-0 bg-gradient-to-br ${s.bg} opacity-40`} />
                 <div className="relative">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: `${s.color}15`, boxShadow: `0 4px 12px ${s.color}15` }}>
@@ -144,14 +144,14 @@ export default function Dashboard() {
 
           {/* Completion bar */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
-            className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-5 mb-8">
+            className="rounded-xl bg-[var(--bg-secondary)] shadow-card p-5 mb-8">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-semibold text-[var(--text-primary)]">Completion Rate</p>
-              <p className="text-sm font-bold text-[#D4A843]">{metrics.rate}%</p>
+              <p className="text-sm font-bold text-[var(--accent)]">{metrics.rate}%</p>
             </div>
             <div className="h-2.5 rounded-full bg-[var(--bg-base)] overflow-hidden">
               <motion.div initial={{ width: 0 }} animate={{ width: `${metrics.rate}%` }} transition={{ duration: 1, ease: 'easeOut' }}
-                className="h-full rounded-full bg-gradient-to-r from-[#D4A843] to-[#E8C85A] shadow-[0_0_12px_rgba(212,168,67,0.4)]" />
+                className="h-full rounded-full bg-[var(--accent)]" />
             </div>
             <div className="flex items-center gap-6 mt-3 text-[11px]">
               <span className="flex items-center gap-1.5 text-emerald-400"><CheckCircle2 className="h-3 w-3" /> {metrics.done} done</span>
@@ -164,8 +164,8 @@ export default function Dashboard() {
           {/* Department performance */}
           {canSeeAllTeams && metrics.byDept.length > 0 && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
-              className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6 mb-8">
-              <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4"><BarChart3 className="h-4 w-4 text-[#D4A843]" /> Department Performance</h2>
+              className="rounded-xl bg-[var(--bg-secondary)] shadow-card p-6 mb-8">
+              <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4"><BarChart3 className="h-4 w-4 text-[var(--accent)]" /> Department Performance</h2>
               <div className="space-y-3">
                 {metrics.byDept.map((dp, di) => (
                   <motion.div key={dp.team.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.45 + di * 0.05 }}
@@ -195,12 +195,12 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* My Tasks */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
-              className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
-              <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Target className="h-4 w-4 text-[#D4A843]" /> My Tasks</h2>
+              className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
+              <div className="p-5 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Target className="h-4 w-4 text-[var(--accent)]" /> My Tasks</h2>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">{metrics.myPending.length} pending</span>
-                  {metrics.myOverdue.length > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20">{metrics.myOverdue.length} overdue</span>}
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">{metrics.myPending.length} pending</span>
+                  {metrics.myOverdue.length > 0 && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">{metrics.myOverdue.length} overdue</span>}
                 </div>
               </div>
               <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto scrollbar-thin">
@@ -211,7 +211,7 @@ export default function Dashboard() {
                   const sColor = statusColors[t.status] || '#64748B';
                   const team = teams.find(tm => tm.id === t.teamId);
                   return (
-                    <div key={t.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--hover-bg)] transition cursor-pointer" onClick={() => router.push('/app/tasks')}>
+                    <div key={t.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition cursor-pointer" onClick={() => router.push('/app/tasks')}>
                       <StIcon className="h-4 w-4 shrink-0" style={{ color: sColor }} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-[var(--text-primary)] truncate">{t.title}</p>
@@ -223,17 +223,17 @@ export default function Dashboard() {
                 })}
               </div>
               {metrics.myPending.length > 8 && (
-                <div className="p-3 border-t border-[var(--border)] text-center">
-                  <button onClick={() => router.push('/app/tasks')} className="text-xs text-[#D4A843] hover:underline flex items-center gap-1 mx-auto">View all <ArrowRight className="h-3 w-3" /></button>
+                <div className="p-3 text-center">
+                  <button onClick={() => router.push('/app/tasks')} className="text-xs text-[var(--accent)] hover:underline flex items-center gap-1 mx-auto">View all <ArrowRight className="h-3 w-3" /></button>
                 </div>
               )}
             </motion.div>
 
             {/* Upcoming Deadlines */}
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
-              className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
-              <div className="p-5 border-b border-[var(--border)] flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Calendar className="h-4 w-4 text-[#D4A843]" /> Upcoming Deadlines</h2>
+              className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
+              <div className="p-5 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Calendar className="h-4 w-4 text-[var(--accent)]" /> Upcoming Deadlines</h2>
                 <span className="text-[10px] text-[var(--text-muted)]">Next 7 days</span>
               </div>
               <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto scrollbar-thin">
@@ -244,7 +244,7 @@ export default function Dashboard() {
                   const daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
                   const team = teams.find(tm => tm.id === t.teamId);
                   return (
-                    <div key={t.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--hover-bg)] transition">
+                    <div key={t.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition">
                       <Calendar className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-[var(--text-primary)] truncate">{t.title}</p>
@@ -253,7 +253,7 @@ export default function Dashboard() {
                           <span className="text-[10px] text-[var(--text-muted)]">{due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                         </div>
                       </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${daysLeft <= 1 ? 'bg-red-500/10 text-red-400 border border-red-500/20' : daysLeft <= 3 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-[var(--bg-base)] text-[var(--text-muted)] border border-[var(--border)]'}`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${daysLeft <= 1 ? 'bg-red-500/10 text-red-400' : daysLeft <= 3 ? 'bg-amber-500/10 text-amber-400' : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)]'}`}>
                         {daysLeft === 0 ? 'Today' : daysLeft === 1 ? 'Tomorrow' : `${daysLeft}d left`}
                       </span>
                     </div>
@@ -266,8 +266,8 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* Priority Breakdown */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
-              className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] p-6">
-              <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4"><Flag className="h-4 w-4 text-[#D4A843]" /> Open Tasks by Priority</h2>
+              className="rounded-xl bg-[var(--bg-secondary)] shadow-card p-6">
+              <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4"><Flag className="h-4 w-4 text-[var(--accent)]" /> Open Tasks by Priority</h2>
               <div className="space-y-3">
                 {['urgent', 'high', 'medium', 'low'].map(p => {
                   const count = metrics.byPriority[p] || 0;
@@ -289,17 +289,17 @@ export default function Dashboard() {
 
             {/* Activity Feed */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.65 }}
-              className="rounded-2xl border border-[var(--border)] bg-[var(--bg-card)] overflow-hidden">
-              <div className="p-5 border-b border-[var(--border)]">
-                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Activity className="h-4 w-4 text-[#D4A843]" /> Recent Activity</h2>
+              className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
+              <div className="p-5">
+                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Activity className="h-4 w-4 text-[var(--accent)]" /> Recent Activity</h2>
               </div>
               <div className="divide-y divide-[var(--border)] max-h-[240px] overflow-y-auto scrollbar-thin">
                 {filteredLogs.length === 0 ? (
                   <p className="p-6 text-sm text-[var(--text-muted)] text-center">Actions will appear here.</p>
                 ) : filteredLogs.slice(0, 10).map((l: any) => (
-                  <div key={l.id} className="px-5 py-3 hover:bg-[var(--hover-bg)] transition">
+                  <div key={l.id} className="px-5 py-3 hover:bg-[var(--bg-hover)] transition">
                     <p className="text-sm">
-                      <span className="text-[#D4A843] font-medium">{l.actorName || 'System'}</span>{' '}
+                      <span className="text-[var(--accent)] font-medium">{l.actorName || 'System'}</span>{' '}
                       <span className="text-[var(--text-muted)]">{l.action}</span>{' '}
                       <span className="text-[var(--text-secondary)]">{l.resource}</span>
                     </p>

@@ -10,6 +10,7 @@ import {
 } from '@/lib/db';
 import { createUserWithEmailAndPassword, updateProfile, signOut as firebaseSignOut } from 'firebase/auth';
 import { getSecondaryAuth } from '@/lib/firebase';
+import { useToast } from '@/components/notifications/toast-provider';
 import {
   Shield, Users, Building2, Columns3, Zap, Bell, Bot, Plug, ScrollText,
   FileStack, LayoutGrid, Plus, Trash2, Save, Search, ChevronRight, Check, X,
@@ -34,6 +35,7 @@ const SS: {id:S;l:string;i:any;d:string}[] = [
 
 export default function Admin() {
   const { user, me, isAdmin } = useAuth();
+  const toast = useToast();
   const [s, setS] = useState<S|null>(null);
 
   if (!isAdmin) return (
@@ -41,7 +43,7 @@ export default function Admin() {
       <div className="text-center">
         <Shield className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
         <p className="text-lg font-bold text-[var(--text-primary)]">Access Denied</p>
-        <p className="text-sm text-[var(--text-muted)] mt-1">Role: <span className="text-[#D4A843]">{me?.role}</span></p>
+        <p className="text-sm text-[var(--text-muted)] mt-1">Role: <span className="text-[var(--accent)]">{me?.role}</span></p>
       </div>
     </div>
   );
@@ -52,9 +54,9 @@ export default function Admin() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {SS.map((x, i) => (
           <button key={x.id} onClick={() => setS(x.id)}
-            className="flex items-start gap-4 p-5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] card-hover text-left group anim-slide"
+            className="flex items-start gap-4 p-5 rounded-xl bg-[var(--bg-secondary)] shadow-card text-left group anim-slide"
             style={{ animationDelay: `${i * 30}ms` }}>
-            <div className={`p-2.5 rounded-xl border text-[#D4A843] ${x.id === 'departments' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-[#D4A843]/10 border-[#D4A843]/20'}`}>
+            <div className={`p-2.5 rounded-xl border text-[var(--accent)] ${x.id === 'departments' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-[var(--accent-subtle)] border-[var(--accent)]/20'}`}>
               <x.i className="h-5 w-5" />
             </div>
             <div>
@@ -69,11 +71,11 @@ export default function Admin() {
   );
 
   const Nav = () => (
-    <aside className="w-48 bg-[var(--bg-base)] border-r border-[var(--border-subtle)] shrink-0 p-2 overflow-y-auto">
+    <aside className="w-48 bg-[var(--bg-base)] shadow-panel shrink-0 p-2 overflow-y-auto">
       <button onClick={() => setS(null)} className="w-full text-left px-3 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-1">← Back</button>
       {SS.map(x => (
         <button key={x.id} onClick={() => setS(x.id)}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] transition ${s === x.id ? 'bg-[#D4A843]/10 text-[#D4A843] font-semibold' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] transition ${s === x.id ? 'bg-[var(--accent-subtle)] text-[var(--accent)] font-semibold' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
           <x.i className="h-4 w-4" />{x.l}
         </button>
       ))}
@@ -106,6 +108,7 @@ export default function Admin() {
 // =====================================================
 function DepartmentsS() {
   const { user, me, teams, refreshTeams, refreshMembers } = useAuth();
+  const toast = useToast();
   const [depts, setDepts] = useState<Team[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,7 +151,7 @@ function DepartmentsS() {
   const handleDelete = async (dept: Team) => {
     const membersInDept = members.filter(m => m.teamId === dept.id);
     if (membersInDept.length > 0) {
-      alert(`Cannot delete "${dept.name}" — ${membersInDept.length} member(s) are still assigned. Reassign them first.`);
+      toast.warning('No se puede eliminar', `"${dept.name}" tiene ${membersInDept.length} miembro(s) asignados. Reasignalos primero.`);
       return;
     }
     if (!confirm(`Delete department "${dept.name}"?`)) return;
@@ -196,16 +199,16 @@ function DepartmentsS() {
           <p className="text-sm text-[var(--text-muted)] mt-1">{depts.length} departments · {members.length} members</p>
         </div>
         <button onClick={() => { setShowNew(true); setEditId(null); setForm({ name: '', color: '#6B7280', icon: '📁', description: '' }); }}
-          className="px-5 h-9 rounded-xl btn-gold text-sm flex items-center gap-2">
+          className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2">
           <Plus className="h-4 w-4" /> New Department
         </button>
       </div>
 
       {/* Create / Edit Form */}
       {(showNew || editId) && (
-        <div className="mb-6 p-5 rounded-2xl border border-[#D4A843]/20 bg-[var(--bg-card)] space-y-4 anim-fade">
+        <div className="mb-6 p-5 rounded-lg border border-[var(--accent)]/20 bg-[var(--bg-elevated)] space-y-4 anim-fade">
           <div className="flex items-center gap-2 mb-1">
-            <FolderOpen className="h-4 w-4 text-[#D4A843]" />
+            <FolderOpen className="h-4 w-4 text-[var(--accent)]" />
             <span className="text-sm font-semibold text-[var(--text-primary)]">{editId ? 'Edit Department' : 'New Department'}</span>
           </div>
 
@@ -226,7 +229,7 @@ function DepartmentsS() {
             <div className="flex gap-1.5 flex-wrap">
               {ICONS.map(ic => (
                 <button key={ic} onClick={() => setForm({ ...form, icon: ic })}
-                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-lg transition border ${form.icon === ic ? 'bg-[#D4A843]/10 border-[#D4A843]/30 scale-110' : 'bg-[var(--bg-base)] border-[var(--border)] hover:border-gray-600'}`}>
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-lg transition-all duration-200 ${form.icon === ic ? 'bg-[var(--accent-subtle)] shadow-card scale-110' : 'bg-[var(--bg-base)] hover:shadow-card-hover'}`}>
                   {ic}
                 </button>
               ))}
@@ -243,14 +246,14 @@ function DepartmentsS() {
                   style={{ backgroundColor: c }} />
               ))}
               <div className="flex items-center gap-2 ml-2">
-                <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} className="w-8 h-8 rounded-lg border border-[var(--border)] bg-transparent cursor-pointer" />
+                <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} className="w-8 h-8 rounded-lg bg-transparent cursor-pointer" />
                 <input value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} className="input-dark w-24 h-8 text-xs px-2" />
               </div>
             </div>
           </div>
 
           {/* Preview */}
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-base)] border border-[var(--border-subtle)]">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-base)]">
             <span className="text-lg">{form.icon}</span>
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: form.color }} />
             <span className="text-sm font-semibold" style={{ color: form.color }}>{form.name || 'Preview'}</span>
@@ -259,11 +262,11 @@ function DepartmentsS() {
 
           <div className="flex gap-2">
             {editId ? (
-              <button onClick={handleUpdate} className="px-5 h-9 rounded-xl btn-gold text-sm">Update</button>
+              <button onClick={handleUpdate} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">Update</button>
             ) : (
-              <button onClick={handleCreate} disabled={!form.name.trim()} className="px-5 h-9 rounded-xl btn-gold text-sm disabled:opacity-40">Create</button>
+              <button onClick={handleCreate} disabled={!form.name.trim()} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40">Create</button>
             )}
-            <button onClick={() => { setShowNew(false); setEditId(null); }} className="px-4 h-9 rounded-xl border border-[var(--border)] text-sm text-[var(--text-secondary)]">Cancel</button>
+            <button onClick={() => { setShowNew(false); setEditId(null); }} className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">Cancel</button>
           </div>
         </div>
       )}
@@ -276,7 +279,7 @@ function DepartmentsS() {
           const isAssigning = assignDeptId === dept.id;
 
           return (
-            <div key={dept.id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] overflow-hidden anim-slide" style={{ animationDelay: `${i * 40}ms` }}>
+            <div key={dept.id} className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden anim-slide" style={{ animationDelay: `${i * 40}ms` }}>
               {/* Department Header */}
               <div className="flex items-center gap-4 px-5 py-4 group">
                 <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0" style={{ backgroundColor: `${dept.color}15`, border: `1px solid ${dept.color}25` }}>
@@ -310,10 +313,10 @@ function DepartmentsS() {
 
               {/* Members in this department */}
               {deptMembers.length > 0 && (
-                <div className="px-5 pb-3 border-t border-[var(--border-subtle)]">
+                <div className="px-5 pb-3">
                   <div className="flex flex-wrap gap-2 pt-3">
                     {deptMembers.map(m => (
-                      <div key={m.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-base)] border border-[var(--border)] group/member">
+                      <div key={m.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-tertiary)] group/member">
                         <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold" style={{ backgroundColor: `${dept.color}15`, color: dept.color }}>
                           {m.displayName?.[0]?.toUpperCase() || '?'}
                         </div>
@@ -332,15 +335,15 @@ function DepartmentsS() {
 
               {/* Assign Members Panel */}
               {isAssigning && (
-                <div className="px-5 pb-4 border-t border-[#D4A843]/20 bg-[#D4A843]/[0.02]">
-                  <p className="text-[10px] text-[#D4A843] uppercase font-semibold tracking-wider py-3">Assign Members to {dept.name}</p>
+                <div className="px-5 pb-4 border-t border-[var(--accent)]/20 bg-[var(--accent-subtle)]">
+                  <p className="text-[10px] text-[var(--accent)] uppercase font-semibold tracking-wider py-3">Assign Members to {dept.name}</p>
                   {unassigned.length === 0 && members.filter(m => m.teamId !== dept.id).length === 0 ? (
                     <p className="text-xs text-[var(--text-muted)] pb-2">All members are already assigned to this department.</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {members.filter(m => m.teamId !== dept.id).map(m => (
                         <button key={m.id} onClick={() => handleAssignMember(m.id, dept.id)}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-base)] hover:border-emerald-500/30 hover:bg-emerald-500/5 transition text-xs text-[var(--text-secondary)] hover:text-gray-200">
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-base)] hover:bg-emerald-500/5 hover:shadow-card-hover transition-all duration-200 text-xs text-[var(--text-secondary)] hover:text-gray-200">
                           <div className="w-5 h-5 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center text-[9px] font-bold text-[var(--text-muted)]">
                             {m.displayName?.[0]?.toUpperCase() || '?'}
                           </div>
@@ -367,7 +370,7 @@ function DepartmentsS() {
         const unassigned = members.filter(m => !m.teamId || m.teamId === '');
         if (unassigned.length === 0) return null;
         return (
-          <div className="mt-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 anim-slide" style={{ animationDelay: `${depts.length * 40 + 100}ms` }}>
+          <div className="mt-6 rounded-lg border border-amber-500/20 bg-amber-500/5 p-5 anim-slide" style={{ animationDelay: `${depts.length * 40 + 100}ms` }}>
             <div className="flex items-center gap-2 mb-3">
               <AlertTriangle className="h-4 w-4 text-amber-400" />
               <span className="text-sm font-semibold text-amber-400">Unassigned Members ({unassigned.length})</span>
@@ -375,7 +378,7 @@ function DepartmentsS() {
             <p className="text-xs text-[var(--text-muted)] mb-3">These members have not been assigned to a department yet.</p>
             <div className="flex flex-wrap gap-2">
               {unassigned.map(m => (
-                <div key={m.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-base)] border border-[var(--border)]">
+                <div key={m.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-tertiary)]">
                   <div className="w-6 h-6 rounded-full bg-amber-500/10 flex items-center justify-center text-[10px] font-bold text-amber-400">
                     {m.displayName?.[0]?.toUpperCase() || '?'}
                   </div>
@@ -419,11 +422,11 @@ function OrgS() {
     <div className="p-6 max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-[var(--text-primary)]">Organization</h2>
-        <button onClick={save} disabled={sv} className="px-5 h-9 rounded-xl btn-gold text-sm flex items-center gap-2">
+        <button onClick={save} disabled={sv} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2">
           <Save className="h-4 w-4" />{sv ? '...' : 'Save'}
         </button>
       </div>
-      <div className="space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6">
+      <div className="space-y-4 rounded-xl bg-[var(--bg-secondary)] shadow-card p-6">
         <I l="Name" v={d.name || ''} c={v => setD({ ...d, name: v })} />
         <I l="Slug" v={d.slug || ''} c={v => setD({ ...d, slug: v })} />
         <I l="Timezone" v={d.timezone || ''} c={v => setD({ ...d, timezone: v })} />
@@ -431,14 +434,14 @@ function OrgS() {
           <div>
             <label className="block text-xs text-[var(--text-muted)] mb-1">Primary Color</label>
             <div className="flex gap-2">
-              <input type="color" value={d.primaryColor || '#D4A843'} onChange={e => setD({ ...d, primaryColor: e.target.value })} className="w-10 h-10 rounded-lg border border-[var(--border)] bg-transparent cursor-pointer" />
+              <input type="color" value={d.primaryColor || '#3B82F6'} onChange={e => setD({ ...d, primaryColor: e.target.value })} className="w-10 h-10 rounded-lg bg-transparent cursor-pointer" />
               <input value={d.primaryColor || ''} onChange={e => setD({ ...d, primaryColor: e.target.value })} className="input-dark flex-1" />
             </div>
           </div>
           <div>
             <label className="block text-xs text-[var(--text-muted)] mb-1">Secondary</label>
             <div className="flex gap-2">
-              <input type="color" value={d.secondaryColor || '#0C1017'} onChange={e => setD({ ...d, secondaryColor: e.target.value })} className="w-10 h-10 rounded-lg border border-[var(--border)] bg-transparent cursor-pointer" />
+              <input type="color" value={d.secondaryColor || '#0C1017'} onChange={e => setD({ ...d, secondaryColor: e.target.value })} className="w-10 h-10 rounded-lg bg-transparent cursor-pointer" />
               <input value={d.secondaryColor || ''} onChange={e => setD({ ...d, secondaryColor: e.target.value })} className="input-dark flex-1" />
             </div>
           </div>
@@ -453,6 +456,7 @@ function OrgS() {
 // =====================================================
 function UsersS() {
   const { user, me, teams, refreshMembers } = useAuth();
+  const toast = useToast();
   const [ms, setMs] = useState<any[]>([]);
   const [ld, setLd] = useState(true);
   const [q, setQ] = useState('');
@@ -511,9 +515,9 @@ function UsersS() {
   };
 
   const handleDeactivate = async (memberId: string) => {
-    if (memberId === user!.uid) { alert('No puedes desactivar tu propia cuenta.'); setDeleteTarget(null); return; }
+    if (memberId === user!.uid) { toast.warning('Accion no permitida', 'No puedes desactivar tu propia cuenta.'); setDeleteTarget(null); return; }
     const target = ms.find(m => m.id === memberId);
-    if (target?.role === 'owner') { alert('No puedes desactivar al owner de la organización.'); setDeleteTarget(null); return; }
+    if (target?.role === 'owner') { toast.warning('Accion no permitida', 'No puedes desactivar al owner de la organizacion.'); setDeleteTarget(null); return; }
     setDeleting(true);
     try {
       await softDeleteMember(memberId);
@@ -521,7 +525,7 @@ function UsersS() {
       setDeleteTarget(null);
       setMs(await getMembers());
       await refreshMembers();
-    } catch (er: any) { alert('Error: ' + (er.message || 'Error desconocido')); }
+    } catch (er: any) { toast.error('Error', er.message || 'Ocurrio un error desconocido.'); }
     setDeleting(false);
   };
 
@@ -545,16 +549,16 @@ function UsersS() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold text-[var(--text-primary)]">Users & Teams ({ms.length})</h2>
         <button onClick={() => { setShowCreate(!showCreate); setCreateErr(''); }}
-          className="px-5 h-9 rounded-xl btn-gold text-sm flex items-center gap-2">
+          className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2">
           <UserPlus className="h-4 w-4" /> Crear Usuario
         </button>
       </div>
 
       {/* Create User Form */}
       {showCreate && (
-        <div className="mb-4 p-5 rounded-2xl border border-[#D4A843]/20 bg-[var(--bg-card)] space-y-4 anim-fade">
+        <div className="mb-4 p-5 rounded-lg border border-[var(--accent)]/20 bg-[var(--bg-elevated)] space-y-4 anim-fade">
           <div className="flex items-center gap-2 mb-1">
-            <UserPlus className="h-4 w-4 text-[#D4A843]" />
+            <UserPlus className="h-4 w-4 text-[var(--accent)]" />
             <span className="text-sm font-semibold text-[var(--text-primary)]">Crear Nuevo Usuario</span>
           </div>
           {createErr && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{createErr}</div>}
@@ -588,10 +592,10 @@ function UsersS() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleCreateUser} disabled={creating} className="px-5 h-9 rounded-xl btn-gold text-sm disabled:opacity-50">
+            <button onClick={handleCreateUser} disabled={creating} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-50">
               {creating ? 'Creando...' : 'Crear Usuario'}
             </button>
-            <button onClick={() => { setShowCreate(false); setCreateErr(''); }} className="px-4 h-9 rounded-xl border border-[var(--border)] text-sm text-[var(--text-secondary)]">Cancelar</button>
+            <button onClick={() => { setShowCreate(false); setCreateErr(''); }} className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">Cancelar</button>
           </div>
         </div>
       )}
@@ -600,10 +604,10 @@ function UsersS() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por nombre, email o departamento..." className="input-dark pl-10" />
       </div>
-      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] overflow-hidden">
+      <div className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[var(--border-subtle)]">
+            <tr>
               <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Usuario</th>
               <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Rol</th>
               <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Departamento</th>
@@ -691,6 +695,7 @@ function UsersS() {
 // =====================================================
 function PermsS() {
   const { user, me } = useAuth();
+  const toast = useToast();
   const rs = ['workspace', 'task', 'doc', 'channel', 'automation', 'admin', 'user'];
   const as2 = ['create', 'read', 'update', 'delete', 'manage'];
   const rls: Role[] = ['owner', 'admin', 'manager', 'member', 'guest'];
@@ -723,19 +728,19 @@ function PermsS() {
   const save = async () => {
     await saveSettings('permissions', { matrix: mx });
     await logAction({ action: 'updated', resource: 'permissions', detail: 'matrix', actorId: user!.uid, actorName: me!.displayName });
-    alert('Saved!');
+    toast.success('Guardado', 'Los permisos se guardaron correctamente.');
   };
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-[var(--text-primary)]">Permissions</h2>
-        <button onClick={save} className="px-5 h-9 rounded-xl btn-gold text-sm flex items-center gap-2"><Save className="h-4 w-4" />Save</button>
+        <button onClick={save} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2"><Save className="h-4 w-4" />Save</button>
       </div>
-      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] overflow-x-auto">
+      <div className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-[var(--border-subtle)]">
+            <tr>
               <th className="text-left px-3 py-2 text-[var(--text-muted)]">Res</th>
               <th className="text-left px-2 py-2 text-[var(--text-muted)]">Act</th>
               {rls.map(r => <th key={r} className="text-center px-2 py-2 text-[var(--text-muted)] capitalize">{r}</th>)}
@@ -784,10 +789,10 @@ function AuditS() {
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search..." className="input-dark pl-10" />
       </div>
       {!f.length ? <p className="text-center py-12 text-[var(--text-muted)]">No logs yet.</p> :
-        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] overflow-hidden">
+        <div className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[var(--border-subtle)]">
+              <tr>
                 <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Actor</th>
                 <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Action</th>
                 <th className="text-left px-5 py-3 text-[10px] uppercase text-[var(--text-muted)]">Resource</th>
@@ -798,7 +803,7 @@ function AuditS() {
             <tbody>
               {f.map(l => (
                 <tr key={l.id} className="border-b border-[var(--border-subtle)] hover:bg-white/[0.01]">
-                  <td className="px-5 py-2.5 text-xs text-[#D4A843]">{l.actorName || '—'}</td>
+                  <td className="px-5 py-2.5 text-xs text-[var(--accent)]">{l.actorName || '—'}</td>
                   <td className="px-5 py-2.5">
                     <span className={`text-[10px] px-2 py-0.5 rounded-lg font-semibold ${l.action === 'deleted' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : l.action === 'created' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>{l.action}</span>
                   </td>
@@ -847,21 +852,21 @@ function CrudS({ label, fields, gFn, cFn, dFn }: { label: string; fields: string
     <div className="p-6 max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-[var(--text-primary)]">{label}</h2>
-        <button onClick={() => setSh(!sh)} className="px-5 h-9 rounded-xl btn-gold text-sm flex items-center gap-2"><Plus className="h-4 w-4" />Add</button>
+        <button onClick={() => setSh(!sh)} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2"><Plus className="h-4 w-4" />Add</button>
       </div>
       {sh && (
-        <div className="mb-4 p-5 rounded-2xl border border-[#D4A843]/20 bg-[var(--bg-card)] space-y-3">
+        <div className="mb-4 p-5 rounded-lg border border-[var(--accent)]/20 bg-[var(--bg-elevated)] space-y-3">
           {fields.map(f => <input key={f} value={fm[f] || ''} onChange={e => setFm({ ...fm, [f]: e.target.value })} placeholder={f} className="input-dark" />)}
           <div className="flex gap-2">
-            <button onClick={add} className="px-5 h-9 rounded-xl btn-gold text-sm">Create</button>
-            <button onClick={() => setSh(false)} className="px-4 h-9 rounded-xl border border-[var(--border)] text-sm text-[var(--text-secondary)]">Cancel</button>
+            <button onClick={add} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">Create</button>
+            <button onClick={() => setSh(false)} className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">Cancel</button>
           </div>
         </div>
       )}
       {!its.length ? <p className="text-center py-12 text-[var(--text-muted)]">No items yet.</p> :
         <div className="space-y-1.5">
           {its.map(it => (
-            <div key={it.id} className="flex items-center gap-3 px-5 py-3.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] card-hover group">
+            <div key={it.id} className="flex items-center gap-3 px-5 py-3.5 rounded-xl bg-[var(--bg-secondary)] shadow-card group">
               <div className="flex-1">
                 <p className="text-sm font-medium text-[var(--text-primary)]">{it.name || it.title || it.id}</p>
                 <p className="text-xs text-[var(--text-muted)]">{fields.filter(f => f !== 'name' && f !== 'title').map(f => `${f}: ${it[f] || '—'}`).join(' · ')}</p>
@@ -882,6 +887,7 @@ function CrudS({ label, fields, gFn, cFn, dFn }: { label: string; fields: string
 // =====================================================
 function SetS({ k, label, fs }: { k: string; label: string; fs: string[] }) {
   const { user, me } = useAuth();
+  const toast = useToast();
   const [d, setD] = useState<any>({});
   const [ld, setLd] = useState(true);
 
@@ -890,7 +896,7 @@ function SetS({ k, label, fs }: { k: string; label: string; fs: string[] }) {
   const save = async () => {
     await saveSettings(k, d);
     await logAction({ action: 'updated', resource: label, detail: 'settings', actorId: user!.uid, actorName: me!.displayName });
-    alert('Saved!');
+    toast.success('Guardado', 'Los cambios se guardaron correctamente.');
   };
 
   if (ld) return <Sk />;
@@ -898,9 +904,9 @@ function SetS({ k, label, fs }: { k: string; label: string; fs: string[] }) {
     <div className="p-6 max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-[var(--text-primary)]">{label}</h2>
-        <button onClick={save} className="px-5 h-9 rounded-xl btn-gold text-sm flex items-center gap-2"><Save className="h-4 w-4" />Save</button>
+        <button onClick={save} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2"><Save className="h-4 w-4" />Save</button>
       </div>
-      <div className="space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] p-6">
+      <div className="space-y-4 rounded-xl bg-[var(--bg-secondary)] shadow-card p-6">
         {fs.map(f => {
           const isBool = f.toLowerCase().includes('enabled') || f.toLowerCase().includes('digest') || f.toLowerCase().includes('report') || f.toLowerCase().includes('alert');
           return (
@@ -908,7 +914,7 @@ function SetS({ k, label, fs }: { k: string; label: string; fs: string[] }) {
               <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 capitalize">{f.replace(/([A-Z])/g, ' $1')}</label>
               {isBool ? (
                 <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" checked={!!d[f]} onChange={e => setD({ ...d, [f]: e.target.checked })} className="w-4 h-4 rounded bg-[var(--bg-elevated)] border-[var(--border)] accent-[#D4A843]" />
+                  <input type="checkbox" checked={!!d[f]} onChange={e => setD({ ...d, [f]: e.target.checked })} className="w-4 h-4 rounded bg-[var(--bg-elevated)] border-[var(--border)] accent-[var(--accent)]" />
                   <span className="text-sm text-[var(--text-secondary)]">{d[f] ? 'Enabled' : 'Disabled'}</span>
                 </label>
               ) : (

@@ -60,8 +60,8 @@ export default function TaskBoardView({ groups, members, teams, selectedTask, ca
       {groups.map(group => (
         <div
           key={group.key}
-          className={`w-72 shrink-0 flex flex-col rounded-2xl p-2 transition-colors duration-200 ${
-            dragOverColumn === group.key ? 'bg-[#D4A843]/5 ring-2 ring-[#D4A843]/20' : ''
+          className={`w-72 shrink-0 flex flex-col rounded-xl p-2 transition-all duration-200 ${
+            dragOverColumn === group.key ? 'bg-[var(--accent)]/5 ring-2 ring-[var(--accent)]/20' : ''
           }`}
           onDragOver={(e) => handleDragOver(e, group.key)}
           onDragLeave={handleDragLeave}
@@ -81,7 +81,7 @@ export default function TaskBoardView({ groups, members, teams, selectedTask, ca
               <motion.div
                 initial={{ opacity: 0, scaleY: 0 }}
                 animate={{ opacity: 1, scaleY: 1 }}
-                className="h-1 rounded-full bg-[#D4A843] mx-2"
+                className="h-1 rounded-full bg-[var(--accent)] mx-2"
               />
             )}
 

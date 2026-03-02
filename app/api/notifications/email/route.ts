@@ -39,18 +39,18 @@ export async function POST(request: NextRequest) {
 <body style="margin:0;padding:0;background:#0C1017;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
   <div style="max-width:520px;margin:0 auto;padding:40px 20px;">
     <div style="text-align:center;margin-bottom:32px;">
-      <div style="display:inline-block;width:48px;height:48px;background:linear-gradient(135deg,#D4A843,#9A7B2F);border-radius:14px;line-height:48px;font-size:20px;font-weight:bold;color:#06080F;">⚡</div>
-      <h1 style="color:#D4A843;font-size:22px;margin:12px 0 4px;letter-spacing:2px;">SOLIS CENTER</h1>
+      <div style="display:inline-block;width:48px;height:48px;background:#3B82F6;border-radius:14px;line-height:48px;font-size:20px;font-weight:bold;color:#FFFFFF;">⚡</div>
+      <h1 style="color:#3B82F6;font-size:22px;margin:12px 0 4px;letter-spacing:2px;">SOLIS CENTER</h1>
       <p style="color:#64748B;font-size:12px;margin:0;letter-spacing:3px;">LAW OFFICE OF MANUEL SOLIS</p>
     </div>
     <div style="background:#111827;border:1px solid #1F293780;border-radius:16px;padding:32px;margin-bottom:24px;">
-      <div style="display:inline-block;padding:4px 12px;background:#D4A84318;border:1px solid #D4A84330;border-radius:20px;font-size:11px;color:#D4A843;font-weight:600;margin-bottom:16px;">${typeLabel.toUpperCase()}</div>
+      <div style="display:inline-block;padding:4px 12px;background:#3B82F618;border:1px solid #3B82F630;border-radius:20px;font-size:11px;color:#3B82F6;font-weight:600;margin-bottom:16px;">${typeLabel.toUpperCase()}</div>
       <h2 style="color:#F1F5F9;font-size:18px;margin:0 0 8px;font-weight:600;">${title}</h2>
       <p style="color:#94A3B8;font-size:14px;line-height:1.6;margin:0 0 16px;">${message}</p>
-      ${actorName ? `<p style="color:#64748B;font-size:12px;margin:0;">From: <span style="color:#D4A843;font-weight:500;">${actorName}</span></p>` : ''}
+      ${actorName ? `<p style="color:#64748B;font-size:12px;margin:0;">From: <span style="color:#3B82F6;font-weight:500;">${actorName}</span></p>` : ''}
     </div>
     <div style="text-align:center;">
-      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://soliscenter.com'}/app" style="display:inline-block;padding:12px 32px;background:linear-gradient(135deg,#D4A843,#B8922E);color:#06080F;text-decoration:none;border-radius:12px;font-size:14px;font-weight:600;">Open Solis Center</a>
+      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://soliscenter.com'}/app" style="display:inline-block;padding:12px 32px;background:#3B82F6;color:#FFFFFF;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">Open Solis Center</a>
     </div>
     <p style="text-align:center;color:#475569;font-size:11px;margin-top:32px;">You're receiving this because you have email notifications enabled in Solis Center.</p>
   </div>

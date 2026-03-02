@@ -65,7 +65,7 @@ export default function AIMessages({ messages, loading, streamingText }: Props) 
           if (isSystem) {
             return (
               <motion.div key={msg.id || i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center py-2">
-                <span className="text-[11px] text-[var(--text-muted)] bg-[var(--bg-card)] px-3 py-1 rounded-full">{msg.content}</span>
+                <span className="text-[11px] text-[var(--text-muted)] bg-[var(--bg-elevated)] px-3 py-1 rounded-full">{msg.content}</span>
               </motion.div>
             );
           }
@@ -76,8 +76,8 @@ export default function AIMessages({ messages, loading, streamingText }: Props) 
                 <div className="max-w-[80%]">
                   <div className="px-4 py-3 rounded-3xl rounded-br-lg text-sm text-white leading-relaxed whitespace-pre-wrap"
                     style={{
-                      background: 'linear-gradient(135deg, #D4A843 0%, #B8912F 100%)',
-                      boxShadow: '0 4px 14px rgba(212, 168, 67, 0.25), 0 2px 4px rgba(0,0,0,0.1)',
+                      background: 'var(--accent)',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                     }}>
                     {msg.content}
                   </div>
@@ -90,14 +90,14 @@ export default function AIMessages({ messages, loading, streamingText }: Props) 
           return (
             <motion.div key={msg.id || i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
               <div className="flex gap-3">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#D4A843] to-[#9A7B2F] flex items-center justify-center shrink-0 mt-0.5"
-                  style={{ boxShadow: '0 2px 8px rgba(212, 168, 67, 0.2)' }}>
-                  <Sparkles className="h-3.5 w-3.5 text-[#06080F]" />
+                <div className="w-7 h-7 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0 mt-0.5"
+                  >
+                  <Sparkles className="h-3.5 w-3.5 text-[var(--accent-text)]" />
                 </div>
                 <div className="flex-1 min-w-0 group">
                   <div className="rounded-2xl rounded-tl-lg px-4 py-3 ai-content"
                     style={{
-                      background: 'var(--bg-card)',
+                      background: 'var(--bg-elevated)',
                       boxShadow: '0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)',
                     }}
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
@@ -105,7 +105,7 @@ export default function AIMessages({ messages, loading, streamingText }: Props) 
                   <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <motion.button whileTap={{ scale: 0.9 }}
                       onClick={() => copyText(msg.content, i)}
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition">
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
                       {copiedIdx === i ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
                       {copiedIdx === i ? 'Copied' : 'Copy'}
                     </motion.button>
@@ -120,18 +120,18 @@ export default function AIMessages({ messages, loading, streamingText }: Props) 
         {loading && streamingText && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="flex gap-3">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#D4A843] to-[#9A7B2F] flex items-center justify-center shrink-0 mt-0.5"
-                style={{ boxShadow: '0 2px 8px rgba(212, 168, 67, 0.2)' }}>
-                <Sparkles className="h-3.5 w-3.5 text-[#06080F]" />
+              <div className="w-7 h-7 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0 mt-0.5"
+                >
+                <Sparkles className="h-3.5 w-3.5 text-[var(--accent-text)]" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="rounded-2xl rounded-tl-lg px-4 py-3 ai-content"
                   style={{
-                    background: 'var(--bg-card)',
+                    background: 'var(--bg-elevated)',
                     boxShadow: '0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)',
                   }}>
                   <div dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }} />
-                  <span className="inline-block w-1.5 h-4 bg-[#D4A843] animate-pulse ml-0.5 rounded-sm align-middle" />
+                  <span className="inline-block w-1.5 h-4 bg-[var(--accent)] animate-pulse ml-0.5 rounded-sm align-middle" />
                 </div>
               </div>
             </div>
@@ -142,20 +142,20 @@ export default function AIMessages({ messages, loading, streamingText }: Props) 
         {loading && !streamingText && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div className="flex gap-3">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#D4A843] to-[#9A7B2F] flex items-center justify-center shrink-0 mt-0.5"
-                style={{ boxShadow: '0 2px 8px rgba(212, 168, 67, 0.2)' }}>
-                <Sparkles className="h-3.5 w-3.5 text-[#06080F]" />
+              <div className="w-7 h-7 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0 mt-0.5"
+                >
+                <Sparkles className="h-3.5 w-3.5 text-[var(--accent-text)]" />
               </div>
               <div className="flex-1">
                 <div className="rounded-2xl rounded-tl-lg px-4 py-3 flex items-center gap-2.5"
                   style={{
-                    background: 'var(--bg-card)',
+                    background: 'var(--bg-elevated)',
                     boxShadow: '0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)',
                   }}>
                   <div className="flex gap-1">
-                    <span className="w-2 h-2 rounded-full bg-[#D4A843]/60 animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-2 h-2 rounded-full bg-[#D4A843]/60 animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-2 h-2 rounded-full bg-[#D4A843]/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <span className="w-2 h-2 rounded-full bg-[var(--accent)]/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 rounded-full bg-[var(--accent)]/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 rounded-full bg-[var(--accent)]/60 animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
                   <span className="text-xs text-[var(--text-muted)]">Thinking...</span>
                 </div>

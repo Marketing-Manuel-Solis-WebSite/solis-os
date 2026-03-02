@@ -430,9 +430,9 @@ export default function ChatPage() {
                 >
                   <div className="px-5 py-1.5 text-xs text-[var(--text-muted)] flex items-center gap-2">
                     <span className="flex gap-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4A843] animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4A843] animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4A843] animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '300ms' }} />
                     </span>
                     {typingUsers.length === 1
                       ? `${typingUsers[0].name} está escribiendo...`
@@ -460,11 +460,11 @@ export default function ChatPage() {
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <button onClick={() => setSidebarOpen(true)} className="lg:hidden w-16 h-16 rounded-2xl bg-[#D4A843]/10 border border-[#D4A843]/20 flex items-center justify-center mx-auto mb-4 hover:bg-[#D4A843]/20 transition">
-                <MessageSquare className="h-7 w-7 text-[#D4A843]/60" />
+              <button onClick={() => setSidebarOpen(true)} className="lg:hidden w-16 h-16 rounded-xl bg-[var(--accent-subtle)] shadow-card flex items-center justify-center mx-auto mb-4 hover:bg-[var(--accent)]/20 transition-all duration-200">
+                <MessageSquare className="h-7 w-7 text-[var(--accent)]/60" />
               </button>
-              <div className="hidden lg:flex w-16 h-16 rounded-2xl bg-[#D4A843]/10 border border-[#D4A843]/20 items-center justify-center mx-auto mb-4">
-                <MessageSquare className="h-7 w-7 text-[#D4A843]/60" />
+              <div className="hidden lg:flex w-16 h-16 rounded-xl bg-[var(--accent-subtle)] shadow-card items-center justify-center mx-auto mb-4">
+                <MessageSquare className="h-7 w-7 text-[var(--accent)]/60" />
               </div>
               <p className="text-lg font-semibold text-[var(--text-secondary)]">Selecciona un canal</p>
               <p className="text-sm text-[var(--text-muted)] mt-1">o crea uno nuevo para empezar a chatear</p>

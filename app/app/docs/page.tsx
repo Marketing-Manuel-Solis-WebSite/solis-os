@@ -12,6 +12,7 @@ import {
 import { renderMarkdown } from '@/lib/markdown';
 import DocEditor from '@/components/docs/doc-editor';
 import DocAIPanel from '@/components/docs/doc-ai-panel';
+import { useToast } from '@/components/notifications/toast-provider';
 
 // ========== TYPES ==========
 interface Doc {
@@ -36,6 +37,7 @@ interface Doc {
 // ========== MAIN PAGE ==========
 export default function DocsPage() {
   const { user, me, isAdmin, activeTeamId, teams, can, canSeeResource, canSeeAllTeams } = useAuth();
+  const toast = useToast();
 
   // State
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -75,7 +77,7 @@ export default function DocsPage() {
 
       setDocs(filtered);
     } catch (err) {
-      console.error('Load docs error:', err);
+      toast.error('Error cargando documentos', 'No se pudieron cargar los documentos.');
     }
     setLoading(false);
   }, [activeTeamId, canSeeAllTeams, canSeeResource, user?.uid]);
@@ -244,18 +246,18 @@ export default function DocsPage() {
           <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
             Documents
             {canSeeAllTeams && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 font-semibold">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">
                 ALL ACCESS
               </span>
             )}
           </h1>
           <p className="text-sm text-[var(--text-muted)] mt-1">
             {visible.length} document{visible.length !== 1 ? 's' : ''}
-            {hasActiveFilters && <span className="text-[#D4A843]"> (filtered)</span>}
+            {hasActiveFilters && <span className="text-[var(--accent)]"> (filtered)</span>}
           </p>
         </div>
         {can('doc', 'create') && (
-          <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-5 h-10 rounded-xl btn-gold text-sm shadow-lg shadow-[#D4A843]/10">
+          <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-5 h-10 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">
             <Plus className="h-4 w-4" /> New Document
           </button>
         )}
@@ -317,12 +319,12 @@ export default function DocsPage() {
 
         {/* Starred toggle */}
         <button onClick={() => setFilterStarred(!filterStarred)}
-          className={`h-9 px-3 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition ${
+          className={`h-9 px-3 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all duration-200 ${
             filterStarred
-              ? 'bg-[#D4A843]/10 text-[#D4A843] border-[#D4A843]/20'
-              : 'border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:border-gray-600'
+              ? 'bg-[var(--accent-subtle)] text-[var(--accent)]'
+              : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:shadow-card-hover'
           }`}>
-          <Star className={`h-3 w-3 ${filterStarred ? 'fill-[#D4A843]' : ''}`} />
+          <Star className={`h-3 w-3 ${filterStarred ? 'fill-[var(--accent)]' : ''}`} />
           Starred
         </button>
 
@@ -333,11 +335,11 @@ export default function DocsPage() {
           </button>
         )}
 
-        <div className="flex rounded-xl border border-[var(--border-subtle)] overflow-hidden">
-          <button onClick={() => setView('grid')} className={`px-3 py-1.5 text-xs ${view === 'grid' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)]'}`}>
+        <div className="flex rounded-xl bg-[var(--bg-tertiary)] overflow-hidden">
+          <button onClick={() => setView('grid')} className={`px-3 py-1.5 text-xs ${view === 'grid' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>
             <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1" /><rect x="9" y="1" width="6" height="6" rx="1" /><rect x="1" y="9" width="6" height="6" rx="1" /><rect x="9" y="9" width="6" height="6" rx="1" /></svg>
           </button>
-          <button onClick={() => setView('list')} className={`px-3 py-1.5 text-xs ${view === 'list' ? 'bg-[#D4A843]/10 text-[#D4A843]' : 'text-[var(--text-muted)]'}`}>
+          <button onClick={() => setView('list')} className={`px-3 py-1.5 text-xs ${view === 'list' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}>
             <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="2.5" rx="0.5" /><rect x="1" y="6.75" width="14" height="2.5" rx="0.5" /><rect x="1" y="11.5" width="14" height="2.5" rx="0.5" /></svg>
           </button>
         </div>
@@ -346,7 +348,7 @@ export default function DocsPage() {
       {/* Document Grid/List */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-44 skeleton rounded-2xl" />)}
+          {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-44 skeleton rounded-lg" />)}
         </div>
       ) : visible.length === 0 ? (
         <div className="text-center py-20">
@@ -355,9 +357,9 @@ export default function DocsPage() {
             {hasActiveFilters ? 'No documents match your filters.' : 'No documents found.'}
           </p>
           {hasActiveFilters ? (
-            <button onClick={clearFilters} className="text-sm text-[#D4A843] hover:underline">Clear filters</button>
+            <button onClick={clearFilters} className="text-sm text-[var(--accent)] hover:underline">Clear filters</button>
           ) : (
-            <button onClick={() => setShowCreate(true)} className="text-sm text-[#D4A843] hover:underline">Create your first document</button>
+            <button onClick={() => setShowCreate(true)} className="text-sm text-[var(--accent)] hover:underline">Create your first document</button>
           )}
         </div>
       ) : view === 'grid' ? (
@@ -410,16 +412,16 @@ function DocCard({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }
 
   // Author initial
   const authorInitial = (doc.createdByName || '?')[0].toUpperCase();
-  const authorColor = team?.color || '#D4A843';
+  const authorColor = team?.color || '#3B82F6';
 
   // Count images as attachments
   const imgCount = (doc.content || '').match(/!\[.*?\]\(.*?\)/g)?.length || 0;
 
   return (
     <div onClick={onClick}
-      className="group relative rounded-2xl border border-[var(--border-subtle)] hover:border-[rgba(255,255,255,0.10)] bg-[var(--bg-card)] hover:bg-[rgba(255,255,255,0.03)] p-5 cursor-pointer anim-slide overflow-hidden transition-all duration-200"
+      className="group relative rounded-xl bg-[var(--bg-secondary)] shadow-card hover:shadow-card-hover hover:bg-[var(--bg-hover)] p-5 cursor-pointer anim-slide overflow-hidden transition-all duration-200"
       style={{ animationDelay: `${index * 40}ms` }}>
-      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: team ? `linear-gradient(90deg, ${team.color}60, transparent)` : 'linear-gradient(90deg, rgba(212,168,67,0.4), transparent)' }} />
+      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-lg" style={{ background: team ? `linear-gradient(90deg, ${team.color}60, transparent)` : 'linear-gradient(90deg, rgba(212,168,67,0.4), transparent)' }} />
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           {/* Author avatar */}
@@ -441,7 +443,7 @@ function DocCard({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }
         </div>
         <div className="flex items-center gap-1">
           <button onClick={e => { e.stopPropagation(); onToggleStar(); }} className="p-1 rounded-lg hover:bg-white/5 transition">
-            {doc.starred ? <Star className="h-3.5 w-3.5 text-[#D4A843] fill-[#D4A843]" /> : <StarOff className="h-3.5 w-3.5 text-[var(--text-muted)] opacity-0 group-hover:opacity-100" />}
+            {doc.starred ? <Star className="h-3.5 w-3.5 text-[var(--accent)] fill-[var(--accent)]" /> : <StarOff className="h-3.5 w-3.5 text-[var(--text-muted)] opacity-0 group-hover:opacity-100" />}
           </button>
           {isOwner && (
             <button onClick={e => { e.stopPropagation(); onDelete(); }} className="p-1 rounded-lg hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition">
@@ -482,15 +484,15 @@ function DocListItem({ doc, index, teams, onClick, onDelete, onToggleStar, isOwn
   const visIcon = doc.visibility === 'private' ? <Lock className="h-3 w-3" /> : doc.visibility === 'public' ? <Globe className="h-3 w-3" /> : <Users className="h-3 w-3" />;
   const visColor = doc.visibility === 'private' ? 'text-red-400' : doc.visibility === 'public' ? 'text-emerald-400' : 'text-blue-400';
   const authorInitial = (doc.createdByName || '?')[0].toUpperCase();
-  const authorColor = team?.color || '#D4A843';
+  const authorColor = team?.color || '#3B82F6';
   const imgCount = (doc.content || '').match(/!\[.*?\]\(.*?\)/g)?.length || 0;
 
   return (
     <div onClick={onClick}
-      className="group flex items-center gap-4 px-5 py-3.5 rounded-2xl border border-[var(--border-subtle)] hover:border-[rgba(255,255,255,0.10)] bg-[var(--bg-card)] hover:bg-[rgba(255,255,255,0.03)] cursor-pointer anim-slide transition-all duration-200"
+      className="group flex items-center gap-4 px-5 py-3.5 rounded-xl bg-[var(--bg-secondary)] shadow-card hover:shadow-card-hover hover:bg-[var(--bg-hover)] cursor-pointer anim-slide transition-all duration-200"
       style={{ animationDelay: `${index * 25}ms` }}>
       <button onClick={e => { e.stopPropagation(); onToggleStar(); }} className="shrink-0">
-        {doc.starred ? <Star className="h-4 w-4 text-[#D4A843] fill-[#D4A843]" /> : <StarOff className="h-4 w-4 text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition" />}
+        {doc.starred ? <Star className="h-4 w-4 text-[var(--accent)] fill-[var(--accent)]" /> : <StarOff className="h-4 w-4 text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition" />}
       </button>
       <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold"
         style={{ backgroundColor: `${authorColor}20`, color: authorColor }}>
@@ -523,6 +525,7 @@ function DocListItem({ doc, index, teams, onClick, onDelete, onToggleStar, isOwn
 function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
   teams: any[]; activeTeamId: string; onClose: () => void; onCreate: (data: Partial<Doc>) => void;
 }) {
+  const toast = useToast();
   const [title, setTitle] = useState('');
   const [visibility, setVisibility] = useState<'team' | 'private' | 'public'>('team');
   const [category, setCategory] = useState('');
@@ -567,7 +570,7 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
           teamId: deptId,
         });
       } catch {
-        alert('Error generating AI content. Creating blank document instead.');
+        toast.warning('Error al generar contenido AI', 'Se creará un documento en blanco.');
         onCreate({
           title: title.trim(), content: '', contentHtml: '', visibility,
           category: category.trim(), tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean), teamId: deptId,
@@ -591,8 +594,8 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} className="w-full max-w-lg bg-[var(--bg-base)] border border-[var(--border)] rounded-2xl shadow-2xl anim-slide overflow-hidden">
-        <div className="flex items-center justify-between p-5 border-b border-[var(--border-subtle)]">
+      <div onClick={e => e.stopPropagation()} className="w-full max-w-lg bg-[var(--bg-base)] rounded-xl shadow-modal anim-slide overflow-hidden">
+        <div className="flex items-center justify-between p-5">
           <h2 className="text-lg font-bold text-[var(--text-primary)]">New Document</h2>
           <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg"><X className="h-5 w-5" /></button>
         </div>
@@ -600,7 +603,7 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
           <div>
             <label className="block text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Document title..."
-              autoFocus className="w-full h-12 px-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-primary)] text-lg font-semibold placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[#D4A843] focus:ring-1 focus:ring-[#D4A843]/30"
+              autoFocus className="w-full h-12 px-4 rounded-xl bg-[var(--bg-elevated)] text-[var(--text-primary)] text-lg font-semibold placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30"
               onKeyDown={e => e.key === 'Enter' && template !== 'ai' && submit()} />
           </div>
 
@@ -609,12 +612,12 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
             <div className="grid grid-cols-3 gap-2">
               {templates.map(t => (
                 <button key={t.id} onClick={() => setTemplate(t.id)}
-                  className={`text-left px-3 py-2.5 rounded-xl text-xs font-medium transition border flex items-center gap-1.5 ${
+                  className={`text-left px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${
                     template === t.id
                       ? t.id === 'ai'
-                        ? 'bg-[#D4A843]/10 text-[#D4A843] border-[#D4A843]/30'
-                        : 'bg-[#D4A843]/10 text-[#D4A843] border-[#D4A843]/20'
-                      : 'bg-[var(--bg-card)] text-[var(--text-muted)] border-[var(--border)] hover:border-gray-600'
+                        ? 'bg-[var(--accent-subtle)] text-[var(--accent)] shadow-card'
+                        : 'bg-[var(--accent-subtle)] text-[var(--accent)] shadow-card'
+                      : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:shadow-card-hover'
                   }`}>
                   {t.id === 'ai' && <Sparkles className="h-3 w-3 shrink-0" />}
                   {t.label}
@@ -634,7 +637,7 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
                 onChange={e => setAiPrompt(e.target.value)}
                 placeholder="E.g. Write a client intake form for immigration cases with fields for personal information, case history, and documents needed..."
                 rows={3}
-                className="w-full px-3 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[#D4A843]/40 resize-none"
+                className="w-full px-3 py-2.5 rounded-xl bg-[var(--bg-elevated)] text-sm text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30 resize-none"
               />
             </div>
           )}
@@ -666,10 +669,10 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
             <input value={tags} onChange={e => setTags(e.target.value)} placeholder="immigration, filing, urgent" className="input-dark h-9 text-sm" />
           </div>
         </div>
-        <div className="flex justify-end gap-2 p-5 border-t border-[var(--border-subtle)]">
-          <button onClick={onClose} className="px-5 h-10 rounded-xl border border-[var(--border)] text-sm text-[var(--text-secondary)]">Cancel</button>
+        <div className="flex justify-end gap-2 p-5">
+          <button onClick={onClose} className="px-5 h-10 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">Cancel</button>
           <button onClick={submit} disabled={!title.trim() || aiGenerating || (template === 'ai' && !aiPrompt.trim())}
-            className="px-6 h-10 rounded-xl btn-gold text-sm disabled:opacity-40 flex items-center gap-2">
+            className="px-6 h-10 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40 flex items-center gap-2">
             {aiGenerating ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
             ) : template === 'ai' ? (

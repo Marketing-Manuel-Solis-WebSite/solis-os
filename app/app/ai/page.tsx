@@ -134,15 +134,15 @@ export default function AIPage() {
 
       <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-base)]">
         {/* Header */}
-        <div className="h-12 border-b border-[var(--border)] flex items-center px-4 shrink-0 bg-[var(--bg-base)]">
+        <div className="h-12 flex items-center px-4 shrink-0 bg-[var(--bg-base)]">
           <div className="flex items-center gap-2.5">
             {!sidebarOpen && (
               <button onClick={() => setSidebarOpen(true)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition mr-1">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
               </button>
             )}
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#D4A843] to-[#9A7B2F] flex items-center justify-center">
-              <Sparkles className="h-3.5 w-3.5 text-[#06080F]" />
+            <div className="w-7 h-7 rounded-lg bg-[var(--accent)] flex items-center justify-center">
+              <Sparkles className="h-3.5 w-3.5 text-[var(--accent-text)]" />
             </div>
             <span className="text-sm font-semibold text-[var(--text-primary)]">
               {activeConvo?.title && activeConvo.title !== 'New conversation' ? activeConvo.title : 'Solis AI'}
@@ -178,9 +178,9 @@ function WelcomeScreen({ onQuickStart }: { onQuickStart: (question: string) => v
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
-            className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-[#D4A843] to-[#9A7B2F] flex items-center justify-center shadow-lg shadow-[#D4A843]/20"
+            className="w-16 h-16 mx-auto mb-5 rounded-lg bg-[var(--accent)] flex items-center justify-center shadow-lg shadow-[var(--accent)]/20"
           >
-            <Sparkles className="h-8 w-8 text-[#06080F]" />
+            <Sparkles className="h-8 w-8 text-[var(--accent-text)]" />
           </motion.div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1.5">How can I help you today?</h1>
           <p className="text-sm text-[var(--text-muted)]">Ask me anything about legal research, documents, or business operations.</p>
@@ -195,12 +195,12 @@ function WelcomeScreen({ onQuickStart }: { onQuickStart: (question: string) => v
               whileHover={{ y: -2, boxShadow: '0 8px 25px rgba(0,0,0,0.15)' }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onQuickStart(s.question)}
-              className="flex items-start gap-3 p-4 rounded-2xl bg-[var(--bg-card)] text-left transition-all group hover:bg-[var(--bg-elevated)]"
+              className="flex items-start gap-3 p-4 rounded-lg bg-[var(--bg-elevated)] text-left transition-all group hover:bg-[var(--bg-elevated)]"
               style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
             >
               <span className="text-lg shrink-0 mt-0.5">{s.icon}</span>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-[var(--text-primary)] group-hover:text-[#D4A843] transition-colors">{s.title}</p>
+                <p className="text-[13px] font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">{s.title}</p>
                 <p className="text-[11px] text-[var(--text-muted)] mt-0.5 line-clamp-2">{s.question}</p>
               </div>
             </motion.button>

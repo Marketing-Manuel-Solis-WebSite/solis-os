@@ -26,11 +26,11 @@ function DropUp({ icon, label, children }: { icon: React.ReactNode; label: strin
   return (
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[#D4A843] transition">
+        className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] transition">
         {icon} {label}
       </button>
       {open && (
-        <div className="absolute bottom-full left-0 mb-2 bg-[var(--bg-base)] border border-[var(--border)] rounded-xl shadow-xl p-1 min-w-[140px] z-50">
+        <div className="absolute bottom-full left-0 mb-2 bg-[var(--bg-base)] rounded-xl shadow-dropdown p-1 min-w-[140px] z-50">
           {children}
         </div>
       )}
@@ -44,9 +44,9 @@ export default function TaskBulkActions({ count, onStatusChange, onPriorityChang
       initial={{ y: 20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 20, opacity: 0 }}
-      className="sticky bottom-4 mx-auto w-fit px-5 py-3 rounded-2xl bg-[var(--bg-card)] border border-[#D4A843]/20 shadow-2xl shadow-black/20 flex items-center gap-4 z-20"
+      className="sticky bottom-4 mx-auto w-fit px-5 py-3 rounded-xl bg-[var(--bg-elevated)] shadow-modal flex items-center gap-4 z-20"
     >
-      <span className="text-sm font-semibold text-[#D4A843]">{count} seleccionadas</span>
+      <span className="text-sm font-semibold text-[var(--accent)]">{count} seleccionadas</span>
 
       <div className="h-5 w-px bg-[var(--border)]" />
 
@@ -54,7 +54,7 @@ export default function TaskBulkActions({ count, onStatusChange, onPriorityChang
       <DropUp icon={<ArrowRight className="h-3.5 w-3.5" />} label="Mover a">
         {STATUSES.map(s => (
           <button key={s.id} onClick={() => onStatusChange(s.id)}
-            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs hover:bg-[var(--hover-bg)] text-[var(--text-secondary)] transition">
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
             {s.label}
           </button>
@@ -65,7 +65,7 @@ export default function TaskBulkActions({ count, onStatusChange, onPriorityChang
       <DropUp icon={<Flag className="h-3.5 w-3.5" />} label="Prioridad">
         {PRIORITIES.map(p => (
           <button key={p.id} onClick={() => onPriorityChange(p.id)}
-            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs hover:bg-[var(--hover-bg)] transition">
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs hover:bg-[var(--bg-hover)] transition">
             {p.icon} {p.label}
           </button>
         ))}

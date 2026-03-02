@@ -75,7 +75,7 @@ export default function TaskToolbar({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {!sidebarOpen && (
-            <button onClick={onToggleSidebar} className="p-2 -ml-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition">
+            <button onClick={onToggleSidebar} className="p-2 -ml-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
               <PanelLeft className="h-4 w-4" />
             </button>
           )}
@@ -89,7 +89,7 @@ export default function TaskToolbar({
                 </span>
               )}
               {canSeeAllTeams && activeTeamId === '__all__' && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 font-semibold">VISTA GENERAL</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] font-semibold">VISTA GENERAL</span>
               )}
             </h1>
             <p className="text-sm text-[var(--text-muted)] mt-1">{taskCount} tareas · {doneCount} completadas</p>
@@ -97,14 +97,14 @@ export default function TaskToolbar({
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowShortcuts(!showShortcuts)}
-            className="hidden md:flex p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition"
+            className="hidden md:flex p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
             title="Atajos de teclado">
             <Keyboard className="h-4 w-4" />
           </button>
           {canCreate && (
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
               onClick={onNewTask}
-              className="flex items-center gap-2 px-5 h-10 rounded-xl btn-gold text-sm shadow-lg shadow-[#D4A843]/10">
+              className="flex items-center gap-2 px-5 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">
               <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nueva Tarea</span>
             </motion.button>
           )}
@@ -118,7 +118,7 @@ export default function TaskToolbar({
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="flex items-center gap-4 px-4 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-[11px] text-[var(--text-muted)]">
+            className="flex items-center gap-4 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] shadow-card text-[11px] text-[var(--text-muted)]">
             <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">N</kbd> Nueva</span>
             <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">F</kbd> Buscar</span>
             <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">1-3</kbd> Vistas</span>
@@ -149,12 +149,12 @@ export default function TaskToolbar({
         </div>
 
         {/* View toggle */}
-        <div className="flex rounded-xl border border-[var(--border-subtle)] overflow-hidden">
+        <div className="flex rounded-xl bg-[var(--bg-elevated)] shadow-card overflow-hidden">
           {VIEWS.map(v => (
             <button key={v.id} onClick={() => onViewChange(v.id)}
               className={`px-3 py-1.5 text-xs flex items-center gap-1.5 transition ${
                 view === v.id
-                  ? 'bg-[#D4A843]/10 text-[#D4A843]'
+                  ? 'bg-[var(--accent-subtle)] text-[var(--accent)]'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
               }`}>
               <v.Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{v.label}</span>
@@ -182,9 +182,9 @@ export default function TaskToolbar({
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-semibold">Filtros:</span>
           {activeChips.map((chip, i) => (
-            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#D4A843]/10 text-[#D4A843] text-[11px] font-medium border border-[#D4A843]/20">
+            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--accent-subtle)] text-[var(--accent)] text-[11px] font-medium">
               {chip.label}
-              <button onClick={chip.onRemove} className="hover:text-[#D4A843]/70">
+              <button onClick={chip.onRemove} className="hover:text-[var(--accent)]/70">
                 <X className="h-3 w-3" />
               </button>
             </span>

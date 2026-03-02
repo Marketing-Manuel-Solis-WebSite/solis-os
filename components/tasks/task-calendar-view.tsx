@@ -83,15 +83,15 @@ export default function TaskCalendarView({ tasks, members, selectedTask, onSelec
             {MESES[month]} {year}
           </h2>
           <button onClick={goToday}
-            className="text-[11px] px-2.5 py-1 rounded-lg border border-[var(--border)] text-[var(--text-muted)] hover:text-[#D4A843] hover:border-[#D4A843]/30 transition">
+            className="text-[11px] px-2.5 py-1 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--accent)] transition-all duration-200">
             Hoy
           </button>
         </div>
         <div className="flex gap-1">
-          <button onClick={prevMonth} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition">
+          <button onClick={prevMonth} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <button onClick={nextMonth} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition">
+          <button onClick={nextMonth} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
@@ -107,7 +107,7 @@ export default function TaskCalendarView({ tasks, members, selectedTask, onSelec
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 flex-1 border border-[var(--border-subtle)] rounded-xl overflow-hidden">
+      <div className="grid grid-cols-7 flex-1 shadow-card rounded-xl overflow-hidden">
         {calendarDays.map((day, i) => {
           const dateKey = day.date.toDateString();
           const dayTasks = tasksByDate[dateKey] || [];
@@ -115,14 +115,14 @@ export default function TaskCalendarView({ tasks, members, selectedTask, onSelec
           return (
             <div
               key={i}
-              className={`min-h-[80px] border-b border-r border-[var(--border-subtle)] p-1.5 transition ${
+              className={`min-h-[80px] border-b border-r border-[var(--border-subtle)]/50 p-1.5 transition-all duration-200 ${
                 !day.isCurrentMonth ? 'bg-[var(--bg-elevated)]/30 opacity-40' : ''
-              } ${day.isToday ? 'bg-[#D4A843]/5' : ''}`}
+              } ${day.isToday ? 'bg-[var(--accent)]/5' : ''}`}
             >
               {/* Date number */}
               <div className={`text-[11px] font-semibold mb-1 flex items-center justify-center w-6 h-6 rounded-full ${
                 day.isToday
-                  ? 'bg-[#D4A843] text-[#06080F]'
+                  ? 'bg-[var(--accent)] text-[var(--accent-text)]'
                   : day.isCurrentMonth
                     ? 'text-[var(--text-secondary)]'
                     : 'text-[var(--text-muted)]'

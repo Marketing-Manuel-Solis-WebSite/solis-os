@@ -131,7 +131,7 @@ const DEFAULT_TEAMS: Omit<Team, 'id'>[] = [
   { name: 'Marketing', color: '#8B5CF6', icon: '📣', description: 'Marketing & social media campaigns' },
   { name: 'Openers', color: '#3B82F6', icon: '🚀', description: 'Lead intake & case openers' },
   { name: 'Closers', color: '#22C55E', icon: '🎯', description: 'Case closers & client conversion' },
-  { name: 'Dirección', color: '#D4A843', icon: '👔', description: 'Management & executive team' },
+  { name: 'Dirección', color: '#3B82F6', icon: '👔', description: 'Management & executive team' },
 ];
 
 const ORG_ID = 'solis-center';
@@ -303,7 +303,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await setDoc(orgRef, {
             name: 'Law Office of Manuel Solis',
             slug: ORG_ID,
-            primaryColor: '#D4A843',
+            primaryColor: '#3B82F6',
             secondaryColor: '#0C1017',
             timezone: 'America/Chicago',
             createdBy: u.uid,
@@ -374,7 +374,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const rawRole = meData.role;
         const canonicalRole = normalizeRole(rawRole);
         if (rawRole !== canonicalRole) {
-          console.warn(`[Auth] Role normalized: "${rawRole}" → "${canonicalRole}". Updating Firestore...`);
+          // Role normalized silently
           await updateDoc(memRef, { role: canonicalRole });
           meData = { ...meData, role: canonicalRole };
         }
@@ -382,7 +382,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Self-heal: if this user is the only active member and not owner, promote to owner
         const activeMems = allMems.filter(m => m.active !== false);
         if (activeMems.length === 1 && (activeMems[0].userId === u.uid || (activeMems[0] as any).id === u.uid) && canonicalRole !== 'owner') {
-          console.warn('[Auth] Self-healing: promoting sole active member to owner.');
+          // Self-healing: sole active member promoted to owner
           await updateDoc(memRef, { role: 'owner', hierarchyLevel: 'owner' });
           meData = { ...meData, role: 'owner', hierarchyLevel: 'owner' };
         }
@@ -393,7 +393,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return norm !== m.role ? { ...m, role: norm } : m;
         });
 
-        console.log('[Auth] User:', meData.displayName, '| Raw role:', rawRole, '| Normalized:', meData.role, '| isAdmin:', meData.role === 'owner' || meData.role === 'admin');
+        // Auth bootstrap complete
 
         if (!meData.teamIds) meData.teamIds = meData.teamId ? [meData.teamId] : [];
         setMe(meData);
@@ -416,7 +416,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setLoading(false);
       } catch (e) {
-        console.error('Auth bootstrap:', e);
+        // Auth bootstrap error handled silently
         setMe(null);
         setLoading(false);
       }

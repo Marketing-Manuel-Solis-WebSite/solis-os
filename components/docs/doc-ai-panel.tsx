@@ -39,7 +39,7 @@ const PROMPTS: Prompt[] = [
     prompt: 'Create a detailed outline/table of contents for this document based on its content and suggest additional sections that could improve it.' },
 
   // Improve
-  { id: 'improve', icon: Wand2, label: 'Improve Writing', color: '#D4A843', tab: 'improve',
+  { id: 'improve', icon: Wand2, label: 'Improve Writing', color: '#3B82F6', tab: 'improve',
     prompt: 'Improve the writing quality, clarity, grammar, and flow of this document while keeping the same meaning and structure. Return the improved full document content in markdown format.' },
   { id: 'proofread', icon: PenLine, label: 'Proofread', color: '#22C55E', tab: 'improve',
     prompt: 'Proofread this document thoroughly. List all grammar errors, spelling mistakes, punctuation issues, and style inconsistencies found.' },
@@ -63,7 +63,7 @@ const PROMPTS: Prompt[] = [
 
 const TABS: { id: Tab; label: string; icon: any; color: string }[] = [
   { id: 'analyze', label: 'Analyze', icon: Search, color: '#3B82F6' },
-  { id: 'improve', label: 'Improve', icon: Wand2, color: '#D4A843' },
+  { id: 'improve', label: 'Improve', icon: Wand2, color: '#3B82F6' },
   { id: 'create', label: 'Create', icon: PenTool, color: '#10B981' },
 ];
 
@@ -176,12 +176,12 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
   const tabPrompts = PROMPTS.filter(p => p.tab === activeTab);
 
   return (
-    <div className="w-[380px] shrink-0 bg-[var(--bg-base)] border-l border-[var(--border-subtle)] flex flex-col h-full overflow-hidden anim-slide">
+    <div className="w-[380px] shrink-0 bg-[var(--bg-base)] shadow-panel flex flex-col h-full overflow-hidden anim-slide">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
+      <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#D4A843]/20 to-[#D4A843]/5 border border-[#D4A843]/20 flex items-center justify-center">
-            <Sparkles className="h-4 w-4 text-[#D4A843]" />
+          <div className="w-8 h-8 rounded-xl bg-[var(--accent-subtle)] flex items-center justify-center">
+            <Sparkles className="h-4 w-4 text-[var(--accent)]" />
           </div>
           <div>
             <p className="text-sm font-bold text-[var(--text-primary)]">Solis AI</p>
@@ -193,11 +193,11 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
 
       {/* Generate Full Document (when doc is empty) */}
       {isDocEmpty && messages.length === 0 && (
-        <div className="p-3 border-b border-[var(--border-subtle)]">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-[#D4A843]/5 to-transparent border border-[#D4A843]/15">
+        <div className="p-3">
+          <div className="p-3 rounded-xl bg-[var(--accent-subtle)]">
             <div className="flex items-center gap-2 mb-2">
-              <BookOpen className="h-4 w-4 text-[#D4A843]" />
-              <span className="text-xs font-bold text-[#D4A843]">Generate Full Document</span>
+              <BookOpen className="h-4 w-4 text-[var(--accent)]" />
+              <span className="text-xs font-bold text-[var(--accent)]">Generate Full Document</span>
             </div>
             <p className="text-[10px] text-[var(--text-muted)] mb-2">Describe what you want and AI will create the full document.</p>
             <textarea
@@ -205,12 +205,12 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
               onChange={e => setGeneratePrompt(e.target.value)}
               placeholder="E.g. Write a client engagement letter for immigration consultation..."
               rows={3}
-              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-xs text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[#D4A843]/40 resize-none"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--bg-elevated)] text-xs text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/40 resize-none"
             />
             <button
               onClick={handleGenerateDoc}
               disabled={generating || !generatePrompt.trim()}
-              className="mt-2 w-full h-8 rounded-lg btn-gold text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"
+              className="mt-2 w-full h-8 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"
             >
               {generating ? (
                 <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating...</>
@@ -224,16 +224,16 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
 
       {/* Category Tabs + Quick Actions */}
       {messages.length === 0 && !generating && (
-        <div className="p-3 border-b border-[var(--border-subtle)]">
+        <div className="p-3">
           {/* Tabs */}
-          <div className="flex rounded-xl border border-[var(--border-subtle)] overflow-hidden mb-2.5">
+          <div className="flex rounded-xl bg-[var(--bg-tertiary)] overflow-hidden mb-2.5">
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold transition ${
                   activeTab === tab.id
-                    ? 'text-[#D4A843] bg-[#D4A843]/10'
+                    ? 'text-[var(--accent)] bg-[var(--accent-subtle)]'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-white/3'
                 }`}
               >
@@ -247,7 +247,7 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
           <div className="grid grid-cols-2 gap-1.5">
             {tabPrompts.map(p => (
               <button key={p.id} onClick={() => handleQuickPrompt(p)}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-medium bg-[var(--bg-card)] border border-[var(--border)] hover:border-gray-600 text-[var(--text-secondary)] hover:text-gray-200 transition text-left">
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-medium bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-gray-200 hover:bg-[var(--bg-hover)] transition-all duration-200 text-left">
                 <p.icon className="h-3.5 w-3.5 shrink-0" style={{ color: p.color }} />
                 <span className="truncate">{p.label}</span>
               </button>
@@ -268,7 +268,7 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
 
         {generating && (
           <div className="flex items-center justify-center gap-2 py-12">
-            <Loader2 className="h-5 w-5 text-[#D4A843] animate-spin" />
+            <Loader2 className="h-5 w-5 text-[var(--accent)] animate-spin" />
             <span className="text-sm text-[var(--text-muted)]">Generating document...</span>
           </div>
         )}
@@ -276,16 +276,16 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
         {messages.map((msg, i) => (
           <div key={i} className={`${msg.role === 'user' ? 'flex justify-end' : ''}`}>
             {msg.role === 'user' ? (
-              <div className="max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-tr-md bg-[#D4A843]/10 border border-[#D4A843]/20">
-                <p className="text-xs text-[#D4A843]">{msg.text.length > 80 ? msg.text.slice(0, 80) + '...' : msg.text}</p>
+              <div className="max-w-[85%] px-3.5 py-2.5 rounded-lg rounded-tr-md bg-[var(--accent-subtle)]">
+                <p className="text-xs text-[var(--accent)]">{msg.text.length > 80 ? msg.text.slice(0, 80) + '...' : msg.text}</p>
               </div>
             ) : (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 mb-1">
-                  <Bot className="h-3.5 w-3.5 text-[#D4A843]" />
-                  <span className="text-[10px] font-semibold text-[#D4A843]">Solis AI</span>
+                  <Bot className="h-3.5 w-3.5 text-[var(--accent)]" />
+                  <span className="text-[10px] font-semibold text-[var(--accent)]">Solis AI</span>
                 </div>
-                <div className="px-3.5 py-3 rounded-2xl rounded-tl-md bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+                <div className="px-3.5 py-3 rounded-lg rounded-tl-md bg-[var(--bg-elevated)]">
                   <p className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                 </div>
                 <div className="flex items-center gap-1.5 pl-1 flex-wrap">
@@ -297,7 +297,7 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
                   {msg.isApplicable && (
                     <>
                       <button onClick={() => handleApply(msg.text)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-[#D4A843] hover:bg-[#D4A843]/10 transition">
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-[var(--accent)] hover:bg-[var(--accent-subtle)] transition">
                         <ArrowRight className="h-3 w-3" />
                         Replace Doc
                       </button>
@@ -316,19 +316,19 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
 
         {loading && (
           <div className="flex items-center gap-2 px-3 py-3">
-            <Loader2 className="h-4 w-4 text-[#D4A843] animate-spin" />
+            <Loader2 className="h-4 w-4 text-[var(--accent)] animate-spin" />
             <span className="text-xs text-[var(--text-muted)]">Analyzing document...</span>
           </div>
         )}
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t border-[var(--border-subtle)] bg-[#0A0E16]">
+      <div className="p-3 bg-[#0A0E16]">
         {messages.length > 0 && (
           <div className="flex gap-1.5 mb-2 overflow-x-auto pb-1">
             {PROMPTS.filter(p => p.tab === activeTab).slice(0, 4).map(p => (
               <button key={p.id} onClick={() => handleQuickPrompt(p)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition whitespace-nowrap shrink-0">
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-all duration-200 whitespace-nowrap shrink-0">
                 <p.icon className="h-3 w-3" style={{ color: p.color }} />
                 {p.label}
               </button>
@@ -342,7 +342,7 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
             onKeyDown={e => e.key === 'Enter' && handleCustomQuestion()}
             disabled={loading} />
           <button onClick={handleCustomQuestion} disabled={loading || !input.trim()}
-            className="h-9 px-4 rounded-xl btn-gold text-xs disabled:opacity-40">
+            className="h-9 px-4 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-xs disabled:opacity-40">
             <Send className="h-3.5 w-3.5" />
           </button>
         </div>

@@ -39,20 +39,20 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
   const availableDMMembers = members.filter(m => m.id !== userId);
 
   return (
-    <aside role="navigation" aria-label="Canales" className="w-72 lg:w-64 h-full bg-[var(--bg-card)] lg:bg-[var(--bg-card)]/60 border-r border-[var(--border)] flex flex-col shrink-0 backdrop-blur-sm">
+    <aside role="navigation" aria-label="Canales" className="w-72 lg:w-64 h-full bg-[var(--bg-elevated)] lg:bg-[var(--bg-elevated)]/60 shadow-panel flex flex-col shrink-0">
       {/* Header */}
-      <div className="p-3 border-b border-[var(--border)]">
+      <div className="p-3">
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-sm font-bold text-[var(--text-primary)]">Messages</span>
           <motion.button whileHover={{ scale: 1.1, rotate: 90 }} whileTap={{ scale: 0.9 }}
-            onClick={onCreate} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[#D4A843] hover:bg-[#D4A843]/10 transition" title="New Channel">
+            onClick={onCreate} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition" title="New Channel">
             <Plus className="h-4 w-4" />
           </motion.button>
         </div>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
           <input value={search} onChange={e => onSearchChange(e.target.value)} placeholder="Search channels..."
-            className="w-full h-8 pl-8 pr-8 rounded-lg bg-[var(--bg-base)] border border-[var(--border)] text-xs text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[#D4A843]/40 focus:bg-[var(--bg-card)] focus:shadow-sm transition-all" />
+            className="w-full h-8 pl-8 pr-8 rounded-lg bg-[var(--bg-base)] text-xs text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30 focus:bg-[var(--bg-elevated)] focus:shadow-sm transition-all duration-200" />
           {search && (
             <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
               <X className="h-3 w-3" />
@@ -99,14 +99,14 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
                     aria-current={isActive ? 'page' : undefined}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] transition-all duration-200 group relative ${
                       isActive
-                        ? 'bg-[#D4A843]/10 text-[var(--text-primary)] font-semibold border-l-[3px] border-l-[#D4A843] rounded-r-xl'
+                        ? 'bg-[var(--accent)]/10 text-[var(--text-primary)] font-semibold border-l-[3px] border-l-[var(--accent)] rounded-r-xl'
                         : isUnread
-                          ? 'text-[var(--text-primary)] font-semibold hover:bg-[var(--hover-bg)] rounded-xl'
-                          : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] rounded-xl'
+                          ? 'text-[var(--text-primary)] font-semibold hover:bg-[var(--bg-hover)] rounded-md'
+                          : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md'
                     }`}>
                     {icon}
                     <span className="flex-1 text-left truncate">{ch.name}</span>
-                    {isUnread && <span className="w-2 h-2 rounded-full bg-[#D4A843] shrink-0" />}
+                    {isUnread && <span className="w-2 h-2 rounded-full bg-[var(--accent)] shrink-0" />}
                     {ch.type === 'private' && !isUnread && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[var(--bg-base)] text-[var(--text-muted)] opacity-60">{(ch.members || []).length}</span>
                     )}
@@ -152,16 +152,16 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
                         onClick={() => onSelect(ch)}
                         className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] transition-all duration-200 relative ${
                           isActive
-                            ? 'bg-[#D4A843]/10 text-[var(--text-primary)] font-semibold border-l-[3px] border-l-[#D4A843] rounded-r-xl'
+                            ? 'bg-[var(--accent)]/10 text-[var(--text-primary)] font-semibold border-l-[3px] border-l-[var(--accent)] rounded-r-xl'
                             : isUnread
-                              ? 'text-[var(--text-primary)] font-semibold hover:bg-[var(--hover-bg)] rounded-xl'
-                              : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] rounded-xl'
+                              ? 'text-[var(--text-primary)] font-semibold hover:bg-[var(--bg-hover)] rounded-md'
+                              : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md'
                         }`}>
                         <div className="relative shrink-0">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold ${isActive ? 'bg-[#D4A843]/20 text-[#D4A843]' : 'bg-[#D4A843]/10 text-[#D4A843]/70'}`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold ${isActive ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : 'bg-[var(--accent)]/10 text-[var(--accent)]/70'}`}>
                             {name?.[0]?.toUpperCase() || '?'}
                           </div>
-                          <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[var(--bg-card)] ${isOnline ? 'bg-[#22C55E]' : 'bg-[var(--text-muted)]/40'}`} />
+                          <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[var(--bg-elevated)] ${isOnline ? 'bg-[#22C55E]' : 'bg-[var(--text-muted)]/40'}`} />
                         </div>
                         <div className="flex-1 min-w-0 text-left">
                           <span className="block truncate">{name}</span>
@@ -169,7 +169,7 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
                             <span className="block text-[10px] text-[var(--text-muted)] truncate opacity-60">{ch.lastMessagePreview}</span>
                           )}
                         </div>
-                        {isUnread && <span className="w-2 h-2 rounded-full bg-[#D4A843] shrink-0" />}
+                        {isUnread && <span className="w-2 h-2 rounded-full bg-[var(--accent)] shrink-0" />}
                       </motion.button>
                     );
                   })}
@@ -183,9 +183,9 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
         {!filtered && (
           <div className="px-2 mt-3">
             <motion.button
-              whileHover={{ backgroundColor: 'var(--hover-bg)' }}
+              whileHover={{ backgroundColor: 'var(--bg-hover)' }}
               onClick={() => setShowDMList(!showDMList)}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
               <MessageCircle className="h-3.5 w-3.5" />
               New Direct Message
               <Plus className="h-3 w-3 ml-auto" />
@@ -197,15 +197,15 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="mt-1 space-y-0.5 ml-2 pl-3 border-l-2 border-[#D4A843]/20 overflow-hidden"
+                  className="mt-1 space-y-0.5 ml-2 pl-3 border-l-2 border-[var(--accent)]/20 overflow-hidden"
                 >
                   {availableDMMembers.map(m => (
                     <motion.button
                       key={m.id}
                       whileHover={{ x: 2 }}
                       onClick={() => { onStartDM(m.id); setShowDMList(false); }}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] transition">
-                      <div className="w-6 h-6 rounded-full bg-[#D4A843]/10 flex items-center justify-center text-[9px] font-bold text-[#D4A843]">
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
+                      <div className="w-6 h-6 rounded-full bg-[var(--accent)]/10 flex items-center justify-center text-[9px] font-bold text-[var(--accent)]">
                         {m.displayName?.[0]?.toUpperCase() || '?'}
                       </div>
                       {m.displayName}

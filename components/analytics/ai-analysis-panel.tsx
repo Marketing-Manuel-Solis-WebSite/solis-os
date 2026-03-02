@@ -26,7 +26,7 @@ const ANALYSIS_CATEGORIES = [
   {
     id: 'performance',
     label: '📊 Performance',
-    color: '#D4A843',
+    color: '#3B82F6',
     analyses: [
       { id: 'overall', icon: TrendingUp, label: 'Overall Performance Report', prompt: 'Generate a comprehensive performance analysis of the entire organization. Cover task completion rates, productivity metrics, department comparisons, and identify strengths and weaknesses. Include specific recommendations for improvement.' },
       { id: 'bottlenecks', icon: AlertTriangle, label: 'Identify Bottlenecks', prompt: 'Analyze the workflow data and identify all bottlenecks, blockers, and inefficiencies across departments. Which teams are overloaded? Where are tasks getting stuck? What processes need improvement?' },
@@ -291,7 +291,7 @@ ${deptContext}${docContext}
       {/* Analysis categories */}
       <div className="space-y-2 anim-slide" style={{ animationDelay: '120ms' }}>
         {ANALYSIS_CATEGORIES.map(cat => (
-          <div key={cat.id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-card)] overflow-hidden">
+          <div key={cat.id} className="rounded-xl shadow-card bg-[var(--bg-elevated)] overflow-hidden">
             <button onClick={() => setExpandedCategory(expandedCategory === cat.id ? null : cat.id)}
               className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-white/[0.01] transition">
               <span className="text-lg">{cat.label.split(' ')[0]}</span>
@@ -300,10 +300,10 @@ ${deptContext}${docContext}
               <ChevronDown className={`h-4 w-4 text-[var(--text-muted)] ml-auto transition-transform ${expandedCategory === cat.id ? 'rotate-180' : ''}`} />
             </button>
             {expandedCategory === cat.id && (
-              <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-[var(--border-subtle)] pt-3">
+              <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-3 gap-2  pt-3">
                 {cat.analyses.map(a => (
                   <button key={a.id} onClick={() => runAnalysis(a.prompt, a.id)} disabled={loading}
-                    className="flex items-start gap-3 p-4 rounded-xl border border-[var(--border)] bg-[var(--bg-base)] hover:border-gray-600 text-left transition group card-hover disabled:opacity-50">
+                    className="flex items-start gap-3 p-4 rounded-xl bg-[var(--bg-base)] hover:bg-[var(--bg-hover)] text-left transition-all duration-200 group disabled:opacity-50">
                     <a.icon className="h-5 w-5 shrink-0 mt-0.5" style={{ color: cat.color }} />
                     <div>
                       <p className="text-xs font-semibold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition">{a.label}</p>
@@ -318,19 +318,19 @@ ${deptContext}${docContext}
       </div>
 
       {/* Custom query */}
-      <div className="rounded-2xl border border-purple-500/20 bg-purple-500/[0.03] p-5 anim-slide" style={{ animationDelay: '160ms' }}>
+      <div className="rounded-xl bg-purple-500/[0.03] p-5 anim-slide" style={{ animationDelay: '160ms' }}>
         <div className="flex items-center gap-2 mb-3">
           <Sparkles className="h-4 w-4 text-purple-400" />
           <span className="text-sm font-bold text-purple-400">Custom Analysis</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">AI has full platform context</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">AI has full platform context</span>
         </div>
         <div className="flex gap-2">
           <textarea value={customQ} onChange={e => setCustomQ(e.target.value)} placeholder="Ask anything about your organization, team, market, operations, documents..."
             rows={2} disabled={loading}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] text-sm text-gray-200 placeholder:text-[var(--text-muted)] outline-none focus:border-purple-500/30 resize-none disabled:opacity-50"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--bg-elevated)] text-sm text-gray-200 placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-purple-500/30 resize-none disabled:opacity-50"
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustom(); } }} />
           <button onClick={handleCustom} disabled={loading || !customQ.trim()}
-            className="h-[52px] px-5 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/20 text-sm font-semibold flex items-center gap-2 hover:bg-purple-500/25 transition disabled:opacity-30 shrink-0">
+            className="h-[52px] px-5 rounded-xl bg-purple-500/15 text-purple-400 text-sm font-semibold flex items-center gap-2 hover:bg-purple-500/25 transition-all duration-200 disabled:opacity-30 shrink-0">
             <Send className="h-4 w-4" /> Analyze
           </button>
         </div>
@@ -341,7 +341,7 @@ ${deptContext}${docContext}
             'Analiza nuestra estrategia de marketing vs competidores',
             'Recommend process automations',
           ].map((q, i) => (
-            <button key={i} onClick={() => { setCustomQ(q); }} className="text-[10px] px-2 py-1 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
+            <button key={i} onClick={() => { setCustomQ(q); }} className="text-[10px] px-2 py-1 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-all duration-200">
               {q}
             </button>
           ))}
@@ -352,13 +352,13 @@ ${deptContext}${docContext}
       {analyses.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-[#D4A843]" />
+            <BarChart3 className="h-4 w-4 text-[var(--accent)]" />
             Analysis Results ({analyses.length})
           </h3>
           {analyses.map((a, i) => (
-            <div key={a.id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-base)] overflow-hidden anim-fade">
+            <div key={a.id} className="rounded-xl shadow-card bg-[var(--bg-base)] overflow-hidden anim-fade">
               {/* Question header */}
-              <div className="px-5 py-3 border-b border-[var(--border-subtle)] bg-[#0A0E16] flex items-center gap-3">
+              <div className="px-5 py-3 bg-[#0A0E16] flex items-center gap-3">
                 <Brain className="h-4 w-4 text-purple-400 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-[var(--text-secondary)] truncate">{a.question.slice(0, 120)}</p>
@@ -379,7 +379,7 @@ ${deptContext}${docContext}
 
       {/* Loading */}
       {loading && (
-        <div className="rounded-2xl border border-purple-500/20 bg-purple-500/[0.03] p-6 flex items-center gap-4 anim-fade">
+        <div className="rounded-xl bg-purple-500/[0.03] p-6 flex items-center gap-4 anim-fade">
           <Loader2 className="h-5 w-5 text-purple-400 animate-spin shrink-0" />
           <div>
             <p className="text-sm text-purple-400 font-semibold">Analyzing platform data...</p>

@@ -86,7 +86,7 @@ function renderMessageText(text: string, members: any[]): React.ReactNode {
       );
       if (isMember) {
         return (
-          <span key={i} className="bg-[#D4A843]/15 text-[#D4A843] px-1 rounded font-medium">
+          <span key={i} className="bg-[var(--accent)]/15 text-[var(--accent)] px-1 rounded font-medium">
             {part}
           </span>
         );
@@ -192,7 +192,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
       {messages.length === 0 && (
         <div className="flex-1 flex items-center justify-center py-16">
           <div className="text-center">
-            <div className="w-16 h-16 rounded-2xl bg-[var(--gold)]/10 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">💬</span>
             </div>
             <p className="text-base font-medium text-[var(--text-secondary)]">No hay mensajes aún</p>
@@ -239,13 +239,13 @@ export default function MessageList({ messages, members, userId, channelType, ca
           <div key={item.id} role="article" aria-label={`${first.displayName}: ${(first.content || '').slice(0, 80)}`}>
             {/* First message — with avatar */}
             <div
-              className={`flex gap-3.5 group/msg py-1.5 hover:bg-[var(--hover-bg)] px-4 -mx-4 transition-colors relative ${isMine ? 'border-l-2 border-l-[#D4A843]/20 hover:bg-[#D4A843]/[0.03]' : ''}`}
+              className={`flex gap-3.5 group/msg py-1.5 hover:bg-[var(--bg-hover)] px-4 -mx-4 transition-colors relative ${isMine ? 'border-l-2 border-l-[var(--accent)]/20 hover:bg-[var(--accent)]/[0.03]' : ''}`}
               onMouseEnter={() => setHoverId(first.id)}
               onMouseLeave={() => setHoverId(null)}
             >
               {/* Avatar */}
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-muted)]"
-                style={member?.teamId ? { backgroundColor: 'rgba(212,168,67,0.1)', color: '#D4A843', borderColor: 'rgba(212,168,67,0.2)' } : undefined}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-[var(--bg-elevated)] text-[var(--text-muted)]"
+                style={member?.teamId ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'color-mix(in srgb, var(--accent) 20%, transparent)' } : undefined}>
                 {(first.displayName || '?')[0].toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -253,7 +253,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
                 <div className="flex items-baseline gap-2 mb-0.5">
                   <span className="text-[14px] font-semibold text-[var(--text-primary)]">{first.displayName}</span>
                   {member?.role && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--bg-elevated)] border border-[var(--border)] text-[var(--text-muted)]">{member.role}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-muted)]">{member.role}</span>
                   )}
                   {time && (
                     <span className="text-[11px] text-[var(--text-muted)]">
@@ -284,7 +284,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
             {group.slice(1).map(msg => (
               <div
                 key={msg.id}
-                className={`group/msg hover:bg-[var(--hover-bg)] px-4 -mx-4 transition-colors relative ${isMine ? 'border-l-2 border-l-[#D4A843]/20 hover:bg-[#D4A843]/[0.03]' : ''}`}
+                className={`group/msg hover:bg-[var(--bg-hover)] px-4 -mx-4 transition-colors relative ${isMine ? 'border-l-2 border-l-[var(--accent)]/20 hover:bg-[var(--accent)]/[0.03]' : ''}`}
                 onMouseEnter={() => setHoverId(msg.id)}
                 onMouseLeave={() => setHoverId(null)}
               >
@@ -324,7 +324,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             onClick={scrollToBottom}
-            className="sticky bottom-4 left-1/2 -translate-x-1/2 mx-auto block px-4 py-2 rounded-full bg-[#D4A843] text-[#06080F] text-sm font-semibold shadow-lg hover:bg-[#E0B84F] transition-colors flex items-center gap-2 z-10"
+            className="sticky bottom-4 left-1/2 -translate-x-1/2 mx-auto block px-4 py-2 rounded-full bg-[var(--accent)] text-[var(--accent-text)] text-sm font-semibold shadow-lg hover:bg-[var(--accent-hover)] transition-colors flex items-center gap-2 z-10"
           >
             Nuevos mensajes
             <ChevronDown className="h-4 w-4" />
@@ -355,7 +355,7 @@ function MessageContent({
       {msg.replyTo && (
         <div className="flex items-center gap-1.5 mb-1">
           <Reply className="h-3 w-3 text-[var(--text-muted)]" />
-          <span className="text-xs text-[var(--gold)] font-medium">{msg.replyAuthor}</span>
+          <span className="text-xs text-[var(--accent)] font-medium">{msg.replyAuthor}</span>
           <span className="text-xs text-[var(--text-muted)] truncate max-w-[250px]">{msg.replyPreview}</span>
         </div>
       )}
@@ -363,8 +363,8 @@ function MessageContent({
       {/* Pin indicator */}
       {msg.pinned && (
         <div className="flex items-center gap-1 mb-1">
-          <Pin className="h-3 w-3 text-[var(--gold)]" />
-          <span className="text-[10px] text-[var(--gold)] font-semibold">Fijado</span>
+          <Pin className="h-3 w-3 text-[var(--accent)]" />
+          <span className="text-[10px] text-[var(--accent)] font-semibold">Fijado</span>
         </div>
       )}
 
@@ -379,13 +379,13 @@ function MessageContent({
       {/* Images — gallery grid */}
       {media.images.length === 1 && (
         <a href={media.images[0]} target="_blank" rel="noopener noreferrer" className="block mt-1.5">
-          <img src={media.images[0]} alt="" className="max-w-full max-h-[300px] rounded-xl border border-[var(--border)] object-cover hover:opacity-90 transition" loading="lazy" />
+          <img src={media.images[0]} alt="" className="max-w-full max-h-[300px] rounded-xl shadow-card object-cover hover:opacity-90 transition-all duration-200" loading="lazy" />
         </a>
       )}
       {media.images.length > 1 && (
         <div className="grid grid-cols-2 gap-1.5 mt-1.5 max-w-[400px]">
           {media.images.map((url, idx) => (
-            <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-xl border border-[var(--border)]">
+            <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-xl shadow-card">
               <img src={url} alt="" className="w-full h-[150px] object-cover hover:scale-105 transition-transform duration-200" loading="lazy" />
             </a>
           ))}
@@ -396,7 +396,7 @@ function MessageContent({
       {media.videos.length > 0 && (
         <div className="space-y-2 mt-1.5">
           {media.videos.map((url, idx) => (
-            <video key={idx} controls className="max-w-full max-h-[300px] rounded-xl border border-[var(--border)]" preload="metadata">
+            <video key={idx} controls className="max-w-full max-h-[300px] rounded-xl shadow-card" preload="metadata">
               <source src={url} />
             </video>
           ))}
@@ -412,11 +412,11 @@ function MessageContent({
             const ext = att.name?.split('.').pop()?.toUpperCase() || 'FILE';
             return (
               <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)] hover:border-[var(--gold)]/30 hover:bg-[var(--bg-card)] transition group/file max-w-sm">
+                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-elevated)] shadow-card hover:shadow-md transition-all duration-200 group/file max-w-sm">
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                  isImg ? 'bg-[var(--gold)]/10' : isVid ? 'bg-blue-500/10' : 'bg-[var(--bg-card)]'
+                  isImg ? 'bg-[var(--accent)]/10' : isVid ? 'bg-blue-500/10' : 'bg-[var(--bg-elevated)]'
                 }`}>
-                  {isImg ? <ImageIcon className="h-5 w-5 text-[var(--gold)]" /> :
+                  {isImg ? <ImageIcon className="h-5 w-5 text-[var(--accent)]" /> :
                    isVid ? <Play className="h-5 w-5 text-blue-400" /> :
                    <FileText className="h-5 w-5 text-[var(--text-muted)]" />}
                 </div>
@@ -424,7 +424,7 @@ function MessageContent({
                   <p className="text-sm font-medium text-[var(--text-primary)] truncate">{att.name || 'Archivo'}</p>
                   <p className="text-[11px] text-[var(--text-muted)]">{ext} {att.size ? `· ${formatFileSize(att.size)}` : ''}</p>
                 </div>
-                <Download className="h-4 w-4 text-[var(--text-muted)] group-hover/file:text-[var(--gold)] transition shrink-0" />
+                <Download className="h-4 w-4 text-[var(--text-muted)] group-hover/file:text-[var(--accent)] transition shrink-0" />
               </a>
             );
           })}
@@ -442,10 +442,10 @@ function MessageContent({
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={e => { e.stopPropagation(); onReaction(msg.id, emoji); }}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-sm transition border ${
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-sm transition-all duration-200 ${
                   reacted
-                    ? 'bg-[var(--gold)]/10 border-[var(--gold)]/20 text-[var(--gold)]'
-                    : 'bg-[var(--bg-card)] border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--text-muted)]'
+                    ? 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]/20 text-[var(--accent)]'
+                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
                 }`}>
                 <span>{emoji}</span>
                 <span className="text-xs font-semibold">{users.length}</span>
@@ -463,26 +463,26 @@ function MessageContent({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.95 }}
             transition={{ duration: 0.12 }}
-            className="absolute -top-3 right-0 flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border)] shadow-lg z-10"
+            className="absolute -top-3 right-0 flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg bg-[var(--bg-elevated)] shadow-dropdown z-10"
             onClick={e => e.stopPropagation()}>
-            <button onClick={() => setShowEmoji(showEmoji === msg.id ? null : msg.id)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--gold)] rounded-md hover:bg-[var(--hover-bg)] transition" title="Reaccionar" aria-label="Reaccionar">
+            <button onClick={() => setShowEmoji(showEmoji === msg.id ? null : msg.id)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] rounded-md hover:bg-[var(--bg-hover)] transition" title="Reaccionar" aria-label="Reaccionar">
               <SmilePlus className="h-4 w-4" />
             </button>
-            <button onClick={() => onReply(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-md hover:bg-[var(--hover-bg)] transition" title="Responder" aria-label="Responder">
+            <button onClick={() => onReply(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-md hover:bg-[var(--bg-hover)] transition" title="Responder" aria-label="Responder">
               <Reply className="h-4 w-4" />
             </button>
             {(canManage || msg.userId === userId) && (
-              <button onClick={() => onPin(msg.id, msg.pinned)} className={`p-1.5 rounded-md hover:bg-[var(--hover-bg)] transition ${msg.pinned ? 'text-[var(--gold)]' : 'text-[var(--text-muted)] hover:text-[var(--gold)]'}`} title={msg.pinned ? 'Desfijar' : 'Fijar'}>
+              <button onClick={() => onPin(msg.id, msg.pinned)} className={`p-1.5 rounded-md hover:bg-[var(--bg-hover)] transition ${msg.pinned ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--accent)]'}`} title={msg.pinned ? 'Desfijar' : 'Fijar'}>
                 <Pin className="h-4 w-4" />
               </button>
             )}
             {msg.userId === userId && (
-              <button onClick={() => onEdit(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-blue-400 rounded-md hover:bg-[var(--hover-bg)] transition" title="Editar">
+              <button onClick={() => onEdit(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-blue-400 rounded-md hover:bg-[var(--bg-hover)] transition" title="Editar">
                 <Edit2 className="h-4 w-4" />
               </button>
             )}
             {(canManage || msg.userId === userId) && (
-              <button onClick={() => { if (confirm('¿Eliminar este mensaje?')) onDelete(msg.id); }} className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-md hover:bg-[var(--hover-bg)] transition" title="Eliminar">
+              <button onClick={() => { if (confirm('¿Eliminar este mensaje?')) onDelete(msg.id); }} className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-md hover:bg-[var(--bg-hover)] transition" title="Eliminar">
                 <Trash2 className="h-4 w-4" />
               </button>
             )}
@@ -498,7 +498,7 @@ function MessageContent({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 4 }}
             transition={{ duration: 0.15 }}
-            className="absolute -top-12 right-0 flex gap-0.5 p-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-xl z-20"
+            className="absolute -top-12 right-0 flex gap-0.5 p-1.5 rounded-xl bg-[var(--bg-elevated)] shadow-dropdown z-20"
             onClick={e => e.stopPropagation()}>
             {QUICK_EMOJIS.map(em => (
               <motion.button
@@ -506,7 +506,7 @@ function MessageContent({
                 whileHover={{ scale: 1.2 }}
                 whileTap={{ scale: 0.8 }}
                 onClick={() => { onReaction(msg.id, em); setShowEmoji(null); }}
-                className="w-8 h-8 rounded-lg hover:bg-[var(--hover-bg)] flex items-center justify-center text-base transition">
+                className="w-8 h-8 rounded-lg hover:bg-[var(--bg-hover)] flex items-center justify-center text-base transition">
                 {em}
               </motion.button>
             ))}
