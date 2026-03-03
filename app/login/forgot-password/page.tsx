@@ -6,10 +6,12 @@ import { friendlyError } from '@/lib/auth-errors';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Mail, ArrowLeft, CheckCircle2, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
+import { useI18n } from '@/lib/i18n';
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 function ForgotPasswordForm() {
+  const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -125,9 +127,9 @@ function ForgotPasswordForm() {
                       <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#8C28FF]/20 to-[#7B68EE]/10 flex items-center justify-center mx-auto mb-4">
                         <Mail className="h-6 w-6 text-[#8C28FF]" />
                       </div>
-                      <h2 className="text-2xl font-bold text-[var(--text-primary)]">Restablecer Contraseña</h2>
+                      <h2 className="text-2xl font-bold text-[var(--text-primary)]">{t('auth.forgotTitle')}</h2>
                       <p className="text-sm text-[var(--text-tertiary)] mt-1.5 leading-relaxed">
-                        Ingresa tu email y te enviaremos un enlace para crear una nueva contraseña.
+                        {t('auth.forgotSubtitle')}
                       </p>
                     </div>
 
@@ -161,7 +163,7 @@ function ForgotPasswordForm() {
                           type="email"
                           value={email}
                           onChange={e => setEmail(e.target.value)}
-                          placeholder="Email"
+                          placeholder={t('auth.email')}
                           required
                           autoFocus
                           className="w-full h-12 pl-10 pr-4 rounded-xl bg-[var(--bg-input)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 border-[1.5px] border-[var(--border)] hover:border-[var(--border-strong)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15 focus:shadow-[0_0_20px_rgba(140,40,255,0.1)]"
@@ -176,7 +178,7 @@ function ForgotPasswordForm() {
                         className="w-full h-12 rounded-xl bg-gradient-to-r from-[#8C28FF] to-[#7B68EE] text-white text-sm font-semibold transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
                         style={{ boxShadow: '0 4px 20px rgba(140,40,255,0.4), 0 0 40px rgba(140,40,255,0.12)' }}
                       >
-                        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar enlace'}
+                        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : t('auth.sendLink')}
                       </motion.button>
                     </form>
 
@@ -186,7 +188,7 @@ function ForgotPasswordForm() {
                       className="flex items-center justify-center gap-1.5 mt-6 text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors duration-200"
                     >
                       <ArrowLeft className="h-3.5 w-3.5" />
-                      Volver a iniciar sesion
+                      {t('auth.backToLogin')}
                     </Link>
                   </motion.div>
                 ) : (
@@ -208,12 +210,12 @@ function ForgotPasswordForm() {
                       <CheckCircle2 className="h-8 w-8 text-[#00C48C]" />
                     </motion.div>
 
-                    <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Revisa tu email</h2>
+                    <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">{t('auth.checkEmail')}</h2>
                     <p className="text-sm text-[var(--text-tertiary)] leading-relaxed mb-2">
-                      Si existe una cuenta con <span className="font-medium text-[var(--text-secondary)]">{email}</span>, recibiras un enlace para restablecer tu contraseña.
+                      {t('auth.checkEmailMsg', { email })}
                     </p>
                     <p className="text-xs text-[var(--text-muted)] mb-8">
-                      Si no lo ves, revisa tu carpeta de spam.
+                      {t('auth.checkSpam')}
                     </p>
 
                     {/* Actions */}
@@ -225,7 +227,7 @@ function ForgotPasswordForm() {
                         style={{ boxShadow: '0 4px 20px rgba(140,40,255,0.4), 0 0 40px rgba(140,40,255,0.12)' }}
                       >
                         <ArrowLeft className="h-4 w-4" />
-                        Volver a iniciar sesion
+                        {t('auth.backToLogin')}
                       </motion.button>
                     </Link>
 
@@ -234,7 +236,7 @@ function ForgotPasswordForm() {
                       className="flex items-center justify-center gap-1.5 mt-5 mx-auto text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors duration-200"
                     >
                       <RefreshCw className="h-3 w-3" />
-                      No llego? Reenviar
+                      {t('auth.didntArrive')}
                     </button>
                   </motion.div>
                 )}
@@ -250,7 +252,7 @@ function ForgotPasswordForm() {
             className="text-center text-[13px] mt-6"
             style={{ color: 'var(--text-muted)', opacity: 0.4 }}
           >
-            Powered by <span className="font-medium" style={{ color: 'var(--accent)', opacity: 0.6 }}>Nora</span>
+            {t('auth.poweredBy')}
           </motion.p>
         </motion.div>
       </div>

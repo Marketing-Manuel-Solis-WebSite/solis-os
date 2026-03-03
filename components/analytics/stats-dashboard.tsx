@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 import type { PlatformData } from '@/app/app/analytics/page';
 import {
   CheckSquare, FileText, Users, MessageSquare, TrendingUp, TrendingDown,
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function StatsDashboard({ data }: Props) {
+  const { t } = useI18n();
   const [section, setSection] = useState<'overview' | 'tasks' | 'docs' | 'team' | 'activity'>('overview');
 
   // ========== COMPUTED METRICS ==========
@@ -93,11 +95,11 @@ export default function StatsDashboard({ data }: Props) {
   });
 
   const NAV = [
-    { id: 'overview' as const, label: 'Overview', icon: BarChart3 },
-    { id: 'tasks' as const, label: 'Tasks', icon: CheckSquare },
-    { id: 'docs' as const, label: 'Documents', icon: FileText },
-    { id: 'team' as const, label: 'Team', icon: Users },
-    { id: 'activity' as const, label: 'Activity', icon: Activity },
+    { id: 'overview' as const, label: t('statsDash.overview'), icon: BarChart3 },
+    { id: 'tasks' as const, label: t('statsDash.tasks'), icon: CheckSquare },
+    { id: 'docs' as const, label: t('statsDash.documents'), icon: FileText },
+    { id: 'team' as const, label: t('statsDash.team'), icon: Users },
+    { id: 'activity' as const, label: t('statsDash.activity'), icon: Activity },
   ];
 
   return (
@@ -117,7 +119,7 @@ export default function StatsDashboard({ data }: Props) {
         <div className="space-y-6">
           {/* Department Performance */}
           <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '120ms' }}>
-            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-[var(--accent)]" /> Department Performance</h3>
+            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2"><TrendingUp className="h-4 w-4 text-[var(--accent)]" /> {t('statsDash.deptPerformance')}</h3>
             <div className="space-y-4">
               {deptPerformance.map(dp => (
                 <div key={dp.team.id} className="flex items-center gap-4">
@@ -133,10 +135,10 @@ export default function StatsDashboard({ data }: Props) {
                       <span className="text-sm font-bold w-10 text-right" style={{ color: dp.team.color }}>{dp.rate}%</span>
                     </div>
                     <div className="flex gap-4 text-[12px] text-[var(--text-muted)]">
-                      <span>{dp.tasks} tasks</span>
-                      <span>{dp.completed} done</span>
-                      <span>{dp.docs} docs</span>
-                      <span>{dp.members} people</span>
+                      <span>{t('statsDash.nTasks', { n: dp.tasks })}</span>
+                      <span>{t('statsDash.nDone', { n: dp.completed })}</span>
+                      <span>{t('statsDash.nDocs', { n: dp.docs })}</span>
+                      <span>{t('statsDash.nPeople', { n: dp.members })}</span>
                     </div>
                   </div>
                 </div>
@@ -148,7 +150,7 @@ export default function StatsDashboard({ data }: Props) {
           <div className="grid grid-cols-2 gap-6">
             {/* Completion Rate Ring */}
             <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '160ms' }}>
-              <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Task Completion</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">{t('statsDash.taskCompletion')}</h3>
               <div className="flex items-center gap-6">
                 <div className="relative w-32 h-32">
                   <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
@@ -160,21 +162,21 @@ export default function StatsDashboard({ data }: Props) {
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
                       <p className="text-2xl font-bold text-[var(--text-primary)]">{completionRate}%</p>
-                      <p className="text-[9px] text-[var(--text-muted)]">complete</p>
+                      <p className="text-[9px] text-[var(--text-muted)]">{t('statsDash.complete')}</p>
                     </div>
                   </div>
                 </div>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span className="text-[var(--text-secondary)]">{completedTasks} completed</span></div>
-                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-blue-500" /><span className="text-[var(--text-secondary)]">{tasks.length - completedTasks - overdueTasks} in progress</span></div>
-                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-red-500" /><span className="text-[var(--text-secondary)]">{overdueTasks} overdue</span></div>
+                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /><span className="text-[var(--text-secondary)]">{t('statsDash.completed', { n: completedTasks })}</span></div>
+                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-blue-500" /><span className="text-[var(--text-secondary)]">{t('statsDash.inProgress', { n: tasks.length - completedTasks - overdueTasks })}</span></div>
+                  <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-red-500" /><span className="text-[var(--text-secondary)]">{t('statsDash.overdue', { n: overdueTasks })}</span></div>
                 </div>
               </div>
             </div>
 
             {/* Activity chart */}
             <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '200ms' }}>
-              <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Weekly Activity</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">{t('statsDash.weeklyActivity')}</h3>
               <div className="flex items-end gap-2 h-32">
                 {Object.entries(activityByDay).map(([day, count]) => {
                   const max = Math.max(...Object.values(activityByDay), 1);
@@ -194,19 +196,19 @@ export default function StatsDashboard({ data }: Props) {
           {/* Content metrics */}
           <div className="grid grid-cols-3 gap-4 anim-slide" style={{ animationDelay: '240ms' }}>
             <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-5">
-              <p className="text-[12px] text-[var(--text-muted)] uppercase font-semibold mb-1">Total Words Written</p>
+              <p className="text-[12px] text-[var(--text-muted)] uppercase font-semibold mb-1">{t('statsDash.totalWordsWritten')}</p>
               <p className="text-3xl font-bold text-[var(--text-primary)]">{totalWords.toLocaleString()}</p>
-              <p className="text-[12px] text-[var(--text-muted)] mt-1">across {docs.length} documents</p>
+              <p className="text-[12px] text-[var(--text-muted)] mt-1">{t('statsDash.acrossDocs', { n: docs.length })}</p>
             </div>
             <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-5">
-              <p className="text-[12px] text-[var(--text-muted)] uppercase font-semibold mb-1">Avg Words/Doc</p>
+              <p className="text-[12px] text-[var(--text-muted)] uppercase font-semibold mb-1">{t('statsDash.avgWordsDoc')}</p>
               <p className="text-3xl font-bold text-[var(--text-primary)]">{docs.length > 0 ? Math.round(totalWords / docs.length).toLocaleString() : 0}</p>
-              <p className="text-[12px] text-[var(--text-muted)] mt-1">per document average</p>
+              <p className="text-[12px] text-[var(--text-muted)] mt-1">{t('statsDash.perDocAvg')}</p>
             </div>
             <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-5">
-              <p className="text-[12px] text-[var(--text-muted)] uppercase font-semibold mb-1">Tasks/Member</p>
+              <p className="text-[12px] text-[var(--text-muted)] uppercase font-semibold mb-1">{t('statsDash.tasksMember')}</p>
               <p className="text-3xl font-bold text-[var(--text-primary)]">{members.length > 0 ? (tasks.length / members.length).toFixed(1) : 0}</p>
-              <p className="text-[12px] text-[var(--text-muted)] mt-1">average workload</p>
+              <p className="text-[12px] text-[var(--text-muted)] mt-1">{t('statsDash.avgWorkload')}</p>
             </div>
           </div>
         </div>
@@ -218,7 +220,7 @@ export default function StatsDashboard({ data }: Props) {
           <div className="grid grid-cols-2 gap-6">
             {/* By Status */}
             <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide">
-              <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Tasks by Status</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">{t('statsDash.tasksByStatus')}</h3>
               <div className="space-y-3">
                 {Object.entries(tasksByStatus).sort((a, b) => b[1] - a[1]).map(([status, count]) => {
                   const pct = tasks.length > 0 ? Math.round((count / tasks.length) * 100) : 0;
@@ -239,7 +241,7 @@ export default function StatsDashboard({ data }: Props) {
 
             {/* By Priority */}
             <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '40ms' }}>
-              <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Tasks by Priority</h3>
+              <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">{t('statsDash.tasksByPriority')}</h3>
               <div className="space-y-3">
                 {['urgent', 'high', 'medium', 'low'].map(p => {
                   const count = tasksByPriority[p] || 0;
@@ -261,7 +263,7 @@ export default function StatsDashboard({ data }: Props) {
 
           {/* By Department */}
           <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '80ms' }}>
-            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Tasks by Department</h3>
+            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">{t('statsDash.tasksByDept')}</h3>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               {Object.entries(tasksByDept).sort((a, b) => b[1] - a[1]).map(([dept, count]) => {
                 const team = teams.find((t: any) => t.name === dept);
@@ -272,7 +274,7 @@ export default function StatsDashboard({ data }: Props) {
                       <span className="text-sm font-medium" style={{ color: team?.color || '#6B7280' }}>{dept}</span>
                     </div>
                     <p className="text-xl font-bold text-[var(--text-primary)]">{count}</p>
-                    <p className="text-[12px] text-[var(--text-muted)]">tasks assigned</p>
+                    <p className="text-[12px] text-[var(--text-muted)]">{t('statsDash.tasksAssigned')}</p>
                   </div>
                 );
               })}

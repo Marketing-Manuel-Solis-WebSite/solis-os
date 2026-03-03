@@ -8,12 +8,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, Lock, Eye, EyeOff, CheckCircle2, ShieldX, ArrowLeft, KeyRound } from 'lucide-react';
 import Link from 'next/link';
+import { useI18n } from '@/lib/i18n';
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 type Stage = 'verifying' | 'form' | 'success' | 'error';
 
 function ResetPasswordHandler() {
+  const { t } = useI18n();
   const searchParams = useSearchParams();
   const router = useRouter();
   const mode = searchParams.get('mode');
@@ -33,7 +35,7 @@ function ResetPasswordHandler() {
   // Verificar el codigo al montar
   useEffect(() => {
     if (mode !== 'resetPassword' || !oobCode) {
-      setErrorDetail({ title: 'Enlace invalido', msg: 'Este enlace no es valido. Verifica que lo hayas copiado correctamente.' });
+      setErrorDetail({ title: t('authError.invalidLink'), msg: t('authError.invalidLinkMsg') });
       setStage('error');
       return;
     }
@@ -81,11 +83,11 @@ function ResetPasswordHandler() {
     setErr('');
 
     if (pw !== confirmPw) {
-      setErr('Las contraseñas no coinciden.');
+      setErr(t('auth.passwordsDontMatch'));
       return;
     }
     if (!strongEnough) {
-      setErr('La contraseña es muy debil. Cumple al menos 3 requisitos.');
+      setErr(t('auth.weakPasswordErr'));
       return;
     }
 
@@ -183,7 +185,7 @@ function ResetPasswordHandler() {
                     className="text-center py-8"
                   >
                     <Loader2 className="h-8 w-8 animate-spin text-[var(--accent)] mx-auto mb-4" />
-                    <p className="text-sm text-[var(--text-secondary)]">Verificando enlace...</p>
+                    <p className="text-sm text-[var(--text-secondary)]">{t('auth.verifying')}</p>
                   </motion.div>
                 )}
 
@@ -216,7 +218,7 @@ function ResetPasswordHandler() {
                         className="w-full h-12 rounded-xl bg-gradient-to-r from-[#8C28FF] to-[#7B68EE] text-white text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-2"
                         style={{ boxShadow: '0 4px 20px rgba(140,40,255,0.4), 0 0 40px rgba(140,40,255,0.12)' }}
                       >
-                        Solicitar nuevo enlace
+                        {t('auth.requestNewLink')}
                       </motion.button>
                     </Link>
 
@@ -225,7 +227,7 @@ function ResetPasswordHandler() {
                       className="flex items-center justify-center gap-1.5 mt-5 text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors duration-200"
                     >
                       <ArrowLeft className="h-3.5 w-3.5" />
-                      Volver a iniciar sesion
+                      {t('auth.backToLogin')}
                     </Link>
                   </motion.div>
                 )}
@@ -244,9 +246,9 @@ function ResetPasswordHandler() {
                       <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#8C28FF]/20 to-[#7B68EE]/10 flex items-center justify-center mx-auto mb-4">
                         <KeyRound className="h-6 w-6 text-[#8C28FF]" />
                       </div>
-                      <h2 className="text-2xl font-bold text-[var(--text-primary)]">Nueva Contraseña</h2>
+                      <h2 className="text-2xl font-bold text-[var(--text-primary)]">{t('auth.resetTitle')}</h2>
                       <p className="text-sm text-[var(--text-tertiary)] mt-1.5 leading-relaxed">
-                        Crea una nueva contraseña para <span className="font-medium text-[var(--text-secondary)]">{verifiedEmail}</span>
+                        {t('auth.resetSubtitle', { email: verifiedEmail })}
                       </p>
                     </div>
 
@@ -281,7 +283,7 @@ function ResetPasswordHandler() {
                           type={showPw ? 'text' : 'password'}
                           value={pw}
                           onChange={e => setPw(e.target.value)}
-                          placeholder="Nueva contraseña"
+                          placeholder={t('auth.newPassword')}
                           required
                           minLength={8}
                           autoFocus
@@ -308,7 +310,7 @@ function ResetPasswordHandler() {
                           type={showConfirm ? 'text' : 'password'}
                           value={confirmPw}
                           onChange={e => setConfirmPw(e.target.value)}
-                          placeholder="Confirmar contraseña"
+                          placeholder={t('auth.confirmPassword')}
                           required
                           minLength={8}
                           className="w-full h-12 pl-10 pr-11 rounded-xl bg-[var(--bg-input)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 border-[1.5px] border-[var(--border)] hover:border-[var(--border-strong)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15 focus:shadow-[0_0_20px_rgba(140,40,255,0.1)]"
@@ -329,7 +331,7 @@ function ResetPasswordHandler() {
                           animate={{ opacity: 1 }}
                           className="text-xs text-[var(--error)] pl-1"
                         >
-                          Las contraseñas no coinciden
+                          {t('auth.passwordsDontMatch')}
                         </motion.p>
                       )}
                       {confirmPw && pw === confirmPw && pw.length > 0 && (
@@ -338,7 +340,7 @@ function ResetPasswordHandler() {
                           animate={{ opacity: 1 }}
                           className="text-xs text-[#00C48C] pl-1 flex items-center gap-1"
                         >
-                          <CheckCircle2 className="h-3 w-3" /> Las contraseñas coinciden
+                          <CheckCircle2 className="h-3 w-3" /> {t('auth.passwordsMatch')}
                         </motion.p>
                       )}
 
@@ -351,7 +353,7 @@ function ResetPasswordHandler() {
                         className="w-full h-12 rounded-xl bg-gradient-to-r from-[#8C28FF] to-[#7B68EE] text-white text-sm font-semibold transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2"
                         style={{ boxShadow: '0 4px 20px rgba(140,40,255,0.4), 0 0 40px rgba(140,40,255,0.12)' }}
                       >
-                        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Restablecer contraseña'}
+                        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : t('auth.resetButton')}
                       </motion.button>
                     </form>
                   </motion.div>
@@ -376,9 +378,9 @@ function ResetPasswordHandler() {
                       <CheckCircle2 className="h-8 w-8 text-[#00C48C]" />
                     </motion.div>
 
-                    <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Contraseña actualizada</h2>
+                    <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">{t('auth.passwordUpdated')}</h2>
                     <p className="text-sm text-[var(--text-tertiary)] leading-relaxed mb-8">
-                      Tu contraseña fue restablecida exitosamente. Ya puedes iniciar sesion con tu nueva contraseña.
+                      {t('auth.passwordUpdatedMsg')}
                     </p>
 
                     <Link href="/login">
@@ -388,12 +390,12 @@ function ResetPasswordHandler() {
                         className="w-full h-12 rounded-xl bg-gradient-to-r from-[#8C28FF] to-[#7B68EE] text-white text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-2"
                         style={{ boxShadow: '0 4px 20px rgba(140,40,255,0.4), 0 0 40px rgba(140,40,255,0.12)' }}
                       >
-                        Iniciar sesion
+                        {t('auth.loginButton')}
                       </motion.button>
                     </Link>
 
                     <p className="text-xs text-[var(--text-muted)] mt-4">
-                      Redirigiendo en {countdown} segundo{countdown !== 1 ? 's' : ''}...
+                      {t('auth.redirecting', { n: countdown })}
                     </p>
                   </motion.div>
                 )}
@@ -409,7 +411,7 @@ function ResetPasswordHandler() {
             className="text-center text-[13px] mt-6"
             style={{ color: 'var(--text-muted)', opacity: 0.4 }}
           >
-            Powered by <span className="font-medium" style={{ color: 'var(--accent)', opacity: 0.6 }}>Nora</span>
+            {t('auth.poweredBy')}
           </motion.p>
         </motion.div>
       </div>

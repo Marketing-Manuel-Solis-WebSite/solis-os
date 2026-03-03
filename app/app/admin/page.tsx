@@ -1,5 +1,6 @@
 'use client';
 import { useAuth, Role, Team } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import {
   getMembers, updateMember, getAuditLogs, logAction, getOrg, updateOrg,
@@ -18,23 +19,24 @@ import {
 } from 'lucide-react';
 
 type S = 'org'|'users'|'departments'|'perms'|'struct'|'fields'|'tpl'|'auto'|'notif'|'ai'|'integ'|'audit';
-const SS: {id:S;l:string;i:any;d:string}[] = [
-  {id:'org',l:'Organization',i:Building2,d:'Branding & settings'},
-  {id:'users',l:'Users & Teams',i:Users,d:'Members & roles'},
-  {id:'departments',l:'Departments',i:FolderOpen,d:'Manage departments'},
-  {id:'perms',l:'Permissions',i:Shield,d:'RBAC matrix'},
-  {id:'struct',l:'Structure',i:LayoutGrid,d:'Workspaces'},
-  {id:'fields',l:'Custom Fields',i:Columns3,d:'Field schemas'},
-  {id:'tpl',l:'Templates',i:FileStack,d:'Task templates'},
-  {id:'auto',l:'Automations',i:Zap,d:'Rules'},
-  {id:'notif',l:'Notifications',i:Bell,d:'Email config'},
-  {id:'ai',l:'AI Config',i:Bot,d:'AI features'},
-  {id:'integ',l:'Integrations',i:Plug,d:'Webhooks'},
-  {id:'audit',l:'Audit Logs',i:ScrollText,d:'Security'},
+const SS: {id:S;lKey:string;i:any;dKey:string}[] = [
+  {id:'org',lKey:'admin.org',i:Building2,dKey:'admin.orgDesc'},
+  {id:'users',lKey:'admin.users',i:Users,dKey:'admin.usersDesc'},
+  {id:'departments',lKey:'admin.departments',i:FolderOpen,dKey:'admin.departmentsDesc'},
+  {id:'perms',lKey:'admin.permissions',i:Shield,dKey:'admin.permissionsDesc'},
+  {id:'struct',lKey:'admin.structure',i:LayoutGrid,dKey:'admin.structureDesc'},
+  {id:'fields',lKey:'admin.customFields',i:Columns3,dKey:'admin.customFieldsDesc'},
+  {id:'tpl',lKey:'admin.templates',i:FileStack,dKey:'admin.templatesDesc'},
+  {id:'auto',lKey:'admin.automations',i:Zap,dKey:'admin.automationsDesc'},
+  {id:'notif',lKey:'admin.notifications',i:Bell,dKey:'admin.notificationsDesc'},
+  {id:'ai',lKey:'admin.aiConfig',i:Bot,dKey:'admin.aiConfigDesc'},
+  {id:'integ',lKey:'admin.integrations',i:Plug,dKey:'admin.integrationsDesc'},
+  {id:'audit',lKey:'admin.audit',i:ScrollText,dKey:'admin.auditDesc'},
 ];
 
 export default function Admin() {
   const { user, me, isAdmin } = useAuth();
+  const { t } = useI18n();
   const toast = useToast();
   const [s, setS] = useState<S|null>(null);
 
@@ -42,15 +44,15 @@ export default function Admin() {
     <div className="flex items-center justify-center h-[60vh]">
       <div className="text-center">
         <Shield className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
-        <p className="text-lg font-bold text-[var(--text-primary)]">Access Denied</p>
-        <p className="text-sm text-[var(--text-muted)] mt-1">Role: <span className="text-[var(--accent)]">{me?.role}</span></p>
+        <p className="text-lg font-bold text-[var(--text-primary)]">{t('admin.accessDenied')}</p>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{t('admin.role', { role: me?.role || '' })}</p>
       </div>
     </div>
   );
 
   if (!s) return (
     <div className="p-6 max-w-5xl mx-auto">
-      <div className="mb-8"><h1 className="text-2xl font-bold text-[var(--text-primary)]">Admin Console</h1></div>
+      <div className="mb-8"><h1 className="text-2xl font-bold text-[var(--text-primary)]">{t('admin.console')}</h1></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {SS.map((x, i) => (
           <button key={x.id} onClick={() => setS(x.id)}
@@ -60,8 +62,8 @@ export default function Admin() {
               <x.i className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-semibold text-sm text-[var(--text-primary)]">{x.l}</p>
-              <p className="text-sm text-[var(--text-muted)]">{x.d}</p>
+              <p className="font-semibold text-sm text-[var(--text-primary)]">{t(x.lKey)}</p>
+              <p className="text-sm text-[var(--text-muted)]">{t(x.dKey)}</p>
             </div>
             <ChevronRight className="h-4 w-4 text-[var(--text-muted)] mt-1 ml-auto" />
           </button>
@@ -72,11 +74,11 @@ export default function Admin() {
 
   const Nav = () => (
     <aside className="w-48 bg-[var(--bg-base)] shadow-panel shrink-0 p-2 overflow-y-auto">
-      <button onClick={() => setS(null)} className="w-full text-left px-3 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-1">← Back</button>
+      <button onClick={() => setS(null)} className="w-full text-left px-3 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-1">{t('common.back')}</button>
       {SS.map(x => (
         <button key={x.id} onClick={() => setS(x.id)}
           className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] transition ${s === x.id ? 'bg-[var(--accent-subtle)] text-[var(--accent)] font-semibold' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-          <x.i className="h-4 w-4" />{x.l}
+          <x.i className="h-4 w-4" />{t(x.lKey)}
         </button>
       ))}
     </aside>

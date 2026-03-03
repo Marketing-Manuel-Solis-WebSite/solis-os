@@ -4,7 +4,9 @@
       "Bash(npx next:*)",
       "Bash(xargs grep:*)",
       "Bash(python3:*)",
-      "Bash(find components:*)"
+      "Bash(find components:*)",
+      "Bash(test:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

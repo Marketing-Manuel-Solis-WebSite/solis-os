@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, ChevronDown, X, Bookmark, Save,
@@ -63,6 +64,7 @@ export default function TaskSidebar({
   onViewChange, onFiltersChange, onGroupByChange, onSortByChange,
   onToggle, onLoadView, onSaveView,
 }: Props) {
+  const { t } = useI18n();
   const [showFilters, setShowFilters] = useState(true);
   const [showSaved, setShowSaved] = useState(true);
 
@@ -83,7 +85,7 @@ export default function TaskSidebar({
     >
       {/* Header */}
       <div className="flex items-center justify-between p-3">
-        <span className="text-sm font-bold text-[var(--text-primary)]">Tareas</span>
+        <span className="text-sm font-bold text-[var(--text-primary)]">{t('tasks.title')}</span>
         <button onClick={onToggle} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -92,7 +94,7 @@ export default function TaskSidebar({
       <div className="flex-1 overflow-y-auto scrollbar-thin">
         {/* View Switcher */}
         <div className="p-2 space-y-0.5">
-          <p className="px-2 py-1.5 text-[12px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Vistas</p>
+          <p className="px-2 py-1.5 text-[12px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{t('shortcuts.views')}</p>
           {VIEWS.map(v => (
             <button key={v.id} onClick={() => onViewChange(v.id)}
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] transition-all ${
@@ -101,7 +103,7 @@ export default function TaskSidebar({
                   : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
               }`}>
               <v.Icon className="h-4 w-4" />
-              {v.label}
+              {t(`view.${v.id}`)}
               <span className="ml-auto text-[12px] opacity-50">{v.shortcut}</span>
             </button>
           ))}
@@ -116,7 +118,7 @@ export default function TaskSidebar({
             <motion.span animate={{ rotate: showFilters ? 0 : -90 }} transition={{ duration: 0.2 }}>
               <ChevronDown className="h-3 w-3" />
             </motion.span>
-            Filtros
+            {t('common.filter')}
             {activeFilterCount > 0 && (
               <span className="ml-auto px-1.5 py-0.5 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] text-[9px] font-bold">
                 {activeFilterCount}
@@ -133,29 +135,29 @@ export default function TaskSidebar({
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <FilterSection label="Estado"
-                  items={STATUSES.map(s => ({ id: s.id, label: s.label, color: s.color }))}
+                <FilterSection label={t('taskCreate.status')}
+                  items={STATUSES.map(s => ({ id: s.id, label: t(`status.${s.id}`), color: s.color }))}
                   selected={filters.status}
                   onChange={(ids) => onFiltersChange({ ...filters, status: ids })} />
 
-                <FilterSection label="Prioridad"
-                  items={PRIORITIES.map(p => ({ id: p.id, label: p.label, color: p.color }))}
+                <FilterSection label={t('taskCreate.priority')}
+                  items={PRIORITIES.map(p => ({ id: p.id, label: t(`priority.${p.id}`), color: p.color }))}
                   selected={filters.priority}
                   onChange={(ids) => onFiltersChange({ ...filters, priority: ids })} />
 
-                <FilterSection label="Tipo"
-                  items={TASK_TYPES.map(t => ({ id: t.id, label: t.label, color: t.color }))}
+                <FilterSection label={t('taskCreate.type')}
+                  items={TASK_TYPES.map(tp => ({ id: tp.id, label: t(`taskType.${tp.id}`), color: tp.color }))}
                   selected={filters.type}
                   onChange={(ids) => onFiltersChange({ ...filters, type: ids })} />
 
-                <FilterSection label="Asignado"
+                <FilterSection label={t('taskCreate.assignees')}
                   items={members.map(m => ({ id: m.id, label: m.displayName || m.email, color: '#3B82F6' }))}
                   selected={filters.assignee}
                   onChange={(ids) => onFiltersChange({ ...filters, assignee: ids })} />
 
                 {/* Date range */}
                 <div className="px-2 py-1.5">
-                  <p className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">Fecha límite</p>
+                  <p className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-1.5">{t('taskCreate.dueDate')}</p>
                   <div className="flex gap-1">
                     <input type="date" value={filters.dateRange.from || ''}
                       onChange={e => onFiltersChange({ ...filters, dateRange: { ...filters.dateRange, from: e.target.value || null } })}
@@ -169,7 +171,7 @@ export default function TaskSidebar({
                 {activeFilterCount > 0 && (
                   <button onClick={() => onFiltersChange(EMPTY_FILTERS)}
                     className="w-full px-3 py-1.5 text-[13px] text-red-400 hover:bg-red-400/5 rounded-lg flex items-center gap-1.5 transition">
-                    <X className="h-3 w-3" /> Limpiar filtros
+                    <X className="h-3 w-3" /> {t('common.clearAll')}
                   </button>
                 )}
               </motion.div>
@@ -181,16 +183,16 @@ export default function TaskSidebar({
 
         {/* Sort & Group */}
         <div className="p-2 space-y-2">
-          <p className="px-2 py-1.5 text-[12px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Ordenar y Agrupar</p>
+          <p className="px-2 py-1.5 text-[12px] font-bold uppercase tracking-widest text-[var(--text-muted)]">{t('tasks.sortLabel', { name: '' }).replace(/[: ]+$/, '')} & {t('tasks.groupLabel', { name: '' }).replace(/[: ]+$/, '')}</p>
           <div className="px-2 space-y-1.5">
             <select value={sortBy} onChange={e => onSortByChange(e.target.value)} className="select-dark h-7 text-[13px] w-full">
               {SORT_OPTIONS.map(s => (
-                <option key={s.id} value={s.id}>{s.label}</option>
+                <option key={s.id} value={s.id}>{t(`sort.${s.id}`)}</option>
               ))}
             </select>
             <select value={groupBy} onChange={e => onGroupByChange(e.target.value)} className="select-dark h-7 text-[13px] w-full">
               {GROUP_OPTIONS.map(g => (
-                <option key={g.id} value={g.id}>Agrupar: {g.label}</option>
+                <option key={g.id} value={g.id}>{t('tasks.groupLabel', { name: t(`group.${g.id}`) })}</option>
               ))}
             </select>
           </div>
@@ -205,7 +207,7 @@ export default function TaskSidebar({
             <motion.span animate={{ rotate: showSaved ? 0 : -90 }} transition={{ duration: 0.2 }}>
               <ChevronDown className="h-3 w-3" />
             </motion.span>
-            Vistas Guardadas
+            {t('shortcuts.views')}
             {savedViews.length > 0 && (
               <span className="ml-auto text-[9px] opacity-60">{savedViews.length}</span>
             )}
@@ -230,7 +232,7 @@ export default function TaskSidebar({
                 <button onClick={onSaveView}
                   className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-[var(--accent)] hover:bg-[var(--accent-subtle)] transition">
                   <Save className="h-3 w-3" />
-                  Guardar vista actual
+                  {t('common.save')}
                 </button>
               </motion.div>
             )}

@@ -143,10 +143,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       answer: text,
       mode,
-      tokens: text.length, // Approximate
+      tokens: text.length,
     });
   } catch (error: any) {
     console.error('AI API error:', error);
+    const is429 = error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('quota');
+    if (is429) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded. Please wait a minute and try again.' },
+        { status: 429 }
+      );
+    }
     return NextResponse.json(
       { error: error.message || 'AI processing failed. Verify your Gemini API key in .env' },
       { status: 500 }

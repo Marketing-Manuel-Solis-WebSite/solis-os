@@ -1,4 +1,5 @@
 'use client';
+import { useI18n } from '@/lib/i18n';
 import { Calendar } from 'lucide-react';
 import { PRIORITIES, VISIBILITY, Task } from './constants';
 
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function TaskCard({ task, members, teams, isSelected, isDragging, compact, onSelect, onDragStart, onDragEnd }: Props) {
+  const { t } = useI18n();
   const pri = PRIORITIES.find(x => x.id === task.priority);
   const due = task.dueDate?.toDate?.();
   const overdue = due && due < new Date() && task.status !== 'done';
@@ -66,7 +68,7 @@ export default function TaskCard({ task, members, teams, isSelected, isDragging,
       {totalSub > 0 && (
         <div className="mb-2.5 ml-5">
           <div className="flex items-center gap-1.5 text-[12px] text-[var(--text-muted)] mb-1">
-            <span>{doneSub}/{totalSub} subtareas</span>
+            <span>{t('tasks.subtasks', { done: doneSub, total: totalSub })}</span>
           </div>
           <div className="h-1 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
             <div className="h-full rounded-full bg-[var(--accent)] transition-all"

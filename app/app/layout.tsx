@@ -1,6 +1,7 @@
 'use client';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
+import { useI18n } from '@/lib/i18n';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { signOut } from 'firebase/auth';
@@ -11,7 +12,7 @@ import { ToastProvider, FirebaseToastBridge } from '@/components/notifications/t
 import {
   LayoutDashboard, CheckSquare, FileText, MessageSquare, Zap, BarChart3,
   Users, Shield, LogOut, Menu, Bot, ChevronLeft, Sun, Moon, ChevronDown,
-  Settings, Loader2,
+  Settings, Loader2, CalendarDays, MoreHorizontal, Target, Clock, PenTool, FileInput,
 } from 'lucide-react';
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -20,21 +21,46 @@ const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 // NAV ITEMS
 // ============================================
 const NAV = [
-  { label: 'Dashboard', icon: LayoutDashboard, href: '/app' },
-  { label: 'Tasks', icon: CheckSquare, href: '/app/tasks' },
-  { label: 'Docs', icon: FileText, href: '/app/docs' },
-  { label: 'Chat', icon: MessageSquare, href: '/app/chat' },
-  { label: 'Automations', icon: Zap, href: '/app/automations' },
-  { label: 'Analytics', icon: BarChart3, href: '/app/analytics' },
-  { label: 'Org Chart', icon: Users, href: '/app/org-chart' },
-  { label: 'Solis AI', icon: Bot, href: '/app/ai' },
+  { key: 'nav.dashboard', icon: LayoutDashboard, href: '/app' },
+  { key: 'nav.tasks', icon: CheckSquare, href: '/app/tasks' },
+  { key: 'nav.planner', icon: CalendarDays, href: '/app/planner' },
+  { key: 'nav.docs', icon: FileText, href: '/app/docs' },
+  { key: 'nav.chat', icon: MessageSquare, href: '/app/chat' },
+  { key: 'nav.automations', icon: Zap, href: '/app/automations' },
+  { key: 'nav.analytics', icon: BarChart3, href: '/app/analytics' },
+  { key: 'nav.orgChart', icon: Users, href: '/app/org-chart' },
+  { key: 'nav.ai', icon: Bot, href: '/app/ai' },
+];
+
+const MORE_NAV = [
+  { key: 'nav.goals', icon: Target, href: '/app/goals' },
+  { key: 'nav.timesheets', icon: Clock, href: '/app/timesheets' },
+  { key: 'nav.whiteboards', icon: PenTool, href: '/app/whiteboards' },
+  { key: 'nav.forms', icon: FileInput, href: '/app/forms' },
 ];
 
 // ============================================
 // TEAM SELECTOR DROPDOWN
 // ============================================
+// ============================================
+// LANGUAGE TOGGLE
+// ============================================
+function LanguageToggle() {
+  const { lang, setLang } = useI18n();
+  return (
+    <button
+      onClick={() => setLang(lang === 'es' ? 'en' : 'es')}
+      className="px-2 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all duration-200"
+      aria-label="Toggle language"
+    >
+      {lang === 'es' ? 'EN' : 'ES'}
+    </button>
+  );
+}
+
 function TeamSelector() {
   const { teams, activeTeamId, setActiveTeamId, canSeeAllTeams, me, allMembers } = useAuth();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const activeTeam = teams.find(t => t.id === activeTeamId);
@@ -56,7 +82,7 @@ function TeamSelector() {
             <span>{myTeam.name}</span>
           </>
         ) : (
-          <span className="text-[var(--text-muted)]">No Department</span>
+          <span className="text-[var(--text-muted)]">{t('common.noDepartment')}</span>
         )}
       </div>
     );
@@ -71,14 +97,14 @@ function TeamSelector() {
         className="flex items-center gap-2 h-8 px-3 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--bg-active)] transition-all duration-200 text-sm font-medium text-[var(--text-primary)] shadow-sm"
       >
         {activeTeamId === '__all__' ? (
-          <span>General</span>
+          <span>{t('common.general')}</span>
         ) : activeTeam ? (
           <>
             <span className="text-sm">{activeTeam.icon}</span>
             <span>{activeTeam.name}</span>
           </>
         ) : (
-          <span className="text-[var(--text-muted)]">Select Team</span>
+          <span className="text-[var(--text-muted)]">{t('common.selectTeam')}</span>
         )}
         <ChevronDown className={`h-3.5 w-3.5 text-[var(--text-muted)] transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -97,8 +123,8 @@ function TeamSelector() {
                 onClick={() => { setActiveTeamId('__all__'); setOpen(false); }}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all duration-200 ${activeTeamId === '__all__' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'hover:bg-[var(--bg-hover)] text-[var(--text-primary)]'}`}
               >
-                <span className="text-sm font-medium">General</span>
-                <span className="text-[12px] text-[var(--text-muted)] ml-auto">All depts</span>
+                <span className="text-sm font-medium">{t('common.general')}</span>
+                <span className="text-[12px] text-[var(--text-muted)] ml-auto">{t('common.allDepts')}</span>
               </button>
               <div className="h-px bg-[var(--border-subtle)] my-1 mx-2" />
               {teams.map(t => (
@@ -145,6 +171,7 @@ function ThemeToggle() {
 // ============================================
 function UserMenu() {
   const { me } = useAuth();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -193,13 +220,13 @@ function UserMenu() {
                 onClick={() => { router.push('/app/admin'); setOpen(false); }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-200"
               >
-                <Settings className="h-4 w-4" strokeWidth={1.75} /> Settings
+                <Settings className="h-4 w-4" strokeWidth={1.75} /> {t('common.settings')}
               </button>
               <button
                 onClick={() => { signOut(auth); setOpen(false); }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-[var(--error)] hover:bg-[var(--error-bg)] transition-all duration-200"
               >
-                <LogOut className="h-4 w-4" strokeWidth={1.75} /> Sign Out
+                <LogOut className="h-4 w-4" strokeWidth={1.75} /> {t('common.signOut')}
               </button>
             </div>
           </motion.div>
@@ -214,9 +241,14 @@ function UserMenu() {
 // ============================================
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, me, loading, isAdmin, canSeeAllTeams } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const path = usePathname();
   const [open, setOpen] = useState(true);
+  const isMoreRoute = MORE_NAV.some(n => path.startsWith(n.href));
+  const [moreOpen, setMoreOpen] = useState(isMoreRoute);
+  const morePopRef = useRef<HTMLDivElement>(null);
+  const [morePopover, setMorePopover] = useState(false);
 
   useEffect(() => { if (!loading && !user) router.push('/login'); }, [loading, user, router]);
 
@@ -224,7 +256,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
       <div className="text-center">
         <Loader2 className="h-6 w-6 animate-spin text-[var(--accent)] mx-auto mb-3" />
-        <p className="text-sm text-[var(--text-muted)]">Loading workspace...</p>
+        <p className="text-sm text-[var(--text-muted)]">{t('common.loadingWorkspace')}</p>
       </div>
     </div>
   );
@@ -283,7 +315,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 <AnimatePresence>
                   {open && (
                     <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
-                      {n.label}
+                      {t(n.key)}
                     </motion.span>
                   )}
                 </AnimatePresence>
@@ -291,13 +323,109 @@ function Shell({ children }: { children: React.ReactNode }) {
             );
           })}
 
+          {/* More section */}
+          {open ? (
+            <>
+              <button
+                onClick={() => setMoreOpen(!moreOpen)}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-200 ${
+                  isMoreRoute && !moreOpen
+                    ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
+                    : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
+                }`}
+              >
+                <MoreHorizontal className="h-5 w-5 shrink-0" strokeWidth={1.75} />
+                <span>{t('nav.more')}</span>
+                <ChevronDown className={`h-3.5 w-3.5 ml-auto transition-transform duration-200 ${moreOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <AnimatePresence>
+                {moreOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: EASE }}
+                    className="overflow-hidden"
+                  >
+                    <div className="pl-3 space-y-0.5">
+                      {MORE_NAV.map(n => {
+                        const active = isActive(n.href);
+                        return (
+                          <button
+                            key={n.href}
+                            onClick={() => router.push(n.href)}
+                            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-200 relative ${
+                              active
+                                ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
+                                : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
+                            }`}
+                          >
+                            {active && (
+                              <motion.div
+                                layoutId="nav-indicator"
+                                className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]"
+                                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                              />
+                            )}
+                            <n.icon className="h-5 w-5 shrink-0" strokeWidth={1.75} />
+                            <span>{t(n.key)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </>
+          ) : (
+            <div ref={morePopRef} className="relative">
+              <button
+                onClick={() => setMorePopover(!morePopover)}
+                className={`w-full flex items-center justify-center py-2 rounded-lg text-sm transition-all duration-200 ${
+                  isMoreRoute
+                    ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)]'
+                    : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
+                }`}
+              >
+                <MoreHorizontal className="h-5 w-5" strokeWidth={1.75} />
+              </button>
+              <AnimatePresence>
+                {morePopover && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -4, scale: 0.97 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: -4, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute left-full top-0 ml-2 w-44 py-1.5 rounded-xl bg-[var(--bg-elevated)] shadow-dropdown z-50"
+                  >
+                    {MORE_NAV.map(n => {
+                      const active = isActive(n.href);
+                      return (
+                        <button
+                          key={n.href}
+                          onClick={() => { router.push(n.href); setMorePopover(false); }}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-all duration-200 ${
+                            active ? 'text-[var(--accent)] font-semibold bg-[var(--accent-subtle)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                          }`}
+                        >
+                          <n.icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                          <span>{t(n.key)}</span>
+                        </button>
+                      );
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
           {/* Admin section */}
           {isAdmin && (
             <>
               <AnimatePresence>
                 {open && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pt-4 pb-1 px-2.5">
-                    <p className="text-[12px] font-semibold uppercase tracking-[0.15em] text-[var(--sidebar-text)]">Administration</p>
+                    <p className="text-[12px] font-semibold uppercase tracking-[0.15em] text-[var(--sidebar-text)]">{t('nav.admin')}</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -314,7 +442,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                   <motion.div layoutId="nav-indicator" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]" />
                 )}
                 <Shield className="h-5 w-5 shrink-0" strokeWidth={1.75} />
-                <AnimatePresence>{open && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>Admin Console</motion.span>}</AnimatePresence>
+                <AnimatePresence>{open && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{t('admin.console')}</motion.span>}</AnimatePresence>
               </button>
             </>
           )}
@@ -370,13 +498,14 @@ function Shell({ children }: { children: React.ReactNode }) {
             )}
           </div>
           <div className="flex items-center gap-1">
+            <LanguageToggle />
             <ThemeToggle />
             <NotificationBell />
             <UserMenu />
           </div>
         </header>
         <main className="min-h-[calc(100vh-56px)]">
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="popLayout">
             <motion.div
               key={path}
               initial={{ opacity: 0, y: 8 }}

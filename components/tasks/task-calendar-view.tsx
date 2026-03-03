@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Task } from './constants';
 import TaskCard from './task-card';
@@ -12,14 +13,23 @@ interface Props {
   onDateChange: (taskId: string, newDate: Date) => void;
 }
 
-const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-
 export default function TaskCalendarView({ tasks, members, selectedTask, onSelect, onDateChange }: Props) {
+  const { t, lang } = useI18n();
+  const locale = lang === 'es' ? 'es-MX' : 'en-US';
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
+
+  const DIAS = useMemo(() => {
+    const fmt = new Intl.DateTimeFormat(locale, { weekday: 'short' });
+    // Monday-based: start from a known Monday (Jan 6 2020)
+    return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2020, 0, 6 + i)));
+  }, [locale]);
+
+  const monthName = useMemo(() => {
+    return new Intl.DateTimeFormat(locale, { month: 'long' }).format(new Date(year, month));
+  }, [locale, year, month]);
 
   const calendarDays = useMemo(() => {
     const firstDay = new Date(year, month, 1);
@@ -80,11 +90,11 @@ export default function TaskCalendarView({ tasks, members, selectedTask, onSelec
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-bold text-[var(--text-primary)]">
-            {MESES[month]} {year}
+            {monthName} {year}
           </h2>
           <button onClick={goToday}
             className="text-[13px] px-2.5 py-1 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--accent)] transition-all duration-200">
-            Hoy
+            {t('common.today')}
           </button>
         </div>
         <div className="flex gap-1">
@@ -145,7 +155,7 @@ export default function TaskCalendarView({ tasks, members, selectedTask, onSelec
                 ))}
                 {dayTasks.length > 3 && (
                   <div className="text-[9px] text-[var(--text-muted)] px-1">
-                    +{dayTasks.length - 3} más
+                    +{dayTasks.length - 3} {t('common.more')}
                   </div>
                 )}
               </div>

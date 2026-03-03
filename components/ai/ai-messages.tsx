@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Copy, Check, Loader2 } from 'lucide-react';
 import type { AIMessage } from '@/lib/ai-db';
+import { useI18n } from '@/lib/i18n';
 
 interface Props {
   messages: AIMessage[];
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function AIMessages({ messages, loading, streamingText }: Props) {
+  const { t } = useI18n();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
@@ -107,7 +109,7 @@ export default function AIMessages({ messages, loading, streamingText }: Props) 
                       onClick={() => copyText(msg.content, i)}
                       className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
                       {copiedIdx === i ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
-                      {copiedIdx === i ? 'Copied' : 'Copy'}
+                      {copiedIdx === i ? t('ai.copied') : t('ai.copy')}
                     </motion.button>
                   </div>
                 </div>
@@ -157,7 +159,7 @@ export default function AIMessages({ messages, loading, streamingText }: Props) 
                     <span className="w-2 h-2 rounded-full bg-[var(--accent)]/60 animate-bounce" style={{ animationDelay: '150ms' }} />
                     <span className="w-2 h-2 rounded-full bg-[var(--accent)]/60 animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
-                  <span className="text-sm text-[var(--text-muted)]">Thinking...</span>
+                  <span className="text-sm text-[var(--text-muted)]">{t('ai.thinking')}</span>
                 </div>
               </div>
             </div>

@@ -1,5 +1,6 @@
 'use client';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import { useEffect, useState, useCallback } from 'react';
 import { getAutomations, createAutomation, updateAutomation, deleteAutomation, logAction } from '@/lib/db';
 import {
@@ -78,6 +79,7 @@ interface AutoRule {
 // === MAIN ===
 export default function AutomationsPage() {
   const { user, me, activeTeamId, teams, can } = useAuth();
+  const { t } = useI18n();
   const [rules, setRules] = useState<AutoRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [showBuilder, setShowBuilder] = useState(false);
@@ -101,7 +103,7 @@ export default function AutomationsPage() {
   };
 
   const handleDelete = async (rule: AutoRule) => {
-    if (!confirm(`Delete automation "${rule.name}"?`)) return;
+    if (!confirm(t('automations.deleteConfirm', { name: rule.name }))) return;
     await deleteAutomation(rule.id);
     await logAction({ action: 'deleted', resource: 'automation', detail: rule.name, actorId: user!.uid, actorName: me!.displayName });
     load();
@@ -144,16 +146,16 @@ export default function AutomationsPage() {
       <div className="flex items-center justify-between mb-6 anim-slide">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
-            Automations
+            {t('automations.title')}
             <span className="text-[12px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-semibold">
-              {activeCount} ACTIVE
+              {t('automations.active', { n: activeCount })}
             </span>
           </h1>
-          <p className="text-base text-[var(--text-muted)] mt-1">{rules.length} rules · {totalRuns} total runs</p>
+          <p className="text-base text-[var(--text-muted)] mt-1">{t('automations.subtitle', { rules: rules.length, runs: totalRuns })}</p>
         </div>
         {canManage && (
           <button onClick={() => { setEditingRule(null); setShowBuilder(true); }} className="flex items-center gap-2 px-5 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">
-            <Plus className="h-4 w-4" /> New Rule
+            <Plus className="h-4 w-4" /> {t('automations.newRule')}
           </button>
         )}
       </div>
@@ -161,10 +163,10 @@ export default function AutomationsPage() {
       {/* Stats bar */}
       <div className="grid grid-cols-4 gap-3 mb-6 anim-slide" style={{ animationDelay: '40ms' }}>
         {[
-          { label: 'Total Rules', val: rules.length, color: '#3B82F6' },
-          { label: 'Active', val: activeCount, color: '#22C55E' },
-          { label: 'Inactive', val: rules.length - activeCount, color: '#64748B' },
-          { label: 'Total Runs', val: totalRuns, color: 'var(--accent)' },
+          { label: t('automations.totalRules'), val: rules.length, color: '#3B82F6' },
+          { label: t('automations.activeRules'), val: activeCount, color: '#22C55E' },
+          { label: t('automations.inactiveRules'), val: rules.length - activeCount, color: '#64748B' },
+          { label: t('automations.totalRuns'), val: totalRuns, color: 'var(--accent)' },
         ].map(s => (
           <div key={s.label} className="p-4 rounded-xl bg-[var(--bg-secondary)] shadow-card">
             <p className="text-2xl font-bold text-[var(--text-primary)]">{s.val}</p>
@@ -177,12 +179,12 @@ export default function AutomationsPage() {
       <div className="flex items-center gap-2 flex-wrap mb-5 anim-slide" style={{ animationDelay: '80ms' }}>
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search automations..." className="input-dark pl-10 h-9 text-sm" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('automations.searchPlaceholder')} className="input-dark pl-10 h-9 text-sm" />
         </div>
         <select value={filterEnabled} onChange={e => setFilterEnabled(e.target.value as any)} className="select-dark h-9 text-sm">
-          <option value="all">All Rules</option>
-          <option value="active">Active Only</option>
-          <option value="inactive">Inactive Only</option>
+          <option value="all">{t('automations.allRules')}</option>
+          <option value="active">{t('automations.activeOnly')}</option>
+          <option value="inactive">{t('automations.inactiveOnly')}</option>
         </select>
       </div>
 
@@ -192,8 +194,8 @@ export default function AutomationsPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-20">
           <Zap className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
-          <p className="text-[var(--text-muted)] text-sm mb-2">No automations found.</p>
-          {canManage && <button onClick={() => setShowBuilder(true)} className="text-sm text-[var(--accent)] hover:underline">Create your first automation</button>}
+          <p className="text-[var(--text-muted)] text-sm mb-2">{t('automations.noRules')}</p>
+          {canManage && <button onClick={() => setShowBuilder(true)} className="text-sm text-[var(--accent)] hover:underline">{t('automations.createFirst')}</button>}
         </div>
       ) : (
         <div className="space-y-3">
@@ -219,7 +221,7 @@ export default function AutomationsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className={`text-sm font-semibold ${rule.enabled !== false ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>{rule.name}</p>
-                      {rule.enabled === false && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] font-semibold">DISABLED</span>}
+                      {rule.enabled === false && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] font-semibold">{t('automations.disabled')}</span>}
                     </div>
                     {rule.description && <p className="text-[13px] text-[var(--text-muted)] mt-0.5 truncate">{rule.description}</p>}
 
@@ -233,7 +235,7 @@ export default function AutomationsPage() {
                         <>
                           <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
                           <span className="text-[12px] px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 font-medium">
-                            {rule.conditions.length} condition{rule.conditions.length !== 1 ? 's' : ''}
+                            {t('automations.conditions', { n: rule.conditions.length })}
                           </span>
                         </>
                       )}
@@ -252,7 +254,7 @@ export default function AutomationsPage() {
                         <>
                           <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
                           <span className="text-[12px] px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 font-medium">
-                            {(rule as any).action || 'Action'}
+                            {(rule as any).action || t('automations.action')}
                           </span>
                         </>
                       )}
@@ -262,14 +264,14 @@ export default function AutomationsPage() {
                   {/* Meta */}
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {ruleTeam && <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: `${ruleTeam.color}15`, color: ruleTeam.color }}>{ruleTeam.icon} {ruleTeam.name}</span>}
-                    {rule.runCount > 0 && <span className="text-[12px] text-[var(--text-muted)]">{rule.runCount} runs</span>}
-                    {rule.lastRunAt && <span className="text-[12px] text-[var(--text-muted)]">Last: {rule.lastRunAt?.toDate?.()?.toLocaleDateString?.() || '—'}</span>}
+                    {rule.runCount > 0 && <span className="text-[12px] text-[var(--text-muted)]">{t('automations.runs', { n: rule.runCount })}</span>}
+                    {rule.lastRunAt && <span className="text-[12px] text-[var(--text-muted)]">{t('automations.lastRun', { date: rule.lastRunAt?.toDate?.()?.toLocaleDateString?.() || '—' })}</span>}
                   </div>
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
-                    <button onClick={() => handleDuplicate(rule)} className="p-2 text-[var(--text-muted)] hover:text-blue-400 rounded-lg" title="Duplicate"><Copy className="h-4 w-4" /></button>
-                    <button onClick={() => handleDelete(rule)} className="p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={() => handleDuplicate(rule)} className="p-2 text-[var(--text-muted)] hover:text-blue-400 rounded-lg" title={t('automations.duplicate')}><Copy className="h-4 w-4" /></button>
+                    <button onClick={() => handleDelete(rule)} className="p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg" title={t('common.delete')}><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </div>
               </div>
@@ -298,6 +300,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
   teams: any[]; members: any[]; initialData: AutoRule | null; activeTeamId: string;
   onClose: () => void; onSave: (data: any) => void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState(initialData?.name || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [trigger, setTrigger] = useState(initialData?.trigger || '');
@@ -348,8 +351,8 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center"><Zap className="h-4 w-4 text-amber-400" /></div>
             <div>
-              <h2 className="text-lg font-bold text-[var(--text-primary)]">Automation Builder</h2>
-              <p className="text-[13px] text-[var(--text-muted)]">When → If → Then</p>
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">{t('automations.builder')}</h2>
+              <p className="text-[13px] text-[var(--text-muted)]">{t('automations.whenIfThen')}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg"><X className="h-5 w-5" /></button>
@@ -357,7 +360,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
 
         {/* Steps indicator */}
         <div className="flex items-center gap-2 px-5 py-3">
-          {['Trigger', 'Conditions', 'Actions', 'Review'].map((s, i) => (
+          {[t('automations.trigger'), t('automations.conditionsStep'), t('automations.actions'), t('automations.review')].map((s, i) => (
             <button key={s} onClick={() => setStep(i)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition ${step === i ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : step > i ? 'text-emerald-400' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
               <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[12px] font-bold ${step === i ? 'bg-[var(--accent)] text-[var(--accent-text)]' : step > i ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)]'}`}>{step > i ? '✓' : i + 1}</span>
@@ -370,26 +373,26 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
           {/* Name + Description (always visible) */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Rule Name *</label>
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g., Auto-assign urgent tasks" autoFocus className="input-dark text-sm" />
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('automations.ruleName')}</label>
+              <input value={name} onChange={e => setName(e.target.value)} placeholder={t('automations.ruleNamePlaceholder')} autoFocus className="input-dark text-sm" />
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Department</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('automations.department')}</label>
               <select value={teamId} onChange={e => setTeamId(e.target.value)} className="select-dark w-full">
-                <option value="">All Departments</option>
-                {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
+                <option value="">{t('automations.allDepartments')}</option>
+                {teams.map(tm => <option key={tm.id} value={tm.id}>{tm.icon} {tm.name}</option>)}
               </select>
             </div>
           </div>
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Description</label>
-            <input value={description} onChange={e => setDescription(e.target.value)} placeholder="What does this rule do?" className="input-dark text-sm" />
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('automations.description')}</label>
+            <input value={description} onChange={e => setDescription(e.target.value)} placeholder={t('automations.whatDoes')} className="input-dark text-sm" />
           </div>
 
           {/* STEP 0: TRIGGER */}
           {step === 0 && (
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[#3B82F6] mb-2 font-semibold">WHEN (Trigger)</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[#3B82F6] mb-2 font-semibold">{t('automations.when')}</label>
               <div className="grid grid-cols-2 gap-2">
                 {TRIGGERS.map(t => (
                   <button key={t.id} onClick={() => setTrigger(t.id)}
@@ -410,16 +413,16 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
           {step === 1 && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-[12px] uppercase tracking-wider text-amber-400 font-semibold">IF (Conditions) — Optional</label>
+                <label className="text-[12px] uppercase tracking-wider text-amber-400 font-semibold">{t('automations.if')}</label>
                 <button onClick={addCondition} className="flex items-center gap-1 px-3 h-7 rounded-lg bg-amber-500/10 text-amber-400 text-[13px] font-medium hover:bg-amber-500/20 transition-all duration-200">
-                  <Plus className="h-3 w-3" /> Add Condition
+                  <Plus className="h-3 w-3" /> {t('automations.addCondition')}
                 </button>
               </div>
               {conditions.length === 0 ? (
                 <div className="text-center py-8 rounded-xl bg-[var(--bg-elevated)]/50">
                   <Filter className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2" />
-                  <p className="text-sm text-[var(--text-muted)]">No conditions. Rule will trigger for all matching events.</p>
-                  <button onClick={addCondition} className="text-sm text-amber-400 hover:underline mt-2">Add a filter condition</button>
+                  <p className="text-sm text-[var(--text-muted)]">{t('automations.noConditions')}</p>
+                  <button onClick={addCondition} className="text-sm text-amber-400 hover:underline mt-2">{t('automations.addFilter')}</button>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -436,11 +439,11 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                         const fieldConf = CONDITION_FIELDS.find(f => f.id === cond.field);
                         if (fieldConf?.options) {
                           return <select value={cond.value} onChange={e => updateCondition(cond.id, 'value', e.target.value)} className="select-dark h-8 text-[13px] flex-1">
-                            <option value="">Select...</option>
+                            <option value="">{t('automations.select')}</option>
                             {fieldConf.options.map(o => <option key={o} value={o}>{o}</option>)}
                           </select>;
                         }
-                        return <input value={cond.value} onChange={e => updateCondition(cond.id, 'value', e.target.value)} placeholder="Value..." className="input-dark h-8 text-[13px] flex-1" />;
+                        return <input value={cond.value} onChange={e => updateCondition(cond.id, 'value', e.target.value)} placeholder={t('automations.value')} className="input-dark h-8 text-[13px] flex-1" />;
                       })()}
                       <button onClick={() => removeCondition(cond.id)} className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-lg"><X className="h-3.5 w-3.5" /></button>
                     </div>
@@ -453,7 +456,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
           {/* STEP 2: ACTIONS */}
           {step === 2 && (
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-emerald-400 mb-2 font-semibold">THEN (Actions)</label>
+              <label className="block text-[12px] uppercase tracking-wider text-emerald-400 mb-2 font-semibold">{t('automations.then')}</label>
               {actions.length > 0 && (
                 <div className="space-y-2 mb-4">
                   {actions.map((action, ai) => {
@@ -473,7 +476,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                             <label className="block text-[12px] text-[var(--text-muted)] mb-1">{field.label}</label>
                             {(field as any).options ? (
                               <select value={action.config[field.key] || ''} onChange={e => updateActionConfig(action.id, field.key, e.target.value)} className="select-dark h-8 text-[13px] w-full">
-                                <option value="">Select...</option>
+                                <option value="">{t('automations.select')}</option>
                                 {(field as any).options.map((o: string) => <option key={o} value={o}>{o}</option>)}
                               </select>
                             ) : (
@@ -505,7 +508,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
           {/* STEP 3: REVIEW */}
           {step === 3 && (
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--accent)] mb-3 font-semibold">REVIEW</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--accent)] mb-3 font-semibold">{t('automations.review').toUpperCase()}</label>
               <div className="rounded-lg border border-[var(--accent)]/20 bg-[var(--accent-subtle)] p-5 space-y-4">
                 <div>
                   <p className="text-lg font-bold text-[var(--text-primary)]">{name || 'Unnamed Rule'}</p>
@@ -524,7 +527,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                 {!canSubmit && (
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/5 border border-red-500/20">
                     <AlertTriangle className="h-4 w-4 text-red-400" />
-                    <p className="text-sm text-red-400">Missing required fields: {!name.trim() ? 'Name, ' : ''}{!trigger ? 'Trigger, ' : ''}{actions.length === 0 ? 'At least one action' : ''}</p>
+                    <p className="text-sm text-red-400">{t('automations.missingFields', { fields: [!name.trim() ? t('automations.ruleName') : '', !trigger ? t('automations.trigger') : '', actions.length === 0 ? t('automations.actions') : ''].filter(Boolean).join(', ') })}</p>
                   </div>
                 )}
               </div>
@@ -535,13 +538,13 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
         {/* Footer */}
         <div className="flex items-center justify-between p-5">
           <button onClick={() => step > 0 ? setStep(step - 1) : onClose} className="px-5 h-10 rounded-md bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">
-            {step > 0 ? '← Back' : 'Cancel'}
+            {step > 0 ? t('common.back') : t('common.cancel')}
           </button>
           <div className="flex gap-2">
             {step < 3 ? (
-              <button onClick={() => setStep(step + 1)} className="px-6 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">Next →</button>
+              <button onClick={() => setStep(step + 1)} className="px-6 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">{t('common.next')}</button>
             ) : (
-              <button onClick={submit} disabled={!canSubmit} className="px-6 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40">Create Automation</button>
+              <button onClick={submit} disabled={!canSubmit} className="px-6 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40">{t('automations.createAutomation')}</button>
             )}
           </div>
         </div>

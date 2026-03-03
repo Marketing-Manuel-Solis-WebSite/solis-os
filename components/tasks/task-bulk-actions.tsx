@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { motion } from 'framer-motion';
 import { X, Trash2, ArrowRight, Flag } from 'lucide-react';
 import { STATUSES, PRIORITIES } from './constants';
@@ -39,6 +40,7 @@ function DropUp({ icon, label, children }: { icon: React.ReactNode; label: strin
 }
 
 export default function TaskBulkActions({ count, onStatusChange, onPriorityChange, onDelete, onClear }: Props) {
+  const { t } = useI18n();
   return (
     <motion.div
       initial={{ y: 20, opacity: 0 }}
@@ -46,34 +48,34 @@ export default function TaskBulkActions({ count, onStatusChange, onPriorityChang
       exit={{ y: 20, opacity: 0 }}
       className="sticky bottom-4 mx-auto w-fit px-5 py-3 rounded-xl bg-[var(--bg-elevated)] shadow-modal flex items-center gap-4 z-20"
     >
-      <span className="text-sm font-semibold text-[var(--accent)]">{count} seleccionadas</span>
+      <span className="text-sm font-semibold text-[var(--accent)]">{t('tasks.count', { n: count })}</span>
 
       <div className="h-5 w-px bg-[var(--border)]" />
 
       {/* Status change */}
-      <DropUp icon={<ArrowRight className="h-3.5 w-3.5" />} label="Mover a">
+      <DropUp icon={<ArrowRight className="h-3.5 w-3.5" />} label={t('taskCreate.status')}>
         {STATUSES.map(s => (
           <button key={s.id} onClick={() => onStatusChange(s.id)}
             className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
-            {s.label}
+            {t(`status.${s.id}`)}
           </button>
         ))}
       </DropUp>
 
       {/* Priority change */}
-      <DropUp icon={<Flag className="h-3.5 w-3.5" />} label="Prioridad">
+      <DropUp icon={<Flag className="h-3.5 w-3.5" />} label={t('taskCreate.priority')}>
         {PRIORITIES.map(p => (
           <button key={p.id} onClick={() => onPriorityChange(p.id)}
             className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm hover:bg-[var(--bg-hover)] transition">
-            {p.icon} {p.label}
+            {p.icon} {t(`priority.${p.id}`)}
           </button>
         ))}
       </DropUp>
 
       {/* Delete */}
       <button onClick={onDelete} className="flex items-center gap-1.5 text-sm text-red-400 hover:text-red-300 transition">
-        <Trash2 className="h-3.5 w-3.5" /> Eliminar
+        <Trash2 className="h-3.5 w-3.5" /> {t('common.delete')}
       </button>
 
       <div className="h-5 w-px bg-[var(--border)]" />

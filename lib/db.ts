@@ -28,8 +28,8 @@ async function getOne(path: string) {
   return s.exists() ? { id: s.id, ...s.data() } : null;
 }
 
-async function getByOrg(col: string) {
-  const q = query(collection(db, col), where('orgId', '==', ORG));
+async function getByOrg(col: string, maxResults = 500) {
+  const q = query(collection(db, col), where('orgId', '==', ORG), limit(maxResults));
   const s = await getDocs(q);
   const results = s.docs.map(d => ({ id: d.id, ...d.data() }));
   return results.sort((a: any, b: any) => {
@@ -367,9 +367,10 @@ export async function markAsRead(channelId: string, messageId: string, userId: s
 
 // Real-time listener for messages
 export function onMessagesSnapshot(channelId: string, callback: (msgs: any[]) => void) {
-  const q = query(collection(db, `channels/${channelId}/messages`), orderBy('createdAt', 'asc'));
+  const q = query(collection(db, `channels/${channelId}/messages`), orderBy('createdAt', 'desc'), limit(100));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    callback(msgs.reverse());
   });
 }
 
@@ -504,6 +505,371 @@ export function onReadCursorsSnapshot(userId: string, callback: (cursors: Record
     }
     callback(cursors);
   }, () => callback({}));
+}
+
+// ===========================================================
+// GOALS
+// ===========================================================
+export async function getGoals(teamId?: string) {
+  if (teamId) return getByTeam('goals', teamId);
+  return getByOrg('goals');
+}
+
+export async function getGoal(id: string) { return getOne(`goals/${id}`); }
+
+export async function createGoal(data: any) {
+  return addTo('goals', {
+    orgId: ORG,
+    name: data.name || '',
+    description: data.description || '',
+    dueDate: data.dueDate || null,
+    ownerId: data.ownerId || '',
+    ownerName: data.ownerName || '',
+    teamId: data.teamId || '',
+    status: data.status || 'on_track',
+    progress: 0,
+    tags: data.tags || [],
+    color: data.color || '#7B68EE',
+    visibility: data.visibility || 'team',
+    createdBy: data.createdBy || '',
+    createdByName: data.createdByName || '',
+  });
+}
+
+export async function updateGoal(id: string, data: any) { return updateAt(`goals/${id}`, data); }
+export async function deleteGoal(id: string) { return deleteAt(`goals/${id}`); }
+
+// Goal Targets (subcollection)
+export async function getGoalTargets(goalId: string) {
+  const q = query(collection(db, `goals/${goalId}/targets`), orderBy('createdAt', 'asc'));
+  const s = await getDocs(q);
+  return s.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function createGoalTarget(goalId: string, data: any) {
+  return addTo(`goals/${goalId}/targets`, {
+    name: data.name || '',
+    type: data.type || 'number',
+    currentValue: data.currentValue || 0,
+    targetValue: data.targetValue || 100,
+    unit: data.unit || '',
+    linkedTaskIds: data.linkedTaskIds || [],
+    autoSync: data.autoSync ?? true,
+  });
+}
+
+export async function updateGoalTarget(goalId: string, targetId: string, data: any) {
+  return updateAt(`goals/${goalId}/targets/${targetId}`, data);
+}
+
+export async function deleteGoalTarget(goalId: string, targetId: string) {
+  return deleteAt(`goals/${goalId}/targets/${targetId}`);
+}
+
+// Recalculate goal progress from targets
+export async function recalculateGoalProgress(goalId: string) {
+  const targets = await getGoalTargets(goalId);
+  if (targets.length === 0) {
+    await updateAt(`goals/${goalId}`, { progress: 0 });
+    return 0;
+  }
+  let totalProgress = 0;
+  for (const t of targets) {
+    const target = t as any;
+    const tv = target.targetValue || 1;
+    const cv = Math.min(target.currentValue || 0, tv);
+    totalProgress += (cv / tv) * 100;
+  }
+  const progress = Math.round(totalProgress / targets.length);
+  await updateAt(`goals/${goalId}`, { progress });
+  return progress;
+}
+
+// Sync goal targets when a task status changes
+export async function syncGoalTargetsForTask(taskId: string) {
+  // Find all goals
+  const allGoals = await getByOrg('goals');
+  for (const goal of allGoals) {
+    const g = goal as any;
+    const targets = await getGoalTargets(g.id);
+    let changed = false;
+    for (const target of targets) {
+      const t = target as any;
+      if (t.type === 'tasks' && t.linkedTaskIds?.includes(taskId) && t.autoSync) {
+        // Count completed tasks among linked
+        let completed = 0;
+        for (const tid of t.linkedTaskIds) {
+          const task = await getOne(`tasks/${tid}`);
+          if ((task as any)?.status === 'done') completed++;
+        }
+        if (completed !== t.currentValue) {
+          await updateAt(`goals/${g.id}/targets/${t.id}`, { currentValue: completed });
+          changed = true;
+        }
+      }
+    }
+    if (changed) await recalculateGoalProgress(g.id);
+  }
+}
+
+// ===========================================================
+// TIME ENTRIES (Timesheets)
+// ===========================================================
+export async function getTimeEntries(teamId?: string) {
+  if (teamId) return getByTeam('time-entries', teamId);
+  return getByOrg('time-entries');
+}
+
+export async function getTimeEntriesByDateRange(startDate: string, endDate: string, userId?: string) {
+  let q;
+  if (userId) {
+    q = query(
+      collection(db, 'time-entries'),
+      where('orgId', '==', ORG),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate),
+      where('userId', '==', userId)
+    );
+  } else {
+    q = query(
+      collection(db, 'time-entries'),
+      where('orgId', '==', ORG),
+      where('date', '>=', startDate),
+      where('date', '<=', endDate)
+    );
+  }
+  const s = await getDocs(q);
+  return s.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function getTimeEntriesByTask(taskId: string) {
+  const q = query(
+    collection(db, 'time-entries'),
+    where('orgId', '==', ORG),
+    where('taskId', '==', taskId)
+  );
+  const s = await getDocs(q);
+  return s.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function createTimeEntry(data: any) {
+  return addTo('time-entries', {
+    orgId: ORG,
+    userId: data.userId || '',
+    userName: data.userName || '',
+    taskId: data.taskId || '',
+    taskTitle: data.taskTitle || '',
+    date: data.date || '',
+    hours: data.hours || 0,
+    minutes: data.minutes || 0,
+    notes: data.notes || '',
+    billable: data.billable ?? false,
+    teamId: data.teamId || '',
+    createdBy: data.createdBy || '',
+  });
+}
+
+export async function updateTimeEntry(id: string, data: any) { return updateAt(`time-entries/${id}`, data); }
+export async function deleteTimeEntry(id: string) { return deleteAt(`time-entries/${id}`); }
+
+// ===========================================================
+// WHITEBOARDS
+// ===========================================================
+export async function getWhiteboards(teamId?: string) {
+  if (teamId) return getByTeam('whiteboards', teamId);
+  return getByOrg('whiteboards');
+}
+
+export async function getWhiteboard(id: string) { return getOne(`whiteboards/${id}`); }
+
+export async function createWhiteboard(data: any) {
+  return addTo('whiteboards', {
+    orgId: ORG,
+    name: data.name || '',
+    description: data.description || '',
+    teamId: data.teamId || '',
+    createdBy: data.createdBy || '',
+    createdByName: data.createdByName || '',
+    members: data.members || [],
+    thumbnail: '',
+    visibility: data.visibility || 'team',
+  });
+}
+
+export async function updateWhiteboard(id: string, data: any) { return updateAt(`whiteboards/${id}`, data); }
+export async function deleteWhiteboard(id: string) { return deleteAt(`whiteboards/${id}`); }
+
+// Whiteboard Elements (subcollection)
+export async function getWhiteboardElements(boardId: string) {
+  const q = query(collection(db, `whiteboards/${boardId}/elements`), orderBy('zIndex', 'asc'));
+  const s = await getDocs(q);
+  return s.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function createWhiteboardElement(boardId: string, data: any) {
+  return addTo(`whiteboards/${boardId}/elements`, {
+    type: data.type || 'sticky',
+    x: data.x || 0,
+    y: data.y || 0,
+    width: data.width || 200,
+    height: data.height || 150,
+    content: data.content || '',
+    color: data.color || '#FBBF24',
+    style: data.style || {},
+    linkedTaskId: data.linkedTaskId || '',
+    createdBy: data.createdBy || '',
+    zIndex: data.zIndex || 0,
+  });
+}
+
+export async function updateWhiteboardElement(boardId: string, elementId: string, data: any) {
+  return updateAt(`whiteboards/${boardId}/elements/${elementId}`, data);
+}
+
+export async function deleteWhiteboardElement(boardId: string, elementId: string) {
+  return deleteAt(`whiteboards/${boardId}/elements/${elementId}`);
+}
+
+// Real-time listener for whiteboard elements (collaboration)
+export function onWhiteboardElementsSnapshot(boardId: string, callback: (elements: any[]) => void) {
+  const q = query(collection(db, `whiteboards/${boardId}/elements`), orderBy('zIndex', 'asc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }, () => callback([]));
+}
+
+// ===========================================================
+// FORMS
+// ===========================================================
+export async function getForms(teamId?: string) {
+  if (teamId) return getByTeam('forms', teamId);
+  return getByOrg('forms');
+}
+
+export async function getForm(id: string) { return getOne(`forms/${id}`); }
+
+export async function getFormByToken(token: string) {
+  const q = query(collection(db, 'forms'), where('publicToken', '==', token), limit(1));
+  const s = await getDocs(q);
+  if (s.empty) return null;
+  return { id: s.docs[0].id, ...s.docs[0].data() };
+}
+
+export async function createForm(data: any) {
+  const token = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  return addTo('forms', {
+    orgId: ORG,
+    title: data.title || '',
+    description: data.description || '',
+    status: 'draft',
+    publicToken: token,
+    responseLimit: null,
+    responseCount: 0,
+    openAt: null,
+    closeAt: null,
+    logoUrl: '',
+    layout: '1col',
+    successMessage: data.successMessage || '',
+    redirectUrl: '',
+    fields: data.fields || [],
+    captchaEnabled: false,
+    rateLimitPerMinute: 5,
+    collectIp: true,
+    collectUserAgent: true,
+    privacyNotice: '',
+    consentRequired: false,
+    retentionDays: null,
+    defaultMappingId: '',
+    autoConvert: false,
+    createdBy: data.createdBy || '',
+    createdByName: data.createdByName || '',
+    teamId: data.teamId || '',
+  });
+}
+
+export async function updateForm(formId: string, data: any) { return updateAt(`forms/${formId}`, data); }
+export async function deleteForm(formId: string) { return deleteAt(`forms/${formId}`); }
+
+export async function regenerateFormToken(formId: string): Promise<string> {
+  const token = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  await updateAt(`forms/${formId}`, { publicToken: token });
+  return token;
+}
+
+// Form Submissions (subcollection)
+export async function getFormSubmissions(formId: string) {
+  const q = query(collection(db, `forms/${formId}/submissions`), orderBy('createdAt', 'desc'));
+  const s = await getDocs(q);
+  return s.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function getFormSubmission(formId: string, submissionId: string) {
+  return getOne(`forms/${formId}/submissions/${submissionId}`);
+}
+
+export async function createFormSubmission(formId: string, data: any) {
+  return addTo(`forms/${formId}/submissions`, {
+    values: data.values || {},
+    ip: data.ip || null,
+    userAgent: data.userAgent || null,
+    utmSource: data.utmSource || '',
+    utmMedium: data.utmMedium || '',
+    utmCampaign: data.utmCampaign || '',
+    referrer: data.referrer || '',
+    attachments: data.attachments || [],
+    status: 'new',
+    reviewedBy: '',
+    reviewedAt: null,
+    notes: '',
+    assignedTo: '',
+    convertedToType: null,
+    convertedToId: null,
+    convertedAt: null,
+    convertedBy: null,
+    consentGiven: data.consentGiven ?? false,
+  });
+}
+
+export async function updateFormSubmission(formId: string, submissionId: string, data: any) {
+  return updateAt(`forms/${formId}/submissions/${submissionId}`, data);
+}
+
+export function onFormSubmissionsSnapshot(formId: string, callback: (subs: any[]) => void) {
+  const q = query(collection(db, `forms/${formId}/submissions`), orderBy('createdAt', 'desc'), limit(100));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }, () => callback([]));
+}
+
+// Form Mappings (subcollection)
+export async function getFormMappings(formId: string) {
+  const q = query(collection(db, `forms/${formId}/mappings`), orderBy('createdAt', 'asc'));
+  const s = await getDocs(q);
+  return s.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function createFormMapping(formId: string, data: any) {
+  return addTo(`forms/${formId}/mappings`, {
+    name: data.name || '',
+    entityType: data.entityType || 'task',
+    targetTeamId: data.targetTeamId || '',
+    defaultStatus: data.defaultStatus || 'todo',
+    defaultPriority: data.defaultPriority || 'medium',
+    defaultAssignees: data.defaultAssignees || [],
+    defaultTags: data.defaultTags || [],
+    fieldMap: data.fieldMap || {},
+    autoSubtasks: data.autoSubtasks || [],
+    autoChecklist: data.autoChecklist || [],
+    createdBy: data.createdBy || '',
+  });
+}
+
+export async function updateFormMapping(formId: string, mappingId: string, data: any) {
+  return updateAt(`forms/${formId}/mappings/${mappingId}`, data);
+}
+
+export async function deleteFormMapping(formId: string, mappingId: string) {
+  return deleteAt(`forms/${formId}/mappings/${mappingId}`);
 }
 
 export { ORG, serverTimestamp };

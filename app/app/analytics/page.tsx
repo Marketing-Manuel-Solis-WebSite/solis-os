@@ -10,6 +10,7 @@ import {
   BarChart3, TrendingUp, Brain, ChevronRight, Sparkles, RefreshCw,
   Users, FileText, CheckSquare, MessageSquare, Activity, Zap
 } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
 
 export interface PlatformData {
   tasks: any[];
@@ -25,6 +26,7 @@ export interface PlatformData {
 export default function AnalyticsPage() {
   const { user, me, isAdmin, teams, can, canSeeAllTeams } = useAuth();
   const toast = useToast();
+  const { t } = useI18n();
   const [data, setData] = useState<PlatformData | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'dashboard' | 'ai'>('dashboard');
@@ -53,7 +55,7 @@ export default function AnalyticsPage() {
         loadedAt: new Date(),
       });
     } catch (err) {
-      toast.error('Error', 'No se pudieron cargar los datos analíticos.');
+      toast.error(t('analytics.loadError'), t('analytics.loadErrorMsg'));
     }
     setLoading(false);
   }, [user]);
@@ -89,26 +91,26 @@ export default function AnalyticsPage() {
           <div className="flex items-center justify-between mb-6 anim-slide">
             <div>
               <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
-                Analytics
-                <span className="text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">AI-POWERED</span>
+                {t('analytics.title')}
+                <span className="text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">{t('analytics.aiPowered')}</span>
               </h1>
               <p className="text-base text-[var(--text-muted)] mt-1">
-                {data ? `Last updated: ${data.loadedAt.toLocaleTimeString()}` : 'Loading platform data...'}
+                {data ? t('analytics.lastUpdated', { time: data.loadedAt.toLocaleTimeString() }) : t('analytics.loadingData')}
               </p>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={refresh} disabled={refreshing}
                 className="flex items-center gap-2 px-4 h-9 rounded-md bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-secondary)] transition-all duration-200">
-                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} /> {t('common.refresh')}
               </button>
               <div className="flex rounded-md bg-[var(--bg-tertiary)] overflow-hidden">
                 <button onClick={() => setView('dashboard')}
                   className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition ${view === 'dashboard' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-                  <BarChart3 className="h-3.5 w-3.5" /> Dashboard
+                  <BarChart3 className="h-3.5 w-3.5" /> {t('analytics.dashboard')}
                 </button>
                 <button onClick={() => setView('ai')}
                   className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition ${view === 'ai' ? 'bg-purple-500/10 text-purple-400' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-                  <Brain className="h-3.5 w-3.5" /> AI Analysis
+                  <Brain className="h-3.5 w-3.5" /> {t('analytics.aiAnalysis')}
                 </button>
               </div>
             </div>
@@ -118,12 +120,12 @@ export default function AnalyticsPage() {
           {stats && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6 anim-slide" style={{ animationDelay: '40ms' }}>
               {[
-                { label: 'Tasks', value: stats.totalTasks, sub: `${stats.completedTasks} done`, icon: CheckSquare, color: '#22C55E' },
-                { label: 'Documents', value: stats.totalDocs, sub: 'total', icon: FileText, color: '#3B82F6' },
-                { label: 'Members', value: stats.activeMembers, sub: `of ${stats.totalMembers}`, icon: Users, color: 'var(--accent)' },
-                { label: 'Channels', value: stats.totalChannels, sub: 'active', icon: MessageSquare, color: '#8B5CF6' },
-                { label: 'Activity', value: stats.totalMessages, sub: 'events', icon: Activity, color: '#F59E0B' },
-                { label: 'AI Chats', value: stats.aiConversations, sub: 'conversations', icon: Zap, color: '#EC4899' },
+                { label: t('analytics.tasks'), value: stats.totalTasks, sub: t('analytics.tasksDone', { n: stats.completedTasks }), icon: CheckSquare, color: '#22C55E' },
+                { label: t('analytics.documents'), value: stats.totalDocs, sub: t('analytics.total'), icon: FileText, color: '#3B82F6' },
+                { label: t('analytics.members'), value: stats.activeMembers, sub: t('analytics.ofTotal', { n: stats.totalMembers }), icon: Users, color: 'var(--accent)' },
+                { label: t('analytics.channels'), value: stats.totalChannels, sub: t('analytics.active'), icon: MessageSquare, color: '#8B5CF6' },
+                { label: t('analytics.activity'), value: stats.totalMessages, sub: t('analytics.events'), icon: Activity, color: '#F59E0B' },
+                { label: t('analytics.aiChats'), value: stats.aiConversations, sub: t('analytics.conversations'), icon: Zap, color: '#EC4899' },
               ].map((s, i) => (
                 <div key={s.label} className="p-4 rounded-xl bg-[var(--bg-secondary)] shadow-card anim-slide" style={{ animationDelay: `${(i + 2) * 40}ms` }}>
                   <div className="flex items-center justify-between mb-2">
@@ -140,7 +142,7 @@ export default function AnalyticsPage() {
           {loading ? (
             <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="h-48 skeleton rounded-lg" />)}</div>
           ) : !data ? (
-            <div className="text-center py-20"><BarChart3 className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" /><p className="text-[var(--text-muted)]">Could not load data.</p></div>
+            <div className="text-center py-20"><BarChart3 className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" /><p className="text-[var(--text-muted)]">{t('analytics.noData')}</p></div>
           ) : (
             <>
               {view === 'dashboard' && <StatsDashboard data={data} />}

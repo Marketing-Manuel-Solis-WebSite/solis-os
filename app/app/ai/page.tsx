@@ -1,5 +1,6 @@
 'use client';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   getAIConversations, createAIConversation, deleteAIConversation,
@@ -14,6 +15,7 @@ import { Sparkles } from 'lucide-react';
 
 export default function AIPage() {
   const { user, me } = useAuth();
+  const { t } = useI18n();
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [activeConvo, setActiveConvo] = useState<AIConversation | null>(null);
   const [messages, setMessages] = useState<AIMessage[]>([]);
@@ -43,7 +45,7 @@ export default function AIPage() {
 
   const handleNewChat = async () => {
     if (!user || !me) return;
-    const id = await createAIConversation({ userId: user.uid, userName: me.displayName, title: 'New conversation', mode: 'chat' });
+    const id = await createAIConversation({ userId: user.uid, userName: me.displayName, title: t('ai.newConversation'), mode: 'chat' });
     const convos = await getAIConversations(user.uid);
     setConversations(convos.filter(c => !c.archived));
     const newConvo = convos.find(c => c.id === id);
@@ -59,7 +61,7 @@ export default function AIPage() {
     let convoId = activeConvo?.id;
 
     if (!convoId) {
-      convoId = await createAIConversation({ userId: user.uid, userName: me.displayName, title: 'New conversation', mode: 'chat' });
+      convoId = await createAIConversation({ userId: user.uid, userName: me.displayName, title: t('ai.newConversation'), mode: 'chat' });
       const convos = await getAIConversations(user.uid);
       setConversations(convos.filter(c => !c.archived));
       const newConvo = convos.find(c => c.id === convoId);
@@ -81,7 +83,10 @@ export default function AIPage() {
       const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
       const res = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: content.trim(), mode: 'chat', history }) });
       const data = await res.json();
-      const answer = data.answer || data.error || 'No response from AI.';
+      if (res.status === 429) {
+        throw new Error(t('ai.rateLimitError'));
+      }
+      const answer = data.answer || data.error || t('ai.noResponse');
 
       await addAIMessage(convoId, { role: 'assistant', content: answer, mode: 'chat', tokens: data.tokens || 0 });
 
@@ -109,7 +114,7 @@ export default function AIPage() {
   };
 
   const handleDeleteConvo = async (id: string) => {
-    if (!confirm('Delete this conversation?')) return;
+    if (!confirm(t('ai.deleteConfirm'))) return;
     await deleteAIConversation(id);
     if (activeConvo?.id === id) { setActiveConvo(null); setMessages([]); }
     loadConversations();
@@ -145,7 +150,7 @@ export default function AIPage() {
               <Sparkles className="h-3.5 w-3.5 text-[var(--accent-text)]" />
             </div>
             <span className="text-sm font-semibold text-[var(--text-primary)]">
-              {activeConvo?.title && activeConvo.title !== 'New conversation' ? activeConvo.title : 'Solis AI'}
+              {activeConvo?.title && activeConvo.title !== t('ai.newConversation') ? activeConvo.title : t('ai.title')}
             </span>
           </div>
         </div>
@@ -163,11 +168,12 @@ export default function AIPage() {
 }
 
 function WelcomeScreen({ onQuickStart }: { onQuickStart: (question: string) => void }) {
+  const { t } = useI18n();
   const SUGGESTIONS = [
-    { icon: '💬', title: 'Redactar un correo profesional', question: 'Ayudame a redactar un correo profesional para un cliente informandole del estatus de su caso' },
-    { icon: '📋', title: 'Checklist de documentos', question: 'Dame un checklist completo de documentos necesarios para abrir un caso nuevo' },
-    { icon: '🔍', title: 'Investigar un tema legal', question: 'Investiga los cambios mas recientes en las politicas de USCIS para visas de trabajo' },
-    { icon: '📊', title: 'Crear un reporte', question: 'Genera un reporte sobre las mejores estrategias de marketing digital para bufetes de abogados' },
+    { icon: '💬', title: t('ai.draftEmail'), question: t('ai.draftEmailQ') },
+    { icon: '📋', title: t('ai.docChecklist'), question: t('ai.docChecklistQ') },
+    { icon: '🔍', title: t('ai.researchLegal'), question: t('ai.researchLegalQ') },
+    { icon: '📊', title: t('ai.createReport'), question: t('ai.createReportQ') },
   ];
 
   return (
@@ -182,8 +188,8 @@ function WelcomeScreen({ onQuickStart }: { onQuickStart: (question: string) => v
           >
             <Sparkles className="h-8 w-8 text-[var(--accent-text)]" />
           </motion.div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1.5">How can I help you today?</h1>
-          <p className="text-base text-[var(--text-muted)]">Ask me anything about legal research, documents, or business operations.</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1.5">{t('ai.howCanIHelp')}</h1>
+          <p className="text-base text-[var(--text-muted)]">{t('ai.askAnything')}</p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }} className="grid grid-cols-2 gap-3">

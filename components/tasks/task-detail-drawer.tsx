@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useI18n } from '@/lib/i18n';
 import {
   X, Check, Trash2, Send, Hash, Plus, Paperclip, Calendar,
   ChevronDown, Download, ExternalLink, FileText,
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function TaskDetailDrawer({ task, members, teams, userId, userName, canUpdate, canDelete, onUpdate, onDelete, onClose }: Props) {
+  const { t } = useI18n();
   const toast = useToast();
   const [comments, setComments] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
@@ -152,7 +154,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
     if (mentionIds.length > 0) {
       notifyMany(mentionIds, {
         type: 'task_mentioned',
-        title: `${userName} te mencionó en una tarea`,
+        title: t('chat.mentionedYou', { name: userName, channel: task.title }),
         message: newComment.trim().slice(0, 80),
         entityType: 'task',
         entityId: task.id,
@@ -181,10 +183,10 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
       <div className="flex items-center justify-between px-5 py-3">
         <div className="flex items-center gap-2 min-w-0">
           <tp.Icon className="h-4 w-4 shrink-0" style={{ color: tp.color }} />
-          <span className="text-sm font-semibold text-[var(--text-muted)] uppercase">{tp.label}</span>
+          <span className="text-sm font-semibold text-[var(--text-muted)] uppercase">{t(`taskType.${tp.id}`)}</span>
           {visConf && (
             <span className="text-[9px] px-1.5 py-0.5 rounded-md flex items-center gap-1 font-medium shrink-0" style={{ backgroundColor: `${visConf.color}10`, color: visConf.color }}>
-              <visConf.Icon className="h-2.5 w-2.5" />{visConf.label}
+              <visConf.Icon className="h-2.5 w-2.5" />{t(`visibility.${visConf.id}`)}
             </span>
           )}
           {taskTeam && (
@@ -221,17 +223,17 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
           {/* Status + Priority */}
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Estado</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.status')}</label>
               <select value={task.status} onChange={e => canUpdate && onUpdate(task.id, 'status', e.target.value, task.status)} disabled={!canUpdate}
                 className="w-full h-9 px-3 rounded-xl text-sm font-semibold border cursor-pointer" style={{ backgroundColor: `${st.color}10`, borderColor: `${st.color}25`, color: st.color }}>
-                {STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                {STATUSES.map(s => <option key={s.id} value={s.id}>{t(`status.${s.id}`)}</option>)}
               </select>
             </div>
             <div className="flex-1">
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Prioridad</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.priority')}</label>
               <div className="flex gap-1">
                 {PRIORITIES.map(p => (
-                  <button key={p.id} onClick={() => canUpdate && onUpdate(task.id, 'priority', p.id, task.priority)} title={p.label} disabled={!canUpdate}
+                  <button key={p.id} onClick={() => canUpdate && onUpdate(task.id, 'priority', p.id, task.priority)} title={t(`priority.${p.id}`)} disabled={!canUpdate}
                     className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm transition ${task.priority === p.id ? 'ring-2 ring-white/20 bg-white/5 scale-105' : 'opacity-40 hover:opacity-70'}`}>
                     {p.icon}
                   </button>
@@ -244,15 +246,15 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
           {canUpdate && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Visibilidad</label>
+                <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.visibility')}</label>
                 <select value={task.visibility || 'team'} onChange={e => onUpdate(task.id, 'visibility', e.target.value, task.visibility)} className="select-dark w-full h-8 text-sm">
-                  {VISIBILITY.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+                  {VISIBILITY.map(v => <option key={v.id} value={v.id}>{t(`visibility.${v.id}`)}</option>)}
                 </select>
               </div>
               <div>
-                <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Departamento</label>
+                <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.department')}</label>
                 <select value={task.teamId || ''} onChange={e => onUpdate(task.id, 'teamId', e.target.value, task.teamId)} className="select-dark w-full h-8 text-sm">
-                  <option value="">General</option>
+                  <option value="">{t('common.general')}</option>
                   {teams.map((t: any) => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
                 </select>
               </div>
@@ -261,7 +263,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
 
           {/* Assignees */}
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Asignados</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.assignees')}</label>
             <div className="flex gap-1.5 flex-wrap">
               {members.map((m: any) => {
                 const assigned = task.assignees?.includes(m.id);
@@ -280,12 +282,12 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
           {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Inicio</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.startDate')}</label>
               <input type="date" value={start ? start.toISOString().split('T')[0] : ''} disabled={!canUpdate}
                 onChange={e => canUpdate && onUpdate(task.id, 'startDate', e.target.value ? new Date(e.target.value) : null)} className="input-dark h-8 text-sm w-full" />
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Fecha Límite</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.dueDate')}</label>
               <input type="date" value={due ? due.toISOString().split('T')[0] : ''} disabled={!canUpdate}
                 onChange={e => canUpdate && onUpdate(task.id, 'dueDate', e.target.value ? new Date(e.target.value) : null)} className="input-dark h-8 text-sm w-full" />
             </div>
@@ -293,20 +295,20 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
 
           {/* Description */}
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Descripción</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.description')}</label>
             {editDesc && canUpdate ? (
               <div>
                 <textarea value={descVal} onChange={e => setDescVal(e.target.value)} rows={5} autoFocus
                   className="w-full px-3 py-2 rounded-xl bg-[var(--bg-elevated)] text-sm text-[var(--text-secondary)] resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30" />
                 <div className="flex gap-2 mt-2">
-                  <button onClick={saveDesc} className="px-3 h-7 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-[13px]">Guardar</button>
-                  <button onClick={() => { setEditDesc(false); setDescVal(task.description || ''); }} className="px-3 h-7 rounded-lg bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-all duration-200">Cancelar</button>
+                  <button onClick={saveDesc} className="px-3 h-7 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-[13px]">{t('common.save')}</button>
+                  <button onClick={() => { setEditDesc(false); setDescVal(task.description || ''); }} className="px-3 h-7 rounded-lg bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-all duration-200">{t('common.cancel')}</button>
                 </div>
               </div>
             ) : (
               <div onClick={() => canUpdate && setEditDesc(true)}
                 className={`min-h-[50px] px-3 py-2 rounded-xl bg-[var(--bg-elevated)] ${canUpdate ? 'cursor-pointer hover:bg-[var(--bg-hover)]' : ''} transition-all duration-200`}>
-                {task.description ? <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{task.description}</p> : <p className="text-sm text-[var(--text-muted)]">{canUpdate ? 'Clic para agregar descripción...' : 'Sin descripción'}</p>}
+                {task.description ? <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{task.description}</p> : <p className="text-sm text-[var(--text-muted)]">{canUpdate ? t('taskCreate.descPlaceholder') : t('common.noResults')}</p>}
               </div>
             )}
           </div>
@@ -314,10 +316,10 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
           {/* Custom Fields */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">Campos Personalizados</label>
+              <label className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{t('taskCreate.customFields')}</label>
               {canUpdate && availableFields.length > 0 && (
                 <button onClick={() => setShowFieldPicker(!showFieldPicker)} className="text-[12px] text-[var(--accent)] hover:underline flex items-center gap-1">
-                  <Plus className="h-3 w-3" /> Agregar
+                  <Plus className="h-3 w-3" /> {t('common.create')}
                 </button>
               )}
             </div>
@@ -326,7 +328,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
                 {availableFields.map(f => (
                   <button key={f.id} onClick={() => { setCustomField(f.id, f.type === 'checkbox' ? false : ''); setShowFieldPicker(false); }}
                     className="text-sm px-2.5 py-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200">
-                    {f.label}
+                    {t(`customField.${f.id}`)}
                   </button>
                 ))}
               </div>
@@ -337,7 +339,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
               const val = customFields[fid];
               return (
                 <div key={fid} className="flex items-center gap-2 mb-2">
-                  <label className="text-sm text-[var(--text-muted)] w-32 shrink-0 truncate">{def.label}</label>
+                  <label className="text-sm text-[var(--text-muted)] w-32 shrink-0 truncate">{t(`customField.${def.id}`)}</label>
                   {def.type === 'checkbox' ? (
                     <button onClick={() => canUpdate && setCustomField(fid, !val)} disabled={!canUpdate}
                       className={`w-5 h-5 rounded-md border flex items-center justify-center transition ${val ? 'bg-emerald-500 border-emerald-500' : 'border-[var(--border)]'}`}>
@@ -345,7 +347,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
                     </button>
                   ) : def.type === 'select' ? (
                     <select value={val || ''} onChange={e => canUpdate && setCustomField(fid, e.target.value)} disabled={!canUpdate} className="select-dark h-8 text-sm flex-1">
-                      <option value="">Seleccionar...</option>
+                      <option value="">{t('common.search')}...</option>
                       {def.options?.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   ) : def.type === 'currency' ? (
@@ -371,7 +373,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
           {/* Subtasks */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">Subtareas</label>
+              <label className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{t('taskCreate.subtasks')}</label>
               {totalSub > 0 && <span className="text-[12px] text-[var(--text-muted)]">{doneSub}/{totalSub} · {progress}%</span>}
             </div>
             {totalSub > 0 && (
@@ -395,7 +397,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
             ))}
             {canUpdate && (
               <div className="flex gap-2 mt-2">
-                <input value={newSub} onChange={e => setNewSub(e.target.value)} placeholder="Agregar subtarea..." className="input-dark h-8 text-sm flex-1" onKeyDown={e => e.key === 'Enter' && addSub()} />
+                <input value={newSub} onChange={e => setNewSub(e.target.value)} placeholder={t('taskCreate.addSubtask')} className="input-dark h-8 text-sm flex-1" onKeyDown={e => e.key === 'Enter' && addSub()} />
                 <button onClick={addSub} className="px-3 h-8 rounded-lg bg-[var(--bg-elevated)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">+</button>
               </div>
             )}
@@ -403,7 +405,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
 
           {/* Tags */}
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Etiquetas</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.tags')}</label>
             <div className="flex gap-1.5 flex-wrap">
               {(task.tags || []).map((tag: string) => (
                 <span key={tag} className="text-[13px] px-2.5 py-1 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] flex items-center gap-1">
@@ -411,17 +413,17 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
                   {canUpdate && <button onClick={() => onUpdate(task.id, 'tags', task.tags.filter((t: string) => t !== tag))} className="text-[var(--text-muted)] hover:text-red-400"><X className="h-3 w-3" /></button>}
                 </span>
               ))}
-              {(task.tags || []).length === 0 && <span className="text-sm text-[var(--text-muted)]">Sin etiquetas</span>}
+              {(task.tags || []).length === 0 && <span className="text-sm text-[var(--text-muted)]">{t('common.noResults')}</span>}
             </div>
           </div>
 
           {/* Attachments */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">Archivos Adjuntos</label>
+              <label className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{t('taskDetail.attachments')}</label>
               {canUpdate && (
                 <button onClick={() => fileRef.current?.click()} className="text-[12px] text-[var(--accent)] hover:underline flex items-center gap-1">
-                  <Paperclip className="h-3 w-3" /> Adjuntar
+                  <Paperclip className="h-3 w-3" /> {t('taskDetail.addAttachment')}
                 </button>
               )}
             </div>
@@ -430,7 +432,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
             {uploading && (
               <div className="mb-3 p-3 rounded-xl bg-[var(--bg-elevated)] shadow-card">
                 <div className="flex items-center gap-2 text-sm text-[var(--text-muted)] mb-1.5">
-                  <Paperclip className="h-3 w-3 animate-pulse" /> Subiendo... {uploadPct}%
+                  <Paperclip className="h-3 w-3 animate-pulse" /> {t('common.loading')} {uploadPct}%
                 </div>
                 <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                   <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${uploadPct}%` }} />
@@ -477,7 +479,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
                 );
               })}
               {(task.attachments || []).length === 0 && !uploading && (
-                <p className="text-sm text-[var(--text-muted)] text-center py-2">Sin archivos adjuntos</p>
+                <p className="text-sm text-[var(--text-muted)] text-center py-2">{t('common.noResults')}</p>
               )}
             </div>
           </div>
@@ -487,13 +489,13 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
         <div>
           <div className="flex px-5">
             {([
-              { key: 'comments', label: `Comentarios (${comments.length})` },
-              { key: 'activity', label: 'Actividad' },
-              { key: 'details', label: 'Detalles' },
-            ] as const).map(t => (
-              <button key={t.key} onClick={() => setTab(t.key as any)}
-                className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition ${tab === t.key ? 'text-[var(--accent)] border-[var(--accent)]' : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'}`}>
-                {t.label}
+              { key: 'comments', label: `${t('taskDetail.comments')} (${comments.length})` },
+              { key: 'activity', label: t('taskDetail.activity') },
+              { key: 'details', label: t('taskDetail.details') },
+            ] as const).map(tb => (
+              <button key={tb.key} onClick={() => setTab(tb.key as any)}
+                className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition ${tab === tb.key ? 'text-[var(--accent)] border-[var(--accent)]' : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'}`}>
+                {tb.label}
               </button>
             ))}
           </div>
@@ -503,7 +505,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
             {tab === 'comments' && (
               <div>
                 <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
-                  {comments.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-4">Sin comentarios aún.</p>}
+                  {comments.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-4">{t('taskDetail.noComments')}</p>}
                   {comments.map(c => (
                     <div key={c.id} className="flex gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-[var(--accent-subtle)] flex items-center justify-center text-[12px] font-bold text-[var(--accent)] shrink-0">{c.authorName?.[0]?.toUpperCase()}</div>
@@ -538,7 +540,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
                   )}
                   <div className="flex gap-2">
                     <input ref={commentRef} value={newComment} onChange={e => handleCommentChange(e.target.value)}
-                      placeholder="Escribe un comentario... usa @ para mencionar"
+                      placeholder={t('taskDetail.addComment')}
                       className="input-dark h-9 text-sm flex-1" onKeyDown={e => { if (e.key === 'Enter' && !mentionOpen) postComment(); if (e.key === 'Escape') setMentionOpen(false); }} />
                     <button onClick={postComment} className="h-9 px-4 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm"><Send className="h-3.5 w-3.5" /></button>
                   </div>
@@ -549,7 +551,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
             {/* Activity tab */}
             {tab === 'activity' && (
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {activity.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-4">Sin actividad.</p>}
+                {activity.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-4">{t('taskDetail.noActivity')}</p>}
                 {activity.map(a => (
                   <div key={a.id} className="flex items-start gap-2 text-sm">
                     <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] mt-1.5 shrink-0" />
@@ -570,43 +572,43 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
             {tab === 'details' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">Tipo</span>
-                  <span className="text-[var(--text-secondary)] flex items-center gap-1"><tp.Icon className="h-3 w-3" style={{ color: tp.color }} />{tp.label}</span>
+                  <span className="text-[var(--text-muted)]">{t('taskCreate.type')}</span>
+                  <span className="text-[var(--text-secondary)] flex items-center gap-1"><tp.Icon className="h-3 w-3" style={{ color: tp.color }} />{t(`taskType.${tp.id}`)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">Visibilidad</span>
-                  <span className="text-[var(--text-secondary)] flex items-center gap-1">{visConf && <><visConf.Icon className="h-3 w-3" style={{ color: visConf.color }} />{visConf.label}</>}</span>
+                  <span className="text-[var(--text-muted)]">{t('taskCreate.visibility')}</span>
+                  <span className="text-[var(--text-secondary)] flex items-center gap-1">{visConf && <><visConf.Icon className="h-3 w-3" style={{ color: visConf.color }} />{t(`visibility.${visConf.id}`)}</>}</span>
                 </div>
                 {taskTeam && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">Departamento</span>
+                    <span className="text-[var(--text-muted)]">{t('taskCreate.department')}</span>
                     <span className="text-[var(--text-secondary)]">{taskTeam.icon} {taskTeam.name}</span>
                   </div>
                 )}
                 {task.timeEstimate && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">Estimación</span>
+                    <span className="text-[var(--text-muted)]">{t('taskCreate.timeEstimate')}</span>
                     <span className="text-[var(--text-secondary)]">{task.timeEstimate}m</span>
                   </div>
                 )}
                 {task.points && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">Puntos</span>
+                    <span className="text-[var(--text-muted)]">{t('taskCreate.points')}</span>
                     <span className="text-[var(--text-secondary)]">{task.points}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">Creado</span>
+                  <span className="text-[var(--text-muted)]">{t('taskDetail.created')}</span>
                   <span className="text-[var(--text-secondary)]">{task.createdAt?.toDate?.()?.toLocaleDateString?.('es-MX') || '—'}</span>
                 </div>
                 {task.updatedAt && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">Actualizado</span>
+                    <span className="text-[var(--text-muted)]">{t('taskDetail.updated')}</span>
                     <span className="text-[var(--text-secondary)]">{task.updatedAt?.toDate?.()?.toLocaleDateString?.('es-MX') || '—'}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">Creado por</span>
+                  <span className="text-[var(--text-muted)]">{t('taskDetail.createdBy')}</span>
                   <span className="text-[var(--text-secondary)]">{members.find(m => m.id === task.createdBy)?.displayName || task.createdBy}</span>
                 </div>
               </div>

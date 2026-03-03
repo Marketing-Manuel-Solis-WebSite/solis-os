@@ -35,19 +35,25 @@ export interface Member {
 
 export type ResourceType =
   | 'workspace' | 'task' | 'doc' | 'channel'
-  | 'automation' | 'analytics' | 'admin' | 'user' | 'org';
+  | 'automation' | 'analytics' | 'admin' | 'user' | 'org'
+  | 'goal' | 'timesheet' | 'whiteboard' | 'form';
 
 export type PermAction = 'create' | 'read' | 'update' | 'delete' | 'manage';
 
 // ============================================
 // DEFAULT PERMISSIONS MATRIX
 // ============================================
+const ALL_RESOURCES: ResourceType[] = [
+  'workspace', 'task', 'doc', 'channel', 'automation', 'analytics',
+  'admin', 'user', 'org', 'goal', 'timesheet', 'whiteboard', 'form',
+];
+
 const DEFAULT_PERMS: Record<Role, Record<ResourceType, Record<PermAction, boolean>>> = {
   owner: Object.fromEntries(
-    (['workspace', 'task', 'doc', 'channel', 'automation', 'analytics', 'admin', 'user', 'org'] as ResourceType[]).map(r => [r, { create: true, read: true, update: true, delete: true, manage: true }])
+    ALL_RESOURCES.map(r => [r, { create: true, read: true, update: true, delete: true, manage: true }])
   ) as any,
   admin: Object.fromEntries(
-    (['workspace', 'task', 'doc', 'channel', 'automation', 'analytics', 'admin', 'user', 'org'] as ResourceType[]).map(r => [r, { create: true, read: true, update: true, delete: true, manage: true }])
+    ALL_RESOURCES.map(r => [r, { create: true, read: true, update: true, delete: true, manage: true }])
   ) as any,
   manager: {
     workspace: { create: true, read: true, update: true, delete: false, manage: false },
@@ -59,6 +65,10 @@ const DEFAULT_PERMS: Record<Role, Record<ResourceType, Record<PermAction, boolea
     admin: { create: false, read: false, update: false, delete: false, manage: false },
     user: { create: false, read: true, update: false, delete: false, manage: false },
     org: { create: false, read: true, update: false, delete: false, manage: false },
+    goal: { create: true, read: true, update: true, delete: true, manage: true },
+    timesheet: { create: true, read: true, update: true, delete: true, manage: true },
+    whiteboard: { create: true, read: true, update: true, delete: true, manage: true },
+    form: { create: true, read: true, update: true, delete: true, manage: false },
   },
   member: {
     workspace: { create: false, read: true, update: false, delete: false, manage: false },
@@ -70,6 +80,10 @@ const DEFAULT_PERMS: Record<Role, Record<ResourceType, Record<PermAction, boolea
     admin: { create: false, read: false, update: false, delete: false, manage: false },
     user: { create: false, read: true, update: false, delete: false, manage: false },
     org: { create: false, read: true, update: false, delete: false, manage: false },
+    goal: { create: true, read: true, update: true, delete: false, manage: false },
+    timesheet: { create: true, read: true, update: true, delete: false, manage: false },
+    whiteboard: { create: true, read: true, update: true, delete: false, manage: false },
+    form: { create: false, read: false, update: false, delete: false, manage: false },
   },
   guest: {
     workspace: { create: false, read: true, update: false, delete: false, manage: false },
@@ -81,6 +95,10 @@ const DEFAULT_PERMS: Record<Role, Record<ResourceType, Record<PermAction, boolea
     admin: { create: false, read: false, update: false, delete: false, manage: false },
     user: { create: false, read: true, update: false, delete: false, manage: false },
     org: { create: false, read: false, update: false, delete: false, manage: false },
+    goal: { create: false, read: true, update: false, delete: false, manage: false },
+    timesheet: { create: false, read: true, update: false, delete: false, manage: false },
+    whiteboard: { create: false, read: true, update: false, delete: false, manage: false },
+    form: { create: false, read: false, update: false, delete: false, manage: false },
   },
   readonly: {
     workspace: { create: false, read: true, update: false, delete: false, manage: false },
@@ -92,6 +110,10 @@ const DEFAULT_PERMS: Record<Role, Record<ResourceType, Record<PermAction, boolea
     admin: { create: false, read: false, update: false, delete: false, manage: false },
     user: { create: false, read: true, update: false, delete: false, manage: false },
     org: { create: false, read: false, update: false, delete: false, manage: false },
+    goal: { create: false, read: true, update: false, delete: false, manage: false },
+    timesheet: { create: false, read: true, update: false, delete: false, manage: false },
+    whiteboard: { create: false, read: true, update: false, delete: false, manage: false },
+    form: { create: false, read: false, update: false, delete: false, manage: false },
   },
 };
 
@@ -297,9 +319,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
 
       try {
-        // Ensure org exists
         const orgRef = doc(db, 'orgs', ORG_ID);
-        if (!(await getDoc(orgRef)).exists()) {
+        const memRef = doc(db, 'orgs', ORG_ID, 'members', u.uid);
+        const teamsCol = collection(db, 'orgs', ORG_ID, 'teams');
+
+        // --- STEP 1: Parallel fetch of org, teams, member ---
+        const [orgSnap, teamsSnap, memSnap] = await Promise.all([
+          getDoc(orgRef),
+          getDocs(teamsCol),
+          getDoc(memRef),
+        ]);
+
+        // Ensure org exists (first-time only)
+        if (!orgSnap.exists()) {
           await setDoc(orgRef, {
             name: 'Law Office of Manuel Solis',
             slug: ORG_ID,
@@ -311,25 +343,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
         }
 
-        // Ensure teams/departments exist
-        const teamsCol = collection(db, 'orgs', ORG_ID, 'teams');
-        let teamsSnap = await getDocs(teamsCol);
+        // Ensure teams exist (first-time only)
+        let loadedTeams: Team[];
         if (teamsSnap.empty) {
           for (const t of DEFAULT_TEAMS) {
             const id = t.name.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             await setDoc(doc(db, 'orgs', ORG_ID, 'teams', id), t);
           }
-          teamsSnap = await getDocs(teamsCol);
+          const freshTeams = await getDocs(teamsCol);
+          loadedTeams = freshTeams.docs.map(d => ({ id: d.id, ...d.data() } as Team));
+        } else {
+          loadedTeams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Team));
         }
-        const loadedTeams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Team));
         setTeams(loadedTeams);
 
-        // Check member record
-        const memRef = doc(db, 'orgs', ORG_ID, 'members', u.uid);
-        const memSnap = await getDoc(memRef);
-
+        // --- STEP 2: Validate member ---
         if (!memSnap.exists()) {
-          // Allow first-ever user to bootstrap as owner
           const existing = await getDocs(query(collection(db, 'orgs', ORG_ID, 'members'), limit(1)));
           if (existing.empty) {
             const direccionTeam = loadedTeams.find(t => t.name.toLowerCase().includes('direcci')) || loadedTeams[0];
@@ -348,7 +377,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               joinedAt: serverTimestamp(),
             });
           } else {
-            // No member record and not first user — access denied
             await signOut(auth);
             if (typeof window !== 'undefined') window.location.href = '/login?error=no_account';
             setLoading(false);
@@ -356,9 +384,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        let meData = (await getDoc(memRef)).data() as Member;
+        let meData = memSnap.exists() ? (memSnap.data() as Member) : ((await getDoc(memRef)).data() as Member);
 
-        // Block inactive users
         if (meData.active === false) {
           await signOut(auth);
           if (typeof window !== 'undefined') window.location.href = '/login?error=deactivated';
@@ -366,46 +393,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Load all members
-        const allMembersSnap = await getDocs(collection(db, 'orgs', ORG_ID, 'members'));
-        const allMems = allMembersSnap.docs.map(d => ({ id: d.id, ...d.data() } as unknown as Member));
-
-        // Normalize role: map variations like "administrador" → "admin"
+        // Normalize role
         const rawRole = meData.role;
         const canonicalRole = normalizeRole(rawRole);
         if (rawRole !== canonicalRole) {
-          // Role normalized silently
-          await updateDoc(memRef, { role: canonicalRole });
+          updateDoc(memRef, { role: canonicalRole });
           meData = { ...meData, role: canonicalRole };
         }
 
-        // Self-heal: if this user is the only active member and not owner, promote to owner
-        const activeMems = allMems.filter(m => m.active !== false);
-        if (activeMems.length === 1 && (activeMems[0].userId === u.uid || (activeMems[0] as any).id === u.uid) && canonicalRole !== 'owner') {
-          // Self-healing: sole active member promoted to owner
-          await updateDoc(memRef, { role: 'owner', hierarchyLevel: 'owner' });
-          meData = { ...meData, role: 'owner', hierarchyLevel: 'owner' };
-        }
-
-        // Also normalize roles for all other members in allMems (display only, don't write to Firestore for others here)
-        const normalizedAllMems = allMems.map(m => {
-          const norm = normalizeRole(m.role);
-          return norm !== m.role ? { ...m, role: norm } : m;
-        });
-
-        // Auth bootstrap complete
-
         if (!meData.teamIds) meData.teamIds = meData.teamId ? [meData.teamId] : [];
         setMe(meData);
-        setAllMembers(normalizedAllMems);
-
-        // Load permissions matrix
-        try {
-          const permDoc = await getDoc(doc(db, 'orgs', ORG_ID, 'settings', 'permissions'));
-          if (permDoc.exists() && permDoc.data()?.matrix) {
-            setPermMatrix(permDoc.data().matrix);
-          }
-        } catch { /* Use defaults */ }
 
         // Set active team
         const userIsAdmin = meData.role === 'owner' || meData.role === 'admin';
@@ -414,9 +411,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userCanSeeAll = userIsAdmin || userIsDirector;
         setActiveTeamIdRaw(userCanSeeAll ? '__all__' : (meData.teamId || meData.teamIds?.[0] || ''));
 
+        // --- STEP 3: Unblock UI — user can see app now ---
         setLoading(false);
+
+        // --- STEP 4: Background — load members + permissions (non-blocking) ---
+        getDocs(collection(db, 'orgs', ORG_ID, 'members')).then(allMembersSnap => {
+          const allMems = allMembersSnap.docs.map(d => ({ id: d.id, ...d.data() } as unknown as Member));
+
+          // Self-heal: sole active member → owner
+          const activeMems = allMems.filter(m => m.active !== false);
+          if (activeMems.length === 1 && (activeMems[0].userId === u.uid || (activeMems[0] as any).id === u.uid) && canonicalRole !== 'owner') {
+            updateDoc(memRef, { role: 'owner', hierarchyLevel: 'owner' });
+            setMe(prev => prev ? { ...prev, role: 'owner', hierarchyLevel: 'owner' } : prev);
+          }
+
+          const normalizedAllMems = allMems.map(m => {
+            const norm = normalizeRole(m.role);
+            return norm !== m.role ? { ...m, role: norm } : m;
+          });
+          setAllMembers(normalizedAllMems);
+        }).catch(() => {});
+
+        getDoc(doc(db, 'orgs', ORG_ID, 'settings', 'permissions')).then(permSnap => {
+          if (permSnap.exists() && permSnap.data()?.matrix) {
+            setPermMatrix(permSnap.data().matrix);
+          }
+        }).catch(() => {});
+
       } catch (e) {
-        // Auth bootstrap error handled silently
         setMe(null);
         setLoading(false);
       }

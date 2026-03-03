@@ -5,35 +5,45 @@ import { Bell, CheckCheck, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { onNotificationsSnapshot, markNotificationRead, markAllRead, type AppNotification } from '@/lib/notifications';
 import { useRouter } from 'next/navigation';
+import { useI18n } from '@/lib/i18n';
 
-const TYPE_LABELS: Record<string, string> = {
-  task_assigned: 'Task',
-  task_mentioned: 'Mention',
-  task_completed: 'Done',
-  task_due_soon: 'Due',
-  task_comment: 'Comment',
-  channel_mention: 'Channel',
-  channel_message: 'Message',
-  doc_mentioned: 'Doc',
-  system: 'System',
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  task_assigned: 'notif.typeTask',
+  task_mentioned: 'notif.typeMention',
+  task_completed: 'notif.typeDone',
+  task_due_soon: 'notif.typeDue',
+  task_comment: 'notif.typeComment',
+  channel_mention: 'notif.typeChannel',
+  channel_message: 'notif.typeMessage',
+  doc_mentioned: 'notif.typeDoc',
+  system: 'notif.typeSystem',
+  goal_assigned: 'notif.typeGoalAssigned',
+  goal_completed: 'notif.typeGoalCompleted',
+  goal_overdue: 'notif.typeGoalOverdue',
+  whiteboard_shared: 'notif.typeWhiteboardShared',
+  form_submission: 'notif.typeFormSubmission',
+  form_converted: 'notif.typeFormConverted',
+  form_paused: 'notif.typeFormPaused',
+  form_limit_reached: 'notif.typeFormLimitReached',
 };
 
-function timeAgo(date: any): string {
+function timeAgo(date: any, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (!date) return '';
   const d = date?.toDate ? date.toDate() : new Date(date?.seconds ? date.seconds * 1000 : date);
   const diff = Date.now() - d.getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t('notif.justNow');
+  if (mins < 60) return t('notif.minutesAgo', { n: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return t('notif.hoursAgo', { n: hrs });
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return t('notif.daysAgo', { n: days });
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export default function NotificationBell() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [notifs, setNotifs] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
@@ -115,14 +125,14 @@ export default function NotificationBell() {
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3">
-              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Notifications</h3>
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t('notif.notifications')}</h3>
               <div className="flex items-center gap-2">
                 {unread > 0 && (
                   <button
                     onClick={handleMarkAll}
                     className="text-sm px-2 py-1 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-200 font-medium flex items-center gap-1"
                   >
-                    <CheckCheck className="h-3 w-3" /> Mark all read
+                    <CheckCheck className="h-3 w-3" /> {t('notif.markAllRead')}
                   </button>
                 )}
                 <button
@@ -139,13 +149,13 @@ export default function NotificationBell() {
               {notifs.length === 0 ? (
                 <div className="py-12 text-center">
                   <Bell className="h-6 w-6 text-[var(--text-muted)] mx-auto mb-2" strokeWidth={1.5} />
-                  <p className="text-sm text-[var(--text-muted)]">No notifications yet</p>
+                  <p className="text-sm text-[var(--text-muted)]">{t('notif.noNotifications')}</p>
                 </div>
               ) : (
                 <>
-                  {grouped.today.length > 0 && <NotifGroup label="Today" items={grouped.today} onClick={handleClick} />}
-                  {grouped.yesterday.length > 0 && <NotifGroup label="Yesterday" items={grouped.yesterday} onClick={handleClick} />}
-                  {grouped.older.length > 0 && <NotifGroup label="Earlier" items={grouped.older} onClick={handleClick} />}
+                  {grouped.today.length > 0 && <NotifGroup label={t('notif.today')} items={grouped.today} onClick={handleClick} t={t} />}
+                  {grouped.yesterday.length > 0 && <NotifGroup label={t('notif.yesterday')} items={grouped.yesterday} onClick={handleClick} t={t} />}
+                  {grouped.older.length > 0 && <NotifGroup label={t('notif.earlier')} items={grouped.older} onClick={handleClick} t={t} />}
                 </>
               )}
             </div>
@@ -156,7 +166,7 @@ export default function NotificationBell() {
   );
 }
 
-function NotifGroup({ label, items, onClick }: { label: string; items: AppNotification[]; onClick: (n: AppNotification) => void }) {
+function NotifGroup({ label, items, onClick, t }: { label: string; items: AppNotification[]; onClick: (n: AppNotification) => void; t: (key: string, params?: Record<string, string | number>) => string }) {
   return (
     <div>
       <div className="px-4 py-2 sticky top-0 bg-[var(--bg-elevated)]">
@@ -170,7 +180,7 @@ function NotifGroup({ label, items, onClick }: { label: string; items: AppNotifi
         >
           {/* Type badge */}
           <span className="text-[12px] font-medium px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] shrink-0 mt-0.5">
-            {TYPE_LABELS[n.type] || 'Notif'}
+            {t(TYPE_LABEL_KEYS[n.type] || 'notif.typeDefault')}
           </span>
           <div className="flex-1 min-w-0">
             <p className={`text-sm leading-tight ${!n.read ? 'text-[var(--text-primary)] font-semibold' : 'text-[var(--text-secondary)]'}`}>
@@ -179,7 +189,7 @@ function NotifGroup({ label, items, onClick }: { label: string; items: AppNotifi
             <p className="text-[13px] text-[var(--text-muted)] mt-0.5 truncate">{n.message}</p>
             <div className="flex items-center gap-2 mt-1">
               {n.actorName && <span className="text-[12px] text-[var(--text-tertiary)] font-medium">{n.actorName}</span>}
-              <span className="text-[12px] text-[var(--text-muted)]">{timeAgo(n.createdAt)}</span>
+              <span className="text-[12px] text-[var(--text-muted)]">{timeAgo(n.createdAt, t)}</span>
             </div>
           </div>
           {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0 mt-2" />}

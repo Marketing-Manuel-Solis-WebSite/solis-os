@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const cfg = {
@@ -15,6 +15,11 @@ const app = getApps().length ? getApp() : initializeApp(cfg);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+
+// Enable offline persistence — subsequent loads use cache
+if (typeof window !== 'undefined') {
+  enableMultiTabIndexedDbPersistence(db).catch(() => {});
+}
 
 /** Secondary Auth instance for admin user-creation without signing out the admin. */
 export function getSecondaryAuth() {

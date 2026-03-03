@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Hash, Lock, Users, Pin, Settings, MessageCircle, UserPlus, Search, X, Check, Eraser, Menu } from 'lucide-react';
 
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export default function ChannelHeader({ channel, members, userId, pinnedCount, memberCount, canManage, onlineMap, getDMName, onShowSettings, onShowMembers, onShowPinned, onAddMember, onClearView, onToggleSidebar }: Props) {
+  const { t } = useI18n();
   const isDM = channel.type === 'dm';
   const name = isDM ? getDMName(channel) : channel.name;
   const icon = isDM
@@ -55,7 +57,7 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
     <div role="banner" className="h-14 bg-[var(--bg-elevated)]/80 flex items-center justify-between px-5 shrink-0">
       <div className="flex items-center gap-3 min-w-0">
         {onToggleSidebar && (
-          <button onClick={onToggleSidebar} className="lg:hidden p-2 -ml-2 mr-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition" aria-label="Abrir menú">
+          <button onClick={onToggleSidebar} className="lg:hidden p-2 -ml-2 mr-1 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition" aria-label={t('chat.openMenu')}>
             <Menu className="h-5 w-5" />
           </button>
         )}
@@ -72,13 +74,13 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[var(--text-primary)] text-sm truncate">{name}</span>
             {channel.type === 'private' && !isDM && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">PRIVATE</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">{t('chat.privateTag')}</span>
             )}
           </div>
           {isDM && otherId && (
             <p className={`text-[13px] flex items-center gap-1 ${onlineMap?.[otherId] ? 'text-[#22C55E]' : 'text-[var(--text-muted)]'}`}>
               <span className={`w-1.5 h-1.5 rounded-full inline-block ${onlineMap?.[otherId] ? 'bg-[#22C55E]' : 'bg-[var(--text-muted)]/40'}`} />
-              {onlineMap?.[otherId] ? 'En línea' : 'Desconectado'}
+              {onlineMap?.[otherId] ? t('chat.onlineStatus') : t('chat.offlineStatus')}
             </p>
           )}
           {channel.description && !isDM && (
@@ -90,13 +92,13 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
         <div className="flex items-center rounded-md bg-[var(--bg-base)]/50 shadow-card overflow-hidden divide-x divide-[var(--border-subtle)]">
           {pinnedCount > 0 && (
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-              onClick={onShowPinned} className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 transition" title="Pinned messages">
+              onClick={onShowPinned} className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 transition" title={t('chat.pinnedMessages')}>
               <Pin className="h-3.5 w-3.5" /><span>{pinnedCount}</span>
             </motion.button>
           )}
           {!isDM && (
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-              onClick={onShowMembers} className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition" title="Members">
+              onClick={onShowMembers} className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition" title={t('chat.members')}>
               <Users className="h-3.5 w-3.5" /><span>{memberCount}</span>
             </motion.button>
           )}
@@ -108,9 +110,9 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
               onClick={() => setShowAdd(!showAdd)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition ${showAdd ? 'bg-[var(--accent)]/10 text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[#22C55E] hover:bg-[#22C55E]/5'}`}
-              title="Add member">
+              title={t('chat.addMember')}>
               <UserPlus className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Add</span>
+              <span className="hidden sm:inline">{t('chat.addMember')}</span>
             </motion.button>
 
             <AnimatePresence>
@@ -125,14 +127,14 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
                   <div className="p-3">
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
-                      <input value={addSearch} onChange={e => setAddSearch(e.target.value)} placeholder="Search members..."
+                      <input value={addSearch} onChange={e => setAddSearch(e.target.value)} placeholder={t('chat.searchMembers')}
                         autoFocus className="w-full h-8 pl-9 pr-3 rounded-lg bg-[var(--bg-elevated)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30" />
                     </div>
                   </div>
                   <div className="max-h-48 overflow-y-auto p-1.5">
                     {filtered.length === 0 ? (
                       <p className="text-sm text-[var(--text-muted)] text-center py-4">
-                        {nonMembers.length === 0 ? 'Everyone is already a member' : 'No matches found'}
+                        {nonMembers.length === 0 ? t('chat.everyoneMember') : t('chat.noMatchesFound')}
                       </p>
                     ) : filtered.slice(0, 10).map(m => (
                       <motion.button key={m.id} whileHover={{ backgroundColor: 'var(--bg-hover)' }}
@@ -157,13 +159,13 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
 
         {onClearView && (
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-            onClick={onClearView} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition" title="Limpiar vista">
+            onClick={onClearView} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition" title={t('chat.clearViewTitle')}>
             <Eraser className="h-4 w-4" />
           </motion.button>
         )}
         {canManage && !isDM && (
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-            onClick={onShowSettings} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition" title="Channel settings">
+            onClick={onShowSettings} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition" title={t('chat.channelSettings')}>
             <Settings className="h-4 w-4" />
           </motion.button>
         )}

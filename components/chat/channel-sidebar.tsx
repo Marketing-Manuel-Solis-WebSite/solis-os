@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Hash, Lock, MessageCircle, Plus, Search, ChevronDown, ChevronRight, X } from 'lucide-react';
 
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export default function ChannelSidebar({ channels, active, members, userId, search, onlineMap, readCursors, onSearchChange, onSelect, onCreate, onStartDM, getDMName }: Props) {
+  const { t } = useI18n();
   const [showDMs, setShowDMs] = useState(true);
   const [showChannels, setShowChannels] = useState(true);
   const [showDMList, setShowDMList] = useState(false);
@@ -39,19 +41,19 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
   const availableDMMembers = members.filter(m => m.id !== userId);
 
   return (
-    <aside role="navigation" aria-label="Canales" className="w-72 lg:w-64 h-full bg-[var(--bg-elevated)] lg:bg-[var(--bg-elevated)]/60 shadow-panel flex flex-col shrink-0">
+    <aside role="navigation" aria-label={t('chat.channels')} className="w-72 lg:w-64 h-full bg-[var(--bg-elevated)] lg:bg-[var(--bg-elevated)]/60 shadow-panel flex flex-col shrink-0">
       {/* Header */}
       <div className="p-3">
         <div className="flex items-center justify-between mb-2.5">
-          <span className="text-sm font-bold text-[var(--text-primary)]">Messages</span>
+          <span className="text-sm font-bold text-[var(--text-primary)]">{t('chat.messages')}</span>
           <motion.button whileHover={{ scale: 1.1, rotate: 90 }} whileTap={{ scale: 0.9 }}
-            onClick={onCreate} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition" title="New Channel">
+            onClick={onCreate} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition" title={t('chat.newChannel')}>
             <Plus className="h-4 w-4" />
           </motion.button>
         </div>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
-          <input value={search} onChange={e => onSearchChange(e.target.value)} placeholder="Search channels..."
+          <input value={search} onChange={e => onSearchChange(e.target.value)} placeholder={t('chat.searchChannels')}
             className="w-full h-8 pl-8 pr-8 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30 focus:bg-[var(--bg-elevated)] focus:shadow-sm transition-all duration-200" />
           {search && (
             <button onClick={() => onSearchChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
@@ -69,7 +71,7 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
               <motion.span animate={{ rotate: showChannels ? 0 : -90 }} transition={{ duration: 0.2 }}>
                 <ChevronDown className="h-3 w-3" />
               </motion.span>
-              Channels <span className="text-[var(--text-muted)] ml-auto opacity-60">{publicChannels.length}</span>
+              {t('chat.channels')} <span className="text-[var(--text-muted)] ml-auto opacity-60">{publicChannels.length}</span>
             </button>
           </div>
         )}
@@ -125,7 +127,7 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
                 <motion.span animate={{ rotate: showDMs ? 0 : -90 }} transition={{ duration: 0.2 }}>
                   <ChevronDown className="h-3 w-3" />
                 </motion.span>
-                Direct Messages <span className="text-[var(--text-muted)] ml-auto opacity-60">{dmChannels.length}</span>
+                {t('chat.directMessages')} <span className="text-[var(--text-muted)] ml-auto opacity-60">{dmChannels.length}</span>
               </button>
             </div>
             <AnimatePresence initial={false}>
@@ -187,7 +189,7 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
               onClick={() => setShowDMList(!showDMList)}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
               <MessageCircle className="h-3.5 w-3.5" />
-              New Direct Message
+              {t('chat.newDirectMessage')}
               <Plus className="h-3 w-3 ml-auto" />
             </motion.button>
             <AnimatePresence>

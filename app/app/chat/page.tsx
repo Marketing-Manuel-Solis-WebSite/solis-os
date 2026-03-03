@@ -1,4 +1,5 @@
 'use client';
+import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
@@ -24,6 +25,7 @@ import { MessageSquare, WifiOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ChatPage() {
+  const { t } = useI18n();
   const { user, me, isAdmin, activeTeamId, teams, can, canSeeAllTeams } = useAuth();
   const [channels, setChannels] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
@@ -176,10 +178,10 @@ export default function ChatPage() {
     // Notify channel members (except sender)
     const recipientIds = (active.members || []).filter((id: string) => id !== user!.uid);
     if (recipientIds.length > 0) {
-      const channelName = active.type === 'dm' ? 'Mensaje Directo' : `#${active.name}`;
+      const channelName = active.type === 'dm' ? t('chat.dm') : `#${active.name}`;
       notifyMany(recipientIds, {
         type: 'channel_message',
-        title: `Nuevo mensaje en ${channelName}`,
+        title: t('chat.newMessage', { channel: channelName }),
         message: content.trim().slice(0, 80),
         entityType: 'channel',
         entityId: active.id,
@@ -195,7 +197,7 @@ export default function ChatPage() {
       if (mentionRecipients.length > 0) {
         notifyMany(mentionRecipients, {
           type: 'channel_mention',
-          title: `${me!.displayName} te mencionó en ${active.type === 'dm' ? 'un DM' : '#' + active.name}`,
+          title: t('chat.mentionedYou', { name: me!.displayName, channel: active.type === 'dm' ? t('chat.mentionedInDm') : '#' + active.name }),
           message: content.trim().slice(0, 80),
           entityType: 'channel',
           entityId: active.id,
@@ -265,7 +267,7 @@ export default function ChatPage() {
 
   const handleDeleteChannel = async () => {
     if (!active) return;
-    if (!confirm(`Delete #${active.name}? All messages will be lost.`)) return;
+    if (!confirm(t('chat.deleteChannelConfirm', { name: active.name }))) return;
     await deleteChannel(active.id);
     await logAction({ action: 'deleted', resource: 'channel', detail: active.name, actorId: user!.uid, actorName: me!.displayName });
     setActive(null);
@@ -332,7 +334,7 @@ export default function ChatPage() {
 
   const handleClearView = () => {
     if (!active) return;
-    if (!confirm('¿Limpiar la vista de esta conversación? Los mensajes no se eliminarán del servidor.')) return;
+    if (!confirm(t('chat.clearView'))) return;
     setClearedChannels(prev => new Set([...prev, active.id]));
   };
 
@@ -382,7 +384,7 @@ export default function ChatPage() {
             >
               <div className="bg-red-500/10 border-b border-red-500/20 px-4 py-2 flex items-center gap-2 text-sm text-red-400 font-medium">
                 <WifiOff className="h-4 w-4 shrink-0" />
-                Sin conexión — los mensajes se enviarán cuando se restablezca
+                {t('chat.offline')}
               </div>
             </motion.div>
           )}
@@ -435,10 +437,10 @@ export default function ChatPage() {
                       <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: '300ms' }} />
                     </span>
                     {typingUsers.length === 1
-                      ? `${typingUsers[0].name} está escribiendo...`
+                      ? t('chat.typing', { name: typingUsers[0].name })
                       : typingUsers.length === 2
-                        ? `${typingUsers[0].name} y ${typingUsers[1].name} están escribiendo...`
-                        : `${typingUsers.length} personas están escribiendo...`}
+                        ? t('chat.typingTwo', { name1: typingUsers[0].name, name2: typingUsers[1].name })
+                        : t('chat.typingMany', { n: typingUsers.length })}
                   </div>
                 </motion.div>
               )}
@@ -466,8 +468,8 @@ export default function ChatPage() {
               <div className="hidden lg:flex w-16 h-16 rounded-xl bg-[var(--accent-subtle)] shadow-card items-center justify-center mx-auto mb-4">
                 <MessageSquare className="h-7 w-7 text-[var(--accent)]/60" />
               </div>
-              <p className="text-lg font-semibold text-[var(--text-secondary)]">Selecciona un canal</p>
-              <p className="text-base text-[var(--text-muted)] mt-1">o crea uno nuevo para empezar a chatear</p>
+              <p className="text-lg font-semibold text-[var(--text-secondary)]">{t('chat.selectChannel')}</p>
+              <p className="text-base text-[var(--text-muted)] mt-1">{t('chat.selectChannelHint')}</p>
             </div>
           </div>
         )}

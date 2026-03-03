@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, UserPlus, Shield, ShieldOff, MessageCircle, UserMinus, Search, Crown } from 'lucide-react';
 
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export default function MemberDrawer({ channel, members, userId, canManage, onClose, onAdd, onRemove, onToggleAdmin, onStartDM }: Props) {
+  const { t } = useI18n();
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -31,13 +33,13 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
       className="w-[320px] shrink-0 bg-[var(--bg-elevated)] shadow-panel flex flex-col h-full overflow-hidden"
     >
       <div className="flex items-center justify-between px-5 py-3.5">
-        <h3 className="text-sm font-bold text-[var(--text-primary)]">Members ({channelMembers.length})</h3>
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('chat.members')} ({channelMembers.length})</h3>
         <div className="flex items-center gap-1">
           {canManage && (
             <motion.button whileTap={{ scale: 0.9 }}
               onClick={() => setShowAdd(!showAdd)}
               className={`p-2 rounded-lg transition ${showAdd ? 'bg-[#22C55E]/10 text-[#22C55E]' : 'text-[var(--text-muted)] hover:text-[#22C55E] hover:bg-[#22C55E]/5'}`}
-              title="Add member">
+              title={t('chat.addMember')}>
               <UserPlus className="h-4 w-4" />
             </motion.button>
           )}
@@ -58,15 +60,15 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
             className="overflow-hidden"
           >
             <div className="p-3 bg-[var(--bg-base)]/50">
-              <p className="text-[12px] text-[#22C55E] uppercase font-semibold tracking-wider mb-2">Add Members</p>
+              <p className="text-[12px] text-[#22C55E] uppercase font-semibold tracking-wider mb-2">{t('chat.addMembers')}</p>
               <div className="relative mb-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--text-muted)]" />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..."
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('common.search') + '...'}
                   className="w-full h-8 pl-8 pr-3 rounded-lg bg-[var(--bg-elevated)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30 transition-all duration-200" />
               </div>
               <div className="max-h-36 overflow-y-auto space-y-0.5 scrollbar-thin">
                 {nonMembers.length === 0 ? (
-                  <p className="text-sm text-[var(--text-muted)] text-center py-3">No more members to add</p>
+                  <p className="text-sm text-[var(--text-muted)] text-center py-3">{t('chat.noMoreMembers')}</p>
                 ) : nonMembers.map(m => (
                   <motion.button
                     key={m.id}
@@ -110,17 +112,17 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-medium text-[var(--text-primary)] truncate">{m.displayName}</span>
-                  {isSelf && <span className="text-[9px] text-[var(--text-muted)]">(you)</span>}
+                  {isSelf && <span className="text-[9px] text-[var(--text-muted)]">{t('chat.you')}</span>}
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {isCreator && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[var(--accent)]/10 text-[var(--accent)] font-semibold flex items-center gap-0.5">
-                      <Crown className="h-2.5 w-2.5" />Owner
+                      <Crown className="h-2.5 w-2.5" />{t('chat.owner')}
                     </span>
                   )}
                   {isChannelAdmin && !isCreator && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 font-semibold flex items-center gap-0.5">
-                      <Shield className="h-2.5 w-2.5" />Admin
+                      <Shield className="h-2.5 w-2.5" />{t('chat.admin')}
                     </span>
                   )}
                   {m.department && <span className="text-[9px] text-[var(--text-muted)]">{m.department}</span>}
@@ -129,7 +131,7 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition">
                 {!isSelf && (
                   <motion.button whileTap={{ scale: 0.85 }}
-                    onClick={() => onStartDM(m.id)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] rounded-lg transition" title="Direct message">
+                    onClick={() => onStartDM(m.id)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] rounded-lg transition" title={t('chat.directMessageAction')}>
                     <MessageCircle className="h-3.5 w-3.5" />
                   </motion.button>
                 )}
@@ -138,12 +140,12 @@ export default function MemberDrawer({ channel, members, userId, canManage, onCl
                     <motion.button whileTap={{ scale: 0.85 }}
                       onClick={() => onToggleAdmin(m.id)}
                       className={`p-1.5 rounded-lg transition ${isChannelAdmin ? 'text-blue-400 hover:text-[var(--text-muted)]' : 'text-[var(--text-muted)] hover:text-blue-400'}`}
-                      title={isChannelAdmin ? 'Remove admin' : 'Make admin'}>
+                      title={isChannelAdmin ? t('chat.removeAdmin') : t('chat.makeAdmin')}>
                       {isChannelAdmin ? <ShieldOff className="h-3.5 w-3.5" /> : <Shield className="h-3.5 w-3.5" />}
                     </motion.button>
                     <motion.button whileTap={{ scale: 0.85 }}
-                      onClick={() => { if (confirm(`Remove ${m.displayName}?`)) onRemove(m.id); }}
-                      className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition" title="Remove">
+                      onClick={() => { if (confirm(t('chat.removeConfirm', { name: m.displayName }))) onRemove(m.id); }}
+                      className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition" title={t('chat.removeAction')}>
                       <UserMinus className="h-3.5 w-3.5" />
                     </motion.button>
                   </>

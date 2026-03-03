@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowUp } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
 
 interface Props {
   loading: boolean;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function AIInput({ loading, onSend }: Props) {
+  const { t } = useI18n();
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -45,7 +47,7 @@ export default function AIInput({ loading, onSend }: Props) {
           <textarea ref={textareaRef} value={text}
             onChange={e => { setText(e.target.value); handleInput(); }}
             onKeyDown={handleKeyDown}
-            placeholder="      Message Solis AI..."
+            placeholder={`      ${t('ai.inputPlaceholder')}`}
             rows={1} disabled={loading}
             className="w-full pl-4 pr-14 py-3.5 rounded-2xl bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none resize-none disabled:opacity-50"
             style={{ minHeight: '48px', maxHeight: '200px' }}
@@ -64,7 +66,7 @@ export default function AIInput({ loading, onSend }: Props) {
           </motion.button>
         </div>
         <p className="text-[12px] text-[var(--text-muted)] text-center mt-2">
-          Solis AI can make mistakes. Verify important information.
+          {t('ai.disclaimer')}
         </p>
       </div>
     </div>

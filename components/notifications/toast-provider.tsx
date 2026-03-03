@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle2, AlertCircle, AlertTriangle, Info, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { onNotificationsSnapshot, type AppNotification } from '@/lib/notifications';
+import { useI18n } from '@/lib/i18n';
 
 /* ============================================
    TYPES
@@ -82,6 +83,7 @@ export function useToast(): ToastContextValue {
    INDIVIDUAL TOAST COMPONENT
    ============================================ */
 function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
+  const { t } = useI18n();
   const config = TYPE_CONFIG[toast.type];
   const Icon = config.icon;
 
@@ -132,7 +134,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
         <button
           onClick={() => onDismiss(toast.id)}
           className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded transition-all duration-200 shrink-0"
-          aria-label="Cerrar notificacion"
+          aria-label={t('notif.closeNotification')}
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -221,8 +223,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
    TOAST CONTAINER + FIREBASE BRIDGE
    ============================================ */
 function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
+  const { t } = useI18n();
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none" aria-label="Notifications">
+    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none" aria-label={t('notif.notifications')}>
       <AnimatePresence mode="popLayout">
         {toasts.map(toast => (
           <ToastItem key={toast.id} toast={toast} onDismiss={onDismiss} />

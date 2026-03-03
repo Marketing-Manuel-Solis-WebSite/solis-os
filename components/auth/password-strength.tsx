@@ -1,36 +1,38 @@
 'use client';
 import { motion } from 'framer-motion';
 import { Check, X } from 'lucide-react';
+import { useI18n } from '@/lib/i18n';
 
 interface Props {
   password: string;
 }
 
 const CHECKS = [
-  { key: 'length', label: 'Al menos 8 caracteres', test: (p: string) => p.length >= 8 },
-  { key: 'upper', label: 'Una letra mayuscula', test: (p: string) => /[A-Z]/.test(p) },
-  { key: 'lower', label: 'Una letra minuscula', test: (p: string) => /[a-z]/.test(p) },
-  { key: 'number', label: 'Un numero', test: (p: string) => /\d/.test(p) },
-  { key: 'special', label: 'Un caracter especial (!@#$...)', test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+  { key: 'length', i18nKey: 'password.length', test: (p: string) => p.length >= 8 },
+  { key: 'upper', i18nKey: 'password.upper', test: (p: string) => /[A-Z]/.test(p) },
+  { key: 'lower', i18nKey: 'password.lower', test: (p: string) => /[a-z]/.test(p) },
+  { key: 'number', i18nKey: 'password.number', test: (p: string) => /\d/.test(p) },
+  { key: 'special', i18nKey: 'password.special', test: (p: string) => /[^A-Za-z0-9]/.test(p) },
 ] as const;
 
-type Level = 'debil' | 'regular' | 'buena' | 'fuerte';
+type Level = 'weak' | 'fair' | 'good' | 'strong';
 
 function getLevel(score: number): { level: Level; color: string; bars: number } {
-  if (score <= 2) return { level: 'debil', color: 'var(--error)', bars: 1 };
-  if (score === 3) return { level: 'regular', color: 'var(--warning)', bars: 2 };
-  if (score === 4) return { level: 'buena', color: '#00C48C', bars: 3 };
-  return { level: 'fuerte', color: '#00C48C', bars: 4 };
+  if (score <= 2) return { level: 'weak', color: 'var(--error)', bars: 1 };
+  if (score === 3) return { level: 'fair', color: 'var(--warning)', bars: 2 };
+  if (score === 4) return { level: 'good', color: '#00C48C', bars: 3 };
+  return { level: 'strong', color: '#00C48C', bars: 4 };
 }
 
-const LEVEL_LABELS: Record<Level, string> = {
-  debil: 'Debil',
-  regular: 'Regular',
-  buena: 'Buena',
-  fuerte: 'Fuerte',
+const LEVEL_I18N_KEYS: Record<Level, string> = {
+  weak: 'password.weak',
+  fair: 'password.fair',
+  good: 'password.good',
+  strong: 'password.strong',
 };
 
 export default function PasswordStrength({ password }: Props) {
+  const { t } = useI18n();
   if (!password) return null;
 
   const results = CHECKS.map(c => ({ ...c, pass: c.test(password) }));
@@ -63,7 +65,7 @@ export default function PasswordStrength({ password }: Props) {
       {/* Label */}
       <div className="flex items-center justify-between">
         <span className="text-[13px] font-medium" style={{ color }}>
-          {LEVEL_LABELS[level]}
+          {t(LEVEL_I18N_KEYS[level])}
         </span>
         <span className="text-[13px] text-[var(--text-muted)]">{score}/5</span>
       </div>
@@ -88,7 +90,7 @@ export default function PasswordStrength({ password }: Props) {
               className="text-[13px] transition-colors duration-200"
               style={{ color: r.pass ? 'var(--text-secondary)' : 'var(--text-muted)' }}
             >
-              {r.label}
+              {t(r.i18nKey)}
             </span>
           </div>
         ))}

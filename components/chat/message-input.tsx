@@ -1,17 +1,18 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, Reply, Edit2, Paperclip, FileVideo, Loader2 } from 'lucide-react';
 import { uploadFile as sharedUploadFile, isImageType, isVideoType, formatFileSize } from '@/lib/upload';
 import { useToast } from '@/components/notifications/toast-provider';
 
 const QUICK_SUGGESTIONS = [
-  { label: 'Hola a todos', icon: '👋' },
-  { label: 'Buenos días', icon: '☀️' },
-  { label: 'Listo', icon: '✅' },
-  { label: 'Gracias', icon: '🙏' },
-  { label: 'De acuerdo', icon: '👍' },
-  { label: 'Entendido', icon: '📝' },
+  { key: 'chat.suggestHello', icon: '👋' },
+  { key: 'chat.suggestGoodMorning', icon: '☀️' },
+  { key: 'chat.suggestDone', icon: '✅' },
+  { key: 'chat.suggestThanks', icon: '🙏' },
+  { key: 'chat.suggestAgree', icon: '👍' },
+  { key: 'chat.suggestUnderstood', icon: '📝' },
 ];
 
 interface Props {
@@ -29,6 +30,7 @@ interface Props {
 }
 
 export default function MessageInput({ channelName, members, replyTo, editingMsg, showSuggestions, onTypingStart, onTypingStop, onSend, onEdit, onCancelReply, onCancelEdit }: Props) {
+  const { t } = useI18n();
   const toast = useToast();
   const [txt, setTxt] = useState('');
   const [showMentions, setShowMentions] = useState(false);
@@ -66,7 +68,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
     const newPreviews: { file: File; url: string; type: string }[] = [];
     Array.from(files).forEach(file => {
       if (file.size > 100 * 1024 * 1024) {
-        toast.warning('Archivo muy grande', `"${file.name}" excede el limite de 100MB.`);
+        toast.warning(t('chat.fileTooLarge'), t('chat.fileTooLargeMsg', { name: file.name }));
         return;
       }
       const url = URL.createObjectURL(file);
@@ -110,7 +112,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
         previews.forEach(p => URL.revokeObjectURL(p.url));
         setPreviews([]);
       } catch (err: any) {
-        toast.error('Error al subir archivo', err.message || 'Ocurrio un error al subir el archivo.');
+        toast.error(t('chat.uploadError'), err.message || t('chat.uploadError'));
       }
       setUploading(false);
       setUploadProgress(0);
@@ -194,7 +196,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
               {replyTo && (
                 <>
                   <Reply className="h-3.5 w-3.5 text-[var(--accent)]" />
-                  <span className="text-sm text-[var(--text-muted)]">Respondiendo a</span>
+                  <span className="text-sm text-[var(--text-muted)]">{t('chat.replyingTo')}</span>
                   <span className="text-sm text-[var(--accent)] font-semibold">{replyTo.displayName}</span>
                   <span className="text-sm text-[var(--text-muted)] truncate flex-1">{replyTo.content?.slice(0, 50)}</span>
                   <motion.button whileTap={{ scale: 0.85 }} onClick={onCancelReply} className="p-1 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-md transition">
@@ -205,7 +207,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
               {editingMsg && (
                 <>
                   <Edit2 className="h-3.5 w-3.5 text-blue-400" />
-                  <span className="text-sm text-blue-400 font-semibold flex-1">Editando mensaje</span>
+                  <span className="text-sm text-blue-400 font-semibold flex-1">{t('chat.editingMessage')}</span>
                   <motion.button whileTap={{ scale: 0.85 }} onClick={() => { onCancelEdit(); setTxt(''); }} className="p-1 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-md transition">
                     <X className="h-3.5 w-3.5" />
                   </motion.button>
@@ -254,7 +256,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
                 <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
                   <motion.div className="h-full bg-[var(--accent)] rounded-full" animate={{ width: `${uploadProgress}%` }} />
                 </div>
-                <span className="text-[12px] text-[var(--text-muted)] mt-0.5">Subiendo... {uploadProgress}%</span>
+                <span className="text-[12px] text-[var(--text-muted)] mt-0.5">{t('chat.uploading', { n: uploadProgress })}</span>
               </div>
             )}
           </motion.div>
@@ -293,14 +295,14 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
         <div className="flex gap-2 px-5 pt-3 pb-1 overflow-x-auto scrollbar-thin">
           {QUICK_SUGGESTIONS.map(s => (
             <motion.button
-              key={s.label}
+              key={s.key}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => onSend(s.label, [])}
+              onClick={() => onSend(t(s.key), [])}
               className="shrink-0 px-3 py-1.5 rounded-full bg-[var(--bg-elevated)] shadow-card text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all duration-200 flex items-center gap-1.5"
             >
               <span>{s.icon}</span>
-              {s.label}
+              {t(s.key)}
             </motion.button>
           ))}
         </div>
@@ -318,7 +320,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
             className="h-[42px] w-[42px] rounded-lg bg-[var(--bg-elevated)] shadow-card flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 transition-all duration-200 shrink-0"
-            title="Adjuntar archivo (máx 100MB)"
+            title={t('chat.attachFile')}
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
           </motion.button>
@@ -330,8 +332,8 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
               onChange={e => handleChange(e.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              aria-label="Escribe un mensaje"
-              placeholder={`Escribe un mensaje en ${channelName ? '#' + channelName : ''}...`}
+              aria-label={t('chat.messagePlaceholder')}
+              placeholder={channelName ? t('chat.messagePlaceholderChannel', { channel: channelName }) : t('chat.messagePlaceholder')}
               rows={1}
               className="w-full px-4 py-2.5 rounded-lg bg-[var(--bg-elevated)] text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-2 focus:ring-[var(--accent)]/15 focus:shadow-none resize-none max-h-32 transition-all duration-200"
               style={{ minHeight: '42px' }}
@@ -355,13 +357,13 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
                 : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition disabled:opacity-30'
             }`}>
             <Send className="h-4 w-4" />
-            <span className="hidden sm:inline">{editingMsg ? 'Editar' : 'Enviar'}</span>
+            <span className="hidden sm:inline">{editingMsg ? t('chat.editAction') : t('chat.send')}</span>
           </motion.button>
         </div>
         <div className="flex items-center gap-3 mt-1.5 px-1">
-          <span className="text-[13px] text-[var(--text-muted)]">Shift+Enter nueva línea</span>
-          <span className="text-[13px] text-[var(--text-muted)]">@ para mencionar</span>
-          <span className="text-[13px] text-[var(--text-muted)]">Pega imágenes del portapapeles</span>
+          <span className="text-[13px] text-[var(--text-muted)]">{t('chat.shiftEnterHint')}</span>
+          <span className="text-[13px] text-[var(--text-muted)]">{t('chat.mentionHint')}</span>
+          <span className="text-[13px] text-[var(--text-muted)]">{t('chat.pasteHint')}</span>
         </div>
       </div>
     </div>

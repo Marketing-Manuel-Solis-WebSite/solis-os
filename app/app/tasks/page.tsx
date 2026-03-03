@@ -1,5 +1,6 @@
 'use client';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { getTasks, createTask, updateTask, softDeleteTask, logAction, addTaskActivity, getMembers, getSettings, saveSettings } from '@/lib/db';
 import { notifyMany } from '@/lib/notifications';
@@ -23,6 +24,7 @@ import {
 
 export default function TasksPage() {
   const { user, me, activeTeamId, teams, can, canSeeResource, allMembers, canSeeAllTeams } = useAuth();
+  const { t } = useI18n();
   const toast = useToast();
 
   // Core data
@@ -48,8 +50,8 @@ export default function TasksPage() {
 
   // Load data
   const load = useCallback(async () => {
-    const [t, m] = await Promise.all([getTasks(activeTeamId), getMembers()]);
-    const visible = (t as any[]).filter(task => !task.deleted && canSeeResource({
+    const [rawTasks, m] = await Promise.all([getTasks(activeTeamId), getMembers()]);
+    const visible = (rawTasks as any[]).filter(task => !task.deleted && canSeeResource({
       teamId: task.teamId,
       createdBy: task.createdBy,
       visibility: task.visibility || 'team',
@@ -138,27 +140,27 @@ export default function TasksPage() {
 
   // Groups
   const groups: TaskGroup[] = useMemo(() => {
-    if (groupBy === 'none') return [{ key: 'all', label: 'Todas', tasks: filteredTasks, color: '#94A3B8', count: filteredTasks.length }];
+    if (groupBy === 'none') return [{ key: 'all', label: t('tasks.all'), tasks: filteredTasks, color: '#94A3B8', count: filteredTasks.length }];
     if (groupBy === 'status') return STATUSES.map(s => {
-      const t = filteredTasks.filter(x => x.status === s.id);
-      return { key: s.id, label: s.label, tasks: t, color: s.color, count: t.length };
+      const tk = filteredTasks.filter(x => x.status === s.id);
+      return { key: s.id, label: t(`status.${s.id}`), tasks: tk, color: s.color, count: tk.length };
     });
     if (groupBy === 'priority') return PRIORITIES.map(p => {
-      const t = filteredTasks.filter(x => x.priority === p.id);
-      return { key: p.id, label: p.label, tasks: t, color: p.color, count: t.length };
+      const tk = filteredTasks.filter(x => x.priority === p.id);
+      return { key: p.id, label: t(`priority.${p.id}`), tasks: tk, color: p.color, count: tk.length };
     });
     if (groupBy === 'assignee') {
       const grouped: TaskGroup[] = members.map(m => {
-        const t = filteredTasks.filter(x => x.assignees?.includes(m.id));
-        return { key: m.id, label: m.displayName || m.email, tasks: t, color: '#3B82F6', count: t.length };
+        const tk = filteredTasks.filter(x => x.assignees?.includes(m.id));
+        return { key: m.id, label: m.displayName || m.email, tasks: tk, color: '#3B82F6', count: tk.length };
       });
       const unassigned = filteredTasks.filter(x => !x.assignees?.length);
-      if (unassigned.length > 0) grouped.push({ key: '__none__', label: 'Sin asignar', tasks: unassigned, color: '#64748B', count: unassigned.length });
+      if (unassigned.length > 0) grouped.push({ key: '__none__', label: t('tasks.unassigned'), tasks: unassigned, color: '#64748B', count: unassigned.length });
       return grouped;
     }
     return TASK_TYPES.map(tp => {
-      const t = filteredTasks.filter(x => (x.type || 'task') === tp.id);
-      return { key: tp.id, label: tp.label, tasks: t, color: tp.color, count: t.length };
+      const tk = filteredTasks.filter(x => (x.type || 'task') === tp.id);
+      return { key: tp.id, label: t(`taskType.${tp.id}`), tasks: tk, color: tp.color, count: tk.length };
     });
   }, [filteredTasks, groupBy, members]);
 
@@ -173,7 +175,7 @@ export default function TasksPage() {
 
   // CRUD handlers
   const doCreate = async (data: any) => {
-    if (!can('task', 'create')) return toast.warning('Sin permisos', 'No tienes permisos para crear tareas.');
+    if (!can('task', 'create')) return toast.warning(t('tasks.noPermission'), t('tasks.noPermCreate'));
     const taskRef = await createTask({
       ...data,
       teamId: data.teamId || (activeTeamId === '__all__' ? '' : activeTeamId),
@@ -184,8 +186,8 @@ export default function TasksPage() {
     const assigneeIds = (data.assignees || []).filter((id: string) => id !== user!.uid);
     if (assigneeIds.length > 0) {
       notifyMany(assigneeIds, {
-        type: 'task_assigned', title: `${me!.displayName} te asignó una tarea`,
-        message: data.title || 'Nueva tarea', entityType: 'task', entityId: taskRef.id,
+        type: 'task_assigned', title: t('tasks.assigned', { name: me!.displayName }),
+        message: data.title || t('tasks.newTaskNotif'), entityType: 'task', entityId: taskRef.id,
         entityUrl: '/app/tasks', actorId: user!.uid, actorName: me!.displayName,
       }).catch(() => {});
     }
@@ -202,8 +204,8 @@ export default function TasksPage() {
       const task = tasks.find(t => t.id === id);
       if (newAssignees.length > 0) {
         notifyMany(newAssignees, {
-          type: 'task_assigned', title: `${me!.displayName} te asignó a una tarea`,
-          message: task?.title || 'Tarea actualizada', entityType: 'task', entityId: id,
+          type: 'task_assigned', title: t('tasks.assignedTo', { name: me!.displayName }),
+          message: task?.title || t('tasks.updated'), entityType: 'task', entityId: id,
           entityUrl: '/app/tasks', actorId: user!.uid, actorName: me!.displayName,
         }).catch(() => {});
       }
@@ -211,12 +213,12 @@ export default function TasksPage() {
     load();
   };
 
-  const doDelete = async (t: any) => {
-    if (!can('task', 'delete') && t.createdBy !== user?.uid) return toast.warning('Sin permisos', 'No tienes permisos para eliminar esta tarea.');
-    if (!confirm(`¿Eliminar "${t.title}"? Se moverá a la papelera.`)) return;
-    await softDeleteTask(t.id);
-    await logAction({ action: 'deleted', resource: 'task', detail: t.title, actorId: user!.uid, actorName: me!.displayName });
-    if (selectedTask?.id === t.id) setSelectedTask(null);
+  const doDelete = async (tk: any) => {
+    if (!can('task', 'delete') && tk.createdBy !== user?.uid) return toast.warning(t('tasks.noPermission'), t('tasks.noPermDelete'));
+    if (!confirm(t('tasks.deleteConfirm', { title: tk.title }))) return;
+    await softDeleteTask(tk.id);
+    await logAction({ action: 'deleted', resource: 'task', detail: tk.title, actorId: user!.uid, actorName: me!.displayName });
+    if (selectedTask?.id === tk.id) setSelectedTask(null);
     load();
   };
 
@@ -230,7 +232,7 @@ export default function TasksPage() {
   };
 
   const bulkDelete = async () => {
-    if (!confirm(`¿Eliminar ${selectedIds.size} tareas seleccionadas?`)) return;
+    if (!confirm(t('tasks.bulkDeleteConfirm', { n: selectedIds.size }))) return;
     const promises = Array.from(selectedIds).map(id => softDeleteTask(id));
     await Promise.all(promises);
     setSelectedIds(new Set());
@@ -240,7 +242,7 @@ export default function TasksPage() {
 
   // Saved views
   const handleSaveView = async () => {
-    const name = prompt('Nombre de la vista:');
+    const name = prompt(t('tasks.viewName'));
     if (!name?.trim()) return;
     const sv: SavedView = {
       id: Date.now().toString(36),
@@ -351,10 +353,10 @@ export default function TasksPage() {
           ) : filteredTasks.length === 0 ? (
             <div className="text-center py-20">
               <CheckSquare className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
-              <p className="text-[var(--text-muted)] text-base">No se encontraron tareas.</p>
+              <p className="text-[var(--text-muted)] text-base">{t('tasks.noTasks')}</p>
               {canCreate && (
                 <button onClick={() => setShowCreate(true)} className="text-sm text-[var(--accent)] hover:underline mt-2">
-                  Crea tu primera tarea
+                  {t('tasks.createFirst')}
                 </button>
               )}
             </div>

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Hash, Lock, Check, Search } from 'lucide-react';
 
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function CreateChannelModal({ members, teams, userId, onClose, onCreate }: Props) {
+  const { t } = useI18n();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<'public' | 'private'>('public');
@@ -50,8 +52,8 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
         {/* Header */}
         <div className="flex items-center justify-between p-5">
           <div>
-            <h2 className="text-lg font-bold text-[var(--text-primary)]">Create Channel</h2>
-            <p className="text-sm text-[var(--text-muted)] mt-0.5">Set up a new conversation space</p>
+            <h2 className="text-lg font-bold text-[var(--text-primary)]">{t('channelCreate.title')}</h2>
+            <p className="text-sm text-[var(--text-muted)] mt-0.5">{t('channelCreate.setupHint')}</p>
           </div>
           <motion.button whileTap={{ scale: 0.9 }} onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg hover:bg-[var(--bg-hover)] transition">
             <X className="h-5 w-5" />
@@ -61,25 +63,25 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
         <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto scrollbar-thin">
           {/* Name */}
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Channel Name *</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('channelCreate.name')} *</label>
             <input value={name} onChange={e => setName(e.target.value.replace(/\s+/g, '-').toLowerCase())}
-              placeholder="e.g. general, marketing-updates"
+              placeholder={t('channelCreate.namePlaceholder')}
               autoFocus className="input-dark" onKeyDown={e => e.key === 'Enter' && submit()} />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Description</label>
-            <input value={description} onChange={e => setDescription(e.target.value)} placeholder="What's this channel about?" className="input-dark" />
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('channelCreate.description')}</label>
+            <input value={description} onChange={e => setDescription(e.target.value)} placeholder={t('channelCreate.descPlaceholder')} className="input-dark" />
           </div>
 
           {/* Type */}
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Type</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('channelCreate.type')}</label>
             <div className="flex gap-2">
               {[
-                { value: 'public' as const, label: 'Public', desc: 'Anyone can join and see messages', icon: Hash, activeClass: 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]/30 text-[var(--accent)]' },
-                { value: 'private' as const, label: 'Private', desc: 'Only invited members can access', icon: Lock, activeClass: 'bg-amber-500/10 ring-1 ring-amber-500/30 text-amber-400' },
+                { value: 'public' as const, label: t('channelCreate.public'), desc: t('channelCreate.publicDesc'), icon: Hash, activeClass: 'bg-[var(--accent)]/10 ring-1 ring-[var(--accent)]/30 text-[var(--accent)]' },
+                { value: 'private' as const, label: t('channelCreate.privateLabel'), desc: t('channelCreate.privateDesc'), icon: Lock, activeClass: 'bg-amber-500/10 ring-1 ring-amber-500/30 text-amber-400' },
               ].map(opt => (
                 <motion.button
                   key={opt.value}
@@ -101,7 +103,7 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
           {/* Members */}
           <div>
             <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">
-              {type === 'private' ? 'Add Members *' : 'Add Members (optional)'}
+              {type === 'private' ? t('channelCreate.addMembersRequired') : t('channelCreate.addMembers')}
             </label>
 
             {/* Selected chips */}
@@ -132,7 +134,7 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
 
             <div className="relative mb-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
-              <input value={memberSearch} onChange={e => setMemberSearch(e.target.value)} placeholder="Search members..."
+              <input value={memberSearch} onChange={e => setMemberSearch(e.target.value)} placeholder={t('channelCreate.searchMembers')}
                 className="w-full h-9 pl-9 pr-3 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent)]/30 transition-all duration-200" />
             </div>
 
@@ -168,16 +170,16 @@ export default function CreateChannelModal({ members, teams, userId, onClose, on
         {/* Footer */}
         <div className="flex items-center justify-between p-5">
           <span className="text-sm text-[var(--text-muted)]">
-            {selectedMembers.length > 0 ? `${selectedMembers.length} member${selectedMembers.length !== 1 ? 's' : ''} selected` : ''}
+            {selectedMembers.length > 0 ? t('channelCreate.membersSelected', { n: selectedMembers.length }) : ''}
           </span>
           <div className="flex gap-2">
             <motion.button whileTap={{ scale: 0.95 }} onClick={onClose}
               className="px-5 h-10 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-200">
-              Cancel
+              {t('common.cancel')}
             </motion.button>
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }} onClick={submit} disabled={!name.trim()}
               className="px-6 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40">
-              Create Channel
+              {t('channelCreate.create')}
             </motion.button>
           </div>
         </div>

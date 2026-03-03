@@ -1,5 +1,6 @@
 'use client';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import { useEffect, useState, useMemo } from 'react';
 import { getTasks, getDocuments, getAuditLogs } from '@/lib/db';
 import { useRouter } from 'next/navigation';
@@ -13,6 +14,7 @@ import {
 
 export default function Dashboard() {
   const { user, me, canSeeAllTeams, activeTeamId, teams, canSeeResource, allMembers } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [tasks, setTasks] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
@@ -25,8 +27,8 @@ export default function Dashboard() {
       getTasks(activeTeamId).catch(() => []),
       getDocuments(activeTeamId).catch(() => []),
       getAuditLogs().catch(() => []),
-    ]).then(([t, d, l]) => {
-      const filteredTasks = canSeeAllTeams ? t : (t as any[]).filter(tk => canSeeResource({ teamId: tk.teamId, createdBy: tk.createdBy, visibility: tk.visibility, assignees: tk.assignees }));
+    ]).then(([ts, d, l]) => {
+      const filteredTasks = canSeeAllTeams ? ts : (ts as any[]).filter(tk => canSeeResource({ teamId: tk.teamId, createdBy: tk.createdBy, visibility: tk.visibility, assignees: tk.assignees }));
       const filteredDocs = canSeeAllTeams ? d : (d as any[]).filter(dc => canSeeResource({ teamId: dc.teamId, createdBy: dc.createdBy, visibility: dc.visibility }));
       setTasks(filteredTasks as any[]);
       setDocs(filteredDocs as any[]);
@@ -81,12 +83,12 @@ export default function Dashboard() {
   }, [tasks, user?.uid, teams]);
 
   const stats = [
-    { label: 'Total Tasks', val: tasks.length, icon: CheckSquare, color: '#3B82F6', bg: 'from-blue-500/20 to-blue-600/5' },
-    { label: 'In Progress', val: metrics.inProgress, icon: Clock, color: '#F59E0B', bg: 'from-amber-500/20 to-amber-600/5' },
-    { label: 'Completed', val: metrics.done, icon: TrendingUp, color: '#22C55E', bg: 'from-emerald-500/20 to-emerald-600/5' },
-    { label: 'Overdue', val: metrics.overdue, icon: AlertTriangle, color: '#EF4444', bg: 'from-red-500/20 to-red-600/5' },
-    { label: 'Documents', val: docs.length, icon: FileText, color: '#8B5CF6', bg: 'from-purple-500/20 to-purple-600/5' },
-    { label: 'Team', val: activeTeamId === '__all__' ? allMembers.length : allMembers.filter(m => m.teamId === activeTeamId || m.teamIds?.includes(activeTeamId)).length, icon: Users, color: '#3B82F6', bg: 'from-blue-500/20 to-blue-600/5' },
+    { label: t('dashboard.totalTasks'), val: tasks.length, icon: CheckSquare, color: '#3B82F6', bg: 'from-blue-500/20 to-blue-600/5' },
+    { label: t('dashboard.inProgress'), val: metrics.inProgress, icon: Clock, color: '#F59E0B', bg: 'from-amber-500/20 to-amber-600/5' },
+    { label: t('dashboard.completed'), val: metrics.done, icon: TrendingUp, color: '#22C55E', bg: 'from-emerald-500/20 to-emerald-600/5' },
+    { label: t('dashboard.overdue'), val: metrics.overdue, icon: AlertTriangle, color: '#EF4444', bg: 'from-red-500/20 to-red-600/5' },
+    { label: t('dashboard.documents'), val: docs.length, icon: FileText, color: '#8B5CF6', bg: 'from-purple-500/20 to-purple-600/5' },
+    { label: t('dashboard.team'), val: activeTeamId === '__all__' ? allMembers.length : allMembers.filter(m => m.teamId === activeTeamId || m.teamIds?.includes(activeTeamId)).length, icon: Users, color: '#3B82F6', bg: 'from-blue-500/20 to-blue-600/5' },
   ];
 
   const filteredLogs = useMemo(() => {
@@ -112,11 +114,11 @@ export default function Dashboard() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-1">
-          Welcome back{me?.displayName ? `, ${me.displayName.split(' ')[0]}` : ''}
+          {t('dashboard.welcome', { name: me?.displayName ? `, ${me.displayName.split(' ')[0]}` : '' })}
         </h1>
         <p className="text-[var(--text-muted)] text-base">
-          Here&apos;s what&apos;s happening in your workspace today.
-          {canSeeAllTeams && activeTeamId === '__all__' && <span className="ml-2 text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">GENERAL VIEW</span>}
+          {t('dashboard.subtitle')}
+          {canSeeAllTeams && activeTeamId === '__all__' && <span className="ml-2 text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">{t('common.generalView')}</span>}
         </p>
       </div>
 
@@ -146,7 +148,7 @@ export default function Dashboard() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
             className="rounded-xl bg-[var(--bg-secondary)] shadow-card p-5 mb-8">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">Completion Rate</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">{t('dashboard.completionRate')}</p>
               <p className="text-sm font-bold text-[var(--accent)]">{metrics.rate}%</p>
             </div>
             <div className="h-2.5 rounded-full bg-[var(--bg-base)] overflow-hidden">
@@ -154,10 +156,10 @@ export default function Dashboard() {
                 className="h-full rounded-full bg-[var(--accent)]" />
             </div>
             <div className="flex items-center gap-6 mt-3 text-[13px]">
-              <span className="flex items-center gap-1.5 text-emerald-400"><CheckCircle2 className="h-3 w-3" /> {metrics.done} done</span>
-              <span className="flex items-center gap-1.5 text-blue-400"><Loader2 className="h-3 w-3" /> {metrics.inProgress} in progress</span>
-              <span className="flex items-center gap-1.5 text-purple-400"><Eye className="h-3 w-3" /> {metrics.inReview} in review</span>
-              <span className="flex items-center gap-1.5 text-red-400"><AlertTriangle className="h-3 w-3" /> {metrics.overdue} overdue</span>
+              <span className="flex items-center gap-1.5 text-emerald-400"><CheckCircle2 className="h-3 w-3" /> {metrics.done} {t('dashboard.done')}</span>
+              <span className="flex items-center gap-1.5 text-blue-400"><Loader2 className="h-3 w-3" /> {metrics.inProgress} {t('dashboard.inProgressLabel')}</span>
+              <span className="flex items-center gap-1.5 text-purple-400"><Eye className="h-3 w-3" /> {metrics.inReview} {t('dashboard.inReviewLabel')}</span>
+              <span className="flex items-center gap-1.5 text-red-400"><AlertTriangle className="h-3 w-3" /> {metrics.overdue} {t('dashboard.overdueLabel')}</span>
             </div>
           </motion.div>
 
@@ -165,7 +167,7 @@ export default function Dashboard() {
           {canSeeAllTeams && metrics.byDept.length > 0 && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
               className="rounded-xl bg-[var(--bg-secondary)] shadow-card p-6 mb-8">
-              <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4"><BarChart3 className="h-4 w-4 text-[var(--accent)]" /> Department Performance</h2>
+              <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4"><BarChart3 className="h-4 w-4 text-[var(--accent)]" /> {t('dashboard.deptPerformance')}</h2>
               <div className="space-y-3">
                 {metrics.byDept.map((dp, di) => (
                   <motion.div key={dp.team.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.45 + di * 0.05 }}
@@ -183,7 +185,7 @@ export default function Dashboard() {
                         <span className="text-sm font-bold w-10 text-right" style={{ color: dp.team.color }}>{dp.rate}%</span>
                       </div>
                       <div className="flex gap-4 text-[12px] text-[var(--text-muted)] mt-0.5">
-                        <span>{dp.total} tasks</span><span>{dp.done} done</span>
+                        <span>{t('dashboard.tasksLabel', { n: dp.total })}</span><span>{t('dashboard.doneLabel', { n: dp.done })}</span>
                       </div>
                     </div>
                   </motion.div>
@@ -197,34 +199,34 @@ export default function Dashboard() {
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
               className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
               <div className="p-5 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Target className="h-4 w-4 text-[var(--accent)]" /> My Tasks</h2>
+                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Target className="h-4 w-4 text-[var(--accent)]" /> {t('dashboard.myTasks')}</h2>
                 <div className="flex items-center gap-2">
-                  <span className="text-[12px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">{metrics.myPending.length} pending</span>
-                  {metrics.myOverdue.length > 0 && <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">{metrics.myOverdue.length} overdue</span>}
+                  <span className="text-[12px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">{t('dashboard.pending', { n: metrics.myPending.length })}</span>
+                  {metrics.myOverdue.length > 0 && <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">{t('dashboard.overdueCount', { n: metrics.myOverdue.length })}</span>}
                 </div>
               </div>
               <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto scrollbar-thin">
                 {metrics.myPending.length === 0 ? (
-                  <p className="p-6 text-sm text-[var(--text-muted)] text-center">All caught up! No pending tasks.</p>
-                ) : metrics.myPending.slice(0, 8).map((t: any) => {
-                  const StIcon = statusIcons[t.status] || Circle;
-                  const sColor = statusColors[t.status] || '#64748B';
-                  const team = teams.find(tm => tm.id === t.teamId);
+                  <p className="p-6 text-sm text-[var(--text-muted)] text-center">{t('dashboard.allCaughtUp')}</p>
+                ) : metrics.myPending.slice(0, 8).map((tk: any) => {
+                  const StIcon = statusIcons[tk.status] || Circle;
+                  const sColor = statusColors[tk.status] || '#64748B';
+                  const team = teams.find(tm => tm.id === tk.teamId);
                   return (
-                    <div key={t.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition cursor-pointer" onClick={() => router.push('/app/tasks')}>
+                    <div key={tk.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition cursor-pointer" onClick={() => router.push('/app/tasks')}>
                       <StIcon className="h-4 w-4 shrink-0" style={{ color: sColor }} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-[var(--text-primary)] truncate">{t.title}</p>
+                        <p className="text-sm text-[var(--text-primary)] truncate">{tk.title}</p>
                         {team && <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: `${team.color}10`, color: team.color }}>{team.icon} {team.name}</span>}
                       </div>
-                      <span className="text-[12px] px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: `${priorityColors[t.priority] || '#64748B'}15`, color: priorityColors[t.priority] || '#64748B', border: `1px solid ${priorityColors[t.priority] || '#64748B'}25` }}>{t.priority}</span>
+                      <span className="text-[12px] px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: `${priorityColors[tk.priority] || '#64748B'}15`, color: priorityColors[tk.priority] || '#64748B', border: `1px solid ${priorityColors[tk.priority] || '#64748B'}25` }}>{t(`priority.${tk.priority}`)}</span>
                     </div>
                   );
                 })}
               </div>
               {metrics.myPending.length > 8 && (
                 <div className="p-3 text-center">
-                  <button onClick={() => router.push('/app/tasks')} className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1 mx-auto">View all <ArrowRight className="h-3 w-3" /></button>
+                  <button onClick={() => router.push('/app/tasks')} className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1 mx-auto">{t('dashboard.viewAll')} <ArrowRight className="h-3 w-3" /></button>
                 </div>
               )}
             </motion.div>
@@ -233,28 +235,28 @@ export default function Dashboard() {
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
               className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
               <div className="p-5 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Calendar className="h-4 w-4 text-[var(--accent)]" /> Upcoming Deadlines</h2>
-                <span className="text-[12px] text-[var(--text-muted)]">Next 7 days</span>
+                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Calendar className="h-4 w-4 text-[var(--accent)]" /> {t('dashboard.upcomingDeadlines')}</h2>
+                <span className="text-[12px] text-[var(--text-muted)]">{t('dashboard.next7Days')}</span>
               </div>
               <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto scrollbar-thin">
                 {metrics.upcoming.length === 0 ? (
-                  <p className="p-6 text-sm text-[var(--text-muted)] text-center">No upcoming deadlines this week.</p>
-                ) : metrics.upcoming.slice(0, 8).map((t: any) => {
-                  const due = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate);
+                  <p className="p-6 text-sm text-[var(--text-muted)] text-center">{t('dashboard.noDeadlines')}</p>
+                ) : metrics.upcoming.slice(0, 8).map((tk: any) => {
+                  const due = tk.dueDate?.toDate ? tk.dueDate.toDate() : new Date(tk.dueDate);
                   const daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
-                  const team = teams.find(tm => tm.id === t.teamId);
+                  const team = teams.find(tm => tm.id === tk.teamId);
                   return (
-                    <div key={t.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition">
+                    <div key={tk.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition">
                       <Calendar className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-[var(--text-primary)] truncate">{t.title}</p>
+                        <p className="text-sm text-[var(--text-primary)] truncate">{tk.title}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           {team && <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: `${team.color}10`, color: team.color }}>{team.icon}</span>}
                           <span className="text-[12px] text-[var(--text-muted)]">{due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                         </div>
                       </div>
                       <span className={`text-[12px] px-2 py-0.5 rounded-full font-semibold ${daysLeft <= 1 ? 'bg-red-500/10 text-red-400' : daysLeft <= 3 ? 'bg-amber-500/10 text-amber-400' : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)]'}`}>
-                        {daysLeft === 0 ? 'Today' : daysLeft === 1 ? 'Tomorrow' : `${daysLeft}d left`}
+                        {daysLeft === 0 ? t('dashboard.today') : daysLeft === 1 ? t('dashboard.tomorrow') : t('dashboard.daysLeft', { n: daysLeft })}
                       </span>
                     </div>
                   );
@@ -267,7 +269,7 @@ export default function Dashboard() {
             {/* Priority Breakdown */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
               className="rounded-xl bg-[var(--bg-secondary)] shadow-card p-6">
-              <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4"><Flag className="h-4 w-4 text-[var(--accent)]" /> Open Tasks by Priority</h2>
+              <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4"><Flag className="h-4 w-4 text-[var(--accent)]" /> {t('dashboard.openByPriority')}</h2>
               <div className="space-y-3">
                 {['urgent', 'high', 'medium', 'low'].map(p => {
                   const count = metrics.byPriority[p] || 0;
@@ -275,7 +277,7 @@ export default function Dashboard() {
                   const pct = openTotal > 0 ? Math.round((count / openTotal) * 100) : 0;
                   return (
                     <div key={p} className="flex items-center gap-3">
-                      <span className="text-sm text-[var(--text-secondary)] w-16 capitalize">{p}</span>
+                      <span className="text-sm text-[var(--text-secondary)] w-16 capitalize">{t(`priority.${p}`)}</span>
                       <div className="flex-1 h-3.5 rounded-full bg-[var(--bg-base)] overflow-hidden">
                         <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.7, delay: 0.65 }}
                           className="h-full rounded-full" style={{ backgroundColor: priorityColors[p] }} />
@@ -291,11 +293,11 @@ export default function Dashboard() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.65 }}
               className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
               <div className="p-5">
-                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Activity className="h-4 w-4 text-[var(--accent)]" /> Recent Activity</h2>
+                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Activity className="h-4 w-4 text-[var(--accent)]" /> {t('dashboard.recentActivity')}</h2>
               </div>
               <div className="divide-y divide-[var(--border)] max-h-[240px] overflow-y-auto scrollbar-thin">
                 {filteredLogs.length === 0 ? (
-                  <p className="p-6 text-sm text-[var(--text-muted)] text-center">Actions will appear here.</p>
+                  <p className="p-6 text-sm text-[var(--text-muted)] text-center">{t('dashboard.actionsWillAppear')}</p>
                 ) : filteredLogs.slice(0, 10).map((l: any) => (
                   <div key={l.id} className="px-5 py-3 hover:bg-[var(--bg-hover)] transition">
                     <p className="text-sm">

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown, ChevronRight, ChevronUp,
@@ -26,20 +27,21 @@ interface Props {
 }
 
 const COLUMNS = [
-  { id: 'checkbox', label: '', width: 'w-10', sortable: false },
-  { id: 'status', label: 'Estado', width: 'w-10', sortable: true },
-  { id: 'title', label: 'Título', width: 'flex-1', sortable: true },
-  { id: 'priority', label: 'Prioridad', width: 'w-24', sortable: true },
-  { id: 'assignees', label: 'Asignados', width: 'w-28', sortable: false },
-  { id: 'due', label: 'Fecha', width: 'w-28', sortable: true },
-  { id: 'tags', label: 'Etiquetas', width: 'w-32 hidden lg:flex', sortable: false },
-  { id: 'points', label: 'Pts', width: 'w-14', sortable: true },
+  { id: 'checkbox', labelKey: '', width: 'w-10', sortable: false },
+  { id: 'status', labelKey: 'taskCreate.status', width: 'w-10', sortable: true },
+  { id: 'title', labelKey: 'taskCreate.titlePlaceholder', width: 'flex-1', sortable: true },
+  { id: 'priority', labelKey: 'taskCreate.priority', width: 'w-24', sortable: true },
+  { id: 'assignees', labelKey: 'taskCreate.assignees', width: 'w-28', sortable: false },
+  { id: 'due', labelKey: 'taskCreate.dueDate', width: 'w-28', sortable: true },
+  { id: 'tags', labelKey: 'taskCreate.tags', width: 'w-32 hidden lg:flex', sortable: false },
+  { id: 'points', labelKey: 'taskCreate.points', width: 'w-14', sortable: true },
 ];
 
 export default function TaskListView({
   groups, members, teams, selectedTask, selectedIds, sortBy, sortDir, canUpdate,
   onSelect, onSelectionChange, onUpdate, onDelete, onSortChange, onQuickCreate,
 }: Props) {
+  const { t } = useI18n();
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const toggleGroup = (key: string) => {
@@ -69,7 +71,7 @@ export default function TaskListView({
           <div key={col.id}
             className={`flex items-center gap-1 ${col.width} shrink-0 ${col.sortable ? 'cursor-pointer hover:text-[var(--text-secondary)] select-none' : ''}`}
             onClick={() => col.sortable && onSortChange(col.id)}>
-            {col.label}
+            {col.labelKey ? t(col.labelKey) : ''}
             {col.sortable && sortBy === col.id && (
               sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
             )}
@@ -90,7 +92,7 @@ export default function TaskListView({
             <span className="text-sm text-[var(--text-muted)] bg-[var(--bg-elevated)] px-1.5 py-0.5 rounded-md">{group.count}</span>
             <button onClick={e => { e.stopPropagation(); selectAllInGroup(group.tasks); }}
               className="ml-2 opacity-0 group-hover:opacity-100 transition text-[var(--text-muted)] hover:text-[var(--accent)]"
-              title="Seleccionar todas">
+              title={t('tasks.all')}>
               <CheckSquare className="h-3.5 w-3.5" />
             </button>
           </button>
@@ -145,6 +147,7 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
   onUpdate: (id: string, field: string, value: any, old?: any) => void;
   onDelete: () => void;
 }) {
+  const { t } = useI18n();
   const [hovered, setHovered] = useState(false);
   const st = STATUSES.find(s => s.id === task.status) || STATUSES[0];
   const p = PRIORITIES.find(x => x.id === task.priority) || PRIORITIES[2];
@@ -177,7 +180,7 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
       {/* Status */}
       <div className="w-10 shrink-0 flex justify-center">
         <button onClick={e => { e.stopPropagation(); if (canUpdate) onUpdate(task.id, 'status', task.status === 'done' ? 'todo' : 'done', task.status); }}
-          className="hover:scale-110 transition" title={st.label}>
+          className="hover:scale-110 transition" title={t(`status.${st.id}`)}>
           <st.Icon className="h-5 w-5" style={{ color: st.color }} />
         </button>
       </div>
@@ -255,7 +258,7 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
         <div className="absolute right-3 flex items-center gap-1 z-10">
           <button onClick={e => { e.stopPropagation(); onDelete(); }}
             className="p-1.5 rounded-lg bg-[var(--bg-base)] text-[var(--text-muted)] hover:text-red-400 shadow-card transition-all duration-200"
-            title="Eliminar">
+            title={t('common.delete')}>
             <Trash2 className="h-3 w-3" />
           </button>
         </div>
@@ -265,6 +268,7 @@ function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate
 }
 
 function InlinePrioritySelect({ value, canUpdate, onChange }: { value: string; canUpdate: boolean; onChange: (v: string) => void }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const p = PRIORITIES.find(x => x.id === value) || PRIORITIES[2];
@@ -280,7 +284,7 @@ function InlinePrioritySelect({ value, canUpdate, onChange }: { value: string; c
 
   return (
     <div ref={ref} className="relative">
-      <button onClick={e => { e.stopPropagation(); setOpen(!open); }} className="text-sm hover:scale-110 transition" title={p.label}>
+      <button onClick={e => { e.stopPropagation(); setOpen(!open); }} className="text-sm hover:scale-110 transition" title={t(`priority.${p.id}`)}>
         {p.icon}
       </button>
       <AnimatePresence>
@@ -293,7 +297,7 @@ function InlinePrioritySelect({ value, canUpdate, onChange }: { value: string; c
             {PRIORITIES.map(pri => (
               <button key={pri.id} onClick={e => { e.stopPropagation(); onChange(pri.id); setOpen(false); }}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm w-full hover:bg-[var(--bg-hover)] transition ${value === pri.id ? 'bg-[var(--bg-hover)]' : ''}`}>
-                {pri.icon} {pri.label}
+                {pri.icon} {t(`priority.${pri.id}`)}
               </button>
             ))}
           </motion.div>

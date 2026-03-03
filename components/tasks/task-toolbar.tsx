@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, X, PanelLeft, Keyboard,
@@ -40,6 +41,7 @@ export default function TaskToolbar({
   onSortByChange, onSortDirToggle, onGroupByChange,
   onNewTask, onClearFilters, onToggleSidebar,
 }: Props) {
+  const { t } = useI18n();
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Active filter chips
@@ -48,7 +50,7 @@ export default function TaskToolbar({
     filters.status.forEach(s => {
       const st = STATUSES.find(x => x.id === s);
       if (st) activeChips.push({
-        label: st.label,
+        label: t(`status.${st.id}`),
         onRemove: () => onFiltersChange({ ...filters, status: filters.status.filter(x => x !== s) }),
       });
     });
@@ -57,7 +59,7 @@ export default function TaskToolbar({
     filters.priority.forEach(p => {
       const pr = PRIORITIES.find(x => x.id === p);
       if (pr) activeChips.push({
-        label: pr.label,
+        label: t(`priority.${pr.id}`),
         onRemove: () => onFiltersChange({ ...filters, priority: filters.priority.filter(x => x !== p) }),
       });
     });
@@ -81,7 +83,7 @@ export default function TaskToolbar({
           )}
           <div>
             <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
-              Tareas
+              {t('tasks.title')}
               {activeTeam && (
                 <span className="text-sm font-semibold px-2.5 py-1 rounded-lg"
                   style={{ backgroundColor: `${activeTeam.color}15`, color: activeTeam.color, border: `1px solid ${activeTeam.color}25` }}>
@@ -89,10 +91,10 @@ export default function TaskToolbar({
                 </span>
               )}
               {canSeeAllTeams && activeTeamId === '__all__' && (
-                <span className="text-[12px] px-2 py-0.5 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] font-semibold">VISTA GENERAL</span>
+                <span className="text-[12px] px-2 py-0.5 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] font-semibold">{t('common.generalView')}</span>
               )}
             </h1>
-            <p className="text-sm text-[var(--text-muted)] mt-1">{taskCount} tareas · {doneCount} completadas</p>
+            <p className="text-sm text-[var(--text-muted)] mt-1">{t('tasks.countDone', { n: taskCount, d: doneCount })}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -105,7 +107,7 @@ export default function TaskToolbar({
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
               onClick={onNewTask}
               className="flex items-center gap-2 px-5 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">
-              <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Nueva Tarea</span>
+              <Plus className="h-4 w-4" /> <span className="hidden sm:inline">{t('tasks.newTask')}</span>
             </motion.button>
           )}
         </div>
@@ -119,11 +121,11 @@ export default function TaskToolbar({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             className="flex items-center gap-4 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] shadow-card text-[13px] text-[var(--text-muted)]">
-            <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">N</kbd> Nueva</span>
-            <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">F</kbd> Buscar</span>
-            <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">1-3</kbd> Vistas</span>
-            <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">Esc</kbd> Cerrar</span>
-            <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">Del</kbd> Eliminar</span>
+            <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">N</kbd> {t('shortcuts.new')}</span>
+            <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">F</kbd> {t('shortcuts.search')}</span>
+            <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">1-3</kbd> {t('shortcuts.views')}</span>
+            <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">Esc</kbd> {t('shortcuts.close')}</span>
+            <span><kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-secondary)] font-mono">Del</kbd> {t('shortcuts.delete')}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -137,7 +139,7 @@ export default function TaskToolbar({
             id="task-search"
             value={search}
             onChange={e => onSearchChange(e.target.value)}
-            placeholder="Buscar tareas... (F)"
+            placeholder={t('tasks.searchPlaceholder')}
             className="input-dark pl-10 pr-8 h-9 text-sm w-full"
           />
           {search && (
@@ -157,7 +159,7 @@ export default function TaskToolbar({
                   ? 'bg-[var(--accent-subtle)] text-[var(--accent)]'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
               }`}>
-              <v.Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{v.label}</span>
+              <v.Icon className="h-3.5 w-3.5" /> <span className="hidden sm:inline">{t(`view.${v.id}`)}</span>
             </button>
           ))}
         </div>
@@ -165,14 +167,14 @@ export default function TaskToolbar({
         {/* Group */}
         <select value={groupBy} onChange={e => onGroupByChange(e.target.value)} className="select-dark h-9 text-sm">
           {GROUP_OPTIONS.map(g => (
-            <option key={g.id} value={g.id}>Grupo: {g.label}</option>
+            <option key={g.id} value={g.id}>{t('tasks.groupLabel', { name: t(`group.${g.id}`) })}</option>
           ))}
         </select>
 
         {/* Sort */}
         <select value={sortBy} onChange={e => onSortByChange(e.target.value)} className="select-dark h-9 text-sm">
           {SORT_OPTIONS.map(s => (
-            <option key={s.id} value={s.id}>Orden: {s.label}</option>
+            <option key={s.id} value={s.id}>{t('tasks.sortLabel', { name: t(`sort.${s.id}`) })}</option>
           ))}
         </select>
       </div>
@@ -180,7 +182,7 @@ export default function TaskToolbar({
       {/* Row 3: Active filter chips */}
       {activeChips.length > 0 && (
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[12px] text-[var(--text-muted)] uppercase tracking-wider font-semibold">Filtros:</span>
+          <span className="text-[12px] text-[var(--text-muted)] uppercase tracking-wider font-semibold">{t('common.filters')}</span>
           {activeChips.map((chip, i) => (
             <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--accent-subtle)] text-[var(--accent)] text-[13px] font-medium">
               {chip.label}
@@ -190,7 +192,7 @@ export default function TaskToolbar({
             </span>
           ))}
           <button onClick={onClearFilters} className="text-[13px] text-red-400 hover:text-red-300 ml-1">
-            Limpiar todo
+            {t('common.clearAll')}
           </button>
         </div>
       )}

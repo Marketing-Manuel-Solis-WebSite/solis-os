@@ -2,7 +2,8 @@
 import { useState, Suspense } from 'react';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { friendlyError, ACCESS_ERRORS } from '@/lib/auth-errors';
+import { friendlyError, accessErrors } from '@/lib/auth-errors';
+import { useI18n } from '@/lib/i18n';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Zap, AlertTriangle, ShieldX, Mail, Lock, Eye, EyeOff } from 'lucide-react';
@@ -19,6 +20,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const accessError = searchParams.get('error');
+  const { t, lang } = useI18n();
 
   const go = async (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setBusy(true);
@@ -36,7 +38,8 @@ function LoginForm() {
     setBusy(false);
   };
 
-  const parsedErr = err ? friendlyError(err) : null;
+  const parsedErr = err ? friendlyError(err, lang) : null;
+  const localizedAccessErrors = accessErrors(lang);
 
   return (
     <div className="min-h-screen flex relative">
@@ -145,13 +148,13 @@ function LoginForm() {
 
               {/* Header */}
               <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-[var(--text-primary)]">Iniciar Sesion</h2>
-                <p className="text-sm text-[var(--text-tertiary)] mt-1.5">Accede a tu espacio de trabajo</p>
+                <h2 className="text-2xl font-bold text-[var(--text-primary)]">{t('auth.login')}</h2>
+                <p className="text-sm text-[var(--text-tertiary)] mt-1.5">{t('auth.loginSubtitle')}</p>
               </div>
 
               {/* Access error — friendly */}
               <AnimatePresence>
-                {accessError && ACCESS_ERRORS[accessError] && (
+                {accessError && localizedAccessErrors[accessError] && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
@@ -167,8 +170,8 @@ function LoginForm() {
                         <AlertTriangle className="h-[18px] w-[18px] text-[var(--warning)]" />
                       </div>
                       <div className="flex-1 min-w-0 pt-0.5">
-                        <p className="text-[13px] font-semibold text-[var(--text-primary)]">{ACCESS_ERRORS[accessError].title}</p>
-                        <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-relaxed">{ACCESS_ERRORS[accessError].msg}</p>
+                        <p className="text-[13px] font-semibold text-[var(--text-primary)]">{localizedAccessErrors[accessError].title}</p>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-1 leading-relaxed">{localizedAccessErrors[accessError].msg}</p>
                       </div>
                     </div>
                   </motion.div>
@@ -212,7 +215,7 @@ function LoginForm() {
                     type="email"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    placeholder="Email"
+                    placeholder={t('auth.email')}
                     required
                     className="w-full h-12 pl-10 pr-4 rounded-xl bg-[var(--bg-input)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 border-[1.5px] border-[var(--border)] hover:border-[var(--border-strong)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15 focus:shadow-[0_0_20px_rgba(140,40,255,0.1)]"
                   />
@@ -227,7 +230,7 @@ function LoginForm() {
                     type={showPw ? 'text' : 'password'}
                     value={pw}
                     onChange={e => setPw(e.target.value)}
-                    placeholder="Password"
+                    placeholder={t('auth.password')}
                     required
                     minLength={6}
                     className="w-full h-12 pl-10 pr-11 rounded-xl bg-[var(--bg-input)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none transition-all duration-300 border-[1.5px] border-[var(--border)] hover:border-[var(--border-strong)] focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/15 focus:shadow-[0_0_20px_rgba(140,40,255,0.1)]"
@@ -247,7 +250,7 @@ function LoginForm() {
                     href="/login/forgot-password"
                     className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors duration-200"
                   >
-                    ¿Olvidaste tu contraseña?
+                    {t('auth.forgotPassword')}
                   </Link>
                 </div>
 
@@ -262,7 +265,7 @@ function LoginForm() {
                     boxShadow: '0 4px 20px rgba(140,40,255,0.4), 0 0 40px rgba(140,40,255,0.12)',
                   }}
                 >
-                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Iniciar Sesion'}
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : t('auth.login')}
                 </motion.button>
               </form>
 
@@ -272,7 +275,7 @@ function LoginForm() {
                   <div className="w-full h-px bg-gradient-to-r from-transparent via-[var(--border-strong)] to-transparent" />
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="bg-[var(--bg-elevated)] px-4 text-xs text-[var(--text-muted)] uppercase tracking-wider">o continua con</span>
+                  <span className="bg-[var(--bg-elevated)] px-4 text-xs text-[var(--text-muted)] uppercase tracking-wider">{t('auth.orContinueWith')}</span>
                 </div>
               </div>
 
@@ -290,7 +293,7 @@ function LoginForm() {
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                 </svg>
-                Google
+                {t('auth.google')}
               </motion.button>
             </div>
           </div>
@@ -303,7 +306,7 @@ function LoginForm() {
             className="text-center text-[13px] mt-6"
             style={{ color: 'var(--text-muted)', opacity: 0.4 }}
           >
-            Powered by <span className="font-medium" style={{ color: 'var(--accent)', opacity: 0.6 }}>Nora</span>
+            {t('auth.poweredBy')}
           </motion.p>
         </motion.div>
       </div>

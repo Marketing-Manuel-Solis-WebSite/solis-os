@@ -13,6 +13,7 @@ import { renderMarkdown } from '@/lib/markdown';
 import DocEditor from '@/components/docs/doc-editor';
 import DocAIPanel from '@/components/docs/doc-ai-panel';
 import { useToast } from '@/components/notifications/toast-provider';
+import { useI18n } from '@/lib/i18n';
 
 // ========== TYPES ==========
 interface Doc {
@@ -38,6 +39,7 @@ interface Doc {
 export default function DocsPage() {
   const { user, me, isAdmin, activeTeamId, teams, can, canSeeResource, canSeeAllTeams } = useAuth();
   const toast = useToast();
+  const { t } = useI18n();
 
   // State
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -77,7 +79,7 @@ export default function DocsPage() {
 
       setDocs(filtered);
     } catch (err) {
-      toast.error('Error cargando documentos', 'No se pudieron cargar los documentos.');
+      toast.error(t('docs.loadError'), t('docs.loadErrorMsg'));
     }
     setLoading(false);
   }, [activeTeamId, canSeeAllTeams, canSeeResource, user?.uid]);
@@ -172,7 +174,7 @@ export default function DocsPage() {
   };
 
   const handleDelete = async (doc: Doc) => {
-    if (!confirm(`Delete "${doc.title}"? This cannot be undone.`)) return;
+    if (!confirm(t('docEditor.deleteConfirm', { title: doc.title }))) return;
     await deleteDocument(doc.id);
     await logAction({ action: 'deleted', resource: 'doc', detail: doc.title, actorId: user!.uid, actorName: me!.displayName });
     if (activeDoc?.id === doc.id) setActiveDoc(null);
@@ -244,21 +246,21 @@ export default function DocsPage() {
       <div className="flex items-center justify-between mb-6 anim-slide">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-3">
-            Documents
+            {t('docs.title')}
             {canSeeAllTeams && (
               <span className="text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">
-                ALL ACCESS
+                {t('docEditor.allAccess')}
               </span>
             )}
           </h1>
           <p className="text-base text-[var(--text-muted)] mt-1">
-            {visible.length} document{visible.length !== 1 ? 's' : ''}
-            {hasActiveFilters && <span className="text-[var(--accent)]"> (filtered)</span>}
+            {t('docs.count', { n: visible.length })}
+            {hasActiveFilters && <span className="text-[var(--accent)]"> {t('docs.filtered')}</span>}
           </p>
         </div>
         {can('doc', 'create') && (
           <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 px-5 h-10 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">
-            <Plus className="h-4 w-4" /> New Document
+            <Plus className="h-4 w-4" /> {t('docs.new')}
           </button>
         )}
       </div>
@@ -267,54 +269,54 @@ export default function DocsPage() {
       <div className="flex items-center gap-2 flex-wrap mb-5 anim-slide" style={{ animationDelay: '60ms' }}>
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search documents..." className="input-dark pl-10 h-9 text-sm" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('docs.searchPlaceholder')} className="input-dark pl-10 h-9 text-sm" />
         </div>
 
         {/* Department filter */}
         {canSeeAllTeams && teams.length > 0 && (
           <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="select-dark h-9 text-sm">
-            <option value="all">All Departments</option>
-            {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
-            <option value="">No Department</option>
+            <option value="all">{t('docs.allDepts')}</option>
+            {teams.map(tm => <option key={tm.id} value={tm.id}>{tm.icon} {tm.name}</option>)}
+            <option value="">{t('common.noDepartment')}</option>
           </select>
         )}
 
         {/* Author filter */}
         {uniqueAuthors.length > 1 && (
           <select value={filterAuthor} onChange={e => setFilterAuthor(e.target.value)} className="select-dark h-9 text-sm">
-            <option value="all">All Authors</option>
+            <option value="all">{t('docs.allAuthors')}</option>
             {uniqueAuthors.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         )}
 
         <select value={filterVisibility} onChange={e => setFilterVisibility(e.target.value as any)} className="select-dark h-9 text-sm">
-          <option value="all">All Visibility</option>
-          <option value="team">Team Only</option>
-          <option value="private">Private</option>
-          <option value="public">Public</option>
+          <option value="all">{t('docs.allVisibility')}</option>
+          <option value="team">{t('docs.teamOnly')}</option>
+          <option value="private">{t('visibility.private')}</option>
+          <option value="public">{t('visibility.public')}</option>
         </select>
 
         {categories.length > 0 && (
           <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="select-dark h-9 text-sm">
-            <option value="all">All Categories</option>
+            <option value="all">{t('docs.allCategories')}</option>
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
 
         {/* Date range filter */}
         <select value={filterDate} onChange={e => setFilterDate(e.target.value as any)} className="select-dark h-9 text-sm">
-          <option value="all">Any Time</option>
-          <option value="7">Last 7 Days</option>
-          <option value="30">Last 30 Days</option>
-          <option value="90">Last 90 Days</option>
-          <option value="365">Last Year</option>
+          <option value="all">{t('docs.anyTime')}</option>
+          <option value="7">{t('docs.last7Days')}</option>
+          <option value="30">{t('docs.last30Days')}</option>
+          <option value="90">{t('docs.last90Days')}</option>
+          <option value="365">{t('docs.lastYear')}</option>
         </select>
 
         <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="select-dark h-9 text-sm">
-          <option value="updated">Last Modified</option>
-          <option value="created">Newest First</option>
-          <option value="title">A → Z</option>
-          <option value="wordCount">Word Count</option>
+          <option value="updated">{t('docs.lastModified')}</option>
+          <option value="created">{t('docs.newestFirst')}</option>
+          <option value="title">{t('docs.aToZ')}</option>
+          <option value="wordCount">{t('docs.wordCount')}</option>
         </select>
 
         {/* Starred toggle */}
@@ -325,13 +327,13 @@ export default function DocsPage() {
               : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:shadow-card-hover'
           }`}>
           <Star className={`h-3 w-3 ${filterStarred ? 'fill-[var(--accent)]' : ''}`} />
-          Starred
+          {t('docs.starred')}
         </button>
 
         {hasActiveFilters && (
           <button onClick={clearFilters}
             className="h-9 px-3 rounded-xl border border-red-500/20 text-sm text-red-400 hover:bg-red-500/10 transition flex items-center gap-1">
-            <X className="h-3 w-3" /> Clear
+            <X className="h-3 w-3" /> {t('docs.clearFilters')}
           </button>
         )}
 
@@ -354,12 +356,12 @@ export default function DocsPage() {
         <div className="text-center py-20">
           <FileText className="h-14 w-14 text-[var(--text-muted)] mx-auto mb-4" />
           <p className="text-[var(--text-muted)] text-sm mb-2">
-            {hasActiveFilters ? 'No documents match your filters.' : 'No documents found.'}
+            {hasActiveFilters ? t('docs.noDocsFilter') : t('docs.noDocs')}
           </p>
           {hasActiveFilters ? (
-            <button onClick={clearFilters} className="text-sm text-[var(--accent)] hover:underline">Clear filters</button>
+            <button onClick={clearFilters} className="text-sm text-[var(--accent)] hover:underline">{t('docs.clearFilters')}</button>
           ) : (
-            <button onClick={() => setShowCreate(true)} className="text-sm text-[var(--accent)] hover:underline">Create your first document</button>
+            <button onClick={() => setShowCreate(true)} className="text-sm text-[var(--accent)] hover:underline">{t('docs.createFirst')}</button>
           )}
         </div>
       ) : view === 'grid' ? (
@@ -526,6 +528,7 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
   teams: any[]; activeTeamId: string; onClose: () => void; onCreate: (data: Partial<Doc>) => void;
 }) {
   const toast = useToast();
+  const { t } = useI18n();
   const [title, setTitle] = useState('');
   const [visibility, setVisibility] = useState<'team' | 'private' | 'public'>('team');
   const [category, setCategory] = useState('');
@@ -536,13 +539,13 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
   const [aiGenerating, setAiGenerating] = useState(false);
 
   const templates: { id: string; label: string; content: string }[] = [
-    { id: 'blank', label: 'Blank', content: '' },
-    { id: 'meeting', label: 'Meeting Notes', content: '# Meeting Notes\n\n**Date:** \n**Attendees:** \n**Agenda:**\n\n---\n\n## Discussion Points\n\n### Topic 1\n\n\n### Topic 2\n\n\n---\n\n## Action Items\n\n- [ ] \n- [ ] \n\n---\n\n## Next Steps\n\n' },
-    { id: 'case', label: 'Case Summary', content: '# Case Summary\n\n**Case Number:** \n**Client:** \n**Case Type:** \n**Filing Date:** \n**Court:** \n\n---\n\n## Case Overview\n\n\n## Key Facts\n\n\n## Legal Analysis\n\n\n## Strategy\n\n\n## Timeline / Deadlines\n\n| Date | Event | Status |\n|------|-------|--------|\n|      |       |        |\n\n## Notes\n\n' },
-    { id: 'sop', label: 'SOP', content: '# [Procedure Name]\n\n**Department:** \n**Version:** 1.0\n**Effective Date:** \n\n---\n\n## Purpose\n\n\n## Procedure Steps\n\n### Step 1: \n\n\n### Step 2: \n\n\n### Step 3: \n\n' },
-    { id: 'report', label: 'Report', content: '# [Report Title]\n\n**Prepared by:** \n**Date:** \n\n---\n\n## Executive Summary\n\n\n## Key Findings\n\n\n## Recommendations\n\n1. \n2. \n3. \n\n## Conclusion\n\n' },
-    { id: 'letter', label: 'Client Letter', content: '# Client Letter\n\n**Date:** \n**To:** \n**Re:** \n\n---\n\nDear [Client Name],\n\n\n\nSincerely,\n\n**Law Office of Manuel Solis**\n' },
-    { id: 'ai', label: 'AI Generate', content: '' },
+    { id: 'blank', label: t('docCreate.blank'), content: '' },
+    { id: 'meeting', label: t('docCreate.meetingNotes'), content: '# Meeting Notes\n\n**Date:** \n**Attendees:** \n**Agenda:**\n\n---\n\n## Discussion Points\n\n### Topic 1\n\n\n### Topic 2\n\n\n---\n\n## Action Items\n\n- [ ] \n- [ ] \n\n---\n\n## Next Steps\n\n' },
+    { id: 'case', label: t('docCreate.caseSummary'), content: '# Case Summary\n\n**Case Number:** \n**Client:** \n**Case Type:** \n**Filing Date:** \n**Court:** \n\n---\n\n## Case Overview\n\n\n## Key Facts\n\n\n## Legal Analysis\n\n\n## Strategy\n\n\n## Timeline / Deadlines\n\n| Date | Event | Status |\n|------|-------|--------|\n|      |       |        |\n\n## Notes\n\n' },
+    { id: 'sop', label: t('docCreate.sop'), content: '# [Procedure Name]\n\n**Department:** \n**Version:** 1.0\n**Effective Date:** \n\n---\n\n## Purpose\n\n\n## Procedure Steps\n\n### Step 1: \n\n\n### Step 2: \n\n\n### Step 3: \n\n' },
+    { id: 'report', label: t('docCreate.report'), content: '# [Report Title]\n\n**Prepared by:** \n**Date:** \n\n---\n\n## Executive Summary\n\n\n## Key Findings\n\n\n## Recommendations\n\n1. \n2. \n3. \n\n## Conclusion\n\n' },
+    { id: 'letter', label: t('docCreate.clientLetter'), content: '# Client Letter\n\n**Date:** \n**To:** \n**Re:** \n\n---\n\nDear [Client Name],\n\n\n\nSincerely,\n\n**Law Office of Manuel Solis**\n' },
+    { id: 'ai', label: t('docCreate.aiGenerate'), content: '' },
   ];
 
   const submit = async () => {
@@ -570,7 +573,7 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
           teamId: deptId,
         });
       } catch {
-        toast.warning('Error al generar contenido AI', 'Se creará un documento en blanco.');
+        toast.warning(t('docCreate.aiError'), t('docCreate.aiFallback'));
         onCreate({
           title: title.trim(), content: '', contentHtml: '', visibility,
           category: category.trim(), tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean), teamId: deptId,
@@ -596,19 +599,19 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div onClick={e => e.stopPropagation()} className="w-full max-w-lg bg-[var(--bg-base)] rounded-xl shadow-modal anim-slide overflow-hidden">
         <div className="flex items-center justify-between p-5">
-          <h2 className="text-lg font-bold text-[var(--text-primary)]">New Document</h2>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">{t('docCreate.title')}</h2>
           <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Title</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Document title..."
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('docCreate.titleLabel')}</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder={t('docCreate.titlePlaceholder')}
               autoFocus className="w-full h-12 px-4 rounded-xl bg-[var(--bg-elevated)] text-[var(--text-primary)] text-lg font-semibold placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30"
               onKeyDown={e => e.key === 'Enter' && template !== 'ai' && submit()} />
           </div>
 
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Template</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('docCreate.template')}</label>
             <div className="grid grid-cols-3 gap-2">
               {templates.map(t => (
                 <button key={t.id} onClick={() => setTemplate(t.id)}
@@ -630,7 +633,7 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
           {template === 'ai' && (
             <div className="anim-fade">
               <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">
-                Describe the document for AI
+                {t('docCreate.aiPrompt')}
               </label>
               <textarea
                 value={aiPrompt}
@@ -644,41 +647,41 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Department</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('docCreate.department')}</label>
               <select value={deptId} onChange={e => setDeptId(e.target.value)} className="select-dark w-full">
-                <option value="">No Department</option>
-                {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
+                <option value="">{t('common.noDepartment')}</option>
+                {teams.map(tm => <option key={tm.id} value={tm.id}>{tm.icon} {tm.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Visibility</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('docCreate.visibility')}</label>
               <select value={visibility} onChange={e => setVisibility(e.target.value as any)} className="select-dark w-full">
-                <option value="team">Team</option>
-                <option value="private">Private</option>
-                <option value="public">Public</option>
+                <option value="team">{t('visibility.team')}</option>
+                <option value="private">{t('visibility.private')}</option>
+                <option value="public">{t('visibility.public')}</option>
               </select>
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Category</label>
-              <input value={category} onChange={e => setCategory(e.target.value)} placeholder="Legal, HR..." className="input-dark h-[38px] text-sm" />
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('docCreate.category')}</label>
+              <input value={category} onChange={e => setCategory(e.target.value)} placeholder={t('docCreate.categoryPlaceholder')} className="input-dark h-[38px] text-sm" />
             </div>
           </div>
 
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Tags (comma-separated)</label>
-            <input value={tags} onChange={e => setTags(e.target.value)} placeholder="immigration, filing, urgent" className="input-dark h-9 text-sm" />
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('docCreate.tags')}</label>
+            <input value={tags} onChange={e => setTags(e.target.value)} placeholder={t('docCreate.tagsPlaceholder')} className="input-dark h-9 text-sm" />
           </div>
         </div>
         <div className="flex justify-end gap-2 p-5">
-          <button onClick={onClose} className="px-5 h-10 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">Cancel</button>
+          <button onClick={onClose} className="px-5 h-10 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">{t('common.cancel')}</button>
           <button onClick={submit} disabled={!title.trim() || aiGenerating || (template === 'ai' && !aiPrompt.trim())}
             className="px-6 h-10 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40 flex items-center gap-2">
             {aiGenerating ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
+              <><Loader2 className="h-4 w-4 animate-spin" /> {t('docCreate.generating')}</>
             ) : template === 'ai' ? (
-              <><Sparkles className="h-4 w-4" /> Generate & Create</>
+              <><Sparkles className="h-4 w-4" /> {t('docCreate.generateAndCreate')}</>
             ) : (
-              'Create'
+              t('common.create')
             )}
           </button>
         </div>

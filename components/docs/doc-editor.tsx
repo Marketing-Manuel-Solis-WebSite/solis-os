@@ -10,6 +10,7 @@ import {
 import { renderMarkdown } from '@/lib/markdown';
 import { uploadFile, isImageType, formatFileSize } from '@/lib/upload';
 import { useToast } from '@/components/notifications/toast-provider';
+import { useI18n } from '@/lib/i18n';
 
 interface DocEditorProps {
   doc: any;
@@ -42,6 +43,7 @@ function TSep() {
 // ========== MAIN EDITOR ==========
 export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDelete, onBack, onToggleAI, showAI }: DocEditorProps) {
   const toast = useToast();
+  const { t } = useI18n();
   const [content, setContent] = useState(doc.content || '');
   const [title, setTitle] = useState(doc.title || '');
   const [mode, setMode] = useState<'edit' | 'preview' | 'split'>('edit');
@@ -147,7 +149,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
       });
       setDirty(false);
     } catch (err) {
-      toast.error('Error al guardar', 'No se pudo guardar el documento. Intenta de nuevo.');
+      toast.error(t('docEditor.saveError'), t('docEditor.saveErrorMsg'));
     }
     setSaving(false);
   };
@@ -209,7 +211,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
     if (!files) return;
     for (const file of Array.from(files)) {
       if (!isImageType(file.type)) {
-        toast.warning('Formato no soportado', 'Solo se permiten archivos de imagen (JPG, PNG, GIF, WebP).');
+        toast.warning(t('docEditor.unsupportedFormat'), t('docEditor.unsupportedFormatMsg'));
         continue;
       }
       setUploading(true);
@@ -230,7 +232,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
         }
         setDirty(true);
       } catch (err: any) {
-        toast.error('Error al subir imagen', err.message || 'Ocurrio un error al subir la imagen.');
+        toast.error(t('docEditor.uploadError'), err.message);
       }
       setUploading(false);
       setUploadProgress(0);
@@ -309,7 +311,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
       }
       case 'pdf': {
         const printWindow = window.open('', '_blank');
-        if (!printWindow) { toast.warning('Pop-ups bloqueados', 'Permite las ventanas emergentes para descargar como PDF.'); return; }
+        if (!printWindow) { toast.warning(t('docEditor.popupBlocked'), t('docEditor.popupBlockedMsg')); return; }
         printWindow.document.write(styledHtml(true));
         printWindow.document.close();
         printWindow.onload = () => {
@@ -350,11 +352,11 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
 
         <input value={title} onChange={e => { setTitle(e.target.value); setDirty(true); }}
           className="flex-1 bg-transparent text-lg font-bold text-[var(--text-primary)] border-none outline-none placeholder:text-[var(--text-muted)]"
-          placeholder="Untitled Document" />
+          placeholder={t('docEditor.untitledDoc')} />
 
         <div className="flex items-center gap-1.5">
-          {dirty && <span className="text-[12px] text-amber-400 px-2 py-0.5 rounded-full bg-amber-500/10">Unsaved</span>}
-          {saving && <span className="text-[12px] text-blue-400 px-2 py-0.5 rounded-full bg-blue-500/10">Saving...</span>}
+          {dirty && <span className="text-[12px] text-amber-400 px-2 py-0.5 rounded-full bg-amber-500/10">{t('docEditor.unsaved')}</span>}
+          {saving && <span className="text-[12px] text-blue-400 px-2 py-0.5 rounded-full bg-blue-500/10">{t('docEditor.saving')}</span>}
           {uploading && (
             <div className="flex items-center gap-2 px-2">
               <div className="w-16 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
@@ -403,7 +405,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
 
           <button onClick={handleSave} disabled={saving || !dirty}
             className="px-4 h-8 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-1.5 disabled:opacity-40">
-            <Save className="h-3.5 w-3.5" /> Save
+            <Save className="h-3.5 w-3.5" /> {t('common.save')}
           </button>
 
           <button onClick={() => setFullscreen(!fullscreen)} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg">
@@ -416,23 +418,23 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
       {showMeta && (
         <div className="px-5 py-3 bg-[#0A0E16] flex items-center gap-4 flex-wrap anim-fade">
           <div className="flex items-center gap-2">
-            <label className="text-[12px] text-[var(--text-muted)] uppercase font-semibold">Visibility</label>
+            <label className="text-[12px] text-[var(--text-muted)] uppercase font-semibold">{t('docCreate.visibility')}</label>
             <select value={visibility} onChange={e => { setVisibility(e.target.value as any); setDirty(true); }} className="select-dark h-7 text-[13px] px-2">
-              <option value="team">Team</option>
-              <option value="private">Private</option>
-              <option value="public">Public</option>
+              <option value="team">{t('visibility.team')}</option>
+              <option value="private">{t('visibility.private')}</option>
+              <option value="public">{t('visibility.public')}</option>
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-[12px] text-[var(--text-muted)] uppercase font-semibold">Category</label>
-            <input value={category} onChange={e => { setCategory(e.target.value); setDirty(true); }} placeholder="Category" className="input-dark h-7 text-[13px] w-28 px-2" />
+            <label className="text-[12px] text-[var(--text-muted)] uppercase font-semibold">{t('docCreate.category')}</label>
+            <input value={category} onChange={e => { setCategory(e.target.value); setDirty(true); }} placeholder={t('docCreate.category')} className="input-dark h-7 text-[13px] w-28 px-2" />
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-[12px] text-[var(--text-muted)] uppercase font-semibold">Tags</label>
+            <label className="text-[12px] text-[var(--text-muted)] uppercase font-semibold">{t('docCreate.tags')}</label>
             <input value={tags} onChange={e => { setTags(e.target.value); setDirty(true); }} placeholder="tag1, tag2" className="input-dark h-7 text-[13px] w-40 px-2" />
           </div>
           <div className="flex items-center gap-3 ml-auto text-[12px] text-[var(--text-muted)]">
-            <span>By {doc.createdByName || 'Unknown'}</span>
+            <span>{t('docEditor.byAuthor', { name: doc.createdByName || 'Unknown' })}</span>
             {doc.createdAt?.toDate && <span>{doc.createdAt.toDate().toLocaleDateString()}</span>}
           </div>
         </div>
@@ -472,7 +474,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
             <Edit2 className="h-3 w-3" />
           </button>
           <button onClick={() => setMode('split')} className={`px-2.5 py-1 text-[12px] font-semibold transition ${mode === 'split' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
-            Split
+            {t('docEditor.split')}
           </button>
           <button onClick={() => setMode('preview')} className={`px-2.5 py-1 text-[12px] font-semibold transition ${mode === 'preview' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
             <Eye className="h-3 w-3" />
@@ -487,8 +489,8 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
           <div className="absolute inset-0 z-10 bg-[var(--accent)]/5 border-2 border-dashed border-[var(--accent)]/40 rounded-xl flex items-center justify-center pointer-events-none">
             <div className="text-center">
               <Upload className="h-8 w-8 text-[var(--accent)] mx-auto mb-2" />
-              <p className="text-sm text-[var(--accent)] font-semibold">Drop image here to upload</p>
-              <p className="text-sm text-[var(--text-muted)] mt-1">Max 100MB per image</p>
+              <p className="text-sm text-[var(--accent)] font-semibold">{t('docEditor.dropImageHere')}</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">{t('docEditor.maxImageSize')}</p>
             </div>
           </div>
         )}
@@ -565,15 +567,15 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
       {/* Status Bar */}
       <div className="flex items-center justify-between px-4 py-1.5 bg-[var(--bg-base)] text-[12px] text-[var(--text-muted)] shrink-0">
         <div className="flex items-center gap-4">
-          <span>{wordCount} words</span>
-          <span>{charCount} chars</span>
-          <span>{lineCount} lines</span>
-          <span>~{readTime} min read</span>
+          <span>{t('docEditor.words', { n: wordCount })}</span>
+          <span>{t('docEditor.chars', { n: charCount })}</span>
+          <span>{t('docEditor.lines', { n: lineCount })}</span>
+          <span>{t('docEditor.minRead', { n: readTime })}</span>
         </div>
         <div className="flex items-center gap-3">
-          {doc.lastEditedByName && <span>Last edited by {doc.lastEditedByName}</span>}
-          <span>Ctrl+S to save</span>
-          <span>Markdown</span>
+          {doc.lastEditedByName && <span>{t('docEditor.lastEditedBy', { name: doc.lastEditedByName })}</span>}
+          <span>{t('docEditor.ctrlSToSave')}</span>
+          <span>{t('docEditor.markdown')}</span>
         </div>
       </div>
     </div>

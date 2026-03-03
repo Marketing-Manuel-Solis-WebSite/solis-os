@@ -1,4 +1,5 @@
 'use client';
+import { useI18n } from '@/lib/i18n';
 import { motion } from 'framer-motion';
 import { X, Pin } from 'lucide-react';
 
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function PinnedDrawer({ messages, members, onClose, onUnpin }: Props) {
+  const { t } = useI18n();
   return (
     <motion.div
       initial={{ x: 320, opacity: 0 }}
@@ -21,7 +23,7 @@ export default function PinnedDrawer({ messages, members, onClose, onUnpin }: Pr
       <div className="flex items-center justify-between px-5 py-3.5">
         <div className="flex items-center gap-2">
           <Pin className="h-4 w-4 text-[var(--accent)]" />
-          <h3 className="text-sm font-bold text-[var(--text-primary)]">Pinned Messages ({messages.length})</h3>
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">{t('chat.pinnedMessages')} ({messages.length})</h3>
         </div>
         <motion.button whileTap={{ scale: 0.9 }} onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition">
           <X className="h-4 w-4" />
@@ -33,7 +35,7 @@ export default function PinnedDrawer({ messages, members, onClose, onUnpin }: Pr
             <div className="w-12 h-12 rounded-md bg-[var(--accent)]/10 flex items-center justify-center mx-auto mb-3">
               <Pin className="h-5 w-5 text-[var(--accent)]/50" />
             </div>
-            <p className="text-sm text-[var(--text-muted)]">No pinned messages</p>
+            <p className="text-sm text-[var(--text-muted)]">{t('chat.noPinnedMessages')}</p>
           </div>
         ) : messages.map((msg, i) => {
           const time = msg.createdAt?.toDate?.();
@@ -57,7 +59,7 @@ export default function PinnedDrawer({ messages, members, onClose, onUnpin }: Pr
                 whileTap={{ scale: 0.9 }}
                 onClick={() => onUnpin(msg.id)}
                 className="mt-2 text-[12px] text-[var(--text-muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition flex items-center gap-1">
-                <Pin className="h-3 w-3" /> Unpin
+                <Pin className="h-3 w-3" /> {t('chat.unpinAction')}
               </motion.button>
             </motion.div>
           );

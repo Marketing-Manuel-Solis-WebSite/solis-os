@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { X, Check, CheckSquare, Plus } from 'lucide-react';
 import { STATUSES, PRIORITIES, TASK_TYPES, VISIBILITY, DEFAULT_CUSTOM_FIELDS } from './constants';
 
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function TaskCreateModal({ members, teams, activeTeamId, onClose, onCreate }: Props) {
+  const { t } = useI18n();
   const [d, setD] = useState<any>({
     title: '', description: '', status: 'todo', priority: 'medium', type: 'task',
     assignees: [] as string[], tags: '', dueDate: '', startDate: '', timeEstimate: '',
@@ -48,44 +50,44 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
       <div onClick={e => e.stopPropagation()} className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[var(--bg-base)] rounded-xl shadow-modal anim-slide">
         {/* Header */}
         <div className="flex items-center justify-between p-5">
-          <h2 className="text-lg font-bold text-[var(--text-primary)]">Nueva Tarea</h2>
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">{t('taskCreate.title')}</h2>
           <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg"><X className="h-5 w-5" /></button>
         </div>
 
         <div className="p-5 space-y-4">
           {/* Title */}
-          <input value={d.title} onChange={e => set('title', e.target.value)} placeholder="Título de la tarea..." autoFocus
+          <input value={d.title} onChange={e => set('title', e.target.value)} placeholder={t('taskCreate.titlePlaceholder')} autoFocus
             className="w-full h-12 px-4 rounded-xl bg-[var(--bg-elevated)] text-[var(--text-primary)] text-lg font-semibold placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30" />
 
           {/* Description */}
-          <textarea value={d.description} onChange={e => set('description', e.target.value)} placeholder="Agrega descripción, contexto, instrucciones..." rows={3}
+          <textarea value={d.description} onChange={e => set('description', e.target.value)} placeholder={t('taskCreate.descPlaceholder')} rows={3}
             className="w-full px-4 py-3 rounded-xl bg-[var(--bg-elevated)] text-[var(--text-secondary)] text-sm placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30 resize-y" />
 
           {/* Type + Status + Priority */}
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Tipo</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.type')}</label>
               <div className="flex flex-wrap gap-1.5">
-                {TASK_TYPES.map(t => (
-                  <button key={t.id} onClick={() => set('type', t.id)}
-                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium transition ${d.type === t.id ? 'border text-[var(--text-primary)]' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
-                    style={d.type === t.id ? { backgroundColor: `${t.color}15`, borderColor: `${t.color}30`, color: t.color } : {}}>
-                    <t.Icon className="h-3 w-3" />{t.label}
+                {TASK_TYPES.map(tp => (
+                  <button key={tp.id} onClick={() => set('type', tp.id)}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium transition ${d.type === tp.id ? 'border text-[var(--text-primary)]' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
+                    style={d.type === tp.id ? { backgroundColor: `${tp.color}15`, borderColor: `${tp.color}30`, color: tp.color } : {}}>
+                    <tp.Icon className="h-3 w-3" />{t(`taskType.${tp.id}`)}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Estado</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.status')}</label>
               <select value={d.status} onChange={e => set('status', e.target.value)} className="select-dark w-full">
-                {STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                {STATUSES.map(s => <option key={s.id} value={s.id}>{t(`status.${s.id}`)}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Prioridad</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.priority')}</label>
               <div className="flex gap-1">
                 {PRIORITIES.map(p => (
-                  <button key={p.id} onClick={() => set('priority', p.id)} title={p.label}
+                  <button key={p.id} onClick={() => set('priority', p.id)} title={t(`priority.${p.id}`)}
                     className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm transition ${d.priority === p.id ? 'ring-2 ring-white/20 scale-110' : 'opacity-50 hover:opacity-80'}`}>
                     {p.icon}
                   </button>
@@ -97,21 +99,21 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
           {/* Visibility + Department */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Visibilidad</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.visibility')}</label>
               <div className="flex gap-1.5">
                 {VISIBILITY.map(v => (
                   <button key={v.id} onClick={() => set('visibility', v.id)}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 border ${d.visibility === v.id ? '' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] border-transparent hover:bg-[var(--bg-hover)]'}`}
                     style={d.visibility === v.id ? { backgroundColor: `${v.color}10`, borderColor: `${v.color}25`, color: v.color } : {}}>
-                    <v.Icon className="h-3 w-3" />{v.label}
+                    <v.Icon className="h-3 w-3" />{t(`visibility.${v.id}`)}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Departamento</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.department')}</label>
               <select value={d.teamId} onChange={e => set('teamId', e.target.value)} className="select-dark w-full">
-                <option value="">General</option>
+                <option value="">{t('common.general')}</option>
                 {teams.map((t: any) => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
               </select>
             </div>
@@ -120,11 +122,11 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
           {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Fecha Inicio</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.startDate')}</label>
               <input type="date" value={d.startDate} onChange={e => set('startDate', e.target.value)} className="input-dark h-9 text-sm" />
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Fecha Límite</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.dueDate')}</label>
               <input type="date" value={d.dueDate} onChange={e => set('dueDate', e.target.value)} className="input-dark h-9 text-sm" />
             </div>
           </div>
@@ -132,18 +134,18 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
           {/* Time + Points */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Estimación (min)</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.timeEstimate')}</label>
               <input type="number" value={d.timeEstimate} onChange={e => set('timeEstimate', e.target.value)} placeholder="60" className="input-dark h-9 text-sm" />
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Puntos</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.points')}</label>
               <input type="number" value={d.points} onChange={e => set('points', e.target.value)} placeholder="5" className="input-dark h-9 text-sm" />
             </div>
           </div>
 
           {/* Assignees */}
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Asignados</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.assignees')}</label>
             <div className="flex gap-2 flex-wrap">
               {members.map((m: any) => (
                 <button key={m.id} onClick={() => toggleAssignee(m.id)}
@@ -158,13 +160,13 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
 
           {/* Tags */}
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Etiquetas (separadas por coma)</label>
-            <input value={d.tags} onChange={e => set('tags', e.target.value)} placeholder="diseño, social, urgente" className="input-dark h-9 text-sm" />
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.tags')}</label>
+            <input value={d.tags} onChange={e => set('tags', e.target.value)} placeholder={t('taskCreate.tagsPlaceholder')} className="input-dark h-9 text-sm" />
           </div>
 
           {/* Subtasks */}
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Subtareas</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.subtasks')}</label>
             {d.subtasks.map((s: any, i: number) => (
               <div key={s.id} className="flex items-center gap-2 mb-1.5">
                 <CheckSquare className="h-3.5 w-3.5 text-[var(--text-muted)]" />
@@ -173,18 +175,18 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
               </div>
             ))}
             <div className="flex gap-2">
-              <input value={newSub} onChange={e => setNewSub(e.target.value)} placeholder="Agregar subtarea..." className="input-dark h-8 text-sm flex-1" onKeyDown={e => e.key === 'Enter' && addSub()} />
-              <button onClick={addSub} className="px-3 h-8 rounded-lg bg-[var(--bg-elevated)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Agregar</button>
+              <input value={newSub} onChange={e => setNewSub(e.target.value)} placeholder={t('taskCreate.addSubtask')} className="input-dark h-8 text-sm flex-1" onKeyDown={e => e.key === 'Enter' && addSub()} />
+              <button onClick={addSub} className="px-3 h-8 rounded-lg bg-[var(--bg-elevated)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">+</button>
             </div>
           </div>
 
           {/* Custom Fields */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">Campos Personalizados</label>
+              <label className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{t('taskCreate.customFields')}</label>
               {availableFields.length > 0 && (
                 <button onClick={() => setShowFields(!showFields)} className="text-[12px] text-[var(--accent)] hover:underline flex items-center gap-1">
-                  <Plus className="h-3 w-3" /> Agregar campo
+                  <Plus className="h-3 w-3" /> {t('common.create')}
                 </button>
               )}
             </div>
@@ -193,7 +195,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
                 {availableFields.map(f => (
                   <button key={f.id} onClick={() => { setCustomField(f.id, f.type === 'checkbox' ? false : ''); setShowFields(false); }}
                     className="text-sm px-2.5 py-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200">
-                    {f.label}
+                    {t(`customField.${f.id}`)}
                   </button>
                 ))}
               </div>
@@ -204,7 +206,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
               const val = d.customFields[fid];
               return (
                 <div key={fid} className="flex items-center gap-2 mb-2">
-                  <label className="text-sm text-[var(--text-muted)] w-36 shrink-0">{def.label}</label>
+                  <label className="text-sm text-[var(--text-muted)] w-36 shrink-0">{t(`customField.${def.id}`)}</label>
                   {def.type === 'checkbox' ? (
                     <button onClick={() => setCustomField(fid, !val)}
                       className={`w-5 h-5 rounded-md border flex items-center justify-center transition ${val ? 'bg-emerald-500 border-emerald-500' : 'border-[var(--border)]'}`}>
@@ -212,7 +214,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
                     </button>
                   ) : def.type === 'select' ? (
                     <select value={val || ''} onChange={e => setCustomField(fid, e.target.value)} className="select-dark h-8 text-sm flex-1">
-                      <option value="">Seleccionar...</option>
+                      <option value="">{t('common.search')}...</option>
                       {def.options?.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   ) : (
@@ -231,8 +233,8 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
 
         {/* Footer */}
         <div className="flex justify-end gap-2 p-5">
-          <button onClick={onClose} className="px-5 h-10 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-200">Cancelar</button>
-          <button onClick={submit} disabled={!d.title.trim()} className="px-6 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40">Crear Tarea</button>
+          <button onClick={onClose} className="px-5 h-10 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-200">{t('common.cancel')}</button>
+          <button onClick={submit} disabled={!d.title.trim()} className="px-6 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40">{t('taskCreate.title')}</button>
         </div>
       </div>
     </div>

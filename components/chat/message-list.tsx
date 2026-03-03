@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Reply, Pin, Trash2, Edit2, SmilePlus, Image as ImageIcon, FileText, Play, Download, ArrowRight, ChevronDown } from 'lucide-react';
+import { Reply, Pin, Trash2, Edit2, SmilePlus, Image as ImageIcon, FileText, Play, Download, ArrowRight, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
 import { formatFileSize } from '@/lib/upload';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '🔥', '👀', '✅', '💯'];
@@ -41,6 +42,25 @@ function MessageSkeleton({ count = 6 }: { count?: number }) {
   );
 }
 
+// ========== COMPACT VIDEO ==========
+function CompactVideo({ url }: { url: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className={`relative rounded-xl overflow-hidden shadow-card transition-all duration-300 ${expanded ? 'max-w-[720px]' : 'max-w-[360px]'}`}>
+      <video controls className="w-full rounded-xl" preload="metadata" style={{ maxHeight: expanded ? '500px' : '220px' }}>
+        <source src={url} />
+      </video>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-all duration-200 z-10"
+        title={expanded ? 'Reducir' : 'Expandir'}
+      >
+        {expanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+      </button>
+    </div>
+  );
+}
+
 // ========== HELPERS ==========
 
 function isImageUrl(url: string) {
@@ -60,40 +80,85 @@ function extractMediaUrls(content: string) {
   return { images, videos, textContent, hasMedia: images.length > 0 || videos.length > 0 };
 }
 
-function formatDateSeparator(date: Date): string {
+function formatDateSeparator(date: Date, t: (key: string, params?: Record<string, string | number>) => string, lang: string): string {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today.getTime() - 86400000);
   const msgDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-  if (msgDate.getTime() === today.getTime()) return 'Hoy';
-  if (msgDate.getTime() === yesterday.getTime()) return 'Ayer';
-  return date.toLocaleDateString('es-MX', { month: 'long', day: 'numeric', year: 'numeric' });
+  if (msgDate.getTime() === today.getTime()) return t('chat.today');
+  if (msgDate.getTime() === yesterday.getTime()) return t('chat.yesterday');
+  return date.toLocaleDateString(lang === 'en' ? 'en-US' : 'es-MX', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+function truncateUrl(url: string, max = 55): string {
+  try {
+    const u = new URL(url);
+    const display = u.hostname + u.pathname;
+    return display.length > max ? display.slice(0, max) + '...' : display;
+  } catch {
+    return url.length > max ? url.slice(0, max) + '...' : url;
+  }
+}
+
 function renderMessageText(text: string, members: any[]): React.ReactNode {
-  const parts = text.split(/(@[A-Za-záéíóúñüÁÉÍÓÚÑÜ]+(?:\s[A-Za-záéíóúñüÁÉÍÓÚÑÜ]+)?)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('@')) {
-      const name = part.slice(1);
+  // Split by URLs and @mentions
+  const TOKEN_RE = /(https?:\/\/[^\s]+)|(@[A-Za-záéíóúñüÁÉÍÓÚÑÜ]+(?:\s[A-Za-záéíóúñüÁÉÍÓÚÑÜ]+)?)/g;
+  const parts: React.ReactNode[] = [];
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = TOKEN_RE.exec(text)) !== null) {
+    // Plain text before this match
+    if (match.index > lastIdx) {
+      parts.push(<span key={`t${lastIdx}`}>{text.slice(lastIdx, match.index)}</span>);
+    }
+
+    const token = match[0];
+    if (token.startsWith('http')) {
+      // URL — clickeable, morado, truncado
+      parts.push(
+        <a
+          key={`u${match.index}`}
+          href={token}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[var(--accent)] hover:underline break-all"
+          title={token}
+        >
+          {truncateUrl(token)}
+        </a>
+      );
+    } else if (token.startsWith('@')) {
+      const name = token.slice(1);
       const isMember = members.some(m =>
         m.displayName?.toLowerCase() === name.toLowerCase() ||
         m.displayName?.toLowerCase().startsWith(name.toLowerCase())
       );
       if (isMember) {
-        return (
-          <span key={i} className="bg-[var(--accent)]/15 text-[var(--accent)] px-1 rounded font-medium">
-            {part}
+        parts.push(
+          <span key={`m${match.index}`} className="bg-[var(--accent)]/15 text-[var(--accent)] px-1 rounded font-medium">
+            {token}
           </span>
         );
+      } else {
+        parts.push(<span key={`m${match.index}`}>{token}</span>);
       }
     }
-    return <span key={i}>{part}</span>;
-  });
+
+    lastIdx = match.index + token.length;
+  }
+
+  // Remaining text
+  if (lastIdx < text.length) {
+    parts.push(<span key={`t${lastIdx}`}>{text.slice(lastIdx)}</span>);
+  }
+
+  return parts.length > 0 ? parts : text;
 }
 
 // ========== GROUPED ITEM TYPES ==========
@@ -103,6 +168,7 @@ type GroupedItem =
 
 // ========== COMPONENT ==========
 export default function MessageList({ messages, members, userId, channelType, canManage, loading, onReply, onEdit, onDelete, onPin, onReaction }: Props) {
+  const { t, lang } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -160,7 +226,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
     if (dayKey && dayKey !== currentDay) {
       flushGroup();
       currentDay = dayKey;
-      grouped.push({ type: 'date', label: formatDateSeparator(msgDate), id: `date-${dayKey}` });
+      grouped.push({ type: 'date', label: formatDateSeparator(msgDate, t, lang), id: `date-${dayKey}` });
     }
 
     const prev = i > 0 ? messages[i - 1] : null;
@@ -188,15 +254,15 @@ export default function MessageList({ messages, members, userId, channelType, ca
   }
 
   return (
-    <div ref={containerRef} onScroll={handleScroll} role="log" aria-live="polite" aria-label="Mensajes del canal" className="flex-1 overflow-y-auto px-4 py-4 space-y-0.5 scrollbar-thin relative" onClick={() => setShowEmoji(null)}>
+    <div ref={containerRef} onScroll={handleScroll} role="log" aria-live="polite" aria-label={t('chat.messages')} className="flex-1 overflow-y-auto px-4 py-4 space-y-0.5 scrollbar-thin relative" onClick={() => setShowEmoji(null)}>
       {messages.length === 0 && (
         <div className="flex-1 flex items-center justify-center py-16">
           <div className="text-center">
             <div className="w-16 h-16 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center mx-auto mb-4">
               <span className="text-2xl">💬</span>
             </div>
-            <p className="text-base font-medium text-[var(--text-secondary)]">No hay mensajes aún</p>
-            <p className="text-sm text-[var(--text-muted)] mt-1">¡Inicia la conversación!</p>
+            <p className="text-base font-medium text-[var(--text-secondary)]">{t('chat.noMessages')}</p>
+            <p className="text-sm text-[var(--text-muted)] mt-1">{t('chat.startConversation')}</p>
           </div>
         </div>
       )}
@@ -326,7 +392,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
             onClick={scrollToBottom}
             className="sticky bottom-4 left-1/2 -translate-x-1/2 mx-auto block px-4 py-2 rounded-full bg-[var(--accent)] text-[var(--accent-text)] text-sm font-semibold shadow-lg hover:bg-[var(--accent-hover)] transition-colors flex items-center gap-2 z-10"
           >
-            Nuevos mensajes
+            {t('chat.newMessagesNotif')}
             <ChevronDown className="h-4 w-4" />
           </motion.button>
         )}
@@ -347,6 +413,7 @@ function MessageContent({
   onDelete: (msgId: string) => void; onPin: (msgId: string, isPinned: boolean) => void;
   onReaction: (msgId: string, emoji: string) => void;
 }) {
+  const { t } = useI18n();
   const media = extractMediaUrls(msg.content || '');
 
   return (
@@ -364,15 +431,15 @@ function MessageContent({
       {msg.pinned && (
         <div className="flex items-center gap-1 mb-1">
           <Pin className="h-3 w-3 text-[var(--accent)]" />
-          <span className="text-[12px] text-[var(--accent)] font-semibold">Fijado</span>
+          <span className="text-[12px] text-[var(--accent)] font-semibold">{t('chat.pinnedLabel')}</span>
         </div>
       )}
 
       {/* Text content — flat, no bubble */}
       {(media.textContent || !media.hasMedia) && (
-        <div className={`text-[15px] leading-relaxed whitespace-pre-wrap ${msg.deleted ? 'italic text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
+        <div className={`text-[15px] leading-relaxed whitespace-pre-wrap break-words overflow-hidden ${msg.deleted ? 'italic text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`} style={{ overflowWrap: 'anywhere' }}>
           {renderMessageText(media.hasMedia ? media.textContent : (msg.content || ''), members)}
-          {msg.edited && !msg.deleted && <span className="text-[12px] text-[var(--text-muted)] ml-2">(editado)</span>}
+          {msg.edited && !msg.deleted && <span className="text-[12px] text-[var(--text-muted)] ml-2">{t('chat.edited')}</span>}
         </div>
       )}
 
@@ -392,13 +459,11 @@ function MessageContent({
         </div>
       )}
 
-      {/* Videos */}
+      {/* Videos — compact with expand */}
       {media.videos.length > 0 && (
         <div className="space-y-2 mt-1.5">
           {media.videos.map((url, idx) => (
-            <video key={idx} controls className="max-w-full max-h-[300px] rounded-xl shadow-card" preload="metadata">
-              <source src={url} />
-            </video>
+            <CompactVideo key={idx} url={url} />
           ))}
         </div>
       )}
@@ -465,24 +530,24 @@ function MessageContent({
             transition={{ duration: 0.12 }}
             className="absolute -top-3 right-0 flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg bg-[var(--bg-elevated)] shadow-dropdown z-10"
             onClick={e => e.stopPropagation()}>
-            <button onClick={() => setShowEmoji(showEmoji === msg.id ? null : msg.id)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] rounded-md hover:bg-[var(--bg-hover)] transition" title="Reaccionar" aria-label="Reaccionar">
+            <button onClick={() => setShowEmoji(showEmoji === msg.id ? null : msg.id)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] rounded-md hover:bg-[var(--bg-hover)] transition" title={t('chat.react')} aria-label={t('chat.react')}>
               <SmilePlus className="h-4 w-4" />
             </button>
-            <button onClick={() => onReply(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-md hover:bg-[var(--bg-hover)] transition" title="Responder" aria-label="Responder">
+            <button onClick={() => onReply(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-md hover:bg-[var(--bg-hover)] transition" title={t('chat.reply')} aria-label={t('chat.reply')}>
               <Reply className="h-4 w-4" />
             </button>
             {(canManage || msg.userId === userId) && (
-              <button onClick={() => onPin(msg.id, msg.pinned)} className={`p-1.5 rounded-md hover:bg-[var(--bg-hover)] transition ${msg.pinned ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--accent)]'}`} title={msg.pinned ? 'Desfijar' : 'Fijar'}>
+              <button onClick={() => onPin(msg.id, msg.pinned)} className={`p-1.5 rounded-md hover:bg-[var(--bg-hover)] transition ${msg.pinned ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--accent)]'}`} title={msg.pinned ? t('chat.unpin') : t('chat.pin')}>
                 <Pin className="h-4 w-4" />
               </button>
             )}
             {msg.userId === userId && (
-              <button onClick={() => onEdit(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-blue-400 rounded-md hover:bg-[var(--bg-hover)] transition" title="Editar">
+              <button onClick={() => onEdit(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-blue-400 rounded-md hover:bg-[var(--bg-hover)] transition" title={t('chat.edit')}>
                 <Edit2 className="h-4 w-4" />
               </button>
             )}
             {(canManage || msg.userId === userId) && (
-              <button onClick={() => { if (confirm('¿Eliminar este mensaje?')) onDelete(msg.id); }} className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-md hover:bg-[var(--bg-hover)] transition" title="Eliminar">
+              <button onClick={() => { if (confirm(t('chat.deleteConfirm'))) onDelete(msg.id); }} className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-md hover:bg-[var(--bg-hover)] transition" title={t('chat.delete')}>
                 <Trash2 className="h-4 w-4" />
               </button>
             )}
