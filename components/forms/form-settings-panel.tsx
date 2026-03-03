@@ -1,5 +1,5 @@
 'use client';
-import { Upload, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { FormDocument } from './constants';
 import { useI18n } from '@/lib/i18n';
 
@@ -10,11 +10,11 @@ interface Props {
 
 export default function FormSettingsPanel({ form, onChange }: Props) {
   const { t } = useI18n();
-  const inputCls = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] px-3 py-2 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] outline-none transition-all';
-  const labelCls = 'block text-[13px] font-medium text-[var(--text-secondary)] mb-1';
+  const inputCls = 'w-full rounded-xl border border-[var(--border-default)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] px-3.5 py-2.5 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/30 outline-none transition-all';
+  const labelCls = 'block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold';
 
   return (
-    <div className="space-y-5 h-full overflow-y-auto pr-1">
+    <div className="space-y-6 h-full overflow-y-auto pr-1">
       {/* General */}
       <Section title={t('common.general')}>
         <div>
@@ -43,7 +43,7 @@ export default function FormSettingsPanel({ form, onChange }: Props) {
               key={l}
               type="button"
               onClick={() => onChange({ layout: l })}
-              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${form.layout === l ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+              className={`flex-1 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${form.layout === l ? 'bg-[var(--accent)] text-white shadow-sm' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
               {t(`formSettings.layout${l === '1col' ? '1col' : '2col'}`)}
             </button>
@@ -53,7 +53,7 @@ export default function FormSettingsPanel({ form, onChange }: Props) {
           <label className={labelCls}>{t('formSettings.logo')}</label>
           {form.logoUrl ? (
             <div className="flex items-center gap-2">
-              <img src={form.logoUrl} alt="Logo" className="h-10 w-10 object-contain rounded" />
+              <img src={form.logoUrl} alt="Logo" className="h-10 w-10 object-contain rounded-lg" />
               <button type="button" onClick={() => onChange({ logoUrl: '' })} className="text-sm text-[var(--error)] hover:underline flex items-center gap-1">
                 <X className="h-3.5 w-3.5" /> {t('formSettings.removeLogo')}
               </button>
@@ -70,7 +70,7 @@ export default function FormSettingsPanel({ form, onChange }: Props) {
           <label className={labelCls}>{t('formSettings.responseLimit')}</label>
           <input type="number" className={inputCls} min={0} placeholder={t('formSettings.responseLimitPlaceholder')} value={form.responseLimit ?? ''} onChange={e => onChange({ responseLimit: e.target.value ? Number(e.target.value) : null })} />
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>{t('formSettings.openAt')}</label>
             <input type="datetime-local" className={inputCls} value={form.openAt ? toLocal(form.openAt) : ''} onChange={e => onChange({ openAt: e.target.value ? new Date(e.target.value) : null })} />
@@ -84,10 +84,10 @@ export default function FormSettingsPanel({ form, onChange }: Props) {
 
       {/* Security */}
       <Section title={t('formSettings.captcha')}>
-        <label className="flex items-center gap-2 cursor-pointer">
+        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-[var(--bg-hover)] transition-all">
           <input type="checkbox" checked={form.captchaEnabled} onChange={e => onChange({ captchaEnabled: e.target.checked })} className="rounded border-[var(--border-default)] text-[var(--accent)] focus:ring-[var(--accent)] h-4 w-4" />
           <div>
-            <span className="text-sm text-[var(--text-secondary)]">{t('formSettings.captcha')}</span>
+            <span className="text-sm font-medium text-[var(--text-secondary)]">{t('formSettings.captcha')}</span>
             <p className="text-[12px] text-[var(--text-muted)]">{t('formSettings.captchaDesc')}</p>
           </div>
         </label>
@@ -99,22 +99,22 @@ export default function FormSettingsPanel({ form, onChange }: Props) {
 
       {/* Privacy */}
       <Section title={t('formPrivacy.title')}>
-        <label className="flex items-center gap-2 cursor-pointer">
+        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-[var(--bg-hover)] transition-all">
           <input type="checkbox" checked={form.collectIp} onChange={e => onChange({ collectIp: e.target.checked })} className="rounded border-[var(--border-default)] text-[var(--accent)] focus:ring-[var(--accent)] h-4 w-4" />
-          <span className="text-sm text-[var(--text-secondary)]">{t('formPrivacy.collectIp')}</span>
+          <span className="text-sm font-medium text-[var(--text-secondary)]">{t('formPrivacy.collectIp')}</span>
         </label>
-        <label className="flex items-center gap-2 cursor-pointer">
+        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-[var(--bg-hover)] transition-all">
           <input type="checkbox" checked={form.collectUserAgent} onChange={e => onChange({ collectUserAgent: e.target.checked })} className="rounded border-[var(--border-default)] text-[var(--accent)] focus:ring-[var(--accent)] h-4 w-4" />
-          <span className="text-sm text-[var(--text-secondary)]">{t('formPrivacy.collectUa')}</span>
+          <span className="text-sm font-medium text-[var(--text-secondary)]">{t('formPrivacy.collectUa')}</span>
         </label>
         <div>
           <label className={labelCls}>{t('formPrivacy.privacyNotice')}</label>
           <textarea className={`${inputCls} min-h-[50px] resize-y`} placeholder={t('formPrivacy.privacyPlaceholder')} value={form.privacyNotice} onChange={e => onChange({ privacyNotice: e.target.value })} rows={2} />
         </div>
-        <label className="flex items-center gap-2 cursor-pointer">
+        <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-[var(--bg-hover)] transition-all">
           <input type="checkbox" checked={form.consentRequired} onChange={e => onChange({ consentRequired: e.target.checked })} className="rounded border-[var(--border-default)] text-[var(--accent)] focus:ring-[var(--accent)] h-4 w-4" />
           <div>
-            <span className="text-sm text-[var(--text-secondary)]">{t('formPrivacy.consentRequired')}</span>
+            <span className="text-sm font-medium text-[var(--text-secondary)]">{t('formPrivacy.consentRequired')}</span>
             <p className="text-[12px] text-[var(--text-muted)]">{t('formPrivacy.consentDesc')}</p>
           </div>
         </label>
@@ -130,7 +130,7 @@ export default function FormSettingsPanel({ form, onChange }: Props) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-[var(--text-primary)] border-b border-[var(--border-subtle)] pb-1">{title}</h3>
+      <h3 className="text-sm font-bold text-[var(--text-primary)] pb-2 border-b border-[var(--border-subtle)]">{title}</h3>
       {children}
     </div>
   );

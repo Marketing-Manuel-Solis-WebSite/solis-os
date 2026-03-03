@@ -21,15 +21,15 @@ export default function FormFieldEditor({ field, allFields, onChange, onClose }:
   const up = (partial: Partial<FormField>) => onChange({ ...field, ...partial });
   const upVal = (key: string, val: any) => onChange({ ...field, validations: { ...field.validations, [key]: val } });
 
-  const inputCls = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] px-3 py-2 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] outline-none transition-all';
-  const labelCls = 'block text-[13px] font-medium text-[var(--text-secondary)] mb-1';
+  const inputCls = 'w-full rounded-xl border border-[var(--border-default)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] px-3 py-2.5 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/30 outline-none transition-all';
+  const labelCls = 'block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold';
 
   return (
     <div className="space-y-4 h-full overflow-y-auto pr-1">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t(`field.${camel(field.type)}`)}</h3>
-        <button onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]">
+        <h3 className="text-sm font-bold text-[var(--text-primary)]">{t(`field.${camel(field.type)}`)}</h3>
+        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] transition-all">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -55,9 +55,9 @@ export default function FormFieldEditor({ field, allFields, onChange, onClose }:
       )}
 
       {/* Required */}
-      <label className="flex items-center gap-2 cursor-pointer">
+      <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-[var(--bg-hover)] transition-all">
         <input type="checkbox" checked={field.required} onChange={e => up({ required: e.target.checked })} className="rounded border-[var(--border-default)] text-[var(--accent)] focus:ring-[var(--accent)] h-4 w-4" />
-        <span className="text-sm text-[var(--text-secondary)]">{t('fieldConfig.required')}</span>
+        <span className="text-sm font-medium text-[var(--text-secondary)]">{t('fieldConfig.required')}</span>
       </label>
 
       {/* Options (dropdown/radio/multi) */}
@@ -79,7 +79,7 @@ export default function FormFieldEditor({ field, allFields, onChange, onClose }:
                   }}
                 />
                 {field.options.length > 1 && (
-                  <button type="button" onClick={() => up({ options: field.options.filter((_, j) => j !== i) })} className="p-1 text-[var(--text-muted)] hover:text-[var(--error)]">
+                  <button type="button" onClick={() => up({ options: field.options.filter((_, j) => j !== i) })} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--error)] hover:bg-[var(--error)]/5 transition-all">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 )}
@@ -88,7 +88,7 @@ export default function FormFieldEditor({ field, allFields, onChange, onClose }:
             <button
               type="button"
               onClick={() => up({ options: [...field.options, { label: '', value: `opt${Date.now().toString(36)}` }] })}
-              className="flex items-center gap-1 text-sm text-[var(--accent)] hover:underline"
+              className="flex items-center gap-1 text-sm font-medium text-[var(--accent)] hover:underline"
             >
               <Plus className="h-3.5 w-3.5" /> {t('fieldConfig.addOption')}
             </button>
@@ -111,7 +111,7 @@ export default function FormFieldEditor({ field, allFields, onChange, onClose }:
                   key={icon}
                   type="button"
                   onClick={() => up({ ratingIcon: icon })}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition-all ${field.ratingIcon === icon ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+                  className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${field.ratingIcon === icon ? 'bg-[var(--accent)] text-white shadow-sm' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
                 >
                   {t(`fieldConfig.ratingIcon${icon.charAt(0).toUpperCase() + icon.slice(1)}`)}
                 </button>
@@ -122,17 +122,17 @@ export default function FormFieldEditor({ field, allFields, onChange, onClose }:
       )}
 
       {/* Validations */}
-      <div className="border-t border-[var(--border-subtle)] pt-3">
-        <label className={`${labelCls} mb-2`}>{t('fieldConfig.validations')}</label>
+      <div className="border-t border-[var(--border-subtle)] pt-4">
+        <label className={`${labelCls} mb-2.5`}>{t('fieldConfig.validations')}</label>
 
         {isText && (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[12px] text-[var(--text-muted)]">{t('fieldConfig.minLength')}</label>
+              <label className="text-[12px] text-[var(--text-muted)] font-medium">{t('fieldConfig.minLength')}</label>
               <input type="number" className={inputCls} min={0} value={field.validations.minLength ?? ''} onChange={e => upVal('minLength', e.target.value ? Number(e.target.value) : undefined)} />
             </div>
             <div>
-              <label className="text-[12px] text-[var(--text-muted)]">{t('fieldConfig.maxLength')}</label>
+              <label className="text-[12px] text-[var(--text-muted)] font-medium">{t('fieldConfig.maxLength')}</label>
               <input type="number" className={inputCls} min={0} value={field.validations.maxLength ?? ''} onChange={e => upVal('maxLength', e.target.value ? Number(e.target.value) : undefined)} />
             </div>
           </div>
@@ -141,11 +141,11 @@ export default function FormFieldEditor({ field, allFields, onChange, onClose }:
         {isNumber && (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[12px] text-[var(--text-muted)]">{t('fieldConfig.min')}</label>
+              <label className="text-[12px] text-[var(--text-muted)] font-medium">{t('fieldConfig.min')}</label>
               <input type="number" className={inputCls} value={field.validations.min ?? ''} onChange={e => upVal('min', e.target.value ? Number(e.target.value) : undefined)} />
             </div>
             <div>
-              <label className="text-[12px] text-[var(--text-muted)]">{t('fieldConfig.max')}</label>
+              <label className="text-[12px] text-[var(--text-muted)] font-medium">{t('fieldConfig.max')}</label>
               <input type="number" className={inputCls} value={field.validations.max ?? ''} onChange={e => upVal('max', e.target.value ? Number(e.target.value) : undefined)} />
             </div>
           </div>
@@ -153,7 +153,7 @@ export default function FormFieldEditor({ field, allFields, onChange, onClose }:
 
         {isText && (
           <div className="mt-2">
-            <label className="text-[12px] text-[var(--text-muted)]">{t('fieldConfig.pattern')}</label>
+            <label className="text-[12px] text-[var(--text-muted)] font-medium">{t('fieldConfig.pattern')}</label>
             <input className={inputCls} placeholder="^[A-Z].*" value={field.validations.pattern ?? ''} onChange={e => upVal('pattern', e.target.value || undefined)} />
           </div>
         )}
@@ -161,16 +161,16 @@ export default function FormFieldEditor({ field, allFields, onChange, onClose }:
         {isFile && (
           <div className="space-y-2">
             <div>
-              <label className="text-[12px] text-[var(--text-muted)]">{t('fieldConfig.fileTypes')}</label>
+              <label className="text-[12px] text-[var(--text-muted)] font-medium">{t('fieldConfig.fileTypes')}</label>
               <input className={inputCls} placeholder={t('fieldConfig.fileTypesPlaceholder')} value={(field.validations.fileTypes || []).join(', ')} onChange={e => upVal('fileTypes', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[12px] text-[var(--text-muted)]">{t('fieldConfig.maxFileSize')}</label>
+                <label className="text-[12px] text-[var(--text-muted)] font-medium">{t('fieldConfig.maxFileSize')}</label>
                 <input type="number" className={inputCls} min={1} value={field.validations.maxFileSize ?? ''} onChange={e => upVal('maxFileSize', e.target.value ? Number(e.target.value) : undefined)} />
               </div>
               <div>
-                <label className="text-[12px] text-[var(--text-muted)]">{t('fieldConfig.maxFiles')}</label>
+                <label className="text-[12px] text-[var(--text-muted)] font-medium">{t('fieldConfig.maxFiles')}</label>
                 <input type="number" className={inputCls} min={1} value={field.validations.maxFiles ?? ''} onChange={e => upVal('maxFiles', e.target.value ? Number(e.target.value) : undefined)} />
               </div>
             </div>
@@ -179,7 +179,7 @@ export default function FormFieldEditor({ field, allFields, onChange, onClose }:
       </div>
 
       {/* Conditional visibility */}
-      <div className="border-t border-[var(--border-subtle)] pt-3">
+      <div className="border-t border-[var(--border-subtle)] pt-4">
         <label className={labelCls}>{t('fieldConfig.conditional')}</label>
         <div className="space-y-2">
           <select

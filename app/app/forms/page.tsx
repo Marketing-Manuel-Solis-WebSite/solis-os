@@ -1,6 +1,7 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { Loader2, ShieldX } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { Loader2, ShieldX, Plus, FileInput } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { getForms, createForm } from '@/lib/db';
@@ -18,27 +19,42 @@ export default function FormsPage() {
 
   const [forms, setForms] = useState<FormDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [activeForm, setActiveForm] = useState<FormDocument | null>(null);
   const [shareForm, setShareForm] = useState<FormDocument | null>(null);
   const [tab, setTab] = useState<'forms' | 'responses'>('forms');
+  const mountedRef = useRef(true);
 
   const hasAccess = can('form', 'create') || me?.role === 'owner' || me?.role === 'admin';
 
   const loadForms = useCallback(async () => {
-    setLoading(true);
     try {
       const data = await getForms();
-      setForms(data as FormDocument[]);
+      if (mountedRef.current) setForms(data as FormDocument[]);
     } catch {
-      toast.error(t('docs.loadError'));
-    } finally {
-      setLoading(false);
+      // silent
     }
-  }, [toast, t]);
+  }, []);
 
-  useEffect(() => { loadForms(); }, [loadForms]);
+  useEffect(() => {
+    mountedRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getForms();
+        if (!cancelled) setForms(data as FormDocument[]);
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; mountedRef.current = false; };
+  }, []);
 
   const handleCreate = async () => {
+    if (creating) return;
+    setCreating(true);
     try {
       const ref = await createForm({
         title: '',
@@ -66,13 +82,15 @@ export default function FormsPage() {
         teamId: '',
       });
       const newId = ref.id;
-      // Reload to get the full object with publicToken
       const refreshed = await getForms();
-      const newForm = (refreshed as FormDocument[]).find(f => f.id === newId);
-      setForms(refreshed as FormDocument[]);
+      const all = refreshed as FormDocument[];
+      const newForm = all.find(f => f.id === newId);
+      setForms(all);
       if (newForm) setActiveForm(newForm);
     } catch {
       toast.error(t('conversion.error'));
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -80,9 +98,10 @@ export default function FormsPage() {
   if (!hasAccess) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <ShieldX className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-3" strokeWidth={1.5} />
-          <p className="text-sm text-[var(--text-muted)]">{t('forms.noPermission')}</p>
+        <div className="text-center py-20">
+          <ShieldX className="h-10 w-10 text-[var(--text-muted)]/20 mx-auto mb-3" strokeWidth={1.5} />
+          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-1">{t('forms.noPermission')}</h3>
+          <p className="text-[14px] text-[var(--text-muted)]">{t('forms.subtitle')}</p>
         </div>
       </div>
     );
@@ -90,7 +109,7 @@ export default function FormsPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center py-20">
         <Loader2 className="h-6 w-6 text-[var(--accent)] animate-spin" />
       </div>
     );
@@ -100,34 +119,62 @@ export default function FormsPage() {
   if (activeForm) {
     return (
       <div className="flex-1 flex flex-col h-full">
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
           <button
             onClick={() => { setActiveForm(null); loadForms(); }}
-            className="text-sm text-[var(--accent)] hover:underline"
+            className="px-3 py-1.5 rounded-lg text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-subtle)] transition-all"
           >
-            {t('common.back')}
+            &larr; {t('common.back')}
           </button>
         </div>
         <div className="flex-1 overflow-hidden">
           <FormBuilder
             form={activeForm}
             onUpdate={updated => setActiveForm(updated)}
+            onShare={f => setShareForm(f)}
           />
         </div>
+
+        {shareForm && (
+          <FormShareModal
+            form={shareForm}
+            onClose={() => setShareForm(null)}
+            onUpdate={updated => {
+              setShareForm(updated);
+              setActiveForm(updated);
+              setForms(prev => prev.map(f => f.id === updated.id ? updated : f));
+            }}
+          />
+        )}
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col p-4 sm:p-6 space-y-4 overflow-y-auto">
-      {/* Header */}
-      <div>
-        <h1 className="text-lg font-bold text-[var(--text-primary)]">{t('forms.title')}</h1>
-        <p className="text-sm text-[var(--text-muted)]">{t('forms.subtitle')}</p>
+    <div className="flex-1 flex flex-col p-6 max-w-7xl mx-auto overflow-y-auto">
+      {/* Header — matches design system */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+            <FileInput className="h-6 w-6 text-[var(--accent)]" />
+            {t('forms.title')}
+          </h1>
+          <p className="text-[14px] text-[var(--text-muted)] mt-0.5">{t('forms.subtitle')}</p>
+        </div>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleCreate}
+          disabled={creating}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium shadow-md hover:opacity-90 transition disabled:opacity-60"
+        >
+          {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          {t('forms.createForm')}
+        </motion.button>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-[var(--border-subtle)]">
+      <div className="flex items-center gap-1 border-b border-[var(--border-subtle)] mb-5">
         {[
           { key: 'forms' as const, label: t('forms.tabForms') },
           { key: 'responses' as const, label: t('forms.tabResponses') },
@@ -135,7 +182,7 @@ export default function FormsPage() {
           <button
             key={tb.key}
             onClick={() => setTab(tb.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-all ${tab === tb.key ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${tab === tb.key ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
           >
             {tb.label}
           </button>

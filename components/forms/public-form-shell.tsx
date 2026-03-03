@@ -11,19 +11,19 @@ export default function PublicFormShell({ logoUrl, children }: Props) {
   const { t } = useI18n();
   return (
     <div className="min-h-screen bg-[var(--bg-base)] flex flex-col">
-      <main className="flex-1 flex items-start justify-center px-4 py-8 sm:py-12">
+      <main className="flex-1 flex items-start justify-center px-4 py-10 sm:py-16">
         <div className="w-full max-w-xl">
           {logoUrl && (
             <div className="flex justify-center mb-6">
               <img src={logoUrl} alt="Logo" className="h-10 object-contain" />
             </div>
           )}
-          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-elevated)] shadow-sm overflow-hidden">
+          <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--bg-elevated)] shadow-modal overflow-hidden">
             {children}
           </div>
         </div>
       </main>
-      <footer className="py-4 text-center">
+      <footer className="py-5 text-center">
         <span className="text-[12px] text-[var(--text-muted)]">{t('publicForm.poweredBy')}</span>
       </footer>
     </div>

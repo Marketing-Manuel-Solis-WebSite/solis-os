@@ -1,6 +1,6 @@
 'use client';
 import { useState, FormEvent } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import type { FormDocument } from './constants';
 import FormFieldRenderer from './form-field-renderer';
 import PublicFormSuccess from './public-form-success';
@@ -32,19 +32,16 @@ export default function PublicFormRenderer({ form }: Props) {
     e.preventDefault();
     setSubmitError('');
 
-    // Consent check
     if (form.consentRequired && !consent) {
       setSubmitError(t('publicForm.consentRequired'));
       return;
     }
 
-    // Client-side validation
     const { valid, errors: valErrors } = validateSubmission(form.fields, values, t);
     if (!valid) { setErrors(valErrors); return; }
 
     setSubmitting(true);
     try {
-      // Upload files first
       const finalValues = { ...values };
       const attachments: { fieldId: string; url: string; name: string; type: string; size: number }[] = [];
 
@@ -66,7 +63,6 @@ export default function PublicFormRenderer({ form }: Props) {
         }
       }
 
-      // Submit via API
       const res = await fetch('/api/forms/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,7 +90,6 @@ export default function PublicFormRenderer({ form }: Props) {
         return;
       }
 
-      // Redirect or show success
       if (form.redirectUrl) {
         window.location.href = form.redirectUrl;
         return;
@@ -119,13 +114,13 @@ export default function PublicFormRenderer({ form }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-0">
       {/* Header */}
-      <div className="px-6 pt-6 pb-4">
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">{form.title}</h1>
-        {form.description && <p className="text-sm text-[var(--text-secondary)] mt-1">{form.description}</p>}
+      <div className="px-7 pt-7 pb-5">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">{form.title}</h1>
+        {form.description && <p className="text-[14px] text-[var(--text-secondary)] mt-1.5">{form.description}</p>}
       </div>
 
       {/* Fields */}
-      <div className={`px-6 pb-4 ${form.layout === '2col' ? 'grid grid-cols-1 sm:grid-cols-2 gap-4' : 'space-y-4'}`}>
+      <div className={`px-7 pb-5 ${form.layout === '2col' ? 'grid grid-cols-1 sm:grid-cols-2 gap-5' : 'space-y-5'}`}>
         {visibleFields.map(field => (
           <FormFieldRenderer
             key={field.id}
@@ -140,15 +135,15 @@ export default function PublicFormRenderer({ form }: Props) {
 
       {/* Privacy notice */}
       {form.privacyNotice && (
-        <div className="px-6 pb-2">
+        <div className="px-7 pb-3">
           <p className="text-[12px] text-[var(--text-muted)] leading-relaxed">{form.privacyNotice}</p>
         </div>
       )}
 
       {/* Consent */}
       {form.consentRequired && (
-        <div className="px-6 pb-3">
-          <label className="flex items-start gap-2 cursor-pointer">
+        <div className="px-7 pb-4">
+          <label className="flex items-start gap-3 cursor-pointer p-3 rounded-xl hover:bg-[var(--bg-hover)] transition-all">
             <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="rounded border-[var(--border-default)] text-[var(--accent)] focus:ring-[var(--accent)] h-4 w-4 mt-0.5" />
             <span className="text-sm text-[var(--text-secondary)]">{t('publicForm.consent')}</span>
           </label>
@@ -157,17 +152,20 @@ export default function PublicFormRenderer({ form }: Props) {
 
       {/* Error */}
       {submitError && (
-        <div className="px-6 pb-2">
-          <p className="text-sm text-[var(--error)]">{submitError}</p>
+        <div className="px-7 pb-3">
+          <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[var(--error)]/5 border border-[var(--error)]/20">
+            <AlertCircle className="h-4 w-4 text-[var(--error)] shrink-0" />
+            <p className="text-sm text-[var(--error)]">{submitError}</p>
+          </div>
         </div>
       )}
 
       {/* Submit */}
-      <div className="px-6 pb-6">
+      <div className="px-7 pb-7">
         <button
           type="submit"
           disabled={submitting}
-          className="w-full py-2.5 rounded-lg bg-[var(--accent)] text-white font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+          className="w-full py-3 rounded-xl bg-[var(--accent)] text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2 shadow-md"
         >
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {submitting ? t('publicForm.submitting') : t('publicForm.submit')}

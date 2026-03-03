@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { X, CheckCircle2, XCircle, ArrowRight, Save } from 'lucide-react';
 import type { FormDocument, FormSubmission } from './constants';
 import { SUBMISSION_STATUSES } from './constants';
@@ -47,23 +48,23 @@ export default function FormSubmissionDetail({ submission, form, onClose, onUpda
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-[var(--text-primary)]">{t('submissions.detail')}</h3>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-2.5">
+          <h3 className="text-base font-bold text-[var(--text-primary)]">{t('submissions.detail')}</h3>
           <span
-            className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ backgroundColor: `${statusInfo?.color}20`, color: statusInfo?.color }}
+            className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full"
+            style={{ backgroundColor: `${statusInfo?.color}18`, color: statusInfo?.color }}
           >
             {t(statusInfo?.labelKey || 'submissions.new')}
           </span>
         </div>
-        <button onClick={onClose} className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]">
+        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] transition-all">
           <X className="h-4 w-4" />
         </button>
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
         {/* Date */}
         <p className="text-[12px] text-[var(--text-muted)]">
           {t('submissions.receivedAt')}: {date.toLocaleString('es-MX')}
@@ -71,12 +72,12 @@ export default function FormSubmissionDetail({ submission, form, onClose, onUpda
 
         {/* Field values */}
         <div className="space-y-3">
-          <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">{t('submissions.fieldValues')}</h4>
+          <h4 className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{t('submissions.fieldValues')}</h4>
           {form.fields.map(field => {
             const val = submission.values?.[field.id];
             if (val === undefined || val === null || val === '') return null;
             return (
-              <div key={field.id} className="space-y-0.5">
+              <div key={field.id} className="p-3 rounded-xl bg-[var(--bg-base)] space-y-0.5">
                 <p className="text-[12px] font-medium text-[var(--text-muted)]">{field.label || field.type}</p>
                 <p className="text-sm text-[var(--text-primary)] break-words">
                   {Array.isArray(val) ? val.join(', ') : typeof val === 'boolean' ? (val ? 'Yes' : 'No') : String(val)}
@@ -89,9 +90,9 @@ export default function FormSubmissionDetail({ submission, form, onClose, onUpda
         {/* Attachments */}
         {submission.attachments && submission.attachments.length > 0 && (
           <div className="space-y-2">
-            <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">{t('submissions.attachments')}</h4>
+            <h4 className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{t('submissions.attachments')}</h4>
             {submission.attachments.map((a, i) => (
-              <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="block text-sm text-[var(--accent)] hover:underline truncate">
+              <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="block text-sm text-[var(--accent)] hover:underline truncate px-3 py-2 rounded-xl bg-[var(--bg-base)]">
                 {a.name}
               </a>
             ))}
@@ -99,32 +100,34 @@ export default function FormSubmissionDetail({ submission, form, onClose, onUpda
         )}
 
         {/* Metadata */}
-        <div className="space-y-1.5 border-t border-[var(--border-subtle)] pt-3">
-          <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">{t('submissions.metadata')}</h4>
-          {submission.ip && <MetaRow label={t('submissions.ip')} value={submission.ip} />}
-          {submission.userAgent && <MetaRow label={t('submissions.userAgent')} value={submission.userAgent} />}
-          {submission.utmSource && <MetaRow label={t('submissions.utmSource')} value={submission.utmSource} />}
-          {submission.utmMedium && <MetaRow label={t('submissions.utmMedium')} value={submission.utmMedium} />}
-          {submission.utmCampaign && <MetaRow label={t('submissions.utmCampaign')} value={submission.utmCampaign} />}
-          {submission.referrer && <MetaRow label={t('submissions.referrer')} value={submission.referrer} />}
-          <MetaRow
-            label={t('submissions.consent')}
-            value={submission.consentGiven ? t('submissions.consentYes') : t('submissions.consentNo')}
-          />
+        <div className="space-y-2 border-t border-[var(--border-subtle)] pt-4">
+          <h4 className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{t('submissions.metadata')}</h4>
+          <div className="p-3 rounded-xl bg-[var(--bg-base)] space-y-1.5">
+            {submission.ip && <MetaRow label={t('submissions.ip')} value={submission.ip} />}
+            {submission.userAgent && <MetaRow label={t('submissions.userAgent')} value={submission.userAgent} />}
+            {submission.utmSource && <MetaRow label={t('submissions.utmSource')} value={submission.utmSource} />}
+            {submission.utmMedium && <MetaRow label={t('submissions.utmMedium')} value={submission.utmMedium} />}
+            {submission.utmCampaign && <MetaRow label={t('submissions.utmCampaign')} value={submission.utmCampaign} />}
+            {submission.referrer && <MetaRow label={t('submissions.referrer')} value={submission.referrer} />}
+            <MetaRow
+              label={t('submissions.consent')}
+              value={submission.consentGiven ? t('submissions.consentYes') : t('submissions.consentNo')}
+            />
+          </div>
         </div>
 
         {/* Notes */}
-        <div className="space-y-2 border-t border-[var(--border-subtle)] pt-3">
-          <h4 className="text-[13px] font-semibold text-[var(--text-primary)]">{t('submissions.notes')}</h4>
+        <div className="space-y-2 border-t border-[var(--border-subtle)] pt-4">
+          <h4 className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{t('submissions.notes')}</h4>
           <textarea
-            className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] px-3 py-2 focus:border-[var(--accent)] outline-none resize-y min-h-[60px]"
+            className="w-full rounded-xl border border-[var(--border-default)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] px-3.5 py-2.5 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/30 outline-none resize-y min-h-[60px]"
             placeholder={t('submissions.notesPlaceholder')}
             value={notes}
             onChange={e => setNotes(e.target.value)}
             rows={2}
           />
           {notes !== submission.notes && (
-            <button onClick={handleSaveNotes} className="flex items-center gap-1 text-sm text-[var(--accent)] hover:underline">
+            <button onClick={handleSaveNotes} className="flex items-center gap-1.5 text-sm font-medium text-[var(--accent)] hover:underline">
               <Save className="h-3.5 w-3.5" /> {t('common.save')}
             </button>
           )}
@@ -132,29 +135,31 @@ export default function FormSubmissionDetail({ submission, form, onClose, onUpda
       </div>
 
       {/* Actions */}
-      <div className="px-4 py-3 border-t border-[var(--border-subtle)] flex items-center gap-2">
+      <div className="px-5 py-4 border-t border-[var(--border-subtle)] flex items-center gap-2">
         {submission.status === 'new' && (
           <button
             onClick={() => handleStatusChange('reviewed')}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[var(--bg-tertiary)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all"
           >
-            <CheckCircle2 className="h-3.5 w-3.5" /> {t('submissions.markReviewed')}
+            <CheckCircle2 className="h-4 w-4" /> {t('submissions.markReviewed')}
           </button>
         )}
         {submission.status !== 'converted' && (
-          <button
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => setShowConvert(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90 transition-opacity shadow-sm"
           >
-            <ArrowRight className="h-3.5 w-3.5" /> {t('submissions.convert')}
-          </button>
+            <ArrowRight className="h-4 w-4" /> {t('submissions.convert')}
+          </motion.button>
         )}
         {submission.status !== 'discarded' && submission.status !== 'converted' && (
           <button
             onClick={() => handleStatusChange('discarded')}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-[var(--error)] hover:bg-[var(--bg-hover)] transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-medium text-[var(--error)] hover:bg-[var(--error)]/5 transition-all"
           >
-            <XCircle className="h-3.5 w-3.5" /> {t('submissions.discard')}
+            <XCircle className="h-4 w-4" /> {t('submissions.discard')}
           </button>
         )}
       </div>
@@ -178,7 +183,7 @@ export default function FormSubmissionDetail({ submission, form, onClose, onUpda
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex gap-2 text-[12px]">
-      <span className="text-[var(--text-muted)] shrink-0">{label}:</span>
+      <span className="text-[var(--text-muted)] shrink-0 font-medium">{label}:</span>
       <span className="text-[var(--text-secondary)] break-all">{value}</span>
     </div>
   );
