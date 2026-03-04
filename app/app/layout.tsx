@@ -12,7 +12,7 @@ import { ToastProvider, FirebaseToastBridge } from '@/components/notifications/t
 import {
   LayoutDashboard, CheckSquare, FileText, MessageSquare, Zap, BarChart3,
   Users, Shield, LogOut, Menu, Bot, ChevronLeft, Sun, Moon, ChevronDown,
-  Settings, Loader2, CalendarDays, MoreHorizontal, Target, Clock, PenTool, FileInput,
+  Settings, Loader2, CalendarDays, MoreHorizontal, Target, Clock, PenTool, FileInput, Plug,
 } from 'lucide-react';
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -37,6 +37,7 @@ const MORE_NAV = [
   { key: 'nav.timesheets', icon: Clock, href: '/app/timesheets' },
   { key: 'nav.whiteboards', icon: PenTool, href: '/app/whiteboards' },
   { key: 'nav.forms', icon: FileInput, href: '/app/forms' },
+  { key: 'nav.integrations', icon: Plug, href: '/app/integrations' },
 ];
 
 // ============================================

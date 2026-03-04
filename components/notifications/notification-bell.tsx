@@ -25,6 +25,11 @@ const TYPE_LABEL_KEYS: Record<string, string> = {
   form_converted: 'notif.typeFormConverted',
   form_paused: 'notif.typeFormPaused',
   form_limit_reached: 'notif.typeFormLimitReached',
+  integration_connected: 'notif.typeIntegrationConnected',
+  integration_error: 'notif.typeIntegrationError',
+  integration_disconnected: 'notif.typeIntegrationDisconnected',
+  webhook_delivery_failed: 'notif.typeWebhookFailed',
+  api_key_created: 'notif.typeApiKeyCreated',
 };
 
 function timeAgo(date: any, t: (key: string, params?: Record<string, string | number>) => string): string {

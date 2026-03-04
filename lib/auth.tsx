@@ -36,7 +36,7 @@ export interface Member {
 export type ResourceType =
   | 'workspace' | 'task' | 'doc' | 'channel'
   | 'automation' | 'analytics' | 'admin' | 'user' | 'org'
-  | 'goal' | 'timesheet' | 'whiteboard' | 'form';
+  | 'goal' | 'timesheet' | 'whiteboard' | 'form' | 'integration';
 
 export type PermAction = 'create' | 'read' | 'update' | 'delete' | 'manage';
 
@@ -45,7 +45,7 @@ export type PermAction = 'create' | 'read' | 'update' | 'delete' | 'manage';
 // ============================================
 const ALL_RESOURCES: ResourceType[] = [
   'workspace', 'task', 'doc', 'channel', 'automation', 'analytics',
-  'admin', 'user', 'org', 'goal', 'timesheet', 'whiteboard', 'form',
+  'admin', 'user', 'org', 'goal', 'timesheet', 'whiteboard', 'form', 'integration',
 ];
 
 const DEFAULT_PERMS: Record<Role, Record<ResourceType, Record<PermAction, boolean>>> = {
@@ -69,6 +69,7 @@ const DEFAULT_PERMS: Record<Role, Record<ResourceType, Record<PermAction, boolea
     timesheet: { create: true, read: true, update: true, delete: true, manage: true },
     whiteboard: { create: true, read: true, update: true, delete: true, manage: true },
     form: { create: true, read: true, update: true, delete: true, manage: false },
+    integration: { create: false, read: true, update: false, delete: false, manage: false },
   },
   member: {
     workspace: { create: false, read: true, update: false, delete: false, manage: false },
@@ -84,6 +85,7 @@ const DEFAULT_PERMS: Record<Role, Record<ResourceType, Record<PermAction, boolea
     timesheet: { create: true, read: true, update: true, delete: false, manage: false },
     whiteboard: { create: true, read: true, update: true, delete: false, manage: false },
     form: { create: false, read: false, update: false, delete: false, manage: false },
+    integration: { create: false, read: false, update: false, delete: false, manage: false },
   },
   guest: {
     workspace: { create: false, read: true, update: false, delete: false, manage: false },
@@ -99,6 +101,7 @@ const DEFAULT_PERMS: Record<Role, Record<ResourceType, Record<PermAction, boolea
     timesheet: { create: false, read: true, update: false, delete: false, manage: false },
     whiteboard: { create: false, read: true, update: false, delete: false, manage: false },
     form: { create: false, read: false, update: false, delete: false, manage: false },
+    integration: { create: false, read: false, update: false, delete: false, manage: false },
   },
   readonly: {
     workspace: { create: false, read: true, update: false, delete: false, manage: false },
@@ -114,6 +117,7 @@ const DEFAULT_PERMS: Record<Role, Record<ResourceType, Record<PermAction, boolea
     timesheet: { create: false, read: true, update: false, delete: false, manage: false },
     whiteboard: { create: false, read: true, update: false, delete: false, manage: false },
     form: { create: false, read: false, update: false, delete: false, manage: false },
+    integration: { create: false, read: false, update: false, delete: false, manage: false },
   },
 };
 

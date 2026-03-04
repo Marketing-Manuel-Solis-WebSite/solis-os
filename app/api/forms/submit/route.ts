@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFormByToken, createFormSubmission, updateForm, getForm } from '@/lib/db';
 import { validateSubmission, sanitizeValue } from '@/lib/form-validation';
 import { notifyMany } from '@/lib/notifications';
+import { queueEvent } from '@/lib/integrations-db';
 import type { FormDocument } from '@/components/forms/constants';
 
 // ---- In-memory rate limiter ----
@@ -136,6 +137,14 @@ export async function POST(req: NextRequest) {
 
     // Increment response count
     await updateForm(form.id, { responseCount: (form.responseCount || 0) + 1 });
+
+    // Queue webhook event
+    queueEvent({
+      eventType: 'form.submitted',
+      entityId: form.id,
+      entityType: 'form',
+      payload: { formTitle: form.title, responseCount: (form.responseCount || 0) + 1 },
+    }).catch(() => {});
 
     // Notify form creator
     if (form.createdBy) {
