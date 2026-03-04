@@ -10,8 +10,8 @@ import {
 import AISidebar from '@/components/ai/ai-sidebar';
 import AIMessages from '@/components/ai/ai-messages';
 import AIInput from '@/components/ai/ai-input';
-import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, PanelLeftOpen } from 'lucide-react';
 
 export default function AIPage() {
   const { user, me } = useAuth();
@@ -90,14 +90,12 @@ export default function AIPage() {
 
       await addAIMessage(convoId, { role: 'assistant', content: answer, mode: 'chat', tokens: data.tokens || 0 });
 
-      // Stream word by word
-      const words = answer.split(' ');
-      let accumulated = '';
-      for (let i = 0; i < words.length; i++) {
-        accumulated += (i === 0 ? '' : ' ') + words[i];
-        setStreamingText(accumulated);
-        const delay = words.length > 200 ? 5 : words.length > 100 ? 10 : 20;
-        await new Promise(r => setTimeout(r, delay));
+      // Stream in chunks — fast, no lag
+      const len = answer.length;
+      const chunkSize = len > 3000 ? 80 : len > 1000 ? 40 : 20;
+      for (let i = 0; i < len; i += chunkSize) {
+        setStreamingText(answer.slice(0, i + chunkSize));
+        await new Promise(r => setTimeout(r, 16));
       }
       setStreamingText('');
 
@@ -127,38 +125,55 @@ export default function AIPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-64px)]">
-      {sidebarOpen && (
-        <AISidebar
-          conversations={conversations} activeId={activeConvo?.id || null} loading={loadingConvos}
-          onSelect={setActiveConvo} onNew={handleNewChat}
-          onDelete={handleDeleteConvo} onRename={handleRenameConvo}
-          onToggle={() => setSidebarOpen(false)}
-        />
-      )}
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+      {/* Sidebar */}
+      <AnimatePresence mode="wait">
+        {sidebarOpen && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 280, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden shrink-0"
+          >
+            <AISidebar
+              conversations={conversations} activeId={activeConvo?.id || null} loading={loadingConvos}
+              onSelect={setActiveConvo} onNew={handleNewChat}
+              onDelete={handleDeleteConvo} onRename={handleRenameConvo}
+              onToggle={() => setSidebarOpen(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
+      {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg-base)]">
         {/* Header */}
-        <div className="h-12 flex items-center px-4 shrink-0 bg-[var(--bg-base)]">
-          <div className="flex items-center gap-2.5">
+        <header className="h-14 flex items-center px-4 shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg-base)]">
+          <div className="flex items-center gap-3">
             {!sidebarOpen && (
-              <button onClick={() => setSidebarOpen(true)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition mr-1">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-              </button>
+              <motion.button
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                onClick={() => setSidebarOpen(true)}
+                className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </motion.button>
             )}
-            <div className="w-7 h-7 rounded-lg bg-[var(--accent)] flex items-center justify-center">
-              <Sparkles className="h-3.5 w-3.5 text-[var(--accent-text)]" />
+            <div className="min-w-0">
+              <span className="text-sm font-semibold text-[var(--text-primary)] truncate block">
+                {activeConvo?.title && activeConvo.title !== t('ai.newConversation') ? activeConvo.title : 'Solis AI'}
+              </span>
             </div>
-            <span className="text-sm font-semibold text-[var(--text-primary)]">
-              {activeConvo?.title && activeConvo.title !== t('ai.newConversation') ? activeConvo.title : t('ai.title')}
-            </span>
           </div>
-        </div>
+        </header>
 
+        {/* Chat or Welcome */}
         {!activeConvo && messages.length === 0 ? (
-          <WelcomeScreen onQuickStart={handleSend} />
+          <WelcomeScreen onQuickStart={handleSend} userName={me?.displayName?.split(' ')[0] || ''} />
         ) : (
-          <AIMessages messages={messages} loading={loading} streamingText={streamingText} />
+          <AIMessages messages={messages} loading={loading} streamingText={streamingText} userPhoto={me?.photoURL} userName={me?.displayName} />
         )}
 
         <AIInput loading={loading} onSend={handleSend} />
@@ -167,47 +182,119 @@ export default function AIPage() {
   );
 }
 
-function WelcomeScreen({ onQuickStart }: { onQuickStart: (question: string) => void }) {
+// =====================================================
+// WELCOME SCREEN
+// =====================================================
+const PHRASE_COUNT = 20;
+
+function getTimeGreeting(t: (key: string) => string): string {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return t('ai.goodMorning');
+  if (h >= 12 && h < 19) return t('ai.goodAfternoon');
+  return t('ai.goodEvening');
+}
+
+function WelcomeScreen({ onQuickStart, userName }: { onQuickStart: (question: string) => void; userName: string }) {
   const { t } = useI18n();
+  // -1 = time greeting, 0..19 = rotating phrases
+  const [phraseIdx, setPhraseIdx] = useState(-1);
+
   const SUGGESTIONS = [
-    { icon: '💬', title: t('ai.draftEmail'), question: t('ai.draftEmailQ') },
-    { icon: '📋', title: t('ai.docChecklist'), question: t('ai.docChecklistQ') },
-    { icon: '🔍', title: t('ai.researchLegal'), question: t('ai.researchLegalQ') },
-    { icon: '📊', title: t('ai.createReport'), question: t('ai.createReportQ') },
+    { title: t('ai.draftEmail'), question: t('ai.draftEmailQ') },
+    { title: t('ai.docChecklist'), question: t('ai.docChecklistQ') },
+    { title: t('ai.researchLegal'), question: t('ai.researchLegalQ') },
+    { title: t('ai.createReport'), question: t('ai.createReportQ') },
   ];
+
+  // Shuffle order for phrases so it feels random each visit
+  const [shuffled] = useState(() => {
+    const arr = Array.from({ length: PHRASE_COUNT }, (_, i) => i);
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  });
+
+  useEffect(() => {
+    // Show greeting for 5 seconds, then rotate every 4 seconds
+    const firstTimer = setTimeout(() => {
+      setPhraseIdx(0);
+    }, 5000);
+
+    const interval = setInterval(() => {
+      setPhraseIdx(prev => (prev < 0 ? 0 : (prev + 1) % PHRASE_COUNT));
+    }, 4000);
+
+    // Clear the first timer once it fires, keep interval
+    return () => { clearTimeout(firstTimer); clearInterval(interval); };
+  }, []);
+
+  const currentPhrase = phraseIdx < 0
+    ? getTimeGreeting(t)
+    : t(`ai.phrase.${shuffled[phraseIdx]}`);
 
   return (
     <div className="flex-1 flex items-center justify-center overflow-y-auto">
       <div className="max-w-2xl w-full px-6 pb-20">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="text-center mb-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="text-center mb-10"
+        >
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
-            className="w-16 h-16 mx-auto mb-5 rounded-lg bg-[var(--accent)] flex items-center justify-center shadow-lg shadow-[var(--accent)]/20"
+            className="w-14 h-14 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-[#5B8DEF] flex items-center justify-center shadow-lg"
           >
-            <Sparkles className="h-8 w-8 text-[var(--accent-text)]" />
+            <Sparkles className="h-7 w-7 text-white" />
           </motion.div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1.5">{t('ai.howCanIHelp')}</h1>
+
+          {/* Dynamic greeting */}
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-2 min-h-[36px]">
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={phraseIdx}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                className="inline-block"
+              >
+                {currentPhrase}
+                {userName ? `, ${userName}` : ''}
+              </motion.span>
+            </AnimatePresence>
+          </h1>
           <p className="text-base text-[var(--text-muted)]">{t('ai.askAnything')}</p>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }} className="grid grid-cols-2 gap-3">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.4 }}
+          className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+        >
           {SUGGESTIONS.map((s, i) => (
-            <motion.button key={i}
+            <motion.button
+              key={i}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 + i * 0.05 }}
-              whileHover={{ y: -2, boxShadow: '0 8px 25px rgba(0,0,0,0.15)' }}
+              transition={{ delay: 0.25 + i * 0.06 }}
+              whileHover={{ y: -2 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onQuickStart(s.question)}
-              className="flex items-start gap-3 p-4 rounded-lg bg-[var(--bg-elevated)] text-left transition-all group hover:bg-[var(--bg-elevated)]"
-              style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
+              className="flex items-start gap-3 p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-left transition-all group hover:border-[var(--accent)]/30 hover:shadow-md"
             >
-              <span className="text-lg shrink-0 mt-0.5">{s.icon}</span>
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">{s.title}</p>
-                <p className="text-[13px] text-[var(--text-muted)] mt-0.5 line-clamp-2">{s.question}</p>
+                <p className="text-[13px] font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+                  {s.title}
+                </p>
+                <p className="text-[12px] text-[var(--text-muted)] mt-0.5 line-clamp-2 leading-relaxed">
+                  {s.question}
+                </p>
               </div>
             </motion.button>
           ))}

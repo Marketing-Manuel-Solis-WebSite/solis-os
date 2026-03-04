@@ -6,7 +6,8 @@ import {
   getMembers, updateMember, getAuditLogs, logAction, getOrg, updateOrg,
   getSettings, saveSettings, getWorkspaces, createWorkspace, deleteWorkspace,
   getTemplates, createTemplate, deleteTemplate, getAutomations, createAutomation,
-  deleteAutomation, getTeams, createTeam, updateTeam, deleteTeam, ORG,
+  deleteAutomation, getTeams, createTeam, updateTeam, deleteTeam, archiveTeam, unarchiveTeam,
+  getDepartmentImpact, reassignTeamResources, purgeTeamResources, ORG,
   createMember, softDeleteMember, reactivateMember,
 } from '@/lib/db';
 import { createUserWithEmailAndPassword, updateProfile, signOut as firebaseSignOut } from 'firebase/auth';
@@ -15,7 +16,8 @@ import { useToast } from '@/components/notifications/toast-provider';
 import {
   Shield, Users, Building2, Columns3, Zap, Bell, Bot, Plug, ScrollText,
   FileStack, LayoutGrid, Plus, Trash2, Save, Search, ChevronRight, Check, X,
-  Edit2, Palette, Hash, FolderOpen, UserPlus, AlertTriangle, UserX, RotateCcw
+  Edit2, Palette, Hash, FolderOpen, UserPlus, AlertTriangle, UserX, RotateCcw,
+  Archive, ArchiveRestore, ArrowRightLeft, Loader2, Eye
 } from 'lucide-react';
 
 type S = 'org'|'users'|'departments'|'perms'|'struct'|'fields'|'tpl'|'auto'|'notif'|'ai'|'integ'|'audit';
@@ -106,10 +108,14 @@ export default function Admin() {
 }
 
 // =====================================================
-// DEPARTMENTS SECTION — Full CRUD + member assignment
+// DEPARTMENTS SECTION — Full CRUD + Archive + Delete modes + Dry-run
 // =====================================================
+type DeleteMode = 'reassign' | 'purge';
+interface DeptImpact { counts: Record<string, number>; total: number; }
+
 function DepartmentsS() {
   const { user, me, teams, refreshTeams, refreshMembers } = useAuth();
+  const { t } = useI18n();
   const toast = useToast();
   const [depts, setDepts] = useState<Team[]>([]);
   const [members, setMembers] = useState<any[]>([]);
@@ -118,6 +124,16 @@ function DepartmentsS() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', color: '#6B7280', icon: '📁', description: '' });
   const [assignDeptId, setAssignDeptId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+
+  // Delete modal state
+  const [deleteTarget, setDeleteTarget] = useState<Team | null>(null);
+  const [deleteMode, setDeleteMode] = useState<DeleteMode>('reassign');
+  const [reassignToId, setReassignToId] = useState('');
+  const [confirmText, setConfirmText] = useState('');
+  const [impact, setImpact] = useState<DeptImpact | null>(null);
+  const [loadingImpact, setLoadingImpact] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     const [t, m] = await Promise.all([getTeams(), getMembers()]);
@@ -126,6 +142,9 @@ function DepartmentsS() {
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+
+  const activeDepts = depts.filter(d => d.status !== 'archived');
+  const archivedDepts = depts.filter(d => d.status === 'archived');
 
   const ICONS = ['📣', '🚀', '🎯', '👔', '⚖️', '💼', '📁', '📊', '🏢', '⚙️', '💡', '📱', '🎨', '📋', '🔧', '💰', '🤝', '📞', '✉️', '🗂️'];
   const COLORS = ['#8B5CF6', '#3B82F6', '#22C55E', '#D4A843', '#EF4444', '#F59E0B', '#EC4899', '#06B6D4', '#6B7280', '#14B8A6', '#F97316', '#84CC16'];
@@ -138,6 +157,7 @@ function DepartmentsS() {
     setShowNew(false);
     await load();
     await refreshTeams();
+    toast.success('Departamento creado', form.name);
   };
 
   const handleUpdate = async () => {
@@ -148,19 +168,70 @@ function DepartmentsS() {
     setForm({ name: '', color: '#6B7280', icon: '📁', description: '' });
     await load();
     await refreshTeams();
+    toast.success('Departamento actualizado', form.name);
   };
 
-  const handleDelete = async (dept: Team) => {
-    const membersInDept = members.filter(m => m.teamId === dept.id);
-    if (membersInDept.length > 0) {
-      toast.warning('No se puede eliminar', `"${dept.name}" tiene ${membersInDept.length} miembro(s) asignados. Reasignalos primero.`);
-      return;
-    }
-    if (!confirm(`Delete department "${dept.name}"?`)) return;
-    await deleteTeam(dept.id);
-    await logAction({ action: 'deleted', resource: 'department', detail: dept.name, actorId: user!.uid, actorName: me!.displayName });
+  const handleArchive = async (dept: Team) => {
+    await archiveTeam(dept.id);
+    await logAction({ action: 'archived', resource: 'department', detail: dept.name, actorId: user!.uid, actorName: me!.displayName });
     await load();
     await refreshTeams();
+    toast.success('Departamento archivado', dept.name);
+  };
+
+  const handleUnarchive = async (dept: Team) => {
+    await unarchiveTeam(dept.id);
+    await logAction({ action: 'unarchived', resource: 'department', detail: dept.name, actorId: user!.uid, actorName: me!.displayName });
+    await load();
+    await refreshTeams();
+    toast.success('Departamento restaurado', dept.name);
+  };
+
+  const openDeleteModal = async (dept: Team) => {
+    setDeleteTarget(dept);
+    setDeleteMode('reassign');
+    setReassignToId('');
+    setConfirmText('');
+    setImpact(null);
+    setLoadingImpact(true);
+    try {
+      const result = await getDepartmentImpact(dept.id);
+      setImpact(result);
+    } catch { setImpact({ counts: {}, total: 0 }); }
+    setLoadingImpact(false);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteTarget) return;
+    if (confirmText !== deleteTarget.name) {
+      toast.warning('Confirmacion requerida', 'Escribe el nombre del departamento para confirmar.');
+      return;
+    }
+    if (deleteMode === 'reassign' && !reassignToId) {
+      toast.warning('Selecciona destino', 'Debes seleccionar un departamento destino para reasignar.');
+      return;
+    }
+    setDeleting(true);
+    try {
+      if (deleteMode === 'reassign') {
+        const targetDept = depts.find(d => d.id === reassignToId);
+        await reassignTeamResources(deleteTarget.id, reassignToId, targetDept?.name || '');
+        await logAction({ action: 'reassigned', resource: 'department', detail: `${deleteTarget.name} → ${targetDept?.name}`, actorId: user!.uid, actorName: me!.displayName });
+      } else {
+        await purgeTeamResources(deleteTarget.id);
+        await logAction({ action: 'purged', resource: 'department', detail: deleteTarget.name, actorId: user!.uid, actorName: me!.displayName });
+      }
+      await deleteTeam(deleteTarget.id);
+      await logAction({ action: 'deleted', resource: 'department', detail: deleteTarget.name, actorId: user!.uid, actorName: me!.displayName });
+      toast.success('Departamento eliminado', deleteTarget.name);
+      setDeleteTarget(null);
+      await load();
+      await refreshTeams();
+      await refreshMembers();
+    } catch (err: any) {
+      toast.error('Error', err?.message || 'No se pudo eliminar el departamento.');
+    }
+    setDeleting(false);
   };
 
   const startEdit = (dept: Team) => {
@@ -191,18 +262,24 @@ function DepartmentsS() {
     await refreshMembers();
   };
 
+  const IMPACT_LABELS: Record<string, string> = {
+    tasks: 'Tareas', goals: 'Objetivos', docs: 'Documentos', channels: 'Canales',
+    forms: 'Formularios', 'time-entries': 'Registros de tiempo', whiteboards: 'Pizarras',
+    automations: 'Automatizaciones', primaryMembers: 'Miembros (primario)', secondaryMembers: 'Miembros (secundario)',
+  };
+
   if (loading) return <Sk />;
 
   return (
     <div className="p-6 max-w-5xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl font-bold text-[var(--text-primary)]">Departments</h2>
-          <p className="text-sm text-[var(--text-muted)] mt-1">{depts.length} departments · {members.length} members</p>
+          <h2 className="text-xl font-bold text-[var(--text-primary)]">Departamentos</h2>
+          <p className="text-sm text-[var(--text-muted)] mt-1">{activeDepts.length} activos · {archivedDepts.length} archivados · {members.length} miembros</p>
         </div>
         <button onClick={() => { setShowNew(true); setEditId(null); setForm({ name: '', color: '#6B7280', icon: '📁', description: '' }); }}
           className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2">
-          <Plus className="h-4 w-4" /> New Department
+          <Plus className="h-4 w-4" /> Nuevo Departamento
         </button>
       </div>
 
@@ -211,23 +288,22 @@ function DepartmentsS() {
         <div className="mb-6 p-5 rounded-lg border border-[var(--accent)]/20 bg-[var(--bg-elevated)] space-y-4 anim-fade">
           <div className="flex items-center gap-2 mb-1">
             <FolderOpen className="h-4 w-4 text-[var(--accent)]" />
-            <span className="text-sm font-semibold text-[var(--text-primary)]">{editId ? 'Edit Department' : 'New Department'}</span>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">{editId ? 'Editar Departamento' : 'Nuevo Departamento'}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Name *</label>
-              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Department name" className="input-dark" autoFocus />
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Nombre *</label>
+              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Nombre del departamento" className="input-dark" autoFocus />
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Description</label>
-              <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="What does this team do?" className="input-dark" />
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Descripcion</label>
+              <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="¿Que hace este equipo?" className="input-dark" />
             </div>
           </div>
 
-          {/* Icon Picker */}
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Icon</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Icono</label>
             <div className="flex gap-1.5 flex-wrap">
               {ICONS.map(ic => (
                 <button key={ic} onClick={() => setForm({ ...form, icon: ic })}
@@ -238,7 +314,6 @@ function DepartmentsS() {
             </div>
           </div>
 
-          {/* Color Picker */}
           <div>
             <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Color</label>
             <div className="flex gap-1.5 flex-wrap items-center">
@@ -254,35 +329,32 @@ function DepartmentsS() {
             </div>
           </div>
 
-          {/* Preview */}
           <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-base)]">
             <span className="text-lg">{form.icon}</span>
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: form.color }} />
-            <span className="text-sm font-semibold" style={{ color: form.color }}>{form.name || 'Preview'}</span>
+            <span className="text-sm font-semibold" style={{ color: form.color }}>{form.name || 'Vista previa'}</span>
             <span className="text-sm text-[var(--text-muted)]">{form.description}</span>
           </div>
 
           <div className="flex gap-2">
             {editId ? (
-              <button onClick={handleUpdate} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">Update</button>
+              <button onClick={handleUpdate} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">Actualizar</button>
             ) : (
-              <button onClick={handleCreate} disabled={!form.name.trim()} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40">Create</button>
+              <button onClick={handleCreate} disabled={!form.name.trim()} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40">Crear</button>
             )}
-            <button onClick={() => { setShowNew(false); setEditId(null); }} className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">Cancel</button>
+            <button onClick={() => { setShowNew(false); setEditId(null); }} className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">Cancelar</button>
           </div>
         </div>
       )}
 
-      {/* Department Cards */}
+      {/* Active Department Cards */}
       <div className="space-y-4">
-        {depts.map((dept, i) => {
-          const deptMembers = members.filter(m => m.teamId === dept.id);
-          const unassigned = members.filter(m => !m.teamId || m.teamId === '');
+        {activeDepts.map((dept, i) => {
+          const deptMembers = members.filter((m: any) => m.teamId === dept.id);
           const isAssigning = assignDeptId === dept.id;
 
           return (
             <div key={dept.id} className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden anim-slide" style={{ animationDelay: `${i * 40}ms` }}>
-              {/* Department Header */}
               <div className="flex items-center gap-4 px-5 py-4 group">
                 <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0" style={{ backgroundColor: `${dept.color}15`, border: `1px solid ${dept.color}25` }}>
                   {dept.icon}
@@ -291,33 +363,35 @@ function DepartmentsS() {
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold" style={{ color: dept.color }}>{dept.name}</p>
                     <span className="text-[12px] px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor: `${dept.color}15`, color: dept.color, border: `1px solid ${dept.color}25` }}>
-                      {deptMembers.length} member{deptMembers.length !== 1 ? 's' : ''}
+                      {deptMembers.length} miembro{deptMembers.length !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  <p className="text-sm text-[var(--text-muted)] mt-0.5">{dept.description || 'No description'}</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-0.5">{dept.description || 'Sin descripcion'}</p>
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setAssignDeptId(isAssigning ? null : dept.id)}
                     className={`p-2 rounded-lg transition ${isAssigning ? 'bg-emerald-500/10 text-emerald-400' : 'text-[var(--text-muted)] hover:text-emerald-400 hover:bg-emerald-500/10'}`}
-                    title="Assign members">
+                    title="Asignar miembros">
                     <UserPlus className="h-4 w-4" />
                   </button>
-                  <button onClick={() => startEdit(dept)} className="p-2 text-[var(--text-muted)] hover:text-blue-400 rounded-lg transition" title="Edit">
+                  <button onClick={() => startEdit(dept)} className="p-2 text-[var(--text-muted)] hover:text-blue-400 rounded-lg transition" title="Editar">
                     <Edit2 className="h-4 w-4" />
                   </button>
-                  <button onClick={() => handleDelete(dept)}
+                  <button onClick={() => handleArchive(dept)} className="p-2 text-[var(--text-muted)] hover:text-amber-400 rounded-lg transition" title="Archivar">
+                    <Archive className="h-4 w-4" />
+                  </button>
+                  <button onClick={() => openDeleteModal(dept)}
                     className="p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition opacity-0 group-hover:opacity-100"
-                    title="Delete">
+                    title="Eliminar">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>
 
-              {/* Members in this department */}
               {deptMembers.length > 0 && (
                 <div className="px-5 pb-3">
                   <div className="flex flex-wrap gap-2 pt-3">
-                    {deptMembers.map(m => (
+                    {deptMembers.map((m: any) => (
                       <div key={m.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-tertiary)] group/member">
                         <div className="w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-bold" style={{ backgroundColor: `${dept.color}15`, color: dept.color }}>
                           {m.displayName?.[0]?.toUpperCase() || '?'}
@@ -326,7 +400,7 @@ function DepartmentsS() {
                         <span className="text-[12px] px-1.5 py-0.5 rounded-md bg-[var(--bg-elevated)] text-[var(--text-muted)]">{m.role}</span>
                         <button onClick={() => handleRemoveFromDept(m.id)}
                           className="opacity-0 group-hover/member:opacity-100 p-0.5 text-[var(--text-muted)] hover:text-red-400 transition"
-                          title="Remove from department">
+                          title="Quitar del departamento">
                           <X className="h-3 w-3" />
                         </button>
                       </div>
@@ -335,15 +409,14 @@ function DepartmentsS() {
                 </div>
               )}
 
-              {/* Assign Members Panel */}
               {isAssigning && (
                 <div className="px-5 pb-4 border-t border-[var(--accent)]/20 bg-[var(--accent-subtle)]">
-                  <p className="text-[12px] text-[var(--accent)] uppercase font-semibold tracking-wider py-3">Assign Members to {dept.name}</p>
-                  {unassigned.length === 0 && members.filter(m => m.teamId !== dept.id).length === 0 ? (
-                    <p className="text-sm text-[var(--text-muted)] pb-2">All members are already assigned to this department.</p>
+                  <p className="text-[12px] text-[var(--accent)] uppercase font-semibold tracking-wider py-3">Asignar Miembros a {dept.name}</p>
+                  {members.filter((m: any) => m.teamId !== dept.id).length === 0 ? (
+                    <p className="text-sm text-[var(--text-muted)] pb-2">Todos los miembros ya estan en este departamento.</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {members.filter(m => m.teamId !== dept.id).map(m => (
+                      {members.filter((m: any) => m.teamId !== dept.id).map((m: any) => (
                         <button key={m.id} onClick={() => handleAssignMember(m.id, dept.id)}
                           className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-base)] hover:bg-emerald-500/5 hover:shadow-card-hover transition-all duration-200 text-sm text-[var(--text-secondary)] hover:text-gray-200">
                           <div className="w-5 h-5 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center text-[9px] font-bold text-[var(--text-muted)]">
@@ -367,19 +440,64 @@ function DepartmentsS() {
         })}
       </div>
 
+      {/* Archived Departments */}
+      {archivedDepts.length > 0 && (
+        <div className="mt-8">
+          <button onClick={() => setShowArchived(!showArchived)}
+            className="flex items-center gap-2 text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition mb-4">
+            <Archive className="h-4 w-4" />
+            Departamentos Archivados ({archivedDepts.length})
+            <ChevronRight className={`h-4 w-4 transition-transform ${showArchived ? 'rotate-90' : ''}`} />
+          </button>
+          {showArchived && (
+            <div className="space-y-3">
+              {archivedDepts.map((dept) => {
+                const deptMembers = members.filter((m: any) => m.teamId === dept.id);
+                return (
+                  <div key={dept.id} className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden opacity-60 hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-4 px-5 py-3">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0 grayscale" style={{ backgroundColor: `${dept.color}15`, border: `1px solid ${dept.color}25` }}>
+                        {dept.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-[var(--text-muted)]">{dept.name}</p>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-semibold border border-amber-500/20">ARCHIVADO</span>
+                          {deptMembers.length > 0 && (
+                            <span className="text-[11px] text-[var(--text-muted)]">{deptMembers.length} miembro{deptMembers.length !== 1 ? 's' : ''}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleUnarchive(dept)} className="p-2 text-[var(--text-muted)] hover:text-emerald-400 rounded-lg transition" title="Restaurar">
+                          <ArchiveRestore className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => openDeleteModal(dept)} className="p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition" title="Eliminar permanentemente">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Unassigned Members */}
       {(() => {
-        const unassigned = members.filter(m => !m.teamId || m.teamId === '');
+        const unassigned = members.filter((m: any) => !m.teamId || m.teamId === '');
         if (unassigned.length === 0) return null;
         return (
-          <div className="mt-6 rounded-lg border border-amber-500/20 bg-amber-500/5 p-5 anim-slide" style={{ animationDelay: `${depts.length * 40 + 100}ms` }}>
+          <div className="mt-6 rounded-lg border border-amber-500/20 bg-amber-500/5 p-5 anim-slide" style={{ animationDelay: `${activeDepts.length * 40 + 100}ms` }}>
             <div className="flex items-center gap-2 mb-3">
               <AlertTriangle className="h-4 w-4 text-amber-400" />
-              <span className="text-sm font-semibold text-amber-400">Unassigned Members ({unassigned.length})</span>
+              <span className="text-sm font-semibold text-amber-400">Miembros Sin Asignar ({unassigned.length})</span>
             </div>
-            <p className="text-sm text-[var(--text-muted)] mb-3">These members have not been assigned to a department yet.</p>
+            <p className="text-sm text-[var(--text-muted)] mb-3">Estos miembros aun no han sido asignados a ningun departamento.</p>
             <div className="flex flex-wrap gap-2">
-              {unassigned.map(m => (
+              {unassigned.map((m: any) => (
                 <div key={m.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-tertiary)]">
                   <div className="w-6 h-6 rounded-full bg-amber-500/10 flex items-center justify-center text-[12px] font-bold text-amber-400">
                     {m.displayName?.[0]?.toUpperCase() || '?'}
@@ -389,8 +507,8 @@ function DepartmentsS() {
                     onChange={e => { if (e.target.value) handleAssignMember(m.id, e.target.value); }}
                     value=""
                     className="select-dark h-7 text-[12px] px-2 ml-1">
-                    <option value="">Assign to...</option>
-                    {depts.map(d => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
+                    <option value="">Asignar a...</option>
+                    {activeDepts.map(d => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
                   </select>
                 </div>
               ))}
@@ -398,6 +516,127 @@ function DepartmentsS() {
           </div>
         );
       })()}
+
+      {/* =================== DELETE CONFIRMATION MODAL =================== */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="bg-[var(--bg-elevated)] rounded-2xl shadow-2xl border border-red-500/20 w-full max-w-lg mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-red-500/10 bg-red-500/5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-red-500/10">
+                  <Trash2 className="h-5 w-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[var(--text-primary)]">Eliminar Departamento</h3>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    <span style={{ color: deleteTarget.color }}>{deleteTarget.icon} {deleteTarget.name}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
+              {/* Impact Summary */}
+              {loadingImpact ? (
+                <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Calculando impacto...
+                </div>
+              ) : impact && (
+                <div className="rounded-xl bg-[var(--bg-base)] p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Eye className="h-4 w-4 text-blue-400" />
+                    <span className="text-sm font-semibold text-[var(--text-primary)]">Impacto de Eliminacion</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(impact.counts).filter(([, v]) => v > 0).map(([key, count]) => (
+                      <div key={key} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)]">
+                        <span className="text-[12px] text-[var(--text-muted)]">{IMPACT_LABELS[key] || key}</span>
+                        <span className="text-sm font-bold text-[var(--text-primary)]">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {impact.total === 0 && (
+                    <p className="text-sm text-emerald-400 mt-2">Este departamento esta vacio. Se puede eliminar sin efectos.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Mode Selection */}
+              <div className="space-y-3">
+                <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">Modo de Eliminacion</label>
+                <div className="space-y-2">
+                  <button onClick={() => setDeleteMode('reassign')}
+                    className={`w-full flex items-start gap-3 p-4 rounded-xl border-2 transition text-left ${deleteMode === 'reassign' ? 'border-blue-500/50 bg-blue-500/5' : 'border-transparent bg-[var(--bg-base)] hover:border-gray-600'}`}>
+                    <ArrowRightLeft className={`h-5 w-5 mt-0.5 ${deleteMode === 'reassign' ? 'text-blue-400' : 'text-[var(--text-muted)]'}`} />
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">Reasignar y Eliminar</p>
+                      <p className="text-[12px] text-[var(--text-muted)] mt-0.5">Mueve todos los recursos y miembros a otro departamento, luego elimina este.</p>
+                    </div>
+                  </button>
+                  <button onClick={() => setDeleteMode('purge')}
+                    className={`w-full flex items-start gap-3 p-4 rounded-xl border-2 transition text-left ${deleteMode === 'purge' ? 'border-red-500/50 bg-red-500/5' : 'border-transparent bg-[var(--bg-base)] hover:border-gray-600'}`}>
+                    <Trash2 className={`h-5 w-5 mt-0.5 ${deleteMode === 'purge' ? 'text-red-400' : 'text-[var(--text-muted)]'}`} />
+                    <div>
+                      <p className="text-sm font-semibold text-red-400">Purgar y Eliminar</p>
+                      <p className="text-[12px] text-[var(--text-muted)] mt-0.5">ELIMINA PERMANENTEMENTE todos los recursos asociados (tareas, documentos, canales, etc.) y desasigna miembros.</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Reassign target selector */}
+              {deleteMode === 'reassign' && (
+                <div>
+                  <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Mover todo a:</label>
+                  <select value={reassignToId} onChange={e => setReassignToId(e.target.value)} className="select-dark w-full">
+                    <option value="">Seleccionar departamento destino...</option>
+                    {activeDepts.filter(d => d.id !== deleteTarget.id).map(d => (
+                      <option key={d.id} value={d.id}>{d.icon} {d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Type to confirm */}
+              <div>
+                <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">
+                  Escribe <span className="text-red-400">{deleteTarget.name}</span> para confirmar
+                </label>
+                <input value={confirmText} onChange={e => setConfirmText(e.target.value)}
+                  placeholder={deleteTarget.name} className="input-dark w-full" autoFocus />
+              </div>
+
+              {deleteMode === 'purge' && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                  <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+                  <p className="text-[12px] text-red-300">
+                    ADVERTENCIA: Esta accion es IRREVERSIBLE. Se eliminaran permanentemente TODOS los recursos asociados a este departamento.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-[var(--accent)]/10 flex justify-end gap-2">
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting}
+                className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] disabled:opacity-40">
+                Cancelar
+              </button>
+              <button onClick={executeDelete}
+                disabled={deleting || confirmText !== deleteTarget.name || (deleteMode === 'reassign' && !reassignToId)}
+                className={`px-5 h-9 rounded-xl font-medium text-sm flex items-center gap-2 transition disabled:opacity-40 ${
+                  deleteMode === 'purge'
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}>
+                {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {deleting ? 'Eliminando...' : deleteMode === 'purge' ? 'Purgar y Eliminar' : 'Reasignar y Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

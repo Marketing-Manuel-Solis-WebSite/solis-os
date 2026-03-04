@@ -74,14 +74,107 @@ export async function getTeams() {
   const s = await getDocs(collection(db, `orgs/${ORG}/teams`));
   return s.docs.map(d => ({ id: d.id, ...d.data() }));
 }
+export async function getActiveTeams() {
+  const all = await getTeams();
+  return all.filter((t: any) => t.status !== 'archived');
+}
 export async function createTeam(data: any) {
   const id = data.id || data.name.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   return setAt(`orgs/${ORG}/teams/${id}`, {
     name: data.name, color: data.color || '#6B7280', icon: data.icon || '📁', description: data.description || '',
+    status: 'active',
   });
 }
 export async function updateTeam(id: string, data: any) { return updateAt(`orgs/${ORG}/teams/${id}`, data); }
 export async function deleteTeam(id: string) { return deleteAt(`orgs/${ORG}/teams/${id}`); }
+export async function archiveTeam(id: string) { return updateAt(`orgs/${ORG}/teams/${id}`, { status: 'archived' }); }
+export async function unarchiveTeam(id: string) { return updateAt(`orgs/${ORG}/teams/${id}`, { status: 'active' }); }
+
+// Collections that reference teamId
+const TEAM_RESOURCE_COLLECTIONS = ['tasks', 'goals', 'docs', 'channels', 'forms', 'time-entries', 'whiteboards', 'automations'] as const;
+
+// Dry-run: count all resources and members that would be affected by deleting a department
+export async function getDepartmentImpact(teamId: string) {
+  const counts: Record<string, number> = {};
+  for (const col of TEAM_RESOURCE_COLLECTIONS) {
+    const q_ = query(collection(db, col), where('orgId', '==', ORG), where('teamId', '==', teamId));
+    const snap = await getDocs(q_);
+    counts[col] = snap.size;
+  }
+  // Count members with this as primary team
+  const membersSnap = await getDocs(collection(db, `orgs/${ORG}/members`));
+  const primaryMembers = membersSnap.docs.filter(d => d.data().teamId === teamId);
+  const secondaryMembers = membersSnap.docs.filter(d => {
+    const tids = d.data().teamIds || [];
+    return tids.includes(teamId) && d.data().teamId !== teamId;
+  });
+  counts['primaryMembers'] = primaryMembers.length;
+  counts['secondaryMembers'] = secondaryMembers.length;
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  return { counts, total };
+}
+
+// Reassign all resources from one team to another
+export async function reassignTeamResources(fromTeamId: string, toTeamId: string, toTeamName: string) {
+  let moved = 0;
+  for (const col of TEAM_RESOURCE_COLLECTIONS) {
+    const q_ = query(collection(db, col), where('orgId', '==', ORG), where('teamId', '==', fromTeamId));
+    const snap = await getDocs(q_);
+    for (const d of snap.docs) {
+      await updateDoc(doc(db, `${col}/${d.id}`), { teamId: toTeamId, updatedAt: serverTimestamp() });
+      moved++;
+    }
+  }
+  // Reassign members: primary team
+  const membersSnap = await getDocs(collection(db, `orgs/${ORG}/members`));
+  for (const d of membersSnap.docs) {
+    const data = d.data();
+    if (data.teamId === fromTeamId) {
+      const newTeamIds = (data.teamIds || []).filter((t: string) => t !== fromTeamId);
+      if (!newTeamIds.includes(toTeamId)) newTeamIds.push(toTeamId);
+      await updateDoc(doc(db, `orgs/${ORG}/members/${d.id}`), {
+        teamId: toTeamId, teamIds: newTeamIds, department: toTeamName, updatedAt: serverTimestamp(),
+      });
+      moved++;
+    } else if ((data.teamIds || []).includes(fromTeamId)) {
+      const newTeamIds = (data.teamIds || []).filter((t: string) => t !== fromTeamId);
+      if (!newTeamIds.includes(toTeamId)) newTeamIds.push(toTeamId);
+      await updateDoc(doc(db, `orgs/${ORG}/members/${d.id}`), {
+        teamIds: newTeamIds, updatedAt: serverTimestamp(),
+      });
+      moved++;
+    }
+  }
+  return moved;
+}
+
+// Purge: delete all resources belonging to a team
+export async function purgeTeamResources(teamId: string) {
+  let deleted = 0;
+  for (const col of TEAM_RESOURCE_COLLECTIONS) {
+    const q_ = query(collection(db, col), where('orgId', '==', ORG), where('teamId', '==', teamId));
+    const snap = await getDocs(q_);
+    for (const d of snap.docs) {
+      await deleteDoc(doc(db, `${col}/${d.id}`));
+      deleted++;
+    }
+  }
+  // Unassign members from this team (don't delete members, just clear the teamId)
+  const membersSnap = await getDocs(collection(db, `orgs/${ORG}/members`));
+  for (const d of membersSnap.docs) {
+    const data = d.data();
+    if (data.teamId === teamId) {
+      await updateDoc(doc(db, `orgs/${ORG}/members/${d.id}`), {
+        teamId: '', teamIds: (data.teamIds || []).filter((t: string) => t !== teamId), department: '', updatedAt: serverTimestamp(),
+      });
+    } else if ((data.teamIds || []).includes(teamId)) {
+      await updateDoc(doc(db, `orgs/${ORG}/members/${d.id}`), {
+        teamIds: (data.teamIds || []).filter((t: string) => t !== teamId), updatedAt: serverTimestamp(),
+      });
+    }
+  }
+  return deleted;
+}
 
 // ===== TEAM-FILTERED GETTER =====
 async function getByTeam(col: string, teamId: string) {

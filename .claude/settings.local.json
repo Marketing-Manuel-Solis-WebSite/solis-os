@@ -6,7 +6,8 @@
       "Bash(python3:*)",
       "Bash(find components:*)",
       "Bash(test:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(rm:*)"
     ]
   }
 }

@@ -15,6 +15,7 @@ export interface Team {
   color: string;
   icon: string;
   description: string;
+  status?: 'active' | 'archived';
 }
 
 export interface Member {
@@ -151,14 +152,6 @@ const AuthCtx = createContext<Ctx>({
   teamMembers: [], refreshTeams: async () => {}, refreshMembers: async () => {},
   can: () => false, canSeeResource: () => false, getMemberById: () => undefined, getMembersByTeam: () => [],
 });
-
-// Default departments for the law office
-const DEFAULT_TEAMS: Omit<Team, 'id'>[] = [
-  { name: 'Marketing', color: '#8B5CF6', icon: '📣', description: 'Marketing & social media campaigns' },
-  { name: 'Openers', color: '#3B82F6', icon: '🚀', description: 'Lead intake & case openers' },
-  { name: 'Closers', color: '#22C55E', icon: '🎯', description: 'Case closers & client conversion' },
-  { name: 'Dirección', color: '#3B82F6', icon: '👔', description: 'Management & executive team' },
-];
 
 const ORG_ID = 'solis-center';
 
@@ -347,34 +340,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
         }
 
-        // Ensure teams exist (first-time only)
-        let loadedTeams: Team[];
-        if (teamsSnap.empty) {
-          for (const t of DEFAULT_TEAMS) {
-            const id = t.name.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            await setDoc(doc(db, 'orgs', ORG_ID, 'teams', id), t);
-          }
-          const freshTeams = await getDocs(teamsCol);
-          loadedTeams = freshTeams.docs.map(d => ({ id: d.id, ...d.data() } as Team));
-        } else {
-          loadedTeams = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Team));
-        }
+        // Load teams (no auto-seeding — departments are fully dynamic, managed via Admin)
+        const loadedTeams: Team[] = teamsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Team));
         setTeams(loadedTeams);
 
         // --- STEP 2: Validate member ---
         if (!memSnap.exists()) {
           const existing = await getDocs(query(collection(db, 'orgs', ORG_ID, 'members'), limit(1)));
           if (existing.empty) {
-            const direccionTeam = loadedTeams.find(t => t.name.toLowerCase().includes('direcci')) || loadedTeams[0];
-            const firstTeam = direccionTeam?.id || loadedTeams[0]?.id || '';
+            const firstTeam = loadedTeams[0]?.id || '';
             await setDoc(memRef, {
               userId: u.uid, orgId: ORG_ID, role: 'owner' as Role,
               teamId: firstTeam,
               teamIds: loadedTeams.map(t => t.id),
               displayName: u.displayName || u.email?.split('@')[0] || 'User',
               email: u.email || '',
-              title: 'Managing Partner',
-              department: direccionTeam?.name || '',
+              title: '',
+              department: loadedTeams[0]?.name || '',
               managerId: '', hierarchyLevel: 'owner',
               photoURL: u.photoURL || '',
               active: true,

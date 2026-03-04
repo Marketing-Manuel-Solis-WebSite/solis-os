@@ -128,7 +128,7 @@ function TeamSelector() {
                 <span className="text-[12px] text-[var(--text-muted)] ml-auto">{t('common.allDepts')}</span>
               </button>
               <div className="h-px bg-[var(--border-subtle)] my-1 mx-2" />
-              {teams.map(t => (
+              {teams.filter(t => t.status !== 'archived').map(t => (
                 <button
                   key={t.id}
                   onClick={() => { setActiveTeamId(t.id); setOpen(false); }}
