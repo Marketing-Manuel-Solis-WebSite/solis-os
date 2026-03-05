@@ -118,6 +118,7 @@ RULES:
 - When discussing legal topics, add a brief disclaimer that this is general information, not legal advice.
 - Be helpful, precise, and give complete answers.
 - If you don't know something, say so clearly.
+
 ${FORMATTING_RULES}`;
 
 const MODE_PROMPTS: Record<string, string> = {

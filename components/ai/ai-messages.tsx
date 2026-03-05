@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Check, ChevronDown, Sparkles, User } from 'lucide-react';
+import { Copy, Check, ChevronDown, Sparkles } from 'lucide-react';
 import type { AIMessage } from '@/lib/ai-db';
 import { useI18n } from '@/lib/i18n';
 import AIMarkdown from './ai-markdown';
@@ -22,23 +22,30 @@ function UserAvatar({ photo, name }: { photo?: string; name?: string }) {
       <img
         src={photo}
         alt={name || ''}
-        className="w-8 h-8 rounded-full object-cover shrink-0"
+        style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
         referrerPolicy="no-referrer"
       />
     );
   }
-  const initials = (name || 'U').charAt(0).toUpperCase();
   return (
-    <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0 text-white text-[13px] font-semibold">
-      {initials}
+    <div style={{
+      width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+      background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {(name || 'U').charAt(0).toUpperCase()}
     </div>
   );
 }
 
 function AIAvatar() {
   return (
-    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--accent)] to-[#5B8DEF] flex items-center justify-center shrink-0 shadow-sm">
-      <Sparkles className="h-4 w-4 text-white" />
+    <div style={{
+      width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+      background: 'linear-gradient(135deg, var(--accent), #5B8DEF)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <Sparkles style={{ width: 16, height: 16, color: '#fff' }} />
     </div>
   );
 }
@@ -56,9 +63,7 @@ export default function AIMessages({ messages, loading, streamingText, userPhoto
   }, []);
 
   useEffect(() => {
-    if (isAutoScrolling.current) {
-      scrollToBottom();
-    }
+    if (isAutoScrolling.current) scrollToBottom();
   }, [messages.length, streamingText, scrollToBottom]);
 
   const handleScroll = useCallback(() => {
@@ -76,147 +81,163 @@ export default function AIMessages({ messages, loading, streamingText, userPhoto
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
-  const isError = (content: string) => {
-    return content.startsWith('Error:') || content.startsWith('error:') || content.includes('429') || content.includes('rate limit');
-  };
+  const isError = (content: string) =>
+    content.startsWith('Error:') || content.startsWith('error:') || content.includes('429') || content.includes('rate limit');
 
   return (
-    <div className="relative flex-1 overflow-hidden">
+    <div style={{ position: 'relative', flex: 1, overflow: 'hidden' }}>
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="h-full overflow-y-auto scroll-smooth"
-        style={{ scrollbarGutter: 'stable' }}
+        style={{ height: '100%', overflowY: 'auto', scrollBehavior: 'smooth', scrollbarGutter: 'stable' }}
       >
-        <div className="max-w-[820px] mx-auto px-4 sm:px-6 py-6 space-y-5">
-          {messages.map((msg, i) => {
-            const isUser = msg.role === 'user';
-            const isSystem = msg.role === 'system';
+        {/* Central container */}
+        <div style={{ maxWidth: 1060, margin: '0 auto', padding: '32px 24px' }}>
+          {/* Messages with vertical gap */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+            {messages.map((msg, i) => {
+              const isUser = msg.role === 'user';
+              const isSystem = msg.role === 'system';
 
-            // System message
-            if (isSystem) {
-              return (
-                <motion.div
-                  key={msg.id || i}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex justify-center py-2"
-                >
-                  <span className="text-[12px] text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-3.5 py-1.5 rounded-full border border-[var(--border-subtle)]">
-                    {msg.content}
-                  </span>
-                </motion.div>
-              );
-            }
+              /* System message */
+              if (isSystem) {
+                return (
+                  <div key={msg.id || i} style={{ display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
+                    <span style={{
+                      fontSize: 12, color: 'var(--text-muted)',
+                      background: 'var(--bg-tertiary)', padding: '6px 14px',
+                      borderRadius: 999, border: '1px solid var(--border)',
+                    }}>
+                      {msg.content}
+                    </span>
+                  </div>
+                );
+              }
 
-            // User message — avatar + bubble
-            if (isUser) {
-              return (
-                <motion.div
-                  key={msg.id || i}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                  className="flex items-start gap-3 justify-end"
-                >
-                  <div className="max-w-[80%] sm:max-w-[70%]">
-                    <div
-                      className="px-4 py-3 rounded-2xl rounded-tr-md text-[0.9375rem] text-white leading-relaxed whitespace-pre-wrap"
-                      style={{
+              /* User message — right aligned */
+              if (isUser) {
+                return (
+                  <motion.div
+                    key={msg.id || i}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25 }}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 12, justifyContent: 'flex-end' }}
+                  >
+                    <div style={{ maxWidth: 720 }}>
+                      <div style={{
+                        padding: '14px 20px',
+                        borderRadius: '20px 20px 6px 20px',
+                        fontSize: '0.9375rem',
+                        color: '#fff',
+                        lineHeight: 1.6,
+                        whiteSpace: 'pre-wrap',
                         background: 'var(--gradient-primary)',
                         boxShadow: 'var(--shadow-sm)',
                         overflowWrap: 'anywhere',
                         wordBreak: 'break-word',
-                      }}
-                    >
-                      {msg.content}
+                      }}>
+                        {msg.content}
+                      </div>
                     </div>
-                  </div>
-                  <UserAvatar photo={userPhoto} name={userName} />
-                </motion.div>
-              );
-            }
+                    <UserAvatar photo={userPhoto} name={userName} />
+                  </motion.div>
+                );
+              }
 
-            // Assistant message — error
-            if (isError(msg.content)) {
+              /* AI error */
+              if (isError(msg.content)) {
+                return (
+                  <motion.div
+                    key={msg.id || i}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25 }}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}
+                  >
+                    <AIAvatar />
+                    <div style={{ maxWidth: 820, minWidth: 0 }}>
+                      <AIErrorCallout message={msg.content} />
+                    </div>
+                  </motion.div>
+                );
+              }
+
+              /* AI response — left aligned, in a bubble */
               return (
                 <motion.div
                   key={msg.id || i}
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                  className="flex items-start gap-3"
+                  transition={{ duration: 0.3 }}
+                  className="group"
+                  style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}
                 >
                   <AIAvatar />
-                  <div className="flex-1 min-w-0 max-w-[85%]">
-                    <AIErrorCallout message={msg.content} />
+                  <div style={{ maxWidth: 820, minWidth: 0 }}>
+                    {/* The bubble */}
+                    <div className="ai-response-bubble" style={{
+                      padding: '16px 20px',
+                      borderRadius: '20px 20px 20px 6px',
+                      overflow: 'hidden',
+                    }}>
+                      <AIMarkdown content={msg.content} />
+                    </div>
+
+                    {/* Copy button on hover */}
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => copyText(msg.content, i)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                      >
+                        {copiedIdx === i ? (
+                          <><Check className="h-3 w-3 text-[var(--success)]" /><span className="text-[var(--success)]">{t('ai.copied')}</span></>
+                        ) : (
+                          <><Copy className="h-3 w-3" /><span>{t('ai.copy')}</span></>
+                        )}
+                      </motion.button>
+                    </div>
                   </div>
                 </motion.div>
               );
-            }
+            })}
 
-            // Assistant message — avatar + constrained content
-            return (
-              <motion.div
-                key={msg.id || i}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="group flex items-start gap-3"
-              >
-                <AIAvatar />
-                <div className="flex-1 min-w-0 max-w-[calc(100%-44px)]">
-                  <AIMarkdown content={msg.content} />
-
-                  {/* Copy on hover */}
-                  <div className="flex items-center gap-1 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <motion.button
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => copyText(msg.content, i)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-                    >
-                      {copiedIdx === i ? (
-                        <><Check className="h-3 w-3 text-[var(--success)]" /><span className="text-[var(--success)]">{t('ai.copied')}</span></>
-                      ) : (
-                        <><Copy className="h-3 w-3" /><span>{t('ai.copy')}</span></>
-                      )}
-                    </motion.button>
+            {/* Streaming */}
+            <AnimatePresence>
+              {loading && streamingText && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}
+                >
+                  <AIAvatar />
+                  <div style={{ maxWidth: 820, minWidth: 0 }}>
+                    <div className="ai-response-bubble" style={{
+                      padding: '16px 20px',
+                      borderRadius: '20px 20px 20px 6px',
+                      overflow: 'hidden',
+                    }}>
+                      <AIMarkdown content={streamingText} />
+                      <motion.span
+                        style={{ display: 'inline-block', width: 3, height: 20, background: 'var(--accent)', borderRadius: 999, marginLeft: 2, verticalAlign: 'middle' }}
+                        animate={{ opacity: [1, 0.3, 1] }}
+                        transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
+                      />
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            );
-          })}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          {/* Streaming text */}
-          <AnimatePresence>
-            {loading && streamingText && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="flex items-start gap-3"
-              >
-                <AIAvatar />
-                <div className="flex-1 min-w-0 max-w-[calc(100%-44px)]">
-                  <AIMarkdown content={streamingText} />
-                  <motion.span
-                    className="inline-block w-[3px] h-5 bg-[var(--accent)] rounded-full ml-0.5 align-middle"
-                    animate={{ opacity: [1, 0.3, 1] }}
-                    transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            {/* Thinking */}
+            <AnimatePresence>
+              {loading && !streamingText && <AIThinking />}
+            </AnimatePresence>
 
-          {/* Thinking indicator */}
-          <AnimatePresence>
-            {loading && !streamingText && (
-              <AIThinking />
-            )}
-          </AnimatePresence>
-
-          <div ref={bottomRef} className="h-1" />
+            <div ref={bottomRef} style={{ height: 4 }} />
+          </div>
         </div>
       </div>
 

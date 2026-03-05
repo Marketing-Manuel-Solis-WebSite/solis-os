@@ -7,6 +7,7 @@ import {
   updateAIConversation, getAIMessages, addAIMessage,
   autoTitleConversation, AIConversation, AIMessage,
 } from '@/lib/ai-db';
+import { getTasks, getGoals } from '@/lib/db';
 import AISidebar from '@/components/ai/ai-sidebar';
 import AIMessages from '@/components/ai/ai-messages';
 import AIInput from '@/components/ai/ai-input';
@@ -14,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, PanelLeftOpen } from 'lucide-react';
 
 export default function AIPage() {
-  const { user, me } = useAuth();
+  const { user, me, teams } = useAuth();
   const { t } = useI18n();
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [activeConvo, setActiveConvo] = useState<AIConversation | null>(null);
@@ -56,12 +57,48 @@ export default function AIPage() {
     setMessages([]);
   };
 
-  const handleSend = async (content: string) => {
+  // Build real workspace context for AI
+  const buildUserContext = useCallback(async () => {
+    if (!user || !me) return null;
+    try {
+      const [allTasks, allGoals] = await Promise.all([getTasks(), getGoals()]);
+      // Filter tasks assigned to this user
+      const myTasks = allTasks.filter((t: any) =>
+        t.assignees?.includes(user.uid) && !t.deleted && !t.archived
+      ).map((t: any) => ({
+        title: t.title,
+        status: t.status,
+        priority: t.priority,
+        dueDate: t.dueDate || null,
+        teamId: t.teamId,
+      }));
+      // Filter goals owned by this user or their team
+      const myGoals = allGoals.filter((g: any) =>
+        g.ownerId === user.uid || g.teamId === me.teamId
+      ).map((g: any) => ({
+        name: g.name,
+        status: g.status,
+        progress: g.progress,
+        dueDate: g.dueDate || null,
+      }));
+      const myTeam = teams.find((t: any) => t.id === me.teamId);
+      return {
+        userName: me.displayName,
+        userRole: me.role,
+        teamName: myTeam?.name || me.teamId || 'Sin equipo',
+        tasks: myTasks,
+        goals: myGoals,
+      };
+    } catch { return null; }
+  }, [user, me, teams]);
+
+  const handleSend = async (content: string, sendMode: string = 'chat') => {
     if (!user || !me || !content.trim() || loading) return;
+    const aiMode = sendMode as 'chat' | 'research' | 'deep';
     let convoId = activeConvo?.id;
 
     if (!convoId) {
-      convoId = await createAIConversation({ userId: user.uid, userName: me.displayName, title: t('ai.newConversation'), mode: 'chat' });
+      convoId = await createAIConversation({ userId: user.uid, userName: me.displayName, title: t('ai.newConversation'), mode: aiMode });
       const convos = await getAIConversations(user.uid);
       setConversations(convos.filter(c => !c.archived));
       const newConvo = convos.find(c => c.id === convoId);
@@ -71,40 +108,74 @@ export default function AIPage() {
       }
     }
 
-    await addAIMessage(convoId, { role: 'user', content: content.trim(), mode: 'chat' });
+    await addAIMessage(convoId, { role: 'user', content: content.trim(), mode: aiMode });
     if (messages.length === 0) await autoTitleConversation(convoId, content.trim());
 
-    const userMsg: AIMessage = { id: `temp-${Date.now()}`, role: 'user', content: content.trim(), mode: 'chat', tokens: 0, createdAt: { seconds: Date.now() / 1000 } };
+    const userMsg: AIMessage = { id: `temp-${Date.now()}`, role: 'user', content: content.trim(), mode: aiMode, tokens: 0, createdAt: { seconds: Date.now() / 1000 } };
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
     setStreamingText('');
 
     try {
       const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
-      const res = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: content.trim(), mode: 'chat', history }) });
-      const data = await res.json();
+      const userContext = await buildUserContext();
+
+      // Use real SSE streaming
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: content.trim(), mode: aiMode, history, stream: true, userContext }),
+      });
+
       if (res.status === 429) {
         throw new Error(t('ai.rateLimitError'));
       }
-      const answer = data.answer || data.error || t('ai.noResponse');
-
-      await addAIMessage(convoId, { role: 'assistant', content: answer, mode: 'chat', tokens: data.tokens || 0 });
-
-      // Stream in chunks — fast, no lag
-      const len = answer.length;
-      const chunkSize = len > 3000 ? 80 : len > 1000 ? 40 : 20;
-      for (let i = 0; i < len; i += chunkSize) {
-        setStreamingText(answer.slice(0, i + chunkSize));
-        await new Promise(r => setTimeout(r, 16));
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || t('ai.noResponse'));
       }
-      setStreamingText('');
 
-      const aiMsg: AIMessage = { id: `temp-ai-${Date.now()}`, role: 'assistant', content: answer, mode: 'chat', tokens: data.tokens || 0, createdAt: { seconds: Date.now() / 1000 } };
+      // Read SSE stream
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullAnswer = '';
+      let tokenCount = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value, { stream: true });
+        const lines = text.split('\n');
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.error) throw new Error(data.error);
+            if (data.done) {
+              tokenCount = data.tokens || 0;
+            } else if (data.text) {
+              fullAnswer += data.text;
+              setStreamingText(fullAnswer);
+            }
+          } catch (parseErr: any) {
+            if (parseErr.message && !parseErr.message.includes('JSON')) throw parseErr;
+          }
+        }
+      }
+
+      setStreamingText('');
+      const answer = fullAnswer || t('ai.noResponse');
+
+      await addAIMessage(convoId, { role: 'assistant', content: answer, mode: aiMode, tokens: tokenCount });
+
+      const aiMsg: AIMessage = { id: `temp-ai-${Date.now()}`, role: 'assistant', content: answer, mode: aiMode, tokens: tokenCount, createdAt: { seconds: Date.now() / 1000 } };
       setMessages(prev => [...prev, aiMsg]);
       await loadConversations();
     } catch (err: any) {
       setStreamingText('');
-      const errorMsg: AIMessage = { id: `temp-err-${Date.now()}`, role: 'assistant', content: `Error: ${err.message || 'Failed to connect to AI.'}`, mode: 'chat', tokens: 0, createdAt: { seconds: Date.now() / 1000 } };
+      const errorMsg: AIMessage = { id: `temp-err-${Date.now()}`, role: 'assistant', content: `Error: ${err.message || 'Failed to connect to AI.'}`, mode: aiMode, tokens: 0, createdAt: { seconds: Date.now() / 1000 } };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
       setLoading(false);

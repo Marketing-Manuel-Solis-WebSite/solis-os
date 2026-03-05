@@ -83,7 +83,7 @@ export default function TaskListView({
       {groups.filter(g => g.tasks.length > 0).map(group => (
         <div key={group.key} className="mt-4">
           {/* Group header */}
-          <button onClick={() => toggleGroup(group.key)} className="flex items-center gap-2 mb-2 group px-1">
+          <div onClick={() => toggleGroup(group.key)} className="flex items-center gap-2 mb-2 group px-1 cursor-pointer select-none">
             {collapsedGroups.has(group.key)
               ? <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />
               : <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />}
@@ -95,7 +95,7 @@ export default function TaskListView({
               title={t('tasks.all')}>
               <CheckSquare className="h-3.5 w-3.5" />
             </button>
-          </button>
+          </div>
 
           <AnimatePresence initial={false}>
             {!collapsedGroups.has(group.key) && (

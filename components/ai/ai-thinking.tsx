@@ -12,31 +12,31 @@ export default function AIThinking() {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
       transition={{ duration: 0.25 }}
-      className="flex gap-3 items-start"
+      style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}
     >
-      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--accent)] to-[#5B8DEF] flex items-center justify-center shrink-0 shadow-sm">
-        <Sparkles className="h-3.5 w-3.5 text-white" />
+      <div style={{
+        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+        background: 'linear-gradient(135deg, var(--accent), #5B8DEF)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Sparkles style={{ width: 16, height: 16, color: '#fff' }} />
       </div>
-      <div className="flex items-center gap-3 px-4 py-3 rounded-2xl rounded-tl-md bg-[var(--bg-elevated)] border border-[var(--border-subtle)]" style={{ boxShadow: 'var(--shadow-sm)' }}>
-        <div className="flex items-center gap-1.5">
+      <div className="ai-response-bubble" style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '14px 20px',
+        borderRadius: '20px 20px 20px 6px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {[0, 1, 2].map(i => (
             <motion.span
               key={i}
-              className="w-2 h-2 rounded-full bg-[var(--accent)]"
-              animate={{
-                scale: [1, 1.3, 1],
-                opacity: [0.4, 1, 0.4],
-              }}
-              transition={{
-                duration: 1.2,
-                repeat: Infinity,
-                delay: i * 0.2,
-                ease: 'easeInOut',
-              }}
+              style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }}
+              animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2, ease: 'easeInOut' }}
             />
           ))}
         </div>
-        <span className="text-[13px] text-[var(--text-muted)]">{t('ai.thinking')}</span>
+        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('ai.thinking')}</span>
       </div>
     </motion.div>
   );

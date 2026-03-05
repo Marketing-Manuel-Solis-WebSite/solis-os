@@ -8,6 +8,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { motion, AnimatePresence } from 'framer-motion';
 import NotificationBell from '@/components/notifications/notification-bell';
+import FloatingAIChat from '@/components/ai/floating-ai-chat';
 import { ToastProvider, FirebaseToastBridge } from '@/components/notifications/toast-provider';
 import {
   LayoutDashboard, CheckSquare, FileText, MessageSquare, Zap, BarChart3,
@@ -527,6 +528,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <ToastProvider>
         <Shell>{children}</Shell>
+        <FloatingAIChat />
         <FirebaseToastBridge />
       </ToastProvider>
     </AuthProvider>

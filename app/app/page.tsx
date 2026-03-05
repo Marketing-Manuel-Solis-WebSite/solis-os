@@ -1,318 +1,141 @@
 'use client';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { useEffect, useState, useMemo } from 'react';
-import { getTasks, getDocuments, getAuditLogs } from '@/lib/db';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { getTasks, getDocuments, getAuditLogs, getGoals } from '@/lib/db';
+import { ensureDefaultDashboard, saveDashboard } from '@/lib/dashboard-db';
 import { motion } from 'framer-motion';
-import {
-  CheckSquare, Clock, AlertTriangle, Users, TrendingUp,
-  Activity, FileText, ArrowRight, Calendar,
-  BarChart3, Target, Eye, Circle, Loader2, CheckCircle2,
-  Flag
-} from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import WidgetGrid from '@/components/dashboard/widget-grid';
+import DashboardBuilder from '@/components/dashboard/dashboard-builder';
+import type { DashboardConfig, WidgetLayout } from '@/lib/dashboard-types';
 
 export default function Dashboard() {
   const { user, me, canSeeAllTeams, activeTeamId, teams, canSeeResource, allMembers } = useAuth();
   const { t } = useI18n();
-  const router = useRouter();
   const [tasks, setTasks] = useState<any[]>([]);
-  const [docs, setDocs] = useState<any[]>([]);
+  const [goals, setGoals] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dashboard, setDashboard] = useState<DashboardConfig | null>(null);
+  const [editing, setEditing] = useState(false);
 
+  const isAdmin = useMemo(() => {
+    return canSeeAllTeams || ['owner', 'admin', 'director'].includes(me?.role || '');
+  }, [canSeeAllTeams, me?.role]);
+
+  // Track if dashboard has been loaded to avoid re-fetching from Firestore
+  const dashboardLoaded = useRef(false);
+
+  // Load data
   useEffect(() => {
     if (!user) return;
     Promise.all([
       getTasks(activeTeamId).catch(() => []),
       getDocuments(activeTeamId).catch(() => []),
       getAuditLogs().catch(() => []),
-    ]).then(([ts, d, l]) => {
-      const filteredTasks = canSeeAllTeams ? ts : (ts as any[]).filter(tk => canSeeResource({ teamId: tk.teamId, createdBy: tk.createdBy, visibility: tk.visibility, assignees: tk.assignees }));
-      const filteredDocs = canSeeAllTeams ? d : (d as any[]).filter(dc => canSeeResource({ teamId: dc.teamId, createdBy: dc.createdBy, visibility: dc.visibility }));
+      getGoals(activeTeamId === '__all__' ? undefined : activeTeamId).catch(() => []),
+    ]).then(([ts, _d, l, g]) => {
+      const filteredTasks = canSeeAllTeams
+        ? ts
+        : (ts as any[]).filter(tk => canSeeResource({ teamId: tk.teamId, createdBy: tk.createdBy, visibility: tk.visibility, assignees: tk.assignees }));
       setTasks(filteredTasks as any[]);
-      setDocs(filteredDocs as any[]);
       setLogs(l as any[]);
+      setGoals(g as any[]);
       setLoading(false);
     });
   }, [activeTeamId, user, canSeeAllTeams, canSeeResource]);
 
-  const metrics = useMemo(() => {
-    const done = tasks.filter(t => t.status === 'done' || t.status === 'completed').length;
-    const inProgress = tasks.filter(t => t.status === 'in_progress').length;
-    const inReview = tasks.filter(t => t.status === 'in_review').length;
-    const overdue = tasks.filter(t => {
-      if (!t.dueDate) return false;
-      const due = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate);
-      return due < new Date() && t.status !== 'done' && t.status !== 'completed';
-    }).length;
-    const rate = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0;
-
-    const myTasks = tasks.filter(t => t.assignees?.includes(user?.uid) || t.createdBy === user?.uid);
-    const myPending = myTasks.filter(t => t.status !== 'done' && t.status !== 'completed');
-    const myOverdue = myTasks.filter(t => {
-      if (!t.dueDate) return false;
-      const due = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate);
-      return due < new Date() && t.status !== 'done' && t.status !== 'completed';
+  // Load dashboard config — only once per session
+  useEffect(() => {
+    if (!user?.uid || !me || dashboardLoaded.current) return;
+    dashboardLoaded.current = true;
+    ensureDefaultDashboard(user.uid, isAdmin).then(setDashboard).catch(() => {
+      dashboardLoaded.current = false; // allow retry on error
     });
+  }, [user?.uid, me, isAdmin]);
 
-    const now = new Date();
-    const weekLater = new Date(now.getTime() + 7 * 86400000);
-    const upcoming = tasks.filter(t => {
-      if (!t.dueDate || t.status === 'done' || t.status === 'completed') return false;
-      const due = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate);
-      return due >= now && due <= weekLater;
-    }).sort((a, b) => {
-      const da = a.dueDate?.toDate ? a.dueDate.toDate() : new Date(a.dueDate);
-      const db = b.dueDate?.toDate ? b.dueDate.toDate() : new Date(b.dueDate);
-      return da.getTime() - db.getTime();
+  const handleUpdateWidgets = useCallback((widgets: WidgetLayout[]) => {
+    setDashboard(prev => prev ? { ...prev, widgets } : prev);
+  }, []);
+
+  const handleRemoveWidget = useCallback((widgetId: string) => {
+    setDashboard(prev => {
+      if (!prev) return prev;
+      const updated = prev.widgets.filter(w => w.widgetId !== widgetId);
+      // Fire-and-forget save outside the updater via microtask
+      queueMicrotask(() => saveDashboard(prev.id, { widgets: updated }).catch(() => {}));
+      return { ...prev, widgets: updated };
     });
+  }, []);
 
-    const byPriority: Record<string, number> = {};
-    tasks.filter(t => t.status !== 'done' && t.status !== 'completed').forEach(t => {
-      byPriority[t.priority || 'medium'] = (byPriority[t.priority || 'medium'] || 0) + 1;
+  const handleReorder = useCallback((widgets: WidgetLayout[]) => {
+    setDashboard(prev => {
+      if (!prev) return prev;
+      queueMicrotask(() => saveDashboard(prev.id, { widgets }).catch(() => {}));
+      return { ...prev, widgets };
     });
+  }, []);
 
-    const byDept = teams.map(team => {
-      const dTasks = tasks.filter(t => t.teamId === team.id);
-      const dDone = dTasks.filter(t => t.status === 'done' || t.status === 'completed').length;
-      return { team, total: dTasks.length, done: dDone, rate: dTasks.length > 0 ? Math.round((dDone / dTasks.length) * 100) : 0 };
-    });
+  const widgets = dashboard?.widgets || [];
 
-    return { done, inProgress, inReview, overdue, rate, myTasks, myPending, myOverdue, upcoming, byPriority, byDept };
-  }, [tasks, user?.uid, teams]);
-
-  const stats = [
-    { label: t('dashboard.totalTasks'), val: tasks.length, icon: CheckSquare, color: '#3B82F6', bg: 'from-blue-500/20 to-blue-600/5' },
-    { label: t('dashboard.inProgress'), val: metrics.inProgress, icon: Clock, color: '#F59E0B', bg: 'from-amber-500/20 to-amber-600/5' },
-    { label: t('dashboard.completed'), val: metrics.done, icon: TrendingUp, color: '#22C55E', bg: 'from-emerald-500/20 to-emerald-600/5' },
-    { label: t('dashboard.overdue'), val: metrics.overdue, icon: AlertTriangle, color: '#EF4444', bg: 'from-red-500/20 to-red-600/5' },
-    { label: t('dashboard.documents'), val: docs.length, icon: FileText, color: '#8B5CF6', bg: 'from-purple-500/20 to-purple-600/5' },
-    { label: t('dashboard.team'), val: activeTeamId === '__all__' ? allMembers.length : allMembers.filter(m => m.teamId === activeTeamId || m.teamIds?.includes(activeTeamId)).length, icon: Users, color: '#3B82F6', bg: 'from-blue-500/20 to-blue-600/5' },
-  ];
-
-  const filteredLogs = useMemo(() => {
-    if (activeTeamId === '__all__') return logs;
-    const teamMemberIds = new Set(
-      allMembers
-        .filter(m => m.teamId === activeTeamId || m.teamIds?.includes(activeTeamId))
-        .map(m => m.userId)
-    );
-    return logs.filter((log: any) => {
-      if (log.actorId && teamMemberIds.has(log.actorId)) return true;
-      if (!log.actorId || log.actorId === 'system') return true;
-      return false;
-    });
-  }, [logs, activeTeamId, allMembers]);
-
-  const priorityColors: Record<string, string> = { urgent: '#EF4444', high: '#F59E0B', medium: '#3B82F6', low: '#64748B' };
-  const statusIcons: Record<string, any> = { todo: Circle, in_progress: Loader2, in_review: Eye, done: CheckCircle2, blocked: AlertTriangle };
-  const statusColors: Record<string, string> = { todo: '#64748B', in_progress: '#3B82F6', in_review: '#A855F7', done: '#22C55E', blocked: '#EF4444' };
+  const sharedProps = useMemo(() => ({
+    tasks,
+    goals,
+    logs,
+    teams,
+    members: allMembers,
+    user,
+    me,
+    canSeeAllTeams,
+    activeTeamId: activeTeamId || '__all__',
+  }), [tasks, goals, logs, teams, allMembers, user, me, canSeeAllTeams, activeTeamId]);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="p-6 max-w-7xl mx-auto">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="p-6 max-w-7xl mx-auto"
+    >
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-1">
-          {t('dashboard.welcome', { name: me?.displayName ? `, ${me.displayName.split(' ')[0]}` : '' })}
-        </h1>
-        <p className="text-[var(--text-muted)] text-base">
-          {t('dashboard.subtitle')}
-          {canSeeAllTeams && activeTeamId === '__all__' && <span className="ml-2 text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">{t('common.generalView')}</span>}
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-1">
+            {t('dashboard.welcome', { name: me?.displayName ? `, ${me.displayName.split(' ')[0]}` : '' })}
+          </h1>
+          <p className="text-[var(--text-muted)] text-base">
+            {t('dashboard.subtitle')}
+            {canSeeAllTeams && activeTeamId === '__all__' && (
+              <span className="ml-2 text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">
+                {t('common.generalView')}
+              </span>
+            )}
+          </p>
+        </div>
+        {dashboard && (
+          <DashboardBuilder
+            dashboard={dashboard}
+            editing={editing}
+            isAdmin={isAdmin}
+            onEditingChange={setEditing}
+            onUpdate={handleUpdateWidgets}
+          />
+        )}
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">{[1,2,3,4,5,6].map(i => <div key={i} className="h-28 skeleton rounded-lg" />)}</div>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--text-muted)]" />
+        </div>
       ) : (
-        <>
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            {stats.map((s, i) => (
-              <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.3 }}
-                whileHover={{ y: -2, transition: { duration: 0.15 } }}
-                className="relative rounded-xl bg-[var(--bg-secondary)] shadow-card p-5 overflow-hidden cursor-default">
-                <div className={`absolute inset-0 bg-gradient-to-br ${s.bg} opacity-40`} />
-                <div className="relative">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: `${s.color}15`, boxShadow: `0 4px 12px ${s.color}15` }}>
-                    <s.icon className="h-5 w-5" style={{ color: s.color }} />
-                  </div>
-                  <p className="text-3xl font-bold text-[var(--text-primary)]">{s.val}</p>
-                  <p className="text-sm text-[var(--text-muted)] mt-1">{s.label}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Completion bar */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
-            className="rounded-xl bg-[var(--bg-secondary)] shadow-card p-5 mb-8">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{t('dashboard.completionRate')}</p>
-              <p className="text-sm font-bold text-[var(--accent)]">{metrics.rate}%</p>
-            </div>
-            <div className="h-2.5 rounded-full bg-[var(--bg-base)] overflow-hidden">
-              <motion.div initial={{ width: 0 }} animate={{ width: `${metrics.rate}%` }} transition={{ duration: 1, ease: 'easeOut' }}
-                className="h-full rounded-full bg-[var(--accent)]" />
-            </div>
-            <div className="flex items-center gap-6 mt-3 text-[13px]">
-              <span className="flex items-center gap-1.5 text-emerald-400"><CheckCircle2 className="h-3 w-3" /> {metrics.done} {t('dashboard.done')}</span>
-              <span className="flex items-center gap-1.5 text-blue-400"><Loader2 className="h-3 w-3" /> {metrics.inProgress} {t('dashboard.inProgressLabel')}</span>
-              <span className="flex items-center gap-1.5 text-purple-400"><Eye className="h-3 w-3" /> {metrics.inReview} {t('dashboard.inReviewLabel')}</span>
-              <span className="flex items-center gap-1.5 text-red-400"><AlertTriangle className="h-3 w-3" /> {metrics.overdue} {t('dashboard.overdueLabel')}</span>
-            </div>
-          </motion.div>
-
-          {/* Department performance */}
-          {canSeeAllTeams && metrics.byDept.length > 0 && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
-              className="rounded-xl bg-[var(--bg-secondary)] shadow-card p-6 mb-8">
-              <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4"><BarChart3 className="h-4 w-4 text-[var(--accent)]" /> {t('dashboard.deptPerformance')}</h2>
-              <div className="space-y-3">
-                {metrics.byDept.map((dp, di) => (
-                  <motion.div key={dp.team.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.45 + di * 0.05 }}
-                    className="flex items-center gap-4">
-                    <div className="w-28 flex items-center gap-2 shrink-0">
-                      <span className="text-sm">{dp.team.icon}</span>
-                      <span className="text-sm font-medium truncate" style={{ color: dp.team.color }}>{dp.team.name}</span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-4 rounded-full bg-[var(--bg-base)] overflow-hidden">
-                          <motion.div initial={{ width: 0 }} animate={{ width: `${dp.rate}%` }} transition={{ duration: 0.8, delay: 0.5 + di * 0.05 }}
-                            className="h-full rounded-full" style={{ backgroundColor: dp.team.color, opacity: 0.7 }} />
-                        </div>
-                        <span className="text-sm font-bold w-10 text-right" style={{ color: dp.team.color }}>{dp.rate}%</span>
-                      </div>
-                      <div className="flex gap-4 text-[12px] text-[var(--text-muted)] mt-0.5">
-                        <span>{t('dashboard.tasksLabel', { n: dp.total })}</span><span>{t('dashboard.doneLabel', { n: dp.done })}</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* My Tasks */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
-              className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
-              <div className="p-5 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Target className="h-4 w-4 text-[var(--accent)]" /> {t('dashboard.myTasks')}</h2>
-                <div className="flex items-center gap-2">
-                  <span className="text-[12px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">{t('dashboard.pending', { n: metrics.myPending.length })}</span>
-                  {metrics.myOverdue.length > 0 && <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">{t('dashboard.overdueCount', { n: metrics.myOverdue.length })}</span>}
-                </div>
-              </div>
-              <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto scrollbar-thin">
-                {metrics.myPending.length === 0 ? (
-                  <p className="p-6 text-sm text-[var(--text-muted)] text-center">{t('dashboard.allCaughtUp')}</p>
-                ) : metrics.myPending.slice(0, 8).map((tk: any) => {
-                  const StIcon = statusIcons[tk.status] || Circle;
-                  const sColor = statusColors[tk.status] || '#64748B';
-                  const team = teams.find(tm => tm.id === tk.teamId);
-                  return (
-                    <div key={tk.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition cursor-pointer" onClick={() => router.push('/app/tasks')}>
-                      <StIcon className="h-4 w-4 shrink-0" style={{ color: sColor }} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-[var(--text-primary)] truncate">{tk.title}</p>
-                        {team && <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: `${team.color}10`, color: team.color }}>{team.icon} {team.name}</span>}
-                      </div>
-                      <span className="text-[12px] px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: `${priorityColors[tk.priority] || '#64748B'}15`, color: priorityColors[tk.priority] || '#64748B', border: `1px solid ${priorityColors[tk.priority] || '#64748B'}25` }}>{t(`priority.${tk.priority}`)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              {metrics.myPending.length > 8 && (
-                <div className="p-3 text-center">
-                  <button onClick={() => router.push('/app/tasks')} className="text-sm text-[var(--accent)] hover:underline flex items-center gap-1 mx-auto">{t('dashboard.viewAll')} <ArrowRight className="h-3 w-3" /></button>
-                </div>
-              )}
-            </motion.div>
-
-            {/* Upcoming Deadlines */}
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
-              className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
-              <div className="p-5 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Calendar className="h-4 w-4 text-[var(--accent)]" /> {t('dashboard.upcomingDeadlines')}</h2>
-                <span className="text-[12px] text-[var(--text-muted)]">{t('dashboard.next7Days')}</span>
-              </div>
-              <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto scrollbar-thin">
-                {metrics.upcoming.length === 0 ? (
-                  <p className="p-6 text-sm text-[var(--text-muted)] text-center">{t('dashboard.noDeadlines')}</p>
-                ) : metrics.upcoming.slice(0, 8).map((tk: any) => {
-                  const due = tk.dueDate?.toDate ? tk.dueDate.toDate() : new Date(tk.dueDate);
-                  const daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
-                  const team = teams.find(tm => tm.id === tk.teamId);
-                  return (
-                    <div key={tk.id} className="px-5 py-3.5 flex items-center gap-3 hover:bg-[var(--bg-hover)] transition">
-                      <Calendar className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-[var(--text-primary)] truncate">{tk.title}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          {team && <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: `${team.color}10`, color: team.color }}>{team.icon}</span>}
-                          <span className="text-[12px] text-[var(--text-muted)]">{due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                        </div>
-                      </div>
-                      <span className={`text-[12px] px-2 py-0.5 rounded-full font-semibold ${daysLeft <= 1 ? 'bg-red-500/10 text-red-400' : daysLeft <= 3 ? 'bg-amber-500/10 text-amber-400' : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)]'}`}>
-                        {daysLeft === 0 ? t('dashboard.today') : daysLeft === 1 ? t('dashboard.tomorrow') : t('dashboard.daysLeft', { n: daysLeft })}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* Priority Breakdown */}
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
-              className="rounded-xl bg-[var(--bg-secondary)] shadow-card p-6">
-              <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 mb-4"><Flag className="h-4 w-4 text-[var(--accent)]" /> {t('dashboard.openByPriority')}</h2>
-              <div className="space-y-3">
-                {['urgent', 'high', 'medium', 'low'].map(p => {
-                  const count = metrics.byPriority[p] || 0;
-                  const openTotal = Object.values(metrics.byPriority).reduce((s: number, v) => s + (v as number), 0);
-                  const pct = openTotal > 0 ? Math.round((count / openTotal) * 100) : 0;
-                  return (
-                    <div key={p} className="flex items-center gap-3">
-                      <span className="text-sm text-[var(--text-secondary)] w-16 capitalize">{t(`priority.${p}`)}</span>
-                      <div className="flex-1 h-3.5 rounded-full bg-[var(--bg-base)] overflow-hidden">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.7, delay: 0.65 }}
-                          className="h-full rounded-full" style={{ backgroundColor: priorityColors[p] }} />
-                      </div>
-                      <span className="text-sm font-bold w-8 text-right text-[var(--text-secondary)]">{count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-
-            {/* Activity Feed */}
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.65 }}
-              className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
-              <div className="p-5">
-                <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2"><Activity className="h-4 w-4 text-[var(--accent)]" /> {t('dashboard.recentActivity')}</h2>
-              </div>
-              <div className="divide-y divide-[var(--border)] max-h-[240px] overflow-y-auto scrollbar-thin">
-                {filteredLogs.length === 0 ? (
-                  <p className="p-6 text-sm text-[var(--text-muted)] text-center">{t('dashboard.actionsWillAppear')}</p>
-                ) : filteredLogs.slice(0, 10).map((l: any) => (
-                  <div key={l.id} className="px-5 py-3 hover:bg-[var(--bg-hover)] transition">
-                    <p className="text-sm">
-                      <span className="text-[var(--accent)] font-medium">{l.actorName || 'System'}</span>{' '}
-                      <span className="text-[var(--text-muted)]">{l.action}</span>{' '}
-                      <span className="text-[var(--text-secondary)]">{l.resource}</span>
-                    </p>
-                    {l.detail && <p className="text-[13px] text-[var(--text-muted)] mt-0.5 truncate">{l.detail}</p>}
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-
-        </>
+        <WidgetGrid
+          widgets={widgets}
+          sharedProps={sharedProps}
+          editing={editing}
+          onReorder={handleReorder}
+          onRemove={handleRemoveWidget}
+        />
       )}
     </motion.div>
   );
