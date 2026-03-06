@@ -41,7 +41,7 @@ export default function PlannerToolbar({
     filters.status.forEach(s => {
       const st = STATUSES.find(x => x.id === s);
       if (st) activeChips.push({
-        label: st.label,
+        label: t(`status.${st.id}`),
         onRemove: () => onFiltersChange({ ...filters, status: filters.status.filter(x => x !== s) }),
       });
     });
@@ -50,7 +50,7 @@ export default function PlannerToolbar({
     filters.priority.forEach(p => {
       const pr = PRIORITIES.find(x => x.id === p);
       if (pr) activeChips.push({
-        label: pr.label,
+        label: t(`priority.${pr.id}`),
         onRemove: () => onFiltersChange({ ...filters, priority: filters.priority.filter(x => x !== p) }),
       });
     });
@@ -173,7 +173,7 @@ export default function PlannerToolbar({
                           : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                       }`}
                       style={filters.status.includes(s.id) ? { backgroundColor: s.color } : {}}>
-                      {s.label}
+                      {t(`status.${s.id}`)}
                     </button>
                   ))}
                 </div>
@@ -191,7 +191,7 @@ export default function PlannerToolbar({
                           : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                       }`}
                       style={filters.priority.includes(p.id) ? { backgroundColor: p.color } : {}}>
-                      {p.icon} {p.label}
+                      {p.icon} {t(`priority.${p.id}`)}
                     </button>
                   ))}
                 </div>
