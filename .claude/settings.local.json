@@ -15,7 +15,11 @@
       "Bash(node:*)",
       "Bash(npm install:*)",
       "Bash(NODE_OPTIONS='--max-old-space-size=8192' npx next:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Read(//c/Users/CARLOS~1/AppData/Local/Temp/claude/C--Users-Carlos-Anaya-Ruiz-solis-os/tasks/**)",
+      "Read(//tmp/claude/C--Users-Carlos-Anaya-Ruiz-solis-os/tasks/**)",
+      "Read(//c/Users/CARLOS~1/AppData/Local/Temp/claude/**)",
+      "Bash(find /tmp -name \"bg6yup1os*\")"
     ]
   }
 }

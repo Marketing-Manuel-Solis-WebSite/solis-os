@@ -1,17 +1,28 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useI18n } from '@/lib/i18n';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Check, Trash2, Send, Hash, Plus, Paperclip, Calendar,
   ChevronDown, Download, ExternalLink, FileText,
   Image as ImageIcon, Video, Music, CheckSquare,
+  Maximize2, Minimize2, GitBranch, Eye, MessageSquare,
+  Clock, User, Activity,
 } from 'lucide-react';
 import { getTaskComments, addTaskComment, getTaskActivity, addTaskActivity } from '@/lib/db';
 import { uploadFile, isImageType, isVideoType, isAudioType, formatFileSize } from '@/lib/upload';
 import { notifyMany } from '@/lib/notifications';
-import { STATUSES, PRIORITIES, TASK_TYPES, VISIBILITY, DEFAULT_CUSTOM_FIELDS, ACCEPTED_FILES } from './constants';
+import {
+  STATUSES, PRIORITIES, TASK_TYPES, VISIBILITY,
+  DEFAULT_CUSTOM_FIELDS, CUSTOM_FIELD_GROUPS, ACCEPTED_FILES,
+  getStatusConfig, getPriorityConfig, getTypeConfig, getVisibilityConfig,
+  getSubtaskProgress,
+} from './constants';
 import { useToast } from '@/components/notifications/toast-provider';
 
+/* ============================================
+   PROPS
+   ============================================ */
 interface Props {
   task: any;
   members: any[];
@@ -25,16 +36,53 @@ interface Props {
   onClose: () => void;
 }
 
-export default function TaskDetailDrawer({ task, members, teams, userId, userName, canUpdate, canDelete, onUpdate, onDelete, onClose }: Props) {
+/* ============================================
+   SECTION HEADER (collapsible)
+   ============================================ */
+function SectionHeader({ id, label, count, collapsed, onToggle }: {
+  id: string;
+  label: string;
+  count?: number;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button onClick={onToggle} className="w-full flex items-center gap-2 py-3 text-[12px] uppercase tracking-[0.06em] text-[var(--text-muted)] font-semibold hover:text-[var(--text-secondary)] transition">
+      <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${collapsed ? '-rotate-90' : ''}`} />
+      {label}
+      {count !== undefined && <span className="ml-auto text-[11px] opacity-70">{count}</span>}
+    </button>
+  );
+}
+
+/* ============================================
+   CUSTOM FIELD GROUP LABELS (fallback)
+   ============================================ */
+const FIELD_GROUP_LABELS: Record<string, string> = {
+  legal: 'Legal / Caso',
+  client: 'Cliente',
+  reference: 'Referencia',
+};
+
+/* ============================================
+   MAIN COMPONENT
+   ============================================ */
+export default function TaskDetailDrawer({
+  task, members, teams, userId, userName,
+  canUpdate, canDelete, onUpdate, onDelete, onClose,
+}: Props) {
   const { t } = useI18n();
   const toast = useToast();
+
+  // --- UI state ---
+  const [expanded, setExpanded] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [tab, setTab] = useState<'comments' | 'activity' | 'details'>('comments');
+  const [tab, setTab] = useState<'comments' | 'activity' | 'details' | null>('comments');
   const [editTitle, setEditTitle] = useState(false);
-  const [titleVal, setTitleVal] = useState(task.title);
   const [editDesc, setEditDesc] = useState(false);
+  const [titleVal, setTitleVal] = useState(task.title);
   const [descVal, setDescVal] = useState(task.description || '');
   const [newSub, setNewSub] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -43,14 +91,31 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const [mentionIds, setMentionIds] = useState<string[]>([]);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  // --- Refs ---
   const fileRef = useRef<HTMLInputElement>(null);
   const commentRef = useRef<HTMLInputElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
 
-  // Sync task data on change
-  useEffect(() => { setTitleVal(task.title); setDescVal(task.description || ''); }, [task.id, task.title, task.description]);
+  // --- Section toggle helper ---
+  const toggleSection = useCallback((id: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const isSectionCollapsed = (id: string) => collapsedSections.has(id);
 
-  // Load comments & activity
+  // --- Sync task data when task changes ---
+  useEffect(() => {
+    setTitleVal(task.title);
+    setDescVal(task.description || '');
+  }, [task.id, task.title, task.description]);
+
+  // --- Load comments & activity ---
   const loadData = useCallback(async () => {
     try { setComments(await getTaskComments(task.id)); } catch { setComments([]); }
     try { setActivity(await getTaskActivity(task.id)); } catch { setActivity([]); }
@@ -58,29 +123,34 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Computed
-  const st = STATUSES.find(s => s.id === task.status) || STATUSES[0];
-  const tp = TASK_TYPES.find(t => t.id === (task.type || 'task')) || TASK_TYPES[0];
+  // --- Computed values ---
+  const st = getStatusConfig(task.status);
+  const tp = getTypeConfig(task.type || 'task');
+  const pr = getPriorityConfig(task.priority);
+  const visConf = getVisibilityConfig(task.visibility || 'team');
+  const taskTeam = teams.find((tm: any) => tm.id === task.teamId);
   const due = task.dueDate?.toDate?.();
   const start = task.startDate?.toDate?.();
-  const doneSub = (task.subtasks || []).filter((s: any) => s.done).length;
-  const totalSub = (task.subtasks || []).length;
-  const progress = totalSub > 0 ? Math.round(doneSub / totalSub * 100) : 0;
-  const visConf = VISIBILITY.find(v => v.id === (task.visibility || 'team'));
-  const taskTeam = teams.find((t: any) => t.id === task.teamId);
+  const { done: doneSub, total: totalSub, pct: progress } = getSubtaskProgress(task);
   const customFields = task.customFields || {};
   const activeFieldIds = Object.keys(customFields);
   const availableFields = DEFAULT_CUSTOM_FIELDS.filter(f => !activeFieldIds.includes(f.id));
 
-  // Handlers
+  // --- Title save ---
   const saveTitle = () => {
-    if (titleVal.trim() && titleVal !== task.title && canUpdate) onUpdate(task.id, 'title', titleVal.trim(), task.title);
+    if (titleVal.trim() && titleVal !== task.title && canUpdate) {
+      onUpdate(task.id, 'title', titleVal.trim(), task.title);
+    }
     setEditTitle(false);
   };
+
+  // --- Description save ---
   const saveDesc = () => {
     if (canUpdate) onUpdate(task.id, 'description', descVal, task.description);
     setEditDesc(false);
   };
+
+  // --- Subtask handlers ---
   const toggleSub = (i: number) => {
     if (!canUpdate) return;
     const u = [...(task.subtasks || [])];
@@ -97,24 +167,29 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
     onUpdate(task.id, 'subtasks', (task.subtasks || []).filter((_: any, j: number) => j !== i));
   };
 
-  // Custom fields
-  const setCustomField = (fid: string, val: any) => onUpdate(task.id, 'customFields', { ...customFields, [fid]: val });
+  // --- Custom field handlers ---
+  const setCustomField = (fid: string, val: any) => {
+    onUpdate(task.id, 'customFields', { ...customFields, [fid]: val });
+  };
   const removeCustomField = (fid: string) => {
     const u = { ...customFields };
     delete u[fid];
     onUpdate(task.id, 'customFields', u);
   };
 
-  // File upload
+  // --- File upload ---
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || !canUpdate) return;
     for (const file of Array.from(files)) {
-      setUploading(true); setUploadPct(0);
+      setUploading(true);
+      setUploadPct(0);
       try {
         const result = await uploadFile(file, 'task-uploads', setUploadPct);
         const att = { id: Date.now().toString(), ...result, uploadedBy: userId, uploadedAt: new Date() };
         onUpdate(task.id, 'attachments', [...(task.attachments || []), att]);
-      } catch (err: any) { toast.error('Error al subir archivo', err.message || 'Ocurrio un error al subir el archivo.'); }
+      } catch (err: any) {
+        toast.error('Error al subir archivo', err.message || 'Ocurrio un error al subir el archivo.');
+      }
       setUploading(false);
     }
   };
@@ -123,7 +198,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
     onUpdate(task.id, 'attachments', (task.attachments || []).filter((a: any) => a.id !== attId));
   };
 
-  // Comments with @mentions
+  // --- Comment @mention handling ---
   const handleCommentChange = (val: string) => {
     setNewComment(val);
     const atMatch = val.match(/@(\w*)$/);
@@ -149,8 +224,12 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
 
   const postComment = async () => {
     if (!newComment.trim()) return;
-    await addTaskComment(task.id, { text: newComment.trim(), authorId: userId, authorName: userName, mentions: mentionIds });
-    // Notify mentioned users
+    await addTaskComment(task.id, {
+      text: newComment.trim(),
+      authorId: userId,
+      authorName: userName,
+      mentions: mentionIds,
+    });
     if (mentionIds.length > 0) {
       notifyMany(mentionIds, {
         type: 'task_mentioned',
@@ -169,7 +248,7 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
     setTimeout(() => commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   };
 
-  // File icon helper
+  // --- File icon helper ---
   const getFileIcon = (type: string) => {
     if (isImageType(type)) return ImageIcon;
     if (isVideoType(type)) return Video;
@@ -177,346 +256,844 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
     return FileText;
   };
 
-  return (
-    <div className="w-[480px] shrink-0 bg-[var(--bg-base)] shadow-panel flex flex-col h-full overflow-hidden anim-slide">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3">
+  // --- Render custom field input ---
+  const renderFieldInput = (def: typeof DEFAULT_CUSTOM_FIELDS[0], val: any, fid: string) => {
+    if (def.type === 'checkbox') {
+      return (
+        <button
+          onClick={() => canUpdate && setCustomField(fid, !val)}
+          disabled={!canUpdate}
+          className={`w-5 h-5 rounded-md border flex items-center justify-center transition ${val ? 'bg-emerald-500 border-emerald-500' : 'border-[var(--border)]'}`}
+        >
+          {val && <Check className="h-3 w-3 text-white" />}
+        </button>
+      );
+    }
+    if (def.type === 'select') {
+      return (
+        <select
+          value={val || ''}
+          onChange={e => canUpdate && setCustomField(fid, e.target.value)}
+          disabled={!canUpdate}
+          className="select-dark h-9 text-sm flex-1"
+        >
+          <option value="">{t('common.search')}...</option>
+          {def.options?.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      );
+    }
+    if (def.type === 'currency') {
+      return (
+        <div className="flex items-center gap-1 flex-1">
+          <span className="text-sm text-[var(--text-muted)]">$</span>
+          <input
+            type="number" step="0.01" min="0"
+            value={val || ''}
+            disabled={!canUpdate}
+            onChange={e => canUpdate && setCustomField(fid, e.target.value)}
+            className="input-dark h-9 text-sm flex-1"
+          />
+        </div>
+      );
+    }
+    const inputType =
+      def.type === 'number' ? 'number'
+      : def.type === 'date' ? 'date'
+      : def.type === 'email' ? 'email'
+      : def.type === 'url' ? 'url'
+      : def.type === 'phone' ? 'tel'
+      : 'text';
+    return (
+      <input
+        type={inputType}
+        value={val || ''}
+        disabled={!canUpdate}
+        onChange={e => canUpdate && setCustomField(fid, e.target.value)}
+        placeholder={def.label}
+        className="input-dark h-9 text-sm flex-1"
+      />
+    );
+  };
+
+  /* ============================================
+     SHARED CONTENT (used in both modes)
+     ============================================ */
+  const content = (
+    <div className="flex flex-col h-full overflow-hidden min-w-0 max-w-full">
+      {/* ---- Header bar ---- */}
+      <div className="flex items-center justify-between px-6 py-4 shrink-0 border-b border-[var(--border)]/30">
         <div className="flex items-center gap-2 min-w-0">
           <tp.Icon className="h-4 w-4 shrink-0" style={{ color: tp.color }} />
-          <span className="text-sm font-semibold text-[var(--text-muted)] uppercase">{t(`taskType.${tp.id}`)}</span>
+          <span className="text-sm font-semibold text-[var(--text-muted)] uppercase">
+            {t(`taskType.${tp.id}`)}
+          </span>
           {visConf && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-md flex items-center gap-1 font-medium shrink-0" style={{ backgroundColor: `${visConf.color}10`, color: visConf.color }}>
-              <visConf.Icon className="h-2.5 w-2.5" />{t(`visibility.${visConf.id}`)}
+            <span
+              className="text-[9px] px-1.5 py-0.5 rounded-md flex items-center gap-1 font-medium shrink-0"
+              style={{ backgroundColor: `${visConf.color}10`, color: visConf.color }}
+            >
+              <visConf.Icon className="h-2.5 w-2.5" />
+              {t(`visibility.${visConf.id}`)}
             </span>
           )}
           {taskTeam && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium shrink-0" style={{ backgroundColor: `${taskTeam.color}15`, color: taskTeam.color }}>
+            <span
+              className="text-[9px] px-1.5 py-0.5 rounded-md font-medium shrink-0"
+              style={{ backgroundColor: `${taskTeam.color}15`, color: taskTeam.color }}
+            >
               {taskTeam.icon} {taskTeam.name}
             </span>
           )}
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition"
+            title={expanded ? 'Minimizar' : 'Pantalla completa'}
+          >
+            {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </button>
           {(canDelete || task.createdBy === userId) && (
-            <button onClick={() => onDelete(task)} className="p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition"><Trash2 className="h-4 w-4" /></button>
+            <button
+              onClick={() => onDelete(task)}
+              className="p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
           )}
-          <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition"><X className="h-4 w-4" /></button>
+          <button
+            onClick={onClose}
+            className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-5 space-y-4">
-          {/* Title */}
+      {/* ---- Scrollable content ---- */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="px-6 py-5 space-y-5 min-w-0">
+
+          {/* ===== 1. TITLE ===== */}
           {editTitle && canUpdate ? (
             <div className="flex gap-2">
-              <input value={titleVal} onChange={e => setTitleVal(e.target.value)}
-                className="input-dark flex-1 text-lg font-bold" autoFocus onKeyDown={e => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') { setEditTitle(false); setTitleVal(task.title); } }} />
-              <button onClick={saveTitle} className="p-2 text-emerald-400 hover:bg-emerald-400/10 rounded-lg"><Check className="h-4 w-4" /></button>
-              <button onClick={() => { setEditTitle(false); setTitleVal(task.title); }} className="p-2 text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] rounded-lg"><X className="h-4 w-4" /></button>
+              <input
+                value={titleVal}
+                onChange={e => setTitleVal(e.target.value)}
+                className="input-dark flex-1 text-[20px] font-bold"
+                autoFocus
+                onKeyDown={e => {
+                  if (e.key === 'Enter') saveTitle();
+                  if (e.key === 'Escape') { setEditTitle(false); setTitleVal(task.title); }
+                }}
+              />
+              <button onClick={saveTitle} className="p-2 text-emerald-400 hover:bg-emerald-400/10 rounded-lg">
+                <Check className="h-4 w-4" />
+              </button>
+              <button onClick={() => { setEditTitle(false); setTitleVal(task.title); }} className="p-2 text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] rounded-lg">
+                <X className="h-4 w-4" />
+              </button>
             </div>
           ) : (
-            <h2 className={`text-xl font-bold text-[var(--text-primary)] ${canUpdate ? 'cursor-pointer hover:text-[var(--accent)]' : ''} transition`} onClick={() => canUpdate && setEditTitle(true)}>
+            <h2
+              className={`text-[20px] font-bold text-[var(--text-primary)] ${canUpdate ? 'cursor-pointer hover:text-[var(--accent)]' : ''} transition`}
+              onClick={() => canUpdate && setEditTitle(true)}
+            >
               {task.title}
             </h2>
           )}
 
-          {/* Status + Priority */}
+          {/* ===== 2. STATUS & PRIORITY ROW ===== */}
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.status')}</label>
-              <select value={task.status} onChange={e => canUpdate && onUpdate(task.id, 'status', e.target.value, task.status)} disabled={!canUpdate}
-                className="w-full h-9 px-3 rounded-xl text-sm font-semibold border cursor-pointer" style={{ backgroundColor: `${st.color}10`, borderColor: `${st.color}25`, color: st.color }}>
-                {STATUSES.map(s => <option key={s.id} value={s.id}>{t(`status.${s.id}`)}</option>)}
+              <label className="block text-[12px] uppercase tracking-[0.06em] text-[var(--text-muted)] mb-1.5 font-semibold">
+                {t('taskCreate.status')}
+              </label>
+              <select
+                value={task.status}
+                onChange={e => canUpdate && onUpdate(task.id, 'status', e.target.value, task.status)}
+                disabled={!canUpdate}
+                className="w-full h-9 px-3 rounded-xl text-sm font-semibold border cursor-pointer"
+                style={{ backgroundColor: `${st.color}10`, borderColor: `${st.color}25`, color: st.color }}
+              >
+                {STATUSES.map(s => (
+                  <option key={s.id} value={s.id}>{t(`status.${s.id}`)}</option>
+                ))}
               </select>
             </div>
             <div className="flex-1">
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.priority')}</label>
-              <div className="flex gap-1">
+              <label className="block text-[12px] uppercase tracking-[0.06em] text-[var(--text-muted)] mb-1.5 font-semibold">
+                {t('taskCreate.priority')}
+              </label>
+              <div className="flex gap-1.5">
                 {PRIORITIES.map(p => (
-                  <button key={p.id} onClick={() => canUpdate && onUpdate(task.id, 'priority', p.id, task.priority)} title={t(`priority.${p.id}`)} disabled={!canUpdate}
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm transition ${task.priority === p.id ? 'ring-2 ring-white/20 bg-white/5 scale-105' : 'opacity-40 hover:opacity-70'}`}>
+                  <button
+                    key={p.id}
+                    onClick={() => canUpdate && onUpdate(task.id, 'priority', p.id, task.priority)}
+                    title={t(`priority.${p.id}`)}
+                    disabled={!canUpdate}
+                    className={`h-8 px-3 rounded-full flex items-center justify-center gap-1.5 text-sm transition ${
+                      task.priority === p.id
+                        ? 'ring-2 ring-white/20 bg-white/5 scale-105'
+                        : 'opacity-40 hover:opacity-70'
+                    }`}
+                  >
                     {p.icon}
+                    {task.priority === p.id && <span className="text-[12px] font-medium">{t(`priority.${p.id}`)}</span>}
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Visibility + Team */}
-          {canUpdate && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.visibility')}</label>
-                <select value={task.visibility || 'team'} onChange={e => onUpdate(task.id, 'visibility', e.target.value, task.visibility)} className="select-dark w-full h-8 text-sm">
-                  {VISIBILITY.map(v => <option key={v.id} value={v.id}>{t(`visibility.${v.id}`)}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.department')}</label>
-                <select value={task.teamId || ''} onChange={e => onUpdate(task.id, 'teamId', e.target.value, task.teamId)} className="select-dark w-full h-8 text-sm">
-                  <option value="">{t('common.general')}</option>
-                  {teams.map((t: any) => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
-                </select>
-              </div>
-            </div>
-          )}
-
-          {/* Assignees */}
-          <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.assignees')}</label>
-            <div className="flex gap-1.5 flex-wrap">
-              {members.map((m: any) => {
-                const assigned = task.assignees?.includes(m.id);
-                return (
-                  <button key={m.id} disabled={!canUpdate}
-                    onClick={() => { const n = assigned ? task.assignees.filter((x: string) => x !== m.id) : [...(task.assignees || []), m.id]; onUpdate(task.id, 'assignees', n, task.assignees); }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-200 ${assigned ? 'bg-[var(--accent-subtle)] text-[var(--accent)] ring-1 ring-[var(--accent)]/20' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'}`}>
-                    <div className="w-4 h-4 rounded-full bg-[var(--accent-subtle)] flex items-center justify-center text-[8px] font-bold">{m.displayName?.[0]?.toUpperCase()}</div>
-                    {m.displayName?.split(' ')[0]}{assigned && <Check className="h-3 w-3" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Dates */}
+          {/* ===== 3. QUICK INFO GRID ===== */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.startDate')}</label>
-              <input type="date" value={start ? start.toISOString().split('T')[0] : ''} disabled={!canUpdate}
-                onChange={e => canUpdate && onUpdate(task.id, 'startDate', e.target.value ? new Date(e.target.value) : null)} className="input-dark h-8 text-sm w-full" />
+              <label className="block text-[12px] uppercase tracking-[0.06em] text-[var(--text-muted)] mb-1.5 font-semibold">
+                {t('taskCreate.visibility')}
+              </label>
+              <select
+                value={task.visibility || 'team'}
+                onChange={e => canUpdate && onUpdate(task.id, 'visibility', e.target.value, task.visibility)}
+                disabled={!canUpdate}
+                className="select-dark w-full h-9 text-sm"
+              >
+                {VISIBILITY.map(v => (
+                  <option key={v.id} value={v.id}>{t(`visibility.${v.id}`)}</option>
+                ))}
+              </select>
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.dueDate')}</label>
-              <input type="date" value={due ? due.toISOString().split('T')[0] : ''} disabled={!canUpdate}
-                onChange={e => canUpdate && onUpdate(task.id, 'dueDate', e.target.value ? new Date(e.target.value) : null)} className="input-dark h-8 text-sm w-full" />
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.description')}</label>
-            {editDesc && canUpdate ? (
-              <div>
-                <textarea value={descVal} onChange={e => setDescVal(e.target.value)} rows={5} autoFocus
-                  className="w-full px-3 py-2 rounded-xl bg-[var(--bg-elevated)] text-sm text-[var(--text-secondary)] resize-y focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30" />
-                <div className="flex gap-2 mt-2">
-                  <button onClick={saveDesc} className="px-3 h-7 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-[13px]">{t('common.save')}</button>
-                  <button onClick={() => { setEditDesc(false); setDescVal(task.description || ''); }} className="px-3 h-7 rounded-lg bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-all duration-200">{t('common.cancel')}</button>
-                </div>
-              </div>
-            ) : (
-              <div onClick={() => canUpdate && setEditDesc(true)}
-                className={`min-h-[50px] px-3 py-2 rounded-xl bg-[var(--bg-elevated)] ${canUpdate ? 'cursor-pointer hover:bg-[var(--bg-hover)]' : ''} transition-all duration-200`}>
-                {task.description ? <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{task.description}</p> : <p className="text-sm text-[var(--text-muted)]">{canUpdate ? t('taskCreate.descPlaceholder') : t('common.noResults')}</p>}
-              </div>
-            )}
-          </div>
-
-          {/* Custom Fields */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{t('taskCreate.customFields')}</label>
-              {canUpdate && availableFields.length > 0 && (
-                <button onClick={() => setShowFieldPicker(!showFieldPicker)} className="text-[12px] text-[var(--accent)] hover:underline flex items-center gap-1">
-                  <Plus className="h-3 w-3" /> {t('common.create')}
-                </button>
-              )}
-            </div>
-            {showFieldPicker && (
-              <div className="flex flex-wrap gap-1.5 mb-3 p-3 rounded-xl bg-[var(--bg-elevated)] shadow-card anim-slide">
-                {availableFields.map(f => (
-                  <button key={f.id} onClick={() => { setCustomField(f.id, f.type === 'checkbox' ? false : ''); setShowFieldPicker(false); }}
-                    className="text-sm px-2.5 py-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200">
-                    {t(`customField.${f.id}`)}
-                  </button>
+              <label className="block text-[12px] uppercase tracking-[0.06em] text-[var(--text-muted)] mb-1.5 font-semibold">
+                {t('taskCreate.department')}
+              </label>
+              <select
+                value={task.teamId || ''}
+                onChange={e => canUpdate && onUpdate(task.id, 'teamId', e.target.value, task.teamId)}
+                disabled={!canUpdate}
+                className="select-dark w-full h-9 text-sm"
+              >
+                <option value="">{t('common.general')}</option>
+                {teams.map((tm: any) => (
+                  <option key={tm.id} value={tm.id}>{tm.icon} {tm.name}</option>
                 ))}
-              </div>
-            )}
-            {activeFieldIds.map(fid => {
-              const def = DEFAULT_CUSTOM_FIELDS.find(f => f.id === fid);
-              if (!def) return null;
-              const val = customFields[fid];
-              return (
-                <div key={fid} className="flex items-center gap-2 mb-2">
-                  <label className="text-sm text-[var(--text-muted)] w-32 shrink-0 truncate">{t(`customField.${def.id}`)}</label>
-                  {def.type === 'checkbox' ? (
-                    <button onClick={() => canUpdate && setCustomField(fid, !val)} disabled={!canUpdate}
-                      className={`w-5 h-5 rounded-md border flex items-center justify-center transition ${val ? 'bg-emerald-500 border-emerald-500' : 'border-[var(--border)]'}`}>
-                      {val && <Check className="h-3 w-3 text-white" />}
-                    </button>
-                  ) : def.type === 'select' ? (
-                    <select value={val || ''} onChange={e => canUpdate && setCustomField(fid, e.target.value)} disabled={!canUpdate} className="select-dark h-8 text-sm flex-1">
-                      <option value="">{t('common.search')}...</option>
-                      {def.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  ) : def.type === 'currency' ? (
-                    <div className="flex items-center gap-1 flex-1">
-                      <span className="text-sm text-[var(--text-muted)]">$</span>
-                      <input type="number" step="0.01" min="0" value={val || ''} disabled={!canUpdate}
-                        onChange={e => canUpdate && setCustomField(fid, e.target.value)} className="input-dark h-8 text-sm flex-1" />
+              </select>
+            </div>
+            <div>
+              <label className="block text-[12px] uppercase tracking-[0.06em] text-[var(--text-muted)] mb-1.5 font-semibold">
+                {t('taskCreate.startDate')}
+              </label>
+              <input
+                type="date"
+                value={start ? start.toISOString().split('T')[0] : ''}
+                disabled={!canUpdate}
+                onChange={e => canUpdate && onUpdate(task.id, 'startDate', e.target.value ? new Date(e.target.value) : null)}
+                className="input-dark h-9 text-sm w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] uppercase tracking-[0.06em] text-[var(--text-muted)] mb-1.5 font-semibold">
+                {t('taskCreate.dueDate')}
+              </label>
+              <input
+                type="date"
+                value={due ? due.toISOString().split('T')[0] : ''}
+                disabled={!canUpdate}
+                onChange={e => canUpdate && onUpdate(task.id, 'dueDate', e.target.value ? new Date(e.target.value) : null)}
+                className="input-dark h-9 text-sm w-full"
+              />
+            </div>
+          </div>
+
+          <div className="h-px bg-[var(--border-subtle)] mx-0" />
+
+          {/* ===== 4. DESCRIPTION (collapsible) ===== */}
+          <div>
+            <SectionHeader
+              id="description"
+              label={t('taskCreate.description')}
+              collapsed={isSectionCollapsed('description')}
+              onToggle={() => toggleSection('description')}
+            />
+            <AnimatePresence initial={false}>
+              {!isSectionCollapsed('description') && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  {editDesc && canUpdate ? (
+                    <div>
+                      <textarea
+                        value={descVal}
+                        onChange={e => setDescVal(e.target.value)}
+                        rows={5}
+                        autoFocus
+                        className="w-full px-3 py-2 rounded-xl bg-[var(--bg-elevated)] text-[14px] leading-relaxed text-[var(--text-secondary)] resize-y min-h-[100px] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30"
+                      />
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={saveDesc}
+                          className="px-3 h-7 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-[13px]"
+                        >
+                          {t('common.save')}
+                        </button>
+                        <button
+                          onClick={() => { setEditDesc(false); setDescVal(task.description || ''); }}
+                          className="px-3 h-7 rounded-lg bg-[var(--bg-tertiary)] text-[13px] text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition-all duration-200"
+                        >
+                          {t('common.cancel')}
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <input type={def.type === 'number' ? 'number' : def.type === 'date' ? 'date' : def.type === 'email' ? 'email' : def.type === 'url' ? 'url' : def.type === 'phone' ? 'tel' : 'text'}
-                      value={val || ''} disabled={!canUpdate}
-                      onChange={e => canUpdate && setCustomField(fid, e.target.value)}
-                      placeholder={def.label} className="input-dark h-8 text-sm flex-1" />
+                    <div
+                      onClick={() => canUpdate && setEditDesc(true)}
+                      className={`min-h-[50px] px-3 py-2 rounded-xl bg-[var(--bg-elevated)] ${canUpdate ? 'cursor-pointer hover:bg-[var(--bg-hover)]' : ''} transition-all duration-200`}
+                    >
+                      {task.description ? (
+                        <p className="text-[14px] leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">{task.description}</p>
+                      ) : (
+                        <p className="text-[14px] leading-relaxed text-[var(--text-muted)]">
+                          {canUpdate ? t('taskCreate.descPlaceholder') : t('common.noResults')}
+                        </p>
+                      )}
+                    </div>
                   )}
-                  {canUpdate && (
-                    <button onClick={() => removeCustomField(fid)} className="text-[var(--text-muted)] hover:text-red-400 p-1"><X className="h-3.5 w-3.5" /></button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Subtasks */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{t('taskCreate.subtasks')}</label>
-              {totalSub > 0 && <span className="text-[12px] text-[var(--text-muted)]">{doneSub}/{totalSub} · {progress}%</span>}
-            </div>
-            {totalSub > 0 && (
-              <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] mb-3 overflow-hidden">
-                <div className="h-full rounded-full bg-[var(--accent)] transition-all duration-500" style={{ width: `${progress}%` }} />
-              </div>
-            )}
-            {(task.subtasks || []).map((s: any, i: number) => (
-              <div key={s.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--bg-elevated)] group">
-                <button onClick={() => toggleSub(i)} disabled={!canUpdate}
-                  className={`w-4 h-4 rounded-md border flex items-center justify-center transition shrink-0 ${s.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[var(--border)]'}`}>
-                  {s.done && <Check className="h-2.5 w-2.5" />}
-                </button>
-                <span className={`text-sm flex-1 ${s.done ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-secondary)]'}`}>{s.title}</span>
-                {canUpdate && (
-                  <button onClick={() => removeSub(i)} className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-400 transition">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-            ))}
-            {canUpdate && (
-              <div className="flex gap-2 mt-2">
-                <input value={newSub} onChange={e => setNewSub(e.target.value)} placeholder={t('taskCreate.addSubtask')} className="input-dark h-8 text-sm flex-1" onKeyDown={e => e.key === 'Enter' && addSub()} />
-                <button onClick={addSub} className="px-3 h-8 rounded-lg bg-[var(--bg-elevated)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">+</button>
-              </div>
-            )}
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('taskCreate.tags')}</label>
-            <div className="flex gap-1.5 flex-wrap">
-              {(task.tags || []).map((tag: string) => (
-                <span key={tag} className="text-[13px] px-2.5 py-1 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] flex items-center gap-1">
-                  <Hash className="h-3 w-3" />{tag}
-                  {canUpdate && <button onClick={() => onUpdate(task.id, 'tags', task.tags.filter((t: string) => t !== tag))} className="text-[var(--text-muted)] hover:text-red-400"><X className="h-3 w-3" /></button>}
-                </span>
-              ))}
-              {(task.tags || []).length === 0 && <span className="text-sm text-[var(--text-muted)]">{t('common.noResults')}</span>}
-            </div>
-          </div>
-
-          {/* Attachments */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{t('taskDetail.attachments')}</label>
-              {canUpdate && (
-                <button onClick={() => fileRef.current?.click()} className="text-[12px] text-[var(--accent)] hover:underline flex items-center gap-1">
-                  <Paperclip className="h-3 w-3" /> {t('taskDetail.addAttachment')}
-                </button>
+                </motion.div>
               )}
-            </div>
-            <input ref={fileRef} type="file" accept={ACCEPTED_FILES} multiple hidden onChange={e => handleFileUpload(e.target.files)} />
+            </AnimatePresence>
+          </div>
 
-            {uploading && (
-              <div className="mb-3 p-3 rounded-xl bg-[var(--bg-elevated)] shadow-card">
-                <div className="flex items-center gap-2 text-sm text-[var(--text-muted)] mb-1.5">
-                  <Paperclip className="h-3 w-3 animate-pulse" /> {t('common.loading')} {uploadPct}%
-                </div>
-                <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                  <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${uploadPct}%` }} />
-                </div>
-              </div>
-            )}
+          {/* ===== 5. ASSIGNEES (collapsible) ===== */}
+          <div>
+            <SectionHeader
+              id="assignees"
+              label={t('taskCreate.assignees')}
+              count={(task.assignees || []).length}
+              collapsed={isSectionCollapsed('assignees')}
+              onToggle={() => toggleSection('assignees')}
+            />
+            <AnimatePresence initial={false}>
+              {!isSectionCollapsed('assignees') && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex gap-1.5 flex-wrap">
+                    {members.map((m: any) => {
+                      const assigned = task.assignees?.includes(m.id);
+                      return (
+                        <button
+                          key={m.id}
+                          disabled={!canUpdate}
+                          onClick={() => {
+                            const n = assigned
+                              ? task.assignees.filter((x: string) => x !== m.id)
+                              : [...(task.assignees || []), m.id];
+                            onUpdate(task.id, 'assignees', n, task.assignees);
+                          }}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition-all duration-200 ${
+                            assigned
+                              ? 'bg-[var(--accent-subtle)] text-[var(--accent)] ring-1 ring-[var(--accent)]/20'
+                              : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+                          }`}
+                        >
+                          <div className="w-4 h-4 rounded-full bg-[var(--accent-subtle)] flex items-center justify-center text-[8px] font-bold">
+                            {m.displayName?.[0]?.toUpperCase()}
+                          </div>
+                          {m.displayName?.split(' ')[0]}
+                          {assigned && <Check className="h-3 w-3" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
-            <div className="space-y-2">
-              {(task.attachments || []).map((att: any) => {
-                const FileIcon = getFileIcon(att.type);
-                const isImg = isImageType(att.type);
-                const isVid = isVideoType(att.type);
-                const isAud = isAudioType(att.type);
+          <div className="h-px bg-[var(--border-subtle)] mx-0" />
 
-                return (
-                  <div key={att.id} className="rounded-xl bg-[var(--bg-elevated)] shadow-card overflow-hidden group">
-                    {/* Preview */}
-                    {isImg && (
-                      <a href={att.url} target="_blank" rel="noopener noreferrer" className="block">
-                        <img src={att.url} alt={att.name} className="w-full max-h-48 object-cover hover:opacity-90 transition" />
-                      </a>
-                    )}
-                    {isVid && (
-                      <video src={att.url} controls className="w-full max-h-48" />
-                    )}
-                    {isAud && (
-                      <div className="p-3"><audio src={att.url} controls className="w-full" /></div>
-                    )}
-                    {/* Info bar */}
-                    <div className="flex items-center gap-2 px-3 py-2">
-                      <FileIcon className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
-                      <span className="text-sm text-[var(--text-secondary)] truncate flex-1">{att.name}</span>
-                      <span className="text-[12px] text-[var(--text-muted)] shrink-0">{formatFileSize(att.size)}</span>
-                      <a href={att.url} target="_blank" rel="noopener noreferrer" className="p-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition">
-                        <Download className="h-3.5 w-3.5" />
-                      </a>
+          {/* ===== 6. SUBTASKS (collapsible) ===== */}
+          <div>
+            <SectionHeader
+              id="subtasks"
+              label={t('taskCreate.subtasks')}
+              count={totalSub > 0 ? totalSub : undefined}
+              collapsed={isSectionCollapsed('subtasks')}
+              onToggle={() => toggleSection('subtasks')}
+            />
+            <AnimatePresence initial={false}>
+              {!isSectionCollapsed('subtasks') && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  {totalSub > 0 && (
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[12px] text-[var(--text-muted)]">
+                          {doneSub}/{totalSub} · {progress}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[var(--accent)] transition-all duration-500"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {(task.subtasks || []).map((s: any, i: number) => (
+                    <div key={s.id} className="flex items-center gap-2 py-2.5 px-3.5 rounded-xl hover:bg-[var(--bg-elevated)] group">
+                      <button
+                        onClick={() => toggleSub(i)}
+                        disabled={!canUpdate}
+                        className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center transition shrink-0 ${
+                          s.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[var(--border)]'
+                        }`}
+                      >
+                        {s.done && <Check className="h-2.5 w-2.5" />}
+                      </button>
+                      <span className={`text-[14px] flex-1 ${s.done ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-secondary)]'}`}>
+                        {s.title}
+                      </span>
                       {canUpdate && (
-                        <button onClick={() => removeAttachment(att.id)} className="p-1 text-[var(--text-muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition">
-                          <Trash2 className="h-3.5 w-3.5" />
+                        <button
+                          onClick={() => removeSub(i)}
+                          className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-400 transition"
+                        >
+                          <X className="h-3.5 w-3.5" />
                         </button>
                       )}
                     </div>
-                  </div>
-                );
-              })}
-              {(task.attachments || []).length === 0 && !uploading && (
-                <p className="text-sm text-[var(--text-muted)] text-center py-2">{t('common.noResults')}</p>
+                  ))}
+
+                  {canUpdate && (
+                    <div className="flex gap-2 mt-2">
+                      <input
+                        value={newSub}
+                        onChange={e => setNewSub(e.target.value)}
+                        placeholder={t('taskCreate.addSubtask')}
+                        className="input-dark h-10 rounded-xl text-sm flex-1"
+                        onKeyDown={e => e.key === 'Enter' && addSub()}
+                      />
+                      <button
+                        onClick={addSub}
+                        className="px-3 h-10 rounded-xl bg-[var(--bg-elevated)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
               )}
-            </div>
+            </AnimatePresence>
+          </div>
+
+          {/* ===== 7. CUSTOM FIELDS (collapsible) ===== */}
+          <div>
+            <SectionHeader
+              id="customFields"
+              label={t('taskCreate.customFields')}
+              count={activeFieldIds.length > 0 ? activeFieldIds.length : undefined}
+              collapsed={isSectionCollapsed('customFields')}
+              onToggle={() => toggleSection('customFields')}
+            />
+            <AnimatePresence initial={false}>
+              {!isSectionCollapsed('customFields') && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  {/* Add field button */}
+                  {canUpdate && availableFields.length > 0 && (
+                    <div className="mb-3">
+                      <button
+                        onClick={() => setShowFieldPicker(!showFieldPicker)}
+                        className="text-[12px] text-[var(--accent)] hover:underline flex items-center gap-1"
+                      >
+                        <Plus className="h-3 w-3" /> {t('common.create')}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Field picker */}
+                  <AnimatePresence>
+                    {showFieldPicker && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="flex flex-wrap gap-1.5 mb-3 p-3 rounded-xl bg-[var(--bg-elevated)] shadow-card">
+                          {availableFields.map(f => (
+                            <button
+                              key={f.id}
+                              onClick={() => {
+                                setCustomField(f.id, f.type === 'checkbox' ? false : '');
+                                setShowFieldPicker(false);
+                              }}
+                              className="text-sm px-2.5 py-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200"
+                            >
+                              {t(`customField.${f.id}`) !== `customField.${f.id}` ? t(`customField.${f.id}`) : f.label}
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Grouped fields */}
+                  {CUSTOM_FIELD_GROUPS.map(group => {
+                    const groupFieldIds = activeFieldIds.filter(fid => {
+                      const def = DEFAULT_CUSTOM_FIELDS.find(f => f.id === fid);
+                      return def && def.group === group.id;
+                    });
+                    if (groupFieldIds.length === 0) return null;
+                    return (
+                      <div key={group.id} className="mb-3 rounded-xl p-4 bg-[var(--bg-tertiary)]/50">
+                        <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]/50 font-semibold mb-2">
+                          {t(group.labelKey) !== group.labelKey ? t(group.labelKey) : FIELD_GROUP_LABELS[group.id] || group.id}
+                        </div>
+                        {groupFieldIds.map(fid => {
+                          const def = DEFAULT_CUSTOM_FIELDS.find(f => f.id === fid);
+                          if (!def) return null;
+                          const val = customFields[fid];
+                          return (
+                            <div key={fid} className="flex items-center gap-2 mb-2">
+                              <label className="text-[13px] text-[var(--text-muted)] w-32 shrink-0 truncate">
+                                {t(`customField.${def.id}`) !== `customField.${def.id}` ? t(`customField.${def.id}`) : def.label}
+                              </label>
+                              {renderFieldInput(def, val, fid)}
+                              {canUpdate && (
+                                <button
+                                  onClick={() => removeCustomField(fid)}
+                                  className="text-[var(--text-muted)] hover:text-red-400 p-1 transition"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+
+                  {/* Ungrouped fields (safety net) */}
+                  {activeFieldIds
+                    .filter(fid => {
+                      const def = DEFAULT_CUSTOM_FIELDS.find(f => f.id === fid);
+                      return def && !CUSTOM_FIELD_GROUPS.some(g => g.id === def.group);
+                    })
+                    .map(fid => {
+                      const def = DEFAULT_CUSTOM_FIELDS.find(f => f.id === fid);
+                      if (!def) return null;
+                      const val = customFields[fid];
+                      return (
+                        <div key={fid} className="flex items-center gap-2 mb-2">
+                          <label className="text-[13px] text-[var(--text-muted)] w-32 shrink-0 truncate">
+                            {t(`customField.${def.id}`) !== `customField.${def.id}` ? t(`customField.${def.id}`) : def.label}
+                          </label>
+                          {renderFieldInput(def, val, fid)}
+                          {canUpdate && (
+                            <button
+                              onClick={() => removeCustomField(fid)}
+                              className="text-[var(--text-muted)] hover:text-red-400 p-1 transition"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* ===== 8. TAGS (collapsible) ===== */}
+          <div>
+            <SectionHeader
+              id="tags"
+              label={t('taskCreate.tags')}
+              count={(task.tags || []).length > 0 ? (task.tags || []).length : undefined}
+              collapsed={isSectionCollapsed('tags')}
+              onToggle={() => toggleSection('tags')}
+            />
+            <AnimatePresence initial={false}>
+              {!isSectionCollapsed('tags') && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex gap-1.5 flex-wrap">
+                    {(task.tags || []).map((tag: string) => (
+                      <span
+                        key={tag}
+                        className="text-[13px] px-2.5 py-1 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] flex items-center gap-1"
+                      >
+                        <Hash className="h-3 w-3" />
+                        {tag}
+                        {canUpdate && (
+                          <button
+                            onClick={() => onUpdate(task.id, 'tags', task.tags.filter((tg: string) => tg !== tag))}
+                            className="text-[var(--text-muted)] hover:text-red-400 transition"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                    {(task.tags || []).length === 0 && (
+                      <span className="text-sm text-[var(--text-muted)]">{t('common.noResults')}</span>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="h-px bg-[var(--border-subtle)] mx-0" />
+
+          {/* ===== 9. ATTACHMENTS (collapsible) ===== */}
+          <div>
+            <SectionHeader
+              id="attachments"
+              label={t('taskDetail.attachments')}
+              count={(task.attachments || []).length > 0 ? (task.attachments || []).length : undefined}
+              collapsed={isSectionCollapsed('attachments')}
+              onToggle={() => toggleSection('attachments')}
+            />
+            <AnimatePresence initial={false}>
+              {!isSectionCollapsed('attachments') && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  {canUpdate && (
+                    <button
+                      onClick={() => fileRef.current?.click()}
+                      className="text-[12px] text-[var(--accent)] hover:underline flex items-center gap-1 mb-2"
+                    >
+                      <Paperclip className="h-3 w-3" /> {t('taskDetail.addAttachment')}
+                    </button>
+                  )}
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept={ACCEPTED_FILES}
+                    multiple
+                    hidden
+                    onChange={e => handleFileUpload(e.target.files)}
+                  />
+
+                  {uploading && (
+                    <div className="mb-3 rounded-xl p-4 bg-[var(--bg-elevated)] shadow-card">
+                      <div className="flex items-center gap-2 text-sm text-[var(--text-muted)] mb-1.5">
+                        <Paperclip className="h-3 w-3 animate-pulse" /> {t('common.loading')} {uploadPct}%
+                      </div>
+                      <div className="h-2 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-[var(--accent)] transition-all"
+                          style={{ width: `${uploadPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Attachment list */}
+                  {(() => {
+                    const allAtts = task.attachments || [];
+                    if (allAtts.length === 0 && !uploading) {
+                      return <p className="text-sm text-[var(--text-muted)] text-center py-2">{t('common.noResults')}</p>;
+                    }
+                    const mediaAtts = allAtts.filter((a: any) => isImageType(a.type) || isVideoType(a.type));
+                    const otherAtts = allAtts.filter((a: any) => !isImageType(a.type) && !isVideoType(a.type));
+
+                    return (
+                      <div className="space-y-3">
+                        {/* Media grid — compact thumbnails, 2 per row */}
+                        {mediaAtts.length > 0 && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {mediaAtts.map((att: any) => {
+                              const isImg = isImageType(att.type);
+                              const h = isImg ? 110 : 130;
+                              return (
+                                <div key={att.id} className="group relative rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-black" style={{ height: `${h}px` }}>
+                                  {isImg ? (
+                                    <a href={att.url} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
+                                      <img src={att.url} alt={att.name} style={{ width: '100%', height: `${h}px`, objectFit: 'cover', display: 'block' }} />
+                                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
+                                        <ExternalLink className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                      </div>
+                                    </a>
+                                  ) : (
+                                    <video src={att.url} controls style={{ width: '100%', height: `${h}px`, objectFit: 'contain', display: 'block' }} />
+                                  )}
+                                  {canUpdate && (
+                                    <button
+                                      onClick={() => removeAttachment(att.id)}
+                                      className="absolute top-1 right-1 p-1 rounded bg-black/50 text-white/70 hover:text-red-400 opacity-0 group-hover:opacity-100 transition"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Other files — compact list */}
+                        {otherAtts.map((att: any) => {
+                          const FileIcon = getFileIcon(att.type);
+                          const isAud = isAudioType(att.type);
+                          return (
+                            <div key={att.id} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] group">
+                              <FileIcon className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
+                              <span className="text-[12px] font-medium text-[var(--text-secondary)] truncate flex-1">{att.name}</span>
+                              {isAud && <audio src={att.url} controls className="h-7 max-w-[140px] shrink-0" />}
+                              <span className="text-[11px] text-[var(--text-muted)] shrink-0">{formatFileSize(att.size)}</span>
+                              <a href={att.url} target="_blank" rel="noopener noreferrer" className="p-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition shrink-0">
+                                <Download className="h-3 w-3" />
+                              </a>
+                              {canUpdate && (
+                                <button onClick={() => removeAttachment(att.id)} className="p-1 text-[var(--text-muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition shrink-0">
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* ===== 10. DEPENDENCIES (collapsible) ===== */}
+          <div>
+            <SectionHeader
+              id="dependencies"
+              label={t('taskDetail.dependencies')}
+              count={(task.dependencies || []).length > 0 ? (task.dependencies || []).length : undefined}
+              collapsed={isSectionCollapsed('dependencies')}
+              onToggle={() => toggleSection('dependencies')}
+            />
+            <AnimatePresence initial={false}>
+              {!isSectionCollapsed('dependencies') && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  {(task.dependencies || []).length > 0 ? (
+                    <div className="space-y-1.5">
+                      {(task.dependencies || []).map((depId: string) => (
+                        <div key={depId} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--bg-elevated)]">
+                          <GitBranch className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                          <span className="text-sm text-[var(--text-secondary)] truncate">{depId}</span>
+                        </div>
+                      ))}
+                      <p className="text-[11px] text-[var(--text-muted)]/50 mt-1">
+                        This task is blocked until the above tasks are completed.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-[var(--text-muted)] text-center py-2">{t('common.noResults')}</p>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
-        {/* Tabs: Comments / Activity / Details */}
-        <div>
-          <div className="flex px-5">
+        {/* ===== BOTTOM TABS ===== */}
+        <div className="sticky bottom-0 bg-[var(--bg-base)] overflow-hidden min-w-0">
+          <div className="flex px-6 border-b border-[var(--border-subtle)]">
             {([
-              { key: 'comments', label: `${t('taskDetail.comments')} (${comments.length})` },
-              { key: 'activity', label: t('taskDetail.activity') },
-              { key: 'details', label: t('taskDetail.details') },
-            ] as const).map(tb => (
-              <button key={tb.key} onClick={() => setTab(tb.key as any)}
-                className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition ${tab === tb.key ? 'text-[var(--accent)] border-[var(--accent)]' : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'}`}>
+              { key: 'comments' as const, label: `${t('taskDetail.comments')} (${comments.length})`, icon: MessageSquare },
+              { key: 'activity' as const, label: t('taskDetail.activity'), icon: Activity },
+              { key: 'details' as const, label: t('taskDetail.details'), icon: Eye },
+            ]).map(tb => (
+              <button
+                key={tb.key}
+                onClick={() => setTab(tab === tb.key ? null : tb.key)}
+                className={`flex items-center gap-2 h-10 px-4 text-[13px] font-medium border-b-2 transition ${
+                  tab === tb.key
+                    ? 'text-[var(--accent)] border-[var(--accent)]'
+                    : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'
+                }`}
+              >
+                <tb.icon className="h-4 w-4" />
                 {tb.label}
               </button>
             ))}
           </div>
 
-          <div className="p-5">
-            {/* Comments tab */}
+          <AnimatePresence initial={false}>
+          {tab !== null && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+          <div className="px-6 py-5 overflow-hidden min-w-0">
+            {/* --- Comments Tab --- */}
             {tab === 'comments' && (
-              <div>
-                <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
-                  {comments.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-4">{t('taskDetail.noComments')}</p>}
+              <div className="overflow-hidden min-w-0">
+                <div className="space-y-4 mb-4 max-h-64 overflow-y-auto overflow-x-hidden">
+                  {comments.length === 0 && (
+                    <p className="text-sm text-[var(--text-muted)] text-center py-4">
+                      {t('taskDetail.noComments')}
+                    </p>
+                  )}
                   {comments.map(c => (
                     <div key={c.id} className="flex gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-[var(--accent-subtle)] flex items-center justify-center text-[12px] font-bold text-[var(--accent)] shrink-0">{c.authorName?.[0]?.toUpperCase()}</div>
+                      <div className="w-8 h-8 rounded-lg bg-[var(--accent-subtle)] flex items-center justify-center text-[12px] font-bold text-[var(--accent)] shrink-0">
+                        {c.authorName?.[0]?.toUpperCase()}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2">
-                          <span className="text-sm font-semibold text-[var(--text-primary)]">{c.authorName}</span>
-                          <span className="text-[12px] text-[var(--text-muted)]">{c.createdAt?.toDate?.()?.toLocaleString?.('es-MX') || ''}</span>
+                          <span className="text-[13px] font-semibold text-[var(--text-primary)]">{c.authorName}</span>
+                          <span className="text-[12px] text-[var(--text-muted)]">
+                            {c.createdAt?.toDate?.()?.toLocaleString?.('es-MX') || ''}
+                          </span>
                         </div>
-                        <p className="text-sm text-[var(--text-secondary)] mt-0.5 break-words">
+                        <p className="text-[14px] leading-relaxed text-[var(--text-secondary)] mt-0.5 break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                           {c.text?.split(/(@\w+)/g).map((part: string, i: number) =>
-                            part.startsWith('@') ? <span key={i} className="text-[var(--accent)] font-medium">{part}</span> : part
+                            part.startsWith('@')
+                              ? <span key={i} className="text-[var(--accent)] font-medium">{part}</span>
+                              : part
                           )}
                         </p>
                       </div>
@@ -524,98 +1101,218 @@ export default function TaskDetailDrawer({ task, members, teams, userId, userNam
                   ))}
                   <div ref={commentsEndRef} />
                 </div>
+
                 {/* Comment input with @mentions */}
                 <div className="relative">
-                  {mentionOpen && filteredMentionMembers.length > 0 && (
-                    <div className="absolute bottom-full left-0 right-0 mb-1 bg-[var(--bg-elevated)] rounded-xl shadow-dropdown max-h-40 overflow-y-auto z-10">
-                      {filteredMentionMembers.map(m => (
-                        <button key={m.id} onClick={() => insertMention(m)}
-                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--bg-elevated)] text-left transition">
-                          <div className="w-5 h-5 rounded-full bg-[var(--accent-subtle)] flex items-center justify-center text-[9px] font-bold text-[var(--accent)]">{m.displayName?.[0]?.toUpperCase()}</div>
-                          <span className="text-sm text-[var(--text-secondary)]">{m.displayName}</span>
-                          <span className="text-[12px] text-[var(--text-muted)]">{m.title || m.role}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <input ref={commentRef} value={newComment} onChange={e => handleCommentChange(e.target.value)}
+                  <AnimatePresence>
+                    {mentionOpen && filteredMentionMembers.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 4 }}
+                        transition={{ duration: 0.12 }}
+                        className="absolute bottom-full left-0 right-0 mb-1 bg-[var(--bg-elevated)] rounded-xl shadow-dropdown max-h-40 overflow-y-auto z-10"
+                      >
+                        {filteredMentionMembers.map(m => (
+                          <button
+                            key={m.id}
+                            onClick={() => insertMention(m)}
+                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--bg-hover)] text-left transition"
+                          >
+                            <div className="w-5 h-5 rounded-full bg-[var(--accent-subtle)] flex items-center justify-center text-[9px] font-bold text-[var(--accent)]">
+                              {m.displayName?.[0]?.toUpperCase()}
+                            </div>
+                            <span className="text-sm text-[var(--text-secondary)]">{m.displayName}</span>
+                            <span className="text-[12px] text-[var(--text-muted)] ml-auto">{m.title || m.role}</span>
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      ref={commentRef}
+                      value={newComment}
+                      onChange={e => handleCommentChange(e.target.value)}
                       placeholder={t('taskDetail.addComment')}
-                      className="input-dark h-9 text-sm flex-1" onKeyDown={e => { if (e.key === 'Enter' && !mentionOpen) postComment(); if (e.key === 'Escape') setMentionOpen(false); }} />
-                    <button onClick={postComment} className="h-9 px-4 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm"><Send className="h-3.5 w-3.5" /></button>
+                      className="flex-1 min-h-[48px] rounded-xl border border-[var(--border-subtle)] focus:border-[var(--accent)]/30 bg-[var(--bg-elevated)] px-4 py-3 text-[14px] text-[var(--text-secondary)] focus:outline-none transition"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !mentionOpen) postComment();
+                        if (e.key === 'Escape') setMentionOpen(false);
+                      }}
+                    />
+                    <button
+                      onClick={postComment}
+                      className="h-8 w-8 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition flex items-center justify-center shrink-0"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Activity tab */}
+            {/* --- Activity Tab --- */}
             {tab === 'activity' && (
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {activity.length === 0 && <p className="text-sm text-[var(--text-muted)] text-center py-4">{t('taskDetail.noActivity')}</p>}
+                {activity.length === 0 && (
+                  <p className="text-sm text-[var(--text-muted)] text-center py-4">
+                    {t('taskDetail.noActivity')}
+                  </p>
+                )}
                 {activity.map(a => (
                   <div key={a.id} className="flex items-start gap-2 text-sm">
                     <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] mt-1.5 shrink-0" />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <span className="text-[var(--accent)] font-medium">{a.actorName}</span>{' '}
                       <span className="text-[var(--text-muted)]">{a.action}</span>
                       {a.field && <span className="text-[var(--text-muted)]"> {a.field}</span>}
                       {a.from && <span className="text-red-400/60 line-through ml-1">{a.from}</span>}
-                      {a.to && <span className="text-emerald-400 ml-1">{a.to}</span>}
-                      <span className="text-[var(--text-muted)]/40 ml-2">{a.createdAt?.toDate?.()?.toLocaleString?.('es-MX') || ''}</span>
+                      {a.to && (
+                        <>
+                          {a.from && <span className="text-[var(--text-muted)] mx-1">-&gt;</span>}
+                          <span className="text-emerald-400">{a.to}</span>
+                        </>
+                      )}
+                      <span className="text-[var(--text-muted)]/40 ml-2 text-[12px]">
+                        {a.createdAt?.toDate?.()?.toLocaleString?.('es-MX') || ''}
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Details tab */}
+            {/* --- Details Tab --- */}
             {tab === 'details' && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">{t('taskCreate.type')}</span>
-                  <span className="text-[var(--text-secondary)] flex items-center gap-1"><tp.Icon className="h-3 w-3" style={{ color: tp.color }} />{t(`taskType.${tp.id}`)}</span>
+                  <span className="text-[var(--text-muted)] flex items-center gap-1.5">
+                    <CheckSquare className="h-3 w-3" />{t('taskCreate.type')}
+                  </span>
+                  <span className="text-[var(--text-secondary)] flex items-center gap-1">
+                    <tp.Icon className="h-3 w-3" style={{ color: tp.color }} />
+                    {t(`taskType.${tp.id}`)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">{t('taskCreate.visibility')}</span>
-                  <span className="text-[var(--text-secondary)] flex items-center gap-1">{visConf && <><visConf.Icon className="h-3 w-3" style={{ color: visConf.color }} />{t(`visibility.${visConf.id}`)}</>}</span>
+                  <span className="text-[var(--text-muted)] flex items-center gap-1.5">
+                    <Eye className="h-3 w-3" />{t('taskCreate.visibility')}
+                  </span>
+                  <span className="text-[var(--text-secondary)] flex items-center gap-1">
+                    {visConf && (
+                      <>
+                        <visConf.Icon className="h-3 w-3" style={{ color: visConf.color }} />
+                        {t(`visibility.${visConf.id}`)}
+                      </>
+                    )}
+                  </span>
                 </div>
                 {taskTeam && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">{t('taskCreate.department')}</span>
+                    <span className="text-[var(--text-muted)] flex items-center gap-1.5">
+                      <User className="h-3 w-3" />{t('taskCreate.department')}
+                    </span>
                     <span className="text-[var(--text-secondary)]">{taskTeam.icon} {taskTeam.name}</span>
                   </div>
                 )}
-                {task.timeEstimate && (
+                {task.timeEstimate != null && task.timeEstimate > 0 && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">{t('taskCreate.timeEstimate')}</span>
+                    <span className="text-[var(--text-muted)] flex items-center gap-1.5">
+                      <Clock className="h-3 w-3" />{t('taskCreate.timeEstimate')}
+                    </span>
                     <span className="text-[var(--text-secondary)]">{task.timeEstimate}m</span>
                   </div>
                 )}
-                {task.points && (
+                {task.points != null && task.points > 0 && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">{t('taskCreate.points')}</span>
+                    <span className="text-[var(--text-muted)] flex items-center gap-1.5">
+                      <Activity className="h-3 w-3" />{t('taskCreate.points')}
+                    </span>
                     <span className="text-[var(--text-secondary)]">{task.points}</span>
                   </div>
                 )}
+                <div className="h-px bg-[var(--border-subtle)] mx-0" />
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">{t('taskDetail.created')}</span>
-                  <span className="text-[var(--text-secondary)]">{task.createdAt?.toDate?.()?.toLocaleDateString?.('es-MX') || '—'}</span>
+                  <span className="text-[var(--text-muted)] flex items-center gap-1.5">
+                    <Calendar className="h-3 w-3" />{t('taskDetail.created')}
+                  </span>
+                  <span className="text-[var(--text-secondary)]">
+                    {task.createdAt?.toDate?.()?.toLocaleDateString?.('es-MX') || '\u2014'}
+                  </span>
                 </div>
                 {task.updatedAt && (
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">{t('taskDetail.updated')}</span>
-                    <span className="text-[var(--text-secondary)]">{task.updatedAt?.toDate?.()?.toLocaleDateString?.('es-MX') || '—'}</span>
+                    <span className="text-[var(--text-muted)] flex items-center gap-1.5">
+                      <Clock className="h-3 w-3" />{t('taskDetail.updated')}
+                    </span>
+                    <span className="text-[var(--text-secondary)]">
+                      {task.updatedAt?.toDate?.()?.toLocaleDateString?.('es-MX') || '\u2014'}
+                    </span>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">{t('taskDetail.createdBy')}</span>
-                  <span className="text-[var(--text-secondary)]">{members.find(m => m.id === task.createdBy)?.displayName || task.createdBy}</span>
+                  <span className="text-[var(--text-muted)] flex items-center gap-1.5">
+                    <User className="h-3 w-3" />{t('taskDetail.createdBy')}
+                  </span>
+                  <span className="text-[var(--text-secondary)]">
+                    {members.find(m => m.id === task.createdBy)?.displayName || task.createdBy}
+                  </span>
                 </div>
               </div>
             )}
           </div>
+          </motion.div>
+          )}
+          </AnimatePresence>
         </div>
       </div>
     </div>
+  );
+
+  /* ============================================
+     RENDER: Drawer vs Fullscreen
+     ============================================ */
+  if (expanded) {
+    return (
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-50 flex items-center justify-center"
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          {/* Full panel */}
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="relative w-full max-w-3xl h-[90vh] bg-[var(--bg-base)]/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-[var(--border-subtle)] overflow-hidden"
+          >
+            {content}
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+      style={{ width: '540px', maxWidth: '85vw' }}
+      className="fixed top-0 right-0 z-40 h-full bg-[var(--bg-base)] border-l border-[var(--border-subtle)] shadow-2xl flex flex-col overflow-hidden"
+    >
+      {content}
+    </motion.div>
   );
 }

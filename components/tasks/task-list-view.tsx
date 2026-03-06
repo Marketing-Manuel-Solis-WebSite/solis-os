@@ -3,11 +3,19 @@ import { useState, useRef, useEffect } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChevronDown, ChevronRight, ChevronUp,
-  Calendar, CheckSquare, Pencil, Trash2,
+  ChevronDown, ChevronRight, ChevronUp, Calendar,
+  CheckSquare, Trash2, GripVertical, Paperclip,
 } from 'lucide-react';
-import { STATUSES, PRIORITIES, TASK_TYPES, Task, TaskGroup } from './constants';
+import {
+  STATUSES, PRIORITIES, TASK_TYPES, ALL_COLUMNS,
+  Task, TaskGroup, Density, SubtaskDisplay, ColumnDef,
+  getStatusConfig, getPriorityConfig, getTypeConfig, isOverdue, getSubtaskProgress,
+} from './constants';
 import TaskQuickAdd from './task-quick-add';
+
+/* ============================================= */
+/* TYPES                                         */
+/* ============================================= */
 
 interface Props {
   groups: TaskGroup[];
@@ -18,6 +26,9 @@ interface Props {
   sortBy: string;
   sortDir: 'asc' | 'desc';
   canUpdate: boolean;
+  density: Density;
+  columns: string[];
+  subtaskDisplay: SubtaskDisplay;
   onSelect: (task: Task) => void;
   onSelectionChange: (ids: Set<string>) => void;
   onUpdate: (id: string, field: string, value: any, old?: any) => void;
@@ -26,30 +37,620 @@ interface Props {
   onQuickCreate: (data: any) => void;
 }
 
-const COLUMNS = [
-  { id: 'checkbox', labelKey: '', width: 'w-10', sortable: false },
-  { id: 'status', labelKey: 'taskCreate.status', width: 'w-10', sortable: true },
-  { id: 'title', labelKey: 'taskCreate.titlePlaceholder', width: 'flex-1', sortable: true },
-  { id: 'priority', labelKey: 'taskCreate.priority', width: 'w-24', sortable: true },
-  { id: 'assignees', labelKey: 'taskCreate.assignees', width: 'w-28', sortable: false },
-  { id: 'due', labelKey: 'taskCreate.dueDate', width: 'w-28', sortable: true },
-  { id: 'tags', labelKey: 'taskCreate.tags', width: 'w-32 hidden lg:flex', sortable: false },
-  { id: 'points', labelKey: 'taskCreate.points', width: 'w-14', sortable: true },
-];
+/* ============================================= */
+/* DENSITY -> ROW HEIGHT MAP                     */
+/* ============================================= */
+
+const DENSITY_HEIGHT: Record<Density, number> = {
+  compact: 36,
+  comfortable: 48,
+  spacious: 56,
+};
+
+/* ============================================= */
+/* HELPERS                                       */
+/* ============================================= */
+
+function formatDate(d: Date): string {
+  return d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' });
+}
+
+function formatMinutes(m: number): string {
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const rem = m % 60;
+    return rem > 0 ? `${h}h${rem}m` : `${h}h`;
+  }
+  return `${m}m`;
+}
+
+function toDateInputValue(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/* ============================================= */
+/* INLINE PRIORITY SELECT                        */
+/* ============================================= */
+
+function InlinePrioritySelect({
+  value,
+  canUpdate,
+  onChange,
+}: {
+  value: string;
+  canUpdate: boolean;
+  onChange: (v: string) => void;
+}) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const p = getPriorityConfig(value);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  if (!canUpdate) {
+    return (
+      <span className="text-[15px]" title={t(`priority.${p.id}`)}>
+        {p.icon}
+      </span>
+    );
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="text-[15px] hover:scale-110 hover:ring-1 hover:ring-[var(--border)] hover:rounded-md transition"
+        title={t(`priority.${p.id}`)}
+      >
+        {p.icon}
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 4, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-[var(--bg-base)] rounded-xl shadow-dropdown z-30 p-1 min-w-[130px] border border-[var(--border-subtle)]"
+          >
+            {PRIORITIES.map((pri) => (
+              <button
+                key={pri.id}
+                onClick={(e) => { e.stopPropagation(); onChange(pri.id); setOpen(false); }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm w-full hover:bg-[var(--bg-hover)] transition ${
+                  value === pri.id ? 'bg-[var(--bg-hover)]' : ''
+                }`}
+              >
+                <span>{pri.icon}</span>
+                <span className="text-[var(--text-secondary)]">{t(`priority.${pri.id}`)}</span>
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ============================================= */
+/* INLINE DATE EDITOR                            */
+/* ============================================= */
+
+function InlineDateEditor({
+  value,
+  overdue,
+  canUpdate,
+  onChange,
+}: {
+  value: Date | null;
+  overdue: boolean;
+  canUpdate: boolean;
+  onChange: (dateStr: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [editing]);
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (canUpdate) setEditing(true);
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.value);
+    setEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === 'Escape') {
+      setEditing(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="date"
+        defaultValue={value ? toDateInputValue(value) : ''}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        onBlur={() => setEditing(false)}
+        onClick={(e) => e.stopPropagation()}
+        className="input-dark text-[12px] h-7 w-full rounded-md px-1.5"
+      />
+    );
+  }
+
+  if (!value) {
+    if (!canUpdate) return null;
+    return (
+      <button
+        onClick={handleClick}
+        className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition opacity-0 group-hover/row:opacity-100"
+      >
+        <Calendar className="h-3.5 w-3.5" />
+      </button>
+    );
+  }
+
+  return (
+    <span
+      onClick={handleClick}
+      className={`text-[12px] font-medium flex items-center gap-1 px-2.5 py-1 rounded-lg truncate ${
+        canUpdate ? 'cursor-pointer hover:ring-1 hover:ring-[var(--accent)]/30' : ''
+      } ${
+        overdue
+          ? 'bg-[var(--error)]/8 text-[var(--error)] border border-[var(--error)]/15'
+          : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)]'
+      }`}
+    >
+      <Calendar className="h-3 w-3 shrink-0" />
+      {formatDate(value)}
+    </span>
+  );
+}
+
+/* ============================================= */
+/* SUBTASK INDICATORS                            */
+/* ============================================= */
+
+function SubtaskCount({ task }: { task: Task }) {
+  const { done, total } = getSubtaskProgress(task);
+  if (total === 0) return null;
+  return (
+    <span className="text-[11px] px-2 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-muted)] font-medium whitespace-nowrap">
+      {done}/{total}
+    </span>
+  );
+}
+
+function SubtaskProgressBar({ task }: { task: Task }) {
+  const { pct, total } = getSubtaskProgress(task);
+  if (total === 0) return null;
+  return (
+    <div className="w-full h-1 rounded-full bg-[var(--bg-tertiary)] mt-1 overflow-hidden max-w-[160px]">
+      <div
+        className="h-full rounded-full bg-[var(--accent)] transition-all duration-300"
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
+function SubtaskExpandedList({
+  task,
+  canUpdate,
+  onUpdate,
+}: {
+  task: Task;
+  canUpdate: boolean;
+  onUpdate: (id: string, field: string, value: any, old?: any) => void;
+}) {
+  if (!task.subtasks?.length) return null;
+
+  const toggleSubtask = (subId: string, currentDone: boolean) => {
+    const updated = task.subtasks.map((s) =>
+      s.id === subId ? { ...s, done: !currentDone } : s
+    );
+    onUpdate(task.id, 'subtasks', updated, task.subtasks);
+  };
+
+  return (
+    <div className="ml-10 mt-1 space-y-0.5">
+      {task.subtasks.map((sub) => (
+        <div
+          key={sub.id}
+          className="flex items-center gap-2 py-0.5 text-[13px]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => canUpdate && toggleSubtask(sub.id, sub.done)}
+            className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 transition ${
+              sub.done
+                ? 'bg-[var(--accent)] text-white'
+                : 'bg-[var(--bg-tertiary)] hover:bg-[var(--accent)]/20'
+            }`}
+          >
+            {sub.done && <span className="text-[9px] font-bold leading-none">&#10003;</span>}
+          </button>
+          <span className={sub.done ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-secondary)]'}>
+            {sub.title}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============================================= */
+/* TASK ROW                                      */
+/* ============================================= */
+
+function TaskRow({
+  task,
+  index,
+  members,
+  teams,
+  isSelected,
+  isChecked,
+  canUpdate,
+  density,
+  columns,
+  subtaskDisplay,
+  onSelect,
+  onCheck,
+  onUpdate,
+  onDelete,
+}: {
+  task: Task;
+  index: number;
+  members: any[];
+  teams: any[];
+  isSelected: boolean;
+  isChecked: boolean;
+  canUpdate: boolean;
+  density: Density;
+  columns: string[];
+  subtaskDisplay: SubtaskDisplay;
+  onSelect: () => void;
+  onCheck: () => void;
+  onUpdate: (id: string, field: string, value: any, old?: any) => void;
+  onDelete: () => void;
+}) {
+  const { t } = useI18n();
+  const [hovered, setHovered] = useState(false);
+
+  const statusCfg = getStatusConfig(task.status);
+  const priorityCfg = getPriorityConfig(task.priority);
+  const typeCfg = getTypeConfig(task.type || 'task');
+  const due = task.dueDate?.toDate?.() ?? null;
+  const overdue = isOverdue(task);
+  const taskTeam = teams.find((tm: any) => tm.id === task.teamId);
+  const rowHeight = Math.max(DENSITY_HEIGHT[density], 44);
+
+  const columnSet = new Set(columns);
+  const visibleCols = ALL_COLUMNS.filter((c) => columnSet.has(c.id));
+
+  const isDone = task.status === 'done';
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, delay: Math.min(index, 20) * 0.015 }}
+        onClick={onSelect}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className={`group/row flex items-center gap-2 px-5 rounded-xl cursor-pointer transition-all duration-150 relative border ${
+          isSelected
+            ? 'bg-[var(--accent)]/8 border-[var(--accent)]/25 shadow-sm'
+            : isChecked
+            ? 'bg-[var(--accent)]/5 border-[var(--accent)]/15'
+            : 'border-transparent hover:bg-[var(--bg-elevated)] hover:border-[var(--border-subtle)] hover:shadow-sm'
+        }`}
+        style={{ height: `${rowHeight}px` }}
+      >
+        {/* Render each visible column */}
+        {visibleCols.map((col) => {
+          const widthCls = `${col.width} ${col.minWidth || ''} shrink-0`;
+
+          switch (col.id) {
+            /* ----- CHECKBOX ----- */
+            case 'checkbox':
+              return (
+                <div
+                  key={col.id}
+                  className={`${widthCls} flex justify-center`}
+                  onClick={(e) => { e.stopPropagation(); onCheck(); }}
+                >
+                  <div
+                    className={`w-4 h-4 rounded flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                      isChecked
+                        ? 'bg-[var(--accent)]'
+                        : 'bg-[var(--bg-tertiary)] hover:bg-[var(--accent)]/20'
+                    }`}
+                  >
+                    {isChecked && (
+                      <span className="text-[var(--accent-text)] text-[11px] font-bold leading-none">&#10003;</span>
+                    )}
+                  </div>
+                </div>
+              );
+
+            /* ----- STATUS ----- */
+            case 'status':
+              return (
+                <div key={col.id} className={`${widthCls} flex justify-center`}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (canUpdate) {
+                        onUpdate(task.id, 'status', isDone ? 'todo' : 'done', task.status);
+                      }
+                    }}
+                    className="hover:scale-110 transition"
+                    title={t(`status.${statusCfg.id}`)}
+                  >
+                    <statusCfg.Icon className="h-[18px] w-[18px]" style={{ color: statusCfg.color }} />
+                  </button>
+                </div>
+              );
+
+            /* ----- TITLE ----- */
+            case 'title':
+              return (
+                <div key={col.id} className={`${widthCls} min-w-0`}>
+                  <div className="flex items-center gap-2">
+                    <typeCfg.Icon
+                      className="h-3.5 w-3.5 shrink-0 opacity-50"
+                      style={{ color: typeCfg.color }}
+                    />
+                    <p
+                      className={`text-[14px] font-medium truncate ${
+                        isDone
+                          ? 'line-through text-[var(--text-muted)]'
+                          : 'text-[var(--text-primary)]'
+                      }`}
+                    >
+                      {task.title}
+                    </p>
+                    {taskTeam && (
+                      <span
+                        className="hidden xl:inline-flex text-[9px] px-1.5 py-0.5 rounded-md font-medium shrink-0"
+                        style={{ backgroundColor: `${taskTeam.color}15`, color: taskTeam.color }}
+                      >
+                        {taskTeam.icon}
+                      </span>
+                    )}
+                    {task.attachments?.length > 0 && (
+                      <Paperclip className="h-3 w-3 shrink-0 text-[var(--text-muted)] opacity-60" />
+                    )}
+                    {subtaskDisplay === 'count' && <SubtaskCount task={task} />}
+                  </div>
+                  {subtaskDisplay === 'progress' && <SubtaskProgressBar task={task} />}
+                </div>
+              );
+
+            /* ----- PRIORITY ----- */
+            case 'priority':
+              return (
+                <div key={col.id} className={`${widthCls} flex justify-center`}>
+                  <InlinePrioritySelect
+                    value={task.priority}
+                    canUpdate={canUpdate}
+                    onChange={(val) => onUpdate(task.id, 'priority', val, task.priority)}
+                  />
+                </div>
+              );
+
+            /* ----- ASSIGNEES ----- */
+            case 'assignees':
+              return (
+                <div key={col.id} className={`${widthCls}`}>
+                  <div className="flex -space-x-1.5">
+                    {task.assignees?.slice(0, 3).map((uid: string) => {
+                      const m = members.find((x: any) => x.id === uid);
+                      return (
+                        <div
+                          key={uid}
+                          className="w-6 h-6 rounded-full bg-[var(--accent-subtle)] border-2 border-[var(--bg-base)] flex items-center justify-center text-[9px] font-bold text-[var(--accent)]"
+                          title={m?.displayName || m?.email || uid}
+                        >
+                          {m?.displayName?.[0]?.toUpperCase() || '?'}
+                        </div>
+                      );
+                    })}
+                    {(task.assignees?.length || 0) > 3 && (
+                      <div className="w-6 h-6 rounded-full bg-[var(--bg-elevated)] border-2 border-[var(--bg-base)] flex items-center justify-center text-[8px] text-[var(--text-muted)]">
+                        +{task.assignees.length - 3}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+
+            /* ----- DUE DATE ----- */
+            case 'due':
+              return (
+                <div key={col.id} className={`${widthCls}`}>
+                  <InlineDateEditor
+                    value={due}
+                    overdue={overdue}
+                    canUpdate={canUpdate}
+                    onChange={(dateStr) => {
+                      onUpdate(task.id, 'dueDate', dateStr, task.dueDate);
+                    }}
+                  />
+                </div>
+              );
+
+            /* ----- TAGS ----- */
+            case 'tags':
+              return (
+                <div key={col.id} className={`${widthCls} flex gap-1 items-center overflow-hidden`}>
+                  {task.tags?.slice(0, 2).map((tg: string) => (
+                    <span
+                      key={tg}
+                      className="text-[11px] px-2.5 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-secondary)] truncate max-w-[60px]"
+                    >
+                      {tg}
+                    </span>
+                  ))}
+                  {(task.tags?.length || 0) > 2 && (
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      +{task.tags.length - 2}
+                    </span>
+                  )}
+                </div>
+              );
+
+            /* ----- POINTS ----- */
+            case 'points':
+              return (
+                <div key={col.id} className={`${widthCls} text-center`}>
+                  {task.points != null && task.points > 0 && (
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-muted)] font-mono">
+                      {task.points}pt
+                    </span>
+                  )}
+                </div>
+              );
+
+            /* ----- TYPE ----- */
+            case 'type':
+              return (
+                <div key={col.id} className={`${widthCls} flex items-center gap-1`}>
+                  <typeCfg.Icon className="h-3.5 w-3.5" style={{ color: typeCfg.color }} />
+                  <span className="text-[11px] text-[var(--text-muted)] truncate">
+                    {t(`taskType.${typeCfg.id}`)}
+                  </span>
+                </div>
+              );
+
+            /* ----- TIME ESTIMATE ----- */
+            case 'timeEstimate':
+              return (
+                <div key={col.id} className={`${widthCls} text-center`}>
+                  {task.timeEstimate != null && task.timeEstimate > 0 && (
+                    <span className="text-[11px] text-[var(--text-muted)] font-mono">
+                      {formatMinutes(task.timeEstimate)}
+                    </span>
+                  )}
+                </div>
+              );
+
+            /* ----- CREATED ----- */
+            case 'created':
+              return (
+                <div key={col.id} className={`${widthCls}`}>
+                  {task.createdAt?.toDate && (
+                    <span className="text-[12px] text-[var(--text-muted)]">
+                      {formatDate(task.createdAt.toDate())}
+                    </span>
+                  )}
+                </div>
+              );
+
+            /* ----- TEAM ----- */
+            case 'team':
+              return (
+                <div key={col.id} className={`${widthCls} flex items-center gap-1 overflow-hidden`}>
+                  {taskTeam && (
+                    <>
+                      <span className="text-[12px] shrink-0">{taskTeam.icon}</span>
+                      <span className="text-[11px] text-[var(--text-muted)] truncate">
+                        {taskTeam.name}
+                      </span>
+                    </>
+                  )}
+                </div>
+              );
+
+            default:
+              return null;
+          }
+        })}
+
+        {/* Hover delete action */}
+        {hovered && canUpdate && (
+          <div className="absolute right-3 flex items-center gap-1 z-10">
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="p-2 rounded-xl bg-[var(--bg-base)] text-[var(--text-muted)] hover:text-red-400 shadow-md transition-all duration-200"
+              title={t('common.delete')}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Expanded subtasks below the row */}
+      {subtaskDisplay === 'expanded' && task.subtasks?.length > 0 && (
+        <SubtaskExpandedList task={task} canUpdate={canUpdate} onUpdate={onUpdate} />
+      )}
+    </>
+  );
+}
+
+/* ============================================= */
+/* MAIN COMPONENT                                */
+/* ============================================= */
 
 export default function TaskListView({
-  groups, members, teams, selectedTask, selectedIds, sortBy, sortDir, canUpdate,
-  onSelect, onSelectionChange, onUpdate, onDelete, onSortChange, onQuickCreate,
+  groups,
+  members,
+  teams,
+  selectedTask,
+  selectedIds,
+  sortBy,
+  sortDir,
+  canUpdate,
+  density,
+  columns,
+  subtaskDisplay,
+  onSelect,
+  onSelectionChange,
+  onUpdate,
+  onDelete,
+  onSortChange,
+  onQuickCreate,
 }: Props) {
   const { t } = useI18n();
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
+  /* Derive visible column definitions */
+  const columnSet = new Set(columns);
+  const visibleCols = ALL_COLUMNS.filter((c) => columnSet.has(c.id));
+
+  /* Group toggle */
   const toggleGroup = (key: string) => {
-    const next = new Set(collapsedGroups);
-    next.has(key) ? next.delete(key) : next.add(key);
-    setCollapsedGroups(next);
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
   };
 
+  /* Selection helpers */
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);
     next.has(id) ? next.delete(id) : next.add(id);
@@ -58,251 +659,142 @@ export default function TaskListView({
 
   const selectAllInGroup = (tasks: Task[]) => {
     const next = new Set(selectedIds);
-    const allSelected = tasks.every(t => next.has(t.id));
-    tasks.forEach(t => allSelected ? next.delete(t.id) : next.add(t.id));
+    const allSelected = tasks.every((tk) => next.has(tk.id));
+    tasks.forEach((tk) => (allSelected ? next.delete(tk.id) : next.add(tk.id)));
     onSelectionChange(next);
   };
 
   return (
     <div className="h-full overflow-y-auto px-6 py-3">
-      {/* Column Headers */}
-      <div className="flex items-center gap-2 px-4 py-2 text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold sticky top-0 bg-[var(--bg-base)] z-10">
-        {COLUMNS.map(col => (
-          <div key={col.id}
-            className={`flex items-center gap-1 ${col.width} shrink-0 ${col.sortable ? 'cursor-pointer hover:text-[var(--text-secondary)] select-none' : ''}`}
-            onClick={() => col.sortable && onSortChange(col.id)}>
-            {col.labelKey ? t(col.labelKey) : ''}
-            {col.sortable && sortBy === col.id && (
-              sortDir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Groups */}
-      {groups.filter(g => g.tasks.length > 0).map(group => (
-        <div key={group.key} className="mt-4">
-          {/* Group header */}
-          <div onClick={() => toggleGroup(group.key)} className="flex items-center gap-2 mb-2 group px-1 cursor-pointer select-none">
-            {collapsedGroups.has(group.key)
-              ? <ChevronRight className="h-4 w-4 text-[var(--text-muted)]" />
-              : <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />}
-            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color, boxShadow: `0 0 8px ${group.color}40` }} />
-            <span className="text-sm font-semibold text-[var(--text-secondary)]">{group.label}</span>
-            <span className="text-sm text-[var(--text-muted)] bg-[var(--bg-elevated)] px-1.5 py-0.5 rounded-md">{group.count}</span>
-            <button onClick={e => { e.stopPropagation(); selectAllInGroup(group.tasks); }}
-              className="ml-2 opacity-0 group-hover:opacity-100 transition text-[var(--text-muted)] hover:text-[var(--accent)]"
-              title={t('tasks.all')}>
-              <CheckSquare className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          <AnimatePresence initial={false}>
-            {!collapsedGroups.has(group.key) && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="space-y-0.5">
-                  {group.tasks.map((task, i) => (
-                    <TaskRow
-                      key={task.id}
-                      task={task}
-                      index={i}
-                      members={members}
-                      teams={teams}
-                      isSelected={selectedTask?.id === task.id}
-                      isChecked={selectedIds.has(task.id)}
-                      canUpdate={canUpdate}
-                      onSelect={() => onSelect(task)}
-                      onCheck={() => toggleSelect(task.id)}
-                      onUpdate={onUpdate}
-                      onDelete={() => onDelete(task)}
-                    />
-                  ))}
-                </div>
-                {canUpdate && (
-                  <TaskQuickAdd
-                    groupKey={group.key}
-                    groupLabel={group.label}
-                    onAdd={(title) => onQuickCreate({ title, status: group.key })}
-                  />
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TaskRow({ task, index, members, teams, isSelected, isChecked, canUpdate, onSelect, onCheck, onUpdate, onDelete }: {
-  task: Task; index: number; members: any[]; teams: any[];
-  isSelected: boolean; isChecked: boolean; canUpdate: boolean;
-  onSelect: () => void; onCheck: () => void;
-  onUpdate: (id: string, field: string, value: any, old?: any) => void;
-  onDelete: () => void;
-}) {
-  const { t } = useI18n();
-  const [hovered, setHovered] = useState(false);
-  const st = STATUSES.find(s => s.id === task.status) || STATUSES[0];
-  const p = PRIORITIES.find(x => x.id === task.priority) || PRIORITIES[2];
-  const tp = TASK_TYPES.find(x => x.id === (task.type || 'task')) || TASK_TYPES[0];
-  const due = task.dueDate?.toDate?.();
-  const overdue = due && due < new Date() && task.status !== 'done';
-  const taskTeam = teams.find((tm: any) => tm.id === task.teamId);
-
-  return (
-    <div
-      onClick={onSelect}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer group transition-all duration-200 relative anim-slide ${
-        isSelected ? 'bg-[var(--accent)]/5 ring-1 ring-[var(--accent)]/20'
-        : isChecked ? 'bg-[var(--accent)]/3 ring-1 ring-[var(--accent)]/10'
-        : 'bg-[var(--bg-elevated)] shadow-card hover:shadow-md hover:bg-[var(--bg-hover)]'
-      }`}
-      style={{ animationDelay: `${Math.min(index, 20) * 15}ms` }}
-    >
-      {/* Checkbox */}
-      <div className="w-10 shrink-0 flex justify-center" onClick={e => { e.stopPropagation(); onCheck(); }}>
-        <div className={`w-4 h-4 rounded-md flex items-center justify-center transition-all duration-200 cursor-pointer ${
-          isChecked ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] hover:bg-[var(--accent)]/20'
-        }`}>
-          {isChecked && <span className="text-[var(--accent-text)] text-[12px] font-bold">&#10003;</span>}
-        </div>
-      </div>
-
-      {/* Status */}
-      <div className="w-10 shrink-0 flex justify-center">
-        <button onClick={e => { e.stopPropagation(); if (canUpdate) onUpdate(task.id, 'status', task.status === 'done' ? 'todo' : 'done', task.status); }}
-          className="hover:scale-110 transition" title={t(`status.${st.id}`)}>
-          <st.Icon className="h-5 w-5" style={{ color: st.color }} />
-        </button>
-      </div>
-
-      {/* Title */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <tp.Icon className="h-3.5 w-3.5 shrink-0 opacity-40" style={{ color: tp.color }} />
-          <p className={`text-sm font-medium truncate ${task.status === 'done' ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
-            {task.title}
-          </p>
-          {taskTeam && (
-            <span className="hidden xl:flex text-[9px] px-1.5 py-0.5 rounded-md font-medium shrink-0"
-              style={{ backgroundColor: `${taskTeam.color}15`, color: taskTeam.color }}>
-              {taskTeam.icon}
+      {/* ========= Column Headers ========= */}
+      <div className="flex items-center gap-2 px-5 py-3 text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)] font-semibold sticky top-0 bg-[var(--bg-base)]/95 backdrop-blur-sm z-10 border-b border-[var(--border)]">
+        {visibleCols.map((col) => (
+          <div
+            key={col.id}
+            className={`flex items-center gap-1 ${col.width} ${col.minWidth || ''} shrink-0 ${
+              col.sortable
+                ? 'cursor-pointer hover:text-[var(--text-secondary)] select-none transition'
+                : ''
+            }`}
+            onClick={() => col.sortable && onSortChange(col.id)}
+          >
+            <span className="truncate">
+              {col.labelKey ? t(col.labelKey) : ''}
             </span>
-          )}
-        </div>
-        {task.description && (
-          <p className="text-[13px] text-[var(--text-muted)] truncate mt-0.5 ml-5">{task.description}</p>
-        )}
-      </div>
-
-      {/* Priority */}
-      <div className="w-24 shrink-0 flex justify-center">
-        <InlinePrioritySelect value={task.priority} canUpdate={canUpdate}
-          onChange={(val) => onUpdate(task.id, 'priority', val, task.priority)} />
-      </div>
-
-      {/* Assignees */}
-      <div className="w-28 shrink-0">
-        <div className="flex -space-x-1.5">
-          {task.assignees?.slice(0, 3).map((uid: string) => {
-            const m = members.find((x: any) => x.id === uid);
-            return (
-              <div key={uid} className="w-6 h-6 rounded-full bg-[var(--accent-subtle)] border-2 border-[var(--bg-base)] flex items-center justify-center text-[9px] font-bold text-[var(--accent)]">
-                {m?.displayName?.[0]?.toUpperCase() || '?'}
-              </div>
-            );
-          })}
-          {(task.assignees?.length || 0) > 3 && (
-            <div className="w-6 h-6 rounded-full bg-[var(--bg-elevated)] border-2 border-[var(--bg-base)] flex items-center justify-center text-[8px] text-[var(--text-muted)]">
-              +{task.assignees.length - 3}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Due date */}
-      <div className="w-28 shrink-0">
-        {due && (
-          <span className={`text-[13px] flex items-center gap-1 px-2 py-0.5 rounded-md ${
-            overdue ? 'bg-red-500/10 text-red-400' : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)]'
-          }`}>
-            <Calendar className="h-3 w-3" />
-            {due.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })}
-          </span>
-        )}
-      </div>
-
-      {/* Tags */}
-      <div className="w-32 hidden lg:flex gap-1 shrink-0">
-        {task.tags?.slice(0, 2).map((tg: string) => (
-          <span key={tg} className="text-[12px] px-2 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">{tg}</span>
+            {col.sortable && sortBy === col.id && (
+              sortDir === 'asc'
+                ? <ChevronUp className="h-3 w-3 shrink-0" />
+                : <ChevronDown className="h-3 w-3 shrink-0" />
+            )}
+          </div>
         ))}
       </div>
 
-      {/* Points */}
-      <div className="w-14 shrink-0 text-center">
-        {task.points && <span className="text-[12px] px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-muted)] font-mono">{task.points}pt</span>}
-      </div>
+      {/* ========= Groups ========= */}
+      {groups
+        .filter((g) => g.tasks.length > 0)
+        .map((group) => {
+          const isCollapsed = collapsedGroups.has(group.key);
+          const allChecked =
+            group.tasks.length > 0 && group.tasks.every((tk) => selectedIds.has(tk.id));
 
-      {/* Hover actions */}
-      {hovered && canUpdate && (
-        <div className="absolute right-3 flex items-center gap-1 z-10">
-          <button onClick={e => { e.stopPropagation(); onDelete(); }}
-            className="p-1.5 rounded-lg bg-[var(--bg-base)] text-[var(--text-muted)] hover:text-red-400 shadow-card transition-all duration-200"
-            title={t('common.delete')}>
-            <Trash2 className="h-3 w-3" />
-          </button>
+          return (
+            <div key={group.key} className="mt-6">
+              {/* Group Header */}
+              <div
+                onClick={() => toggleGroup(group.key)}
+                className="flex items-center gap-2 mb-3 group/header px-1 cursor-pointer select-none"
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="h-3.5 w-3.5 text-[var(--text-muted)] transition-transform" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5 text-[var(--text-muted)] transition-transform" />
+                )}
+                <div
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{
+                    backgroundColor: group.color,
+                    boxShadow: `0 0 8px ${group.color}50`,
+                  }}
+                />
+                <span className="text-[13px] font-semibold text-[var(--text-secondary)]">
+                  {group.label}
+                </span>
+                <span className="text-[11px] text-[var(--text-muted)] bg-[var(--bg-elevated)] px-2 py-0.5 rounded-md h-5 min-w-[24px] flex items-center justify-center font-medium">
+                  {group.count}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    selectAllInGroup(group.tasks);
+                  }}
+                  className={`ml-1 transition text-[var(--text-muted)] hover:text-[var(--accent)] ${
+                    allChecked ? 'opacity-100 text-[var(--accent)]' : 'opacity-0 group-hover/header:opacity-100'
+                  }`}
+                  title={t('tasks.all')}
+                >
+                  <CheckSquare className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {/* Group Content */}
+              <AnimatePresence initial={false}>
+                {!isCollapsed && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="space-y-1">
+                      {group.tasks.map((task, i) => (
+                        <TaskRow
+                          key={task.id}
+                          task={task}
+                          index={i}
+                          members={members}
+                          teams={teams}
+                          isSelected={selectedTask?.id === task.id}
+                          isChecked={selectedIds.has(task.id)}
+                          canUpdate={canUpdate}
+                          density={density}
+                          columns={columns}
+                          subtaskDisplay={subtaskDisplay}
+                          onSelect={() => onSelect(task)}
+                          onCheck={() => toggleSelect(task.id)}
+                          onUpdate={onUpdate}
+                          onDelete={() => onDelete(task)}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Quick Add at bottom of group */}
+                    {canUpdate && (
+                      <div className="mt-2">
+                        <TaskQuickAdd
+                          groupKey={group.key}
+                          groupLabel={group.label}
+                          onAdd={(title) =>
+                            onQuickCreate({ title, status: group.key })
+                          }
+                        />
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+
+      {/* Empty state when all groups have 0 tasks */}
+      {groups.every((g) => g.tasks.length === 0) && (
+        <div className="flex flex-col items-center justify-center py-20 text-[var(--text-muted)]">
+          <CheckSquare className="h-10 w-10 mb-3 opacity-30" />
+          <p className="text-sm">{t('tasks.noTasks')}</p>
         </div>
       )}
-    </div>
-  );
-}
-
-function InlinePrioritySelect({ value, canUpdate, onChange }: { value: string; canUpdate: boolean; onChange: (v: string) => void }) {
-  const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const p = PRIORITIES.find(x => x.id === value) || PRIORITIES[2];
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  if (!canUpdate) return <span className="text-sm">{p.icon}</span>;
-
-  return (
-    <div ref={ref} className="relative">
-      <button onClick={e => { e.stopPropagation(); setOpen(!open); }} className="text-sm hover:scale-110 transition" title={t(`priority.${p.id}`)}>
-        {p.icon}
-      </button>
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-[var(--bg-base)] rounded-xl shadow-dropdown z-30 p-1 min-w-[120px]">
-            {PRIORITIES.map(pri => (
-              <button key={pri.id} onClick={e => { e.stopPropagation(); onChange(pri.id); setOpen(false); }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm w-full hover:bg-[var(--bg-hover)] transition ${value === pri.id ? 'bg-[var(--bg-hover)]' : ''}`}>
-                {pri.icon} {t(`priority.${pri.id}`)}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

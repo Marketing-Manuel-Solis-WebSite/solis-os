@@ -524,6 +524,14 @@ export async function logAction(data: { action: string; resource: string; detail
 export async function getSettings(key: string) { return getOne(`orgs/${ORG}/settings/${key}`); }
 export async function saveSettings(key: string, data: any) { return setAt(`orgs/${ORG}/settings/${key}`, data); }
 
+// ===== USER PREFERENCES =====
+export async function getUserPreferences(userId: string, key: string) {
+  return getOne(`orgs/${ORG}/members/${userId}/preferences/${key}`);
+}
+export async function saveUserPreferences(userId: string, key: string, data: any) {
+  return setAt(`orgs/${ORG}/members/${userId}/preferences/${key}`, data);
+}
+
 // ===== WORKSPACES =====
 export async function getWorkspaces() { return getByOrg('workspaces'); }
 export async function createWorkspace(data: any) { return addTo('workspaces', { ...data, orgId: ORG }); }

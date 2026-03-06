@@ -1,11 +1,15 @@
 'use client';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { getTasks, createTask, updateTask, softDeleteTask, logAction, addTaskActivity, getMembers, getSettings, saveSettings } from '@/lib/db';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import {
+  getTasks, createTask, updateTask, softDeleteTask, logAction,
+  addTaskActivity, getMembers, getSettings, saveSettings,
+  getUserPreferences, saveUserPreferences,
+} from '@/lib/db';
 import { notifyMany } from '@/lib/notifications';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckSquare } from 'lucide-react';
+import { useToast } from '@/components/notifications/toast-provider';
 
 import TaskSidebar from '@/components/tasks/task-sidebar';
 import TaskToolbar from '@/components/tasks/task-toolbar';
@@ -15,12 +19,17 @@ import TaskCalendarView from '@/components/tasks/task-calendar-view';
 import TaskDetailDrawer from '@/components/tasks/task-detail-drawer';
 import TaskCreateModal from '@/components/tasks/task-create-modal';
 import TaskBulkActions from '@/components/tasks/task-bulk-actions';
-import { useToast } from '@/components/notifications/toast-provider';
+import TaskEmptyState from '@/components/tasks/task-empty-state';
 
 import {
   Task, ViewType, FilterState, EMPTY_FILTERS, SavedView, TaskGroup,
-  STATUSES, PRIORITIES, TASK_TYPES, PRIORITY_ORDER, SHORTCUTS,
+  STATUSES, SHORTCUTS,
+  CalendarMode, Density, SubtaskDisplay,
+  BUILT_IN_PRESETS, DEFAULT_PREFERENCES, TaskPreferences,
+  applyFilters, sortTasks, groupTasks, isOverdue,
 } from '@/components/tasks/constants';
+
+const PREFS_KEY = 'taskPreferences';
 
 export default function TasksPage() {
   const { user, me, activeTeamId, teams, can, canSeeResource, allMembers, canSeeAllTeams } = useAuth();
@@ -32,12 +41,26 @@ export default function TasksPage() {
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // View state
-  const [view, setView] = useState<ViewType>('list');
+  // Preferences (loaded from Firestore)
+  const [prefs, setPrefs] = useState<TaskPreferences>(DEFAULT_PREFERENCES);
+  const prefsLoaded = useRef(false);
+
+  // View state (initialized from prefs once loaded)
+  const [view, setView] = useState<ViewType>(DEFAULT_PREFERENCES.defaultView);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
-  const [sortBy, setSortBy] = useState('created');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [groupBy, setGroupBy] = useState('status');
+  const [sortBy, setSortBy] = useState(DEFAULT_PREFERENCES.lastSortBy);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_PREFERENCES.lastSortDir);
+  const [groupBy, setGroupBy] = useState(DEFAULT_PREFERENCES.lastGroupBy);
+  const [density, setDensity] = useState<Density>(DEFAULT_PREFERENCES.density);
+  const [columns, setColumns] = useState<string[]>(DEFAULT_PREFERENCES.columns);
+  const [subtaskDisplay, setSubtaskDisplay] = useState<SubtaskDisplay>(DEFAULT_PREFERENCES.subtaskDisplay);
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>(DEFAULT_PREFERENCES.calendarMode);
+  const [meMode, setMeMode] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(DEFAULT_PREFERENCES.sidebarOpen);
+  const [pinnedPresets, setPinnedPresets] = useState<string[]>(DEFAULT_PREFERENCES.pinnedPresets);
+
+  // Active preset
+  const [activePreset, setActivePreset] = useState('all');
 
   // Selection
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -45,10 +68,40 @@ export default function TasksPage() {
 
   // UI
   const [showCreate, setShowCreate] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
 
-  // Load data
+  // ─── Load preferences from Firestore ───────────────────
+  useEffect(() => {
+    if (!user?.uid) return;
+    getUserPreferences(user.uid, PREFS_KEY).then((data: any) => {
+      if (data) {
+        const merged = { ...DEFAULT_PREFERENCES, ...data } as TaskPreferences;
+        setPrefs(merged);
+        setView(merged.defaultView);
+        setSortBy(merged.lastSortBy);
+        setSortDir(merged.lastSortDir);
+        setGroupBy(merged.lastGroupBy);
+        setDensity(merged.density);
+        setColumns(merged.columns);
+        setSubtaskDisplay(merged.subtaskDisplay);
+        setCalendarMode(merged.calendarMode);
+        setMeMode(merged.meMode);
+        setSidebarOpen(merged.sidebarOpen);
+        setPinnedPresets(merged.pinnedPresets);
+      }
+      prefsLoaded.current = true;
+    }).catch(() => { prefsLoaded.current = true; });
+  }, [user?.uid]);
+
+  // ─── Persist preferences ───────────────────────────────
+  const persistPrefs = useCallback((partial: Partial<TaskPreferences>) => {
+    if (!user?.uid || !prefsLoaded.current) return;
+    const next = { ...prefs, ...partial };
+    setPrefs(next);
+    saveUserPreferences(user.uid, PREFS_KEY, next).catch(() => {});
+  }, [user?.uid, prefs]);
+
+  // ─── Load data ─────────────────────────────────────────
   const load = useCallback(async () => {
     const [rawTasks, m] = await Promise.all([getTasks(activeTeamId), getMembers()]);
     const visible = (rawTasks as any[]).filter(task => !task.deleted && canSeeResource({
@@ -74,108 +127,83 @@ export default function TasksPage() {
   // Sync selected task with updated data
   useEffect(() => {
     if (selectedTask) {
-      const updated = tasks.find(t => t.id === selectedTask.id);
+      const updated = tasks.find(tk => tk.id === selectedTask.id);
       if (updated) setSelectedTask(updated);
     }
   }, [tasks]);
 
-  // Filtered + sorted tasks
+  // ─── Derived: preset-filtered tasks ────────────────────
+  const presetFilteredTasks = useMemo(() => {
+    let base = tasks.filter(tk => !tk.archived);
+
+    // Me Mode: only my tasks
+    if (meMode && user?.uid) {
+      base = base.filter(tk => tk.assignees?.includes(user.uid));
+    }
+
+    // Apply preset filter
+    if (activePreset.startsWith('saved:')) return base; // saved views use their own filters
+    const preset = BUILT_IN_PRESETS.find(p => p.id === activePreset);
+    if (!preset || preset.id === 'all') return base;
+
+    if (preset.filterFn && user?.uid) {
+      base = base.filter(tk => preset.filterFn!(tk, user.uid));
+    }
+    if (preset.filters?.status?.length) {
+      base = base.filter(tk => preset.filters!.status!.includes(tk.status));
+    }
+
+    return base;
+  }, [tasks, activePreset, meMode, user?.uid]);
+
+  // ─── Derived: fully filtered + sorted ──────────────────
   const filteredTasks = useMemo(() => {
-    let result = tasks.filter(t => !t.archived);
+    const afterFilters = applyFilters(presetFilteredTasks, filters);
+    return sortTasks(afterFilters, sortBy, sortDir);
+  }, [presetFilteredTasks, filters, sortBy, sortDir]);
 
-    // Text search
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      result = result.filter(t =>
-        t.title?.toLowerCase().includes(q) ||
-        t.description?.toLowerCase().includes(q) ||
-        t.tags?.some((tag: string) => tag.toLowerCase().includes(q))
-      );
-    }
-
-    if (filters.status.length > 0) {
-      result = result.filter(t => filters.status.includes(t.status));
-    }
-    if (filters.priority.length > 0) {
-      result = result.filter(t => filters.priority.includes(t.priority));
-    }
-    if (filters.assignee.length > 0) {
-      result = result.filter(t => t.assignees?.some((a: string) => filters.assignee.includes(a)));
-    }
-    if (filters.type.length > 0) {
-      result = result.filter(t => filters.type.includes(t.type || 'task'));
-    }
-    if (filters.tags.length > 0) {
-      result = result.filter(t => t.tags?.some((tag: string) => filters.tags.includes(tag)));
-    }
-    if (filters.dateRange.from) {
-      const from = new Date(filters.dateRange.from);
-      result = result.filter(t => { const d = t.dueDate?.toDate?.(); return d && d >= from; });
-    }
-    if (filters.dateRange.to) {
-      const to = new Date(filters.dateRange.to);
-      to.setHours(23, 59, 59);
-      result = result.filter(t => { const d = t.dueDate?.toDate?.(); return d && d <= to; });
-    }
-
-    // Sort
-    result.sort((a, b) => {
-      const dir = sortDir === 'asc' ? 1 : -1;
-      switch (sortBy) {
-        case 'priority': return ((PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9)) * dir;
-        case 'due': return ((a.dueDate?.seconds || 9e9) - (b.dueDate?.seconds || 9e9)) * dir;
-        case 'title': return (a.title || '').localeCompare(b.title || '') * dir;
-        case 'status': {
-          const so: Record<string, number> = {};
-          STATUSES.forEach((s, i) => so[s.id] = i);
-          return ((so[a.status] ?? 9) - (so[b.status] ?? 9)) * dir;
-        }
-        case 'points': return ((a.points || 0) - (b.points || 0)) * dir;
-        default: return ((b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)) * dir;
-      }
-    });
-
-    return result;
-  }, [tasks, filters, sortBy, sortDir]);
-
-  // Groups
+  // ─── Derived: groups ───────────────────────────────────
   const groups: TaskGroup[] = useMemo(() => {
-    if (groupBy === 'none') return [{ key: 'all', label: t('tasks.all'), tasks: filteredTasks, color: '#94A3B8', count: filteredTasks.length }];
-    if (groupBy === 'status') return STATUSES.map(s => {
-      const tk = filteredTasks.filter(x => x.status === s.id);
-      return { key: s.id, label: t(`status.${s.id}`), tasks: tk, color: s.color, count: tk.length };
-    });
-    if (groupBy === 'priority') return PRIORITIES.map(p => {
-      const tk = filteredTasks.filter(x => x.priority === p.id);
-      return { key: p.id, label: t(`priority.${p.id}`), tasks: tk, color: p.color, count: tk.length };
-    });
-    if (groupBy === 'assignee') {
-      const grouped: TaskGroup[] = members.map(m => {
-        const tk = filteredTasks.filter(x => x.assignees?.includes(m.id));
-        return { key: m.id, label: m.displayName || m.email, tasks: tk, color: '#3B82F6', count: tk.length };
-      });
-      const unassigned = filteredTasks.filter(x => !x.assignees?.length);
-      if (unassigned.length > 0) grouped.push({ key: '__none__', label: t('tasks.unassigned'), tasks: unassigned, color: '#64748B', count: unassigned.length });
-      return grouped;
-    }
-    return TASK_TYPES.map(tp => {
-      const tk = filteredTasks.filter(x => (x.type || 'task') === tp.id);
-      return { key: tp.id, label: t(`taskType.${tp.id}`), tasks: tk, color: tp.color, count: tk.length };
-    });
-  }, [filteredTasks, groupBy, members]);
+    return groupTasks(filteredTasks, groupBy, members, t);
+  }, [filteredTasks, groupBy, members, t]);
 
-  // Task counts
+  // ─── Derived: counts ──────────────────────────────────
   const taskCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: tasks.filter(t => !t.archived).length };
-    STATUSES.forEach(s => { counts[s.id] = tasks.filter(t => t.status === s.id && !t.archived).length; });
+    const nonArchived = tasks.filter(tk => !tk.archived);
+    const counts: Record<string, number> = { all: nonArchived.length };
+    STATUSES.forEach(s => { counts[s.id] = nonArchived.filter(tk => tk.status === s.id).length; });
     return counts;
   }, [tasks]);
 
   const doneCount = taskCounts.done || 0;
 
-  // CRUD handlers
+  const overdueCount = useMemo(() => {
+    return tasks.filter(tk => !tk.archived && isOverdue(tk)).length;
+  }, [tasks]);
+
+  // ─── Empty state type ─────────────────────────────────
+  const emptyStateType = useMemo(() => {
+    if (filteredTasks.length > 0) return null;
+    // If filters are active, it's a "no results" state
+    const hasActiveFilters = filters.search || filters.status.length > 0 || filters.priority.length > 0
+      || filters.assignee.length > 0 || filters.type.length > 0 || filters.tags.length > 0
+      || filters.dateRange.from || filters.dateRange.to
+      || filters.hasAttachments || filters.hasDependencies || filters.isBlocked
+      || filters.noDate || filters.noAssignee;
+    if (hasActiveFilters) return 'no-results' as const;
+
+    // Preset-specific empty states
+    switch (activePreset) {
+      case 'my_tasks': return 'no-my-tasks' as const;
+      case 'overdue': return 'no-overdue' as const;
+      case 'today': return 'no-today' as const;
+      default: return 'no-tasks' as const;
+    }
+  }, [filteredTasks.length, filters, activePreset]);
+
+  // ─── CRUD handlers ─────────────────────────────────────
   const doCreate = async (data: any) => {
-    if (!can('task', 'create')) return toast.warning(t('tasks.noPermission'), t('tasks.noPermCreate'));
+    if (!can('task', 'create')) return;
     const taskRef = await createTask({
       ...data,
       teamId: data.teamId || (activeTeamId === '__all__' ? '' : activeTeamId),
@@ -198,10 +226,10 @@ export default function TasksPage() {
   const doUpdate = async (id: string, field: string, val: any, old?: any) => {
     if (!can('task', 'update')) return;
     await updateTask(id, { [field]: val });
-    try { await addTaskActivity(id, { action: 'actualizó', field, from: String(old || ''), to: String(val), actorId: user!.uid, actorName: me!.displayName }); } catch {}
+    try { await addTaskActivity(id, { action: 'updated', field, from: String(old || ''), to: String(val), actorId: user!.uid, actorName: me!.displayName }); } catch {}
     if (field === 'assignees' && Array.isArray(val) && Array.isArray(old)) {
       const newAssignees = val.filter((uid: string) => !old.includes(uid) && uid !== user!.uid);
-      const task = tasks.find(t => t.id === id);
+      const task = tasks.find(tk => tk.id === id);
       if (newAssignees.length > 0) {
         notifyMany(newAssignees, {
           type: 'task_assigned', title: t('tasks.assignedTo', { name: me!.displayName }),
@@ -214,7 +242,7 @@ export default function TasksPage() {
   };
 
   const doDelete = async (tk: any) => {
-    if (!can('task', 'delete') && tk.createdBy !== user?.uid) return toast.warning(t('tasks.noPermission'), t('tasks.noPermDelete'));
+    if (!can('task', 'delete') && tk.createdBy !== user?.uid) return;
     if (!confirm(t('tasks.deleteConfirm', { title: tk.title }))) return;
     await softDeleteTask(tk.id);
     await logAction({ action: 'deleted', resource: 'task', detail: tk.title, actorId: user!.uid, actorName: me!.displayName });
@@ -222,7 +250,7 @@ export default function TasksPage() {
     load();
   };
 
-  // Bulk actions
+  // ─── Bulk actions ──────────────────────────────────────
   const bulkUpdate = async (field: string, value: any) => {
     if (!can('task', 'update')) return;
     const promises = Array.from(selectedIds).map(id => updateTask(id, { [field]: value }));
@@ -240,7 +268,37 @@ export default function TasksPage() {
     load();
   };
 
-  // Saved views
+  const bulkArchive = async () => {
+    if (!can('task', 'update')) return;
+    const promises = Array.from(selectedIds).map(id => updateTask(id, { archived: true }));
+    await Promise.all(promises);
+    setSelectedIds(new Set());
+    load();
+  };
+
+  const bulkAssignee = async (userId: string) => {
+    if (!can('task', 'update')) return;
+    const promises = Array.from(selectedIds).map(id => {
+      const task = tasks.find(tk => tk.id === id);
+      if (!task) return Promise.resolve();
+      const current = task.assignees || [];
+      if (current.includes(userId)) return Promise.resolve();
+      return updateTask(id, { assignees: [...current, userId] });
+    });
+    await Promise.all(promises);
+    setSelectedIds(new Set());
+    load();
+  };
+
+  const bulkTeamChange = async (teamId: string) => {
+    if (!can('task', 'update')) return;
+    const promises = Array.from(selectedIds).map(id => updateTask(id, { teamId }));
+    await Promise.all(promises);
+    setSelectedIds(new Set());
+    load();
+  };
+
+  // ─── Saved views ──────────────────────────────────────
   const handleSaveView = async () => {
     const name = prompt(t('tasks.viewName'));
     if (!name?.trim()) return;
@@ -249,6 +307,7 @@ export default function TasksPage() {
       name: name.trim(),
       view, filters, sortBy, groupBy,
       createdBy: user!.uid,
+      density, columns, subtaskDisplay, calendarMode,
     };
     const updated = [...savedViews, sv];
     setSavedViews(updated);
@@ -260,9 +319,85 @@ export default function TasksPage() {
     setFilters(sv.filters);
     setSortBy(sv.sortBy);
     setGroupBy(sv.groupBy);
+    if (sv.density) setDensity(sv.density);
+    if (sv.columns) setColumns(sv.columns);
+    if (sv.subtaskDisplay) setSubtaskDisplay(sv.subtaskDisplay);
+    if (sv.calendarMode) setCalendarMode(sv.calendarMode);
   };
 
-  // Keyboard shortcuts
+  const handleDeleteView = async (id: string) => {
+    const updated = savedViews.filter(sv => sv.id !== id);
+    setSavedViews(updated);
+    if (activePreset === `saved:${id}`) setActivePreset('all');
+    await saveSettings('taskViews', { views: updated });
+  };
+
+  const handleDuplicateView = async (sv: SavedView) => {
+    const dup: SavedView = {
+      ...sv,
+      id: Date.now().toString(36),
+      name: `${sv.name} (copy)`,
+      createdBy: user!.uid,
+    };
+    const updated = [...savedViews, dup];
+    setSavedViews(updated);
+    await saveSettings('taskViews', { views: updated });
+  };
+
+  // ─── Preset change ────────────────────────────────────
+  const handlePresetChange = (id: string) => {
+    setActivePreset(id);
+    // Reset filters when switching presets (unless loading a saved view)
+    if (!id.startsWith('saved:')) {
+      setFilters(EMPTY_FILTERS);
+    }
+  };
+
+  // ─── Preference-aware setters ─────────────────────────
+  const handleViewChange = (v: ViewType) => {
+    setView(v);
+    persistPrefs({ defaultView: v });
+  };
+
+  const handleDensityChange = (d: Density) => {
+    setDensity(d);
+    persistPrefs({ density: d });
+  };
+
+  const handleMeModeToggle = () => {
+    const next = !meMode;
+    setMeMode(next);
+    persistPrefs({ meMode: next });
+  };
+
+  const handleSortByChange = (s: string) => {
+    setSortBy(s);
+    persistPrefs({ lastSortBy: s });
+  };
+
+  const handleSortDirToggle = () => {
+    const next = sortDir === 'asc' ? 'desc' : 'asc';
+    setSortDir(next);
+    persistPrefs({ lastSortDir: next });
+  };
+
+  const handleGroupByChange = (g: string) => {
+    setGroupBy(g);
+    persistPrefs({ lastGroupBy: g });
+  };
+
+  const handleSidebarToggle = () => {
+    const next = !sidebarOpen;
+    setSidebarOpen(next);
+    persistPrefs({ sidebarOpen: next });
+  };
+
+  const handleCalendarModeChange = (m: CalendarMode) => {
+    setCalendarMode(m);
+    persistPrefs({ calendarMode: m });
+  };
+
+  // ─── Keyboard shortcuts ───────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -274,9 +409,9 @@ export default function TasksPage() {
           e.preventDefault();
           document.getElementById('task-search')?.focus();
           break;
-        case SHORTCUTS.viewList: setView('list'); break;
-        case SHORTCUTS.viewBoard: setView('board'); break;
-        case SHORTCUTS.viewCalendar: setView('calendar'); break;
+        case SHORTCUTS.viewList: handleViewChange('list'); break;
+        case SHORTCUTS.viewBoard: handleViewChange('board'); break;
+        case SHORTCUTS.viewCalendar: handleViewChange('calendar'); break;
         case SHORTCUTS.escape:
           if (selectedTask) setSelectedTask(null);
           else if (showCreate) setShowCreate(false);
@@ -291,32 +426,34 @@ export default function TasksPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [selectedTask, showCreate, selectedIds, can]);
 
-  const activeTeam = teams.find((t: any) => t.id === activeTeamId);
+  const activeTeam = teams.find((tm: any) => tm.id === activeTeamId);
   const canCreate = can('task', 'create');
 
   return (
-    <div className="flex h-[calc(100vh-64px)]">
+    <div className="flex h-[calc(100vh-56px)]">
       {/* Sidebar */}
       <TaskSidebar
         open={sidebarOpen}
-        view={view}
         filters={filters}
         groupBy={groupBy}
         sortBy={sortBy}
         members={members}
         taskCounts={taskCounts}
-        savedViews={savedViews}
-        onViewChange={setView}
+        density={density}
+        meMode={meMode}
         onFiltersChange={setFilters}
-        onGroupByChange={setGroupBy}
-        onSortByChange={setSortBy}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onLoadView={handleLoadView}
-        onSaveView={handleSaveView}
+        onGroupByChange={handleGroupByChange}
+        onSortByChange={handleSortByChange}
+        onDensityChange={handleDensityChange}
+        onMeModeToggle={handleMeModeToggle}
+        onToggle={handleSidebarToggle}
       />
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div
+        className="flex-1 flex flex-col min-w-0 transition-[margin] duration-300 ease-out"
+        style={{ marginRight: selectedTask ? '540px' : '0' }}
+      >
         {/* Toolbar */}
         <TaskToolbar
           view={view}
@@ -331,39 +468,45 @@ export default function TasksPage() {
           activeTeamId={activeTeamId}
           taskCount={filteredTasks.length}
           doneCount={doneCount}
+          overdueCount={overdueCount}
           selectedCount={selectedIds.size}
           sidebarOpen={sidebarOpen}
-          onViewChange={setView}
+          activePreset={activePreset}
+          savedViews={savedViews}
+          pinnedPresets={pinnedPresets}
+          onViewChange={handleViewChange}
           onSearchChange={(s) => setFilters(f => ({ ...f, search: s }))}
           onFiltersChange={setFilters}
-          onSortByChange={setSortBy}
-          onSortDirToggle={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-          onGroupByChange={setGroupBy}
+          onSortByChange={handleSortByChange}
+          onSortDirToggle={handleSortDirToggle}
+          onGroupByChange={handleGroupByChange}
           onNewTask={() => setShowCreate(true)}
           onClearFilters={() => setFilters(EMPTY_FILTERS)}
           onToggleSidebar={() => setSidebarOpen(true)}
+          onPresetChange={handlePresetChange}
+          onSaveView={handleSaveView}
+          onLoadView={handleLoadView}
+          onDeleteView={handleDeleteView}
+          onDuplicateView={handleDuplicateView}
         />
 
         {/* View content */}
         <div className="flex-1 overflow-hidden relative">
           {loading ? (
-            <div className="px-6 py-3 space-y-2">
-              {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-14 skeleton rounded-xl" />)}
+            <div className="px-7 py-5 space-y-3">
+              {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-[52px] skeleton rounded-2xl" />)}
             </div>
-          ) : filteredTasks.length === 0 ? (
-            <div className="text-center py-20">
-              <CheckSquare className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
-              <p className="text-[var(--text-muted)] text-base">{t('tasks.noTasks')}</p>
-              {canCreate && (
-                <button onClick={() => setShowCreate(true)} className="text-sm text-[var(--accent)] hover:underline mt-2">
-                  {t('tasks.createFirst')}
-                </button>
-              )}
-            </div>
+          ) : emptyStateType ? (
+            <TaskEmptyState
+              type={emptyStateType}
+              canCreate={canCreate}
+              onCreateTask={() => setShowCreate(true)}
+              onClearFilters={() => setFilters(EMPTY_FILTERS)}
+            />
           ) : (
             <AnimatePresence mode="wait">
-              <motion.div key={view} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="h-full">
-                {view === 'list' && (
+              {view === 'list' && (
+                <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
                   <TaskListView
                     groups={groups}
                     members={members}
@@ -373,18 +516,23 @@ export default function TasksPage() {
                     sortBy={sortBy}
                     sortDir={sortDir}
                     canUpdate={can('task', 'update')}
+                    density={density}
+                    columns={columns}
+                    subtaskDisplay={subtaskDisplay}
                     onSelect={setSelectedTask}
                     onSelectionChange={setSelectedIds}
                     onUpdate={doUpdate}
                     onDelete={doDelete}
                     onSortChange={(field) => {
-                      if (sortBy === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-                      else { setSortBy(field); setSortDir('asc'); }
+                      if (sortBy === field) handleSortDirToggle();
+                      else { handleSortByChange(field); setSortDir('asc'); persistPrefs({ lastSortDir: 'asc' }); }
                     }}
                     onQuickCreate={doCreate}
                   />
-                )}
-                {view === 'board' && (
+                </motion.div>
+              )}
+              {view === 'board' && (
+                <motion.div key="board" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
                   <TaskBoardView
                     groups={groups}
                     members={members}
@@ -395,17 +543,21 @@ export default function TasksPage() {
                     onStatusChange={(taskId, newStatus) => doUpdate(taskId, 'status', newStatus)}
                     onQuickCreate={doCreate}
                   />
-                )}
-                {view === 'calendar' && (
+                </motion.div>
+              )}
+              {view === 'calendar' && (
+                <motion.div key="calendar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
                   <TaskCalendarView
                     tasks={filteredTasks}
                     members={members}
                     selectedTask={selectedTask}
+                    calendarMode={calendarMode}
                     onSelect={setSelectedTask}
                     onDateChange={(taskId, newDate) => doUpdate(taskId, 'dueDate', newDate)}
+                    onModeChange={handleCalendarModeChange}
                   />
-                )}
-              </motion.div>
+                </motion.div>
+              )}
             </AnimatePresence>
           )}
 
@@ -414,8 +566,13 @@ export default function TasksPage() {
             {selectedIds.size > 0 && (
               <TaskBulkActions
                 count={selectedIds.size}
+                members={members}
+                teams={teams}
                 onStatusChange={(status) => bulkUpdate('status', status)}
                 onPriorityChange={(priority) => bulkUpdate('priority', priority)}
+                onAssigneeAdd={bulkAssignee}
+                onTeamChange={bulkTeamChange}
+                onArchive={bulkArchive}
                 onDelete={bulkDelete}
                 onClear={() => setSelectedIds(new Set())}
               />

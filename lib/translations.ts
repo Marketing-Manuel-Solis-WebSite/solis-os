@@ -125,6 +125,72 @@ export const translations: Record<Lang, Dict> = {
     'tasks.subtasks': '{done}/{total} subtareas',
     'tasks.groupLabel': 'Grupo: {name}',
     'tasks.sortLabel': 'Orden: {name}',
+    'tasks.overdue': '{n} vencidas',
+    'tasks.meMode': 'Solo mis tareas',
+    'tasks.moreOptions': 'Mas opciones',
+    'tasks.noTasksInColumn': 'Sin tareas',
+    'tasks.archive': 'Archivar',
+    'tasks.assignTo': 'Asignar a',
+    'tasks.moveTo': 'Mover a',
+
+    // --- Presets ---
+    'preset.all': 'Todas',
+    'preset.my_tasks': 'Mis tareas',
+    'preset.today': 'Hoy',
+    'preset.upcoming': 'Proximas',
+    'preset.overdue': 'Vencidas',
+    'preset.in_review': 'En revision',
+
+    // --- Empty States ---
+    'emptyState.noTasks': 'Sin tareas aun',
+    'emptyState.noTasksDesc': 'Crea tu primera tarea para empezar a organizar tu trabajo.',
+    'emptyState.noResults': 'Sin resultados',
+    'emptyState.noResultsDesc': 'Ninguna tarea coincide con tus filtros actuales.',
+    'emptyState.noMyTasks': 'Sin tareas asignadas',
+    'emptyState.noMyTasksDesc': 'No tienes tareas asignadas en este momento.',
+    'emptyState.noOverdue': 'Sin tareas vencidas',
+    'emptyState.noOverdueDesc': 'Todas tus tareas estan al dia.',
+    'emptyState.noToday': 'Sin tareas para hoy',
+    'emptyState.noTodayDesc': 'No hay tareas con fecha limite para hoy.',
+    'emptyState.noDate': 'Sin tareas en este rango',
+    'emptyState.noDateDesc': 'No se encontraron tareas con las fechas seleccionadas.',
+
+    // --- Density ---
+    'density.compact': 'Compacto',
+    'density.comfortable': 'Comodo',
+    'density.spacious': 'Espacioso',
+
+    // --- Calendar Modes ---
+    'calendarMode.month': 'Mes',
+    'calendarMode.week': 'Semana',
+    'calendarMode.day': 'Dia',
+
+    // --- Filter labels ---
+    'filter.noDate': 'Sin fecha',
+    'filter.noAssignee': 'Sin asignar',
+    'filter.blocked': 'Bloqueadas',
+    'filter.hasAttachments': 'Con adjuntos',
+    'filter.hasDependencies': 'Con dependencias',
+
+    // --- Custom Field Groups ---
+    'customFieldGroup.legal': 'Datos Legales',
+    'customFieldGroup.client': 'Datos del Cliente',
+    'customFieldGroup.reference': 'Referencias',
+
+    // --- Misc ---
+    'common.rename': 'Renombrar',
+    'common.duplicate': 'Duplicar',
+    'common.share': 'Compartir',
+    'common.pin': 'Fijar',
+
+    // --- Task Create Sections ---
+    'taskCreate.sectionIdentity': 'Identidad',
+    'taskCreate.sectionOrganization': 'Organizacion',
+    'taskCreate.sectionDates': 'Tiempo y Fechas',
+    'taskCreate.sectionAssignees': 'Responsables',
+    'taskCreate.sectionTags': 'Etiquetas',
+    'taskCreate.sectionSubtasks': 'Subtareas',
+    'taskCreate.sectionCustom': 'Campos Personalizados',
 
     // --- Task Create Modal ---
     'taskCreate.title': 'Nueva Tarea',
@@ -1614,6 +1680,64 @@ export const translations: Record<Lang, Dict> = {
     'tasks.subtasks': '{done}/{total} subtasks',
     'tasks.groupLabel': 'Group: {name}',
     'tasks.sortLabel': 'Sort: {name}',
+    'tasks.overdue': '{n} overdue',
+    'tasks.meMode': 'My tasks only',
+    'tasks.moreOptions': 'More options',
+    'tasks.noTasksInColumn': 'No tasks',
+    'tasks.archive': 'Archive',
+    'tasks.assignTo': 'Assign to',
+    'tasks.moveTo': 'Move to',
+
+    'preset.all': 'All',
+    'preset.my_tasks': 'My Tasks',
+    'preset.today': 'Today',
+    'preset.upcoming': 'Upcoming',
+    'preset.overdue': 'Overdue',
+    'preset.in_review': 'In Review',
+
+    'emptyState.noTasks': 'No tasks yet',
+    'emptyState.noTasksDesc': 'Create your first task to start organizing your work.',
+    'emptyState.noResults': 'No results',
+    'emptyState.noResultsDesc': 'No tasks match your current filters.',
+    'emptyState.noMyTasks': 'No assigned tasks',
+    'emptyState.noMyTasksDesc': 'You don\'t have any assigned tasks right now.',
+    'emptyState.noOverdue': 'No overdue tasks',
+    'emptyState.noOverdueDesc': 'All your tasks are on track.',
+    'emptyState.noToday': 'No tasks for today',
+    'emptyState.noTodayDesc': 'There are no tasks due today.',
+    'emptyState.noDate': 'No tasks in this range',
+    'emptyState.noDateDesc': 'No tasks found for the selected dates.',
+
+    'density.compact': 'Compact',
+    'density.comfortable': 'Comfortable',
+    'density.spacious': 'Spacious',
+
+    'calendarMode.month': 'Month',
+    'calendarMode.week': 'Week',
+    'calendarMode.day': 'Day',
+
+    'filter.noDate': 'No date',
+    'filter.noAssignee': 'Unassigned',
+    'filter.blocked': 'Blocked',
+    'filter.hasAttachments': 'Has attachments',
+    'filter.hasDependencies': 'Has dependencies',
+
+    'customFieldGroup.legal': 'Legal Data',
+    'customFieldGroup.client': 'Client Data',
+    'customFieldGroup.reference': 'References',
+
+    'common.rename': 'Rename',
+    'common.duplicate': 'Duplicate',
+    'common.share': 'Share',
+    'common.pin': 'Pin',
+
+    'taskCreate.sectionIdentity': 'Identity',
+    'taskCreate.sectionOrganization': 'Organization',
+    'taskCreate.sectionDates': 'Dates & Time',
+    'taskCreate.sectionAssignees': 'Assignees',
+    'taskCreate.sectionTags': 'Tags',
+    'taskCreate.sectionSubtasks': 'Subtasks',
+    'taskCreate.sectionCustom': 'Custom Fields',
 
     // --- Task Create Modal ---
     'taskCreate.title': 'New Task',
