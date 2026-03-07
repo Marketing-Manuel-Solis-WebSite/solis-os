@@ -8,6 +8,7 @@ import {
   getUserPreferences, saveUserPreferences,
 } from '@/lib/db';
 import { notifyMany } from '@/lib/notifications';
+import { handleTaskCompletion } from '@/lib/recurrence-trigger';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useToast } from '@/components/notifications/toast-provider';
 
@@ -18,6 +19,7 @@ import TaskBoardView from '@/components/tasks/task-board-view';
 import TaskCalendarView from '@/components/tasks/task-calendar-view';
 import TaskDetailDrawer from '@/components/tasks/task-detail-drawer';
 import TaskCreateModal from '@/components/tasks/task-create-modal';
+import ImportWizard from '@/components/tasks/import-wizard';
 import TaskBulkActions from '@/components/tasks/task-bulk-actions';
 import TaskEmptyState from '@/components/tasks/task-empty-state';
 
@@ -68,6 +70,7 @@ export default function TasksPage() {
 
   // UI
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
 
   // ─── Load preferences from Firestore ───────────────────
@@ -236,6 +239,13 @@ export default function TasksPage() {
           message: task?.title || t('tasks.updated'), entityType: 'task', entityId: id,
           entityUrl: '/app/tasks', actorId: user!.uid, actorName: me!.displayName,
         }).catch(() => {});
+      }
+    }
+    // Recurring task: auto-generate next instance when marked done
+    if (field === 'status' && val === 'done') {
+      const task = tasks.find(tk => tk.id === id);
+      if (task?.recurrence) {
+        handleTaskCompletion(task).catch(() => {});
       }
     }
     load();
@@ -488,6 +498,7 @@ export default function TasksPage() {
           onLoadView={handleLoadView}
           onDeleteView={handleDeleteView}
           onDuplicateView={handleDuplicateView}
+          onImport={can('task', 'create') ? () => setShowImport(true) : undefined}
         />
 
         {/* View content */}
@@ -608,6 +619,20 @@ export default function TasksPage() {
             activeTeamId={activeTeamId}
             onClose={() => setShowCreate(false)}
             onCreate={doCreate}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Import Wizard */}
+      <AnimatePresence>
+        {showImport && (
+          <ImportWizard
+            members={members}
+            teamId={activeTeamId}
+            userId={user!.uid}
+            userName={me?.displayName || ''}
+            onClose={() => setShowImport(false)}
+            onComplete={load}
           />
         )}
       </AnimatePresence>

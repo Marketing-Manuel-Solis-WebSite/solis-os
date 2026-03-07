@@ -7,6 +7,8 @@ import {
   STATUSES, PRIORITIES, TASK_TYPES, VISIBILITY,
   DEFAULT_CUSTOM_FIELDS, CUSTOM_FIELD_GROUPS,
 } from './constants';
+import RecurrencePicker from './recurrence-picker';
+import type { RecurrenceConfig } from '@/lib/recurrence';
 
 interface Props {
   members: any[];
@@ -25,6 +27,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
     points: '', subtasks: [] as any[], visibility: 'team',
     teamId: activeTeamId === '__all__' ? '' : activeTeamId,
     customFields: {} as Record<string, any>,
+    recurrence: undefined as RecurrenceConfig | undefined,
   });
   const [newSub, setNewSub] = useState('');
   const [showFields, setShowFields] = useState(false);
@@ -55,6 +58,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
     };
     if (d.dueDate) out.dueDate = new Date(d.dueDate);
     if (d.startDate) out.startDate = new Date(d.startDate);
+    if (d.recurrence) out.recurrence = d.recurrence;
     onCreate(out);
   };
 
@@ -532,6 +536,16 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
               />
             </div>
           </div>
+        </div>
+
+        {/* ──────── Section: Recurrencia ──────── */}
+        {sectionSep(t('recurrence.recurrence'))}
+
+        <div>
+          <RecurrencePicker
+            value={d.recurrence}
+            onChange={(cfg) => set('recurrence', cfg)}
+          />
         </div>
 
         {/* ──────── Section 4: Responsables ──────── */}

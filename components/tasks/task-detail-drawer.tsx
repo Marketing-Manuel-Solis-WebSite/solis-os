@@ -7,11 +7,14 @@ import {
   ChevronDown, Download, ExternalLink, FileText,
   Image as ImageIcon, Video, Music, CheckSquare,
   Maximize2, Minimize2, GitBranch, Eye, MessageSquare,
-  Clock, User, Activity,
+  Clock, User, Activity, Repeat,
 } from 'lucide-react';
 import { getTaskComments, addTaskComment, getTaskActivity, addTaskActivity } from '@/lib/db';
 import { uploadFile, isImageType, isVideoType, isAudioType, formatFileSize } from '@/lib/upload';
 import { notifyMany } from '@/lib/notifications';
+import EntityRelations from '@/components/shared/entity-relations';
+import RecurrencePicker from './recurrence-picker';
+import { getRecurrenceDescription } from '@/lib/recurrence';
 import {
   STATUSES, PRIORITIES, TASK_TYPES, VISIBILITY,
   DEFAULT_CUSTOM_FIELDS, CUSTOM_FIELD_GROUPS, ACCEPTED_FILES,
@@ -1033,6 +1036,37 @@ export default function TaskDetailDrawer({
               )}
             </AnimatePresence>
           </div>
+        </div>
+
+        {/* ===== RECURRENCE ===== */}
+        <div className="px-6 py-3 border-t border-[var(--border-subtle)]">
+          {task.recurrenceTemplateId && (
+            <div className="flex items-center gap-2 text-[12px] text-[var(--accent)] mb-2">
+              <Repeat className="h-3 w-3" />
+              {t('recurrence.partOfSeries')}
+            </div>
+          )}
+          {canUpdate ? (
+            <RecurrencePicker
+              value={task.recurrence}
+              onChange={(cfg) => onUpdate(task.id, 'recurrence', cfg)}
+            />
+          ) : task.recurrence ? (
+            <div className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
+              <Repeat className="h-3 w-3 text-[var(--accent)]" />
+              {getRecurrenceDescription(task.recurrence, t, 'es')}
+            </div>
+          ) : null}
+        </div>
+
+        {/* ===== RELATED ITEMS ===== */}
+        <div className="px-6 py-3 border-t border-[var(--border-subtle)]">
+          <EntityRelations
+            entityType="task"
+            entityId={task.id}
+            entityName={task.title || 'Untitled'}
+            canEdit={canUpdate}
+          />
         </div>
 
         {/* ===== BOTTOM TABS ===== */}

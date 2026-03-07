@@ -2,6 +2,7 @@
 import { useAuth, Role, Team } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
+import CustomFieldManager from '@/components/admin/custom-field-manager';
 import {
   getMembers, updateMember, getAuditLogs, logAction, getOrg, updateOrg,
   getSettings, saveSettings, getWorkspaces, createWorkspace, deleteWorkspace,
@@ -95,7 +96,7 @@ export default function Admin() {
         {s === 'departments' && <DepartmentsS />}
         {s === 'perms' && <PermsS />}
         {s === 'struct' && <CrudS label="Workspaces" fields={['name', 'description']} gFn={getWorkspaces} cFn={createWorkspace} dFn={deleteWorkspace} />}
-        {s === 'fields' && <SetS k="customFields" label="Custom Fields" fs={['caseNumber', 'caseValue', 'filingDate', 'caseType', 'courtLocation', 'retainerPaid']} />}
+        {s === 'fields' && <div className="p-6"><CustomFieldManager /></div>}
         {s === 'tpl' && <CrudS label="Templates" fields={['name', 'type', 'content']} gFn={getTemplates} cFn={createTemplate} dFn={deleteTemplate} />}
         {s === 'auto' && <CrudS label="Automations" fields={['name', 'trigger', 'action']} gFn={getAutomations} cFn={createAutomation} dFn={deleteAutomation} />}
         {s === 'notif' && <SetS k="notifications" label="Notifications" fs={['dailyDigest', 'weeklyReport', 'overdueAlerts', 'fromName', 'replyTo']} />}

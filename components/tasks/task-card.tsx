@@ -1,7 +1,7 @@
 'use client';
 
 import { useI18n } from '@/lib/i18n';
-import { Calendar, Paperclip, MessageSquare, GitBranch, CheckSquare } from 'lucide-react';
+import { Calendar, Paperclip, MessageSquare, GitBranch, CheckSquare, Repeat } from 'lucide-react';
 import {
   Task,
   PRIORITIES,
@@ -234,6 +234,13 @@ export default function TaskCard({
           <span className="flex items-center gap-0.5 text-[var(--text-muted)]">
             <GitBranch className="h-3 w-3" />
             <span className="text-[11px]">{dependencyCount}</span>
+          </span>
+        )}
+
+        {/* Recurrence indicator */}
+        {task.recurrence && (
+          <span className="text-[var(--accent)]" title="Recurring">
+            <Repeat className="h-3 w-3" />
           </span>
         )}
 

@@ -37,6 +37,10 @@ export interface Task {
   archived: boolean;
   deleted?: boolean;
   deletedAt?: any;
+  recurrence?: any;
+  isRecurrenceTemplate?: boolean;
+  recurrenceTemplateId?: string;
+  recurrenceInstanceDate?: any;
 }
 
 // =============================================
@@ -386,15 +390,18 @@ export function applyFilters(tasks: Task[], filters: FilterState): Task[] {
 
   if (filters.search) {
     const q = filters.search.toLowerCase();
-    result = result.filter(t =>
-      t.title?.toLowerCase().includes(q) ||
-      t.description?.toLowerCase().includes(q) ||
-      t.tags?.some(tag => tag.toLowerCase().includes(q)) ||
-      t.customFields?.caseNumber?.toLowerCase?.()?.includes(q) ||
-      t.customFields?.clientName?.toLowerCase?.()?.includes(q) ||
-      t.customFields?.clientEmail?.toLowerCase?.()?.includes(q) ||
-      t.customFields?.clientPhone?.toLowerCase?.()?.includes(q)
-    );
+    result = result.filter(t => {
+      if (t.title?.toLowerCase().includes(q)) return true;
+      if (t.description?.toLowerCase().includes(q)) return true;
+      if (t.tags?.some(tag => tag.toLowerCase().includes(q))) return true;
+      // Search all custom field string values dynamically
+      if (t.customFields) {
+        for (const val of Object.values(t.customFields)) {
+          if (typeof val === 'string' && val.toLowerCase().includes(q)) return true;
+        }
+      }
+      return false;
+    });
   }
 
   if (filters.status.length > 0) result = result.filter(t => filters.status.includes(t.status));

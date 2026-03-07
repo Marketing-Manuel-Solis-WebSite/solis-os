@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Save, ArrowLeft, Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   List, ListOrdered, Heading1, Heading2, Heading3, Quote, Code,
-  Minus, Link, Image, Eye, Edit2, Sparkles,
+  Minus, Link, Image, Eye, Edit2, Sparkles, Clock,
   Lock, Globe, Users, X, Download, Type, Undo2, Redo2,
   Maximize2, Minimize2, Table, CheckSquare, FileText, Upload, FileDown,
 } from 'lucide-react';
@@ -11,6 +11,7 @@ import { renderMarkdown } from '@/lib/markdown';
 import { uploadFile, isImageType, formatFileSize } from '@/lib/upload';
 import { useToast } from '@/components/notifications/toast-provider';
 import { useI18n } from '@/lib/i18n';
+import EntityRelations from '@/components/shared/entity-relations';
 
 interface DocEditorProps {
   doc: any;
@@ -22,6 +23,8 @@ interface DocEditorProps {
   onBack: () => void;
   onToggleAI: () => void;
   showAI: boolean;
+  onToggleVersions?: () => void;
+  showVersions?: boolean;
 }
 
 // ========== TOOLBAR BUTTON ==========
@@ -41,7 +44,7 @@ function TSep() {
 }
 
 // ========== MAIN EDITOR ==========
-export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDelete, onBack, onToggleAI, showAI }: DocEditorProps) {
+export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDelete, onBack, onToggleAI, showAI, onToggleVersions, showVersions }: DocEditorProps) {
   const toast = useToast();
   const { t } = useI18n();
   const [content, setContent] = useState(doc.content || '');
@@ -371,6 +374,14 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
             {visIcon} {visibility}
           </button>
 
+          {onToggleVersions && (
+            <button onClick={onToggleVersions}
+              className={`p-2 rounded-lg transition ${showVersions ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+              title={t('docVersion.title')}>
+              <Clock className="h-4 w-4" />
+            </button>
+          )}
+
           <button onClick={onToggleAI}
             className={`p-2 rounded-lg transition ${showAI ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-subtle)]'}`}
             title="AI Assistant">
@@ -437,6 +448,18 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
             <span>{t('docEditor.byAuthor', { name: doc.createdByName || 'Unknown' })}</span>
             {doc.createdAt?.toDate && <span>{doc.createdAt.toDate().toLocaleDateString()}</span>}
           </div>
+        </div>
+      )}
+
+      {/* Relations (collapsible inline) */}
+      {showMeta && (
+        <div className="px-5 py-2 bg-[#0A0E16] border-b border-[var(--border-subtle)]">
+          <EntityRelations
+            entityType="doc"
+            entityId={doc.id}
+            entityName={title || 'Untitled'}
+            canEdit={isAdmin || doc.createdBy === userId}
+          />
         </div>
       )}
 

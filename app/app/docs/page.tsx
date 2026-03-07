@@ -1,6 +1,6 @@
 'use client';
 import { useAuth } from '@/lib/auth';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Plus, Trash2, FileText, Search, Lock, Globe, Users, Star, StarOff,
   Filter, X, Sparkles, Paperclip, Calendar, User, Loader2,
@@ -12,6 +12,8 @@ import {
 import { renderMarkdown } from '@/lib/markdown';
 import DocEditor from '@/components/docs/doc-editor';
 import DocAIPanel from '@/components/docs/doc-ai-panel';
+import DocVersionHistory from '@/components/docs/doc-version-history';
+import { createRevision, getLatestVersionNumber, type DocRevision } from '@/lib/doc-versions';
 import { useToast } from '@/components/notifications/toast-provider';
 import { useI18n } from '@/lib/i18n';
 
@@ -56,7 +58,13 @@ export default function DocsPage() {
   const [activeDoc, setActiveDoc] = useState<Doc | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showAI, setShowAI] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [docVersion, setDocVersion] = useState(0);
   const [view, setView] = useState<'grid' | 'list'>('grid');
+
+  // Version tracking for smart autosave versioning
+  const lastVersionContentRef = useRef('');
+  const lastVersionTimeRef = useRef(0);
 
   // Load docs
   const load = useCallback(async () => {
@@ -159,14 +167,43 @@ export default function DocsPage() {
     if (newest) setActiveDoc(newest);
   };
 
-  const handleSave = async (id: string, data: Partial<Doc>) => {
+  const handleSave = async (id: string, data: Partial<Doc>, isManualSave = false) => {
     const wc = (data.content || '').split(/\s+/).filter(Boolean).length;
+    const newVersion = docVersion + 1;
     await updateDocument(id, {
       ...data,
       lastEditedBy: user!.uid,
       lastEditedByName: me!.displayName,
       wordCount: wc,
+      version: newVersion,
     });
+
+    // Version snapshot logic:
+    // Manual save → always create version
+    // Autosave → only if >100 chars changed OR >5 min since last version
+    const currentContent = data.content || '';
+    const charDelta = Math.abs(currentContent.length - lastVersionContentRef.current.length);
+    const timeSinceLastVersion = Date.now() - lastVersionTimeRef.current;
+    const shouldVersion = isManualSave || charDelta > 100 || timeSinceLastVersion > 5 * 60 * 1000;
+
+    if (shouldVersion && currentContent.trim()) {
+      try {
+        await createRevision(id, {
+          content: currentContent,
+          contentHtml: data.contentHtml || '',
+          title: data.title || activeDoc?.title || '',
+          version: newVersion,
+          editedBy: user!.uid,
+          editedByName: me!.displayName,
+        });
+        lastVersionContentRef.current = currentContent;
+        lastVersionTimeRef.current = Date.now();
+        setDocVersion(newVersion);
+      } catch {
+        // Version creation failure shouldn't block save
+      }
+    }
+
     await load();
     if (activeDoc?.id === id) {
       setActiveDoc(prev => prev ? { ...prev, ...data, wordCount: wc } : null);
@@ -184,6 +221,74 @@ export default function DocsPage() {
   const handleToggleStar = async (doc: Doc) => {
     await updateDocument(doc.id, { starred: !doc.starred });
     load();
+  };
+
+  // Initialize version tracking when doc is opened
+  useEffect(() => {
+    if (activeDoc) {
+      lastVersionContentRef.current = activeDoc.content || '';
+      lastVersionTimeRef.current = Date.now();
+      getLatestVersionNumber(activeDoc.id).then(v => setDocVersion(v)).catch(() => setDocVersion(0));
+    }
+  }, [activeDoc?.id]);
+
+  // Handle version restore
+  const handleRestoreVersion = async (revision: DocRevision) => {
+    if (!activeDoc) return;
+    try {
+      // First save current state as a safety snapshot
+      const safetyVersion = docVersion + 1;
+      await createRevision(activeDoc.id, {
+        content: activeDoc.content || '',
+        contentHtml: activeDoc.contentHtml || '',
+        title: activeDoc.title,
+        version: safetyVersion,
+        editedBy: user!.uid,
+        editedByName: me!.displayName,
+        changeNote: `Auto-saved before restoring v${revision.version}`,
+      });
+
+      // Now restore the selected version
+      const restoredVersion = safetyVersion + 1;
+      await updateDocument(activeDoc.id, {
+        content: revision.content,
+        contentHtml: revision.contentHtml || renderMarkdown(revision.content || ''),
+        title: revision.title,
+        lastEditedBy: user!.uid,
+        lastEditedByName: me!.displayName,
+        wordCount: revision.wordCount,
+        version: restoredVersion,
+      });
+
+      await createRevision(activeDoc.id, {
+        content: revision.content,
+        contentHtml: revision.contentHtml || '',
+        title: revision.title,
+        version: restoredVersion,
+        editedBy: user!.uid,
+        editedByName: me!.displayName,
+        changeNote: `Restored from v${revision.version}`,
+      });
+
+      setDocVersion(restoredVersion);
+      lastVersionContentRef.current = revision.content;
+      lastVersionTimeRef.current = Date.now();
+
+      await logAction({ action: 'restored_version', resource: 'doc', detail: `${activeDoc.title} → v${revision.version}`, actorId: user!.uid, actorName: me!.displayName });
+      setActiveDoc(prev => prev ? {
+        ...prev,
+        content: revision.content,
+        contentHtml: revision.contentHtml || renderMarkdown(revision.content || ''),
+        title: revision.title,
+        wordCount: revision.wordCount,
+      } : null);
+
+      setShowVersions(false);
+      toast.success(t('docVersion.restored'), t('docVersion.restoredMsg', { v: revision.version }));
+      await load();
+    } catch {
+      toast.error(t('docVersion.restoreError'), t('docVersion.restoreErrorMsg'));
+    }
   };
 
   // Handle AI insert (append to document)
@@ -207,18 +312,28 @@ export default function DocsPage() {
             members={members}
             isAdmin={isAdmin}
             userId={user!.uid}
-            onSave={handleSave}
+            onSave={(id, data) => handleSave(id, data, true)}
             onDelete={handleDelete}
-            onBack={() => setActiveDoc(null)}
+            onBack={() => { setActiveDoc(null); setShowVersions(false); }}
             onToggleAI={() => setShowAI(!showAI)}
             showAI={showAI}
+            onToggleVersions={() => setShowVersions(!showVersions)}
+            showVersions={showVersions}
           />
         </div>
+        {showVersions && (
+          <DocVersionHistory
+            docId={activeDoc.id}
+            currentVersion={docVersion}
+            onRestore={handleRestoreVersion}
+            onClose={() => setShowVersions(false)}
+          />
+        )}
         {showAI && (
           <DocAIPanel
             doc={activeDoc}
             onClose={() => setShowAI(false)}
-            onApply={(content: string) => handleSave(activeDoc.id, { content, contentHtml: renderMarkdown(content) })}
+            onApply={(content: string) => handleSave(activeDoc.id, { content, contentHtml: renderMarkdown(content) }, true)}
             onInsert={handleAIInsert}
           />
         )}

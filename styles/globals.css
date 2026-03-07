@@ -54,3 +54,20 @@
 .ProseMirror pre code {
   @apply bg-transparent p-0;
 }
+
+/* Command Palette (cmdk) */
+.cmdk-group [cmdk-group-heading] {
+  @apply text-[11px] font-semibold uppercase tracking-wider px-2 py-1.5 text-[var(--text-muted)];
+}
+.cmdk-group + .cmdk-group {
+  @apply mt-1;
+}
+.cmdk-item {
+  @apply flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors duration-150;
+}
+.cmdk-item[data-selected='true'] {
+  @apply bg-[var(--bg-hover)];
+}
+.cmdk-item:active {
+  @apply bg-[var(--bg-active)];
+}

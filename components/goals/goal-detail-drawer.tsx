@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Edit2, Trash2, Target, Calendar, User, ChevronDown } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
+import EntityRelations from '@/components/shared/entity-relations';
 import { getGoalTargets, createGoalTarget, updateGoalTarget, deleteGoalTarget, recalculateGoalProgress, getTasks } from '@/lib/db';
 import { GOAL_STATUSES, TARGET_TYPES, GOAL_COLORS } from './constants';
 import type { Goal, GoalTarget, GoalStatus, TargetType } from './constants';
@@ -361,6 +362,15 @@ export default function GoalDetailDrawer({ goal, open, onClose, onUpdate, onDele
                     </motion.div>
                   )}
                 </AnimatePresence>
+              </div>
+
+              {/* Related Items */}
+              <div>
+                <EntityRelations
+                  entityType="goal"
+                  entityId={goal.id}
+                  entityName={goal.name || ''}
+                />
               </div>
 
               {/* Tags */}

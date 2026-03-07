@@ -10,10 +10,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import NotificationBell from '@/components/notifications/notification-bell';
 import FloatingAIChat from '@/components/ai/floating-ai-chat';
 import { ToastProvider, FirebaseToastBridge } from '@/components/notifications/toast-provider';
+import CommandPaletteProvider, { useCommandPalette } from '@/components/command-palette/command-palette-provider';
 import {
   LayoutDashboard, CheckSquare, FileText, MessageSquare, Zap, BarChart3,
   Users, Shield, LogOut, Menu, Bot, ChevronLeft, Sun, Moon, ChevronDown,
-  Settings, Loader2, CalendarDays, MoreHorizontal, Target, Clock, PenTool, FileInput, Plug,
+  Settings, Loader2, CalendarDays, MoreHorizontal, Target, Clock, PenTool, FileInput, Plug, Search,
 } from 'lucide-react';
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -235,6 +236,24 @@ function UserMenu() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// ============================================
+// SEARCH TRIGGER
+// ============================================
+function SearchTrigger() {
+  const { toggle } = useCommandPalette();
+  const { t } = useI18n();
+  return (
+    <button
+      onClick={toggle}
+      className="hidden sm:flex items-center gap-2 h-8 px-3 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--bg-active)] transition-all duration-200 text-sm text-[var(--text-muted)] border border-[var(--border-subtle)]"
+    >
+      <Search className="h-3.5 w-3.5" strokeWidth={1.75} />
+      <span className="text-[13px]">{t('common.search')}</span>
+      <kbd className="ml-2 text-[10px] px-1 py-0.5 rounded bg-[var(--bg-base)] font-mono text-[var(--text-muted)]">⌘K</kbd>
+    </button>
   );
 }
 
@@ -493,6 +512,7 @@ function Shell({ children }: { children: React.ReactNode }) {
               <Menu className="h-4 w-4" strokeWidth={1.75} />
             </button>
             <TeamSelector />
+            <SearchTrigger />
             {canSeeAllTeams && (
               <span className="hidden sm:inline text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] font-medium tracking-wider text-[var(--text-muted)] uppercase">
                 {path === '/app' ? 'DASHBOARD' : path.split('/').pop()?.toUpperCase().replace(/-/g, ' ')}
@@ -527,9 +547,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <ToastProvider>
-        <Shell>{children}</Shell>
-        <FloatingAIChat />
-        <FirebaseToastBridge />
+        <CommandPaletteProvider>
+          <Shell>{children}</Shell>
+          <FloatingAIChat />
+          <FirebaseToastBridge />
+        </CommandPaletteProvider>
       </ToastProvider>
     </AuthProvider>
   );

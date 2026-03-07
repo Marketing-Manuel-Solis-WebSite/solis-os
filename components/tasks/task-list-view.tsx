@@ -4,7 +4,7 @@ import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown, ChevronRight, ChevronUp, Calendar,
-  CheckSquare, Trash2, GripVertical, Paperclip,
+  CheckSquare, Trash2, GripVertical, Paperclip, Repeat,
 } from 'lucide-react';
 import {
   STATUSES, PRIORITIES, TASK_TYPES, ALL_COLUMNS,
@@ -442,6 +442,11 @@ function TaskRow({
                     )}
                     {task.attachments?.length > 0 && (
                       <Paperclip className="h-3 w-3 shrink-0 text-[var(--text-muted)] opacity-60" />
+                    )}
+                    {task.recurrence && (
+                      <span title="Recurring">
+                        <Repeat className="h-3 w-3 shrink-0 text-[var(--accent)] opacity-70" />
+                      </span>
                     )}
                     {subtaskDisplay === 'count' && <SubtaskCount task={task} />}
                   </div>

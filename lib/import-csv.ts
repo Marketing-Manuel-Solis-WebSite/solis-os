@@ -1,0 +1,265 @@
+// ================================================================
+// SOLIS CENTER — CSV Import: Parse, Validate, Map
+// ================================================================
+
+import Papa from 'papaparse';
+import { writeBatch, doc, collection, serverTimestamp, addDoc } from 'firebase/firestore';
+import { db } from './firebase';
+
+const ORG = 'solis-center';
+
+// ─── Types ────────────────────────────────────────────────────
+
+export interface ColumnMapping {
+  [csvHeader: string]: string; // maps CSV header → task field
+}
+
+export interface ImportError {
+  row: number;
+  field: string;
+  value: string;
+  message: string;
+}
+
+export interface ImportResult {
+  totalRows: number;
+  importedCount: number;
+  skippedCount: number;
+  errors: ImportError[];
+}
+
+export interface ImportLog {
+  orgId: string;
+  entityType: string;
+  fileName: string;
+  totalRows: number;
+  importedCount: number;
+  skippedCount: number;
+  errors: ImportError[];
+  columnMapping: ColumnMapping;
+  importedBy: string;
+  importedByName: string;
+  teamId: string;
+  dryRun: boolean;
+}
+
+// ─── Task field definitions for mapping ─────────────────────────
+
+export const MAPPABLE_FIELDS = [
+  { id: 'title', label: 'Título / Title', required: true },
+  { id: 'description', label: 'Descripción / Description', required: false },
+  { id: 'status', label: 'Status', required: false },
+  { id: 'priority', label: 'Prioridad / Priority', required: false },
+  { id: 'type', label: 'Tipo / Type', required: false },
+  { id: 'assignees', label: 'Asignados / Assignees', required: false },
+  { id: 'tags', label: 'Etiquetas / Tags', required: false },
+  { id: 'dueDate', label: 'Fecha límite / Due Date', required: false },
+  { id: 'startDate', label: 'Fecha inicio / Start Date', required: false },
+  { id: 'timeEstimate', label: 'Estimación (min)', required: false },
+  { id: 'points', label: 'Puntos / Points', required: false },
+  { id: 'visibility', label: 'Visibilidad / Visibility', required: false },
+] as const;
+
+// ─── Auto-detect column mapping ────────────────────────────────
+
+const HEADER_ALIASES: Record<string, string[]> = {
+  title: ['title', 'titulo', 'título', 'nombre', 'name', 'task', 'tarea'],
+  description: ['description', 'descripcion', 'descripción', 'desc', 'detalle', 'details'],
+  status: ['status', 'estado', 'state'],
+  priority: ['priority', 'prioridad', 'urgencia'],
+  type: ['type', 'tipo', 'kind'],
+  assignees: ['assignees', 'asignados', 'assigned', 'responsable', 'assignee'],
+  tags: ['tags', 'etiquetas', 'labels', 'categorias'],
+  dueDate: ['duedate', 'due_date', 'due date', 'fecha_limite', 'fecha limite', 'fecha límite', 'vencimiento', 'deadline'],
+  startDate: ['startdate', 'start_date', 'start date', 'fecha_inicio', 'fecha inicio', 'inicio'],
+  timeEstimate: ['timeestimate', 'time_estimate', 'estimacion', 'estimate', 'hours', 'minutes', 'horas', 'minutos'],
+  points: ['points', 'puntos', 'story_points', 'sp'],
+  visibility: ['visibility', 'visibilidad'],
+};
+
+export function autoDetectMapping(headers: string[]): ColumnMapping {
+  const mapping: ColumnMapping = {};
+  for (const header of headers) {
+    const normalized = header.toLowerCase().trim().replace(/[_\-]/g, '');
+    for (const [fieldId, aliases] of Object.entries(HEADER_ALIASES)) {
+      if (aliases.some(a => a.replace(/[_\-\s]/g, '') === normalized)) {
+        mapping[header] = fieldId;
+        break;
+      }
+    }
+  }
+  return mapping;
+}
+
+// ─── Parse CSV ─────────────────────────────────────────────────
+
+export function parseCSV(file: File): Promise<{ headers: string[]; rows: Record<string, string>[]; rowCount: number }> {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const headers = results.meta.fields || [];
+        const rows = results.data as Record<string, string>[];
+        resolve({ headers, rows, rowCount: rows.length });
+      },
+      error: (err) => reject(err),
+    });
+  });
+}
+
+// ─── Validate + Transform rows ─────────────────────────────────
+
+const VALID_STATUSES = ['todo', 'in_progress', 'review', 'done', 'blocked', 'open'];
+const VALID_PRIORITIES = ['urgent', 'high', 'medium', 'low'];
+const VALID_TYPES = ['task', 'bug', 'feature', 'improvement', 'subtask'];
+const VALID_VISIBILITY = ['team', 'private', 'public'];
+
+function resolveAssignees(value: string, members: any[]): string[] {
+  if (!value) return [];
+  const names = value.split(/[,;]/).map(n => n.trim()).filter(Boolean);
+  const ids: string[] = [];
+  for (const name of names) {
+    const lower = name.toLowerCase();
+    const member = members.find((m: any) =>
+      m.displayName?.toLowerCase() === lower ||
+      m.email?.toLowerCase() === lower
+    );
+    if (member) ids.push(member.id);
+  }
+  return ids;
+}
+
+function parseDate(value: string): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+export function validateAndTransform(
+  rows: Record<string, string>[],
+  mapping: ColumnMapping,
+  members: any[],
+  defaults: { teamId: string; createdBy: string },
+): { tasks: any[]; errors: ImportError[] } {
+  const errors: ImportError[] = [];
+  const tasks: any[] = [];
+  const reverseMap: Record<string, string> = {};
+
+  for (const [csvHeader, fieldId] of Object.entries(mapping)) {
+    reverseMap[fieldId] = csvHeader;
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 2; // +2 for header row + 1-indexed
+
+    const getValue = (fieldId: string): string => {
+      const csvHeader = reverseMap[fieldId];
+      return csvHeader ? (row[csvHeader] || '').trim() : '';
+    };
+
+    const title = getValue('title');
+    if (!title) {
+      errors.push({ row: rowNum, field: 'title', value: '', message: 'Title is required' });
+      continue;
+    }
+
+    const statusRaw = getValue('status').toLowerCase();
+    const status = VALID_STATUSES.includes(statusRaw) ? statusRaw : 'todo';
+    if (statusRaw && !VALID_STATUSES.includes(statusRaw)) {
+      errors.push({ row: rowNum, field: 'status', value: statusRaw, message: `Invalid status: "${statusRaw}"` });
+    }
+
+    const priorityRaw = getValue('priority').toLowerCase();
+    const priority = VALID_PRIORITIES.includes(priorityRaw) ? priorityRaw : 'medium';
+    if (priorityRaw && !VALID_PRIORITIES.includes(priorityRaw)) {
+      errors.push({ row: rowNum, field: 'priority', value: priorityRaw, message: `Invalid priority: "${priorityRaw}"` });
+    }
+
+    const typeRaw = getValue('type').toLowerCase();
+    const type = VALID_TYPES.includes(typeRaw) ? typeRaw : 'task';
+
+    const visRaw = getValue('visibility').toLowerCase();
+    const visibility = VALID_VISIBILITY.includes(visRaw) ? visRaw : 'team';
+
+    const assignees = resolveAssignees(getValue('assignees'), members);
+    const tags = getValue('tags') ? getValue('tags').split(/[,;]/).map(t => t.trim()).filter(Boolean) : [];
+    const dueDate = parseDate(getValue('dueDate'));
+    const startDate = parseDate(getValue('startDate'));
+
+    const timeEstRaw = getValue('timeEstimate');
+    const timeEstimate = timeEstRaw ? parseInt(timeEstRaw, 10) || null : null;
+
+    const pointsRaw = getValue('points');
+    const points = pointsRaw ? parseInt(pointsRaw, 10) || null : null;
+
+    tasks.push({
+      title,
+      description: getValue('description'),
+      status,
+      priority,
+      type,
+      visibility,
+      assignees,
+      tags,
+      dueDate: dueDate || null,
+      startDate: startDate || null,
+      timeEstimate,
+      points,
+      teamId: defaults.teamId,
+      createdBy: defaults.createdBy,
+      orgId: ORG,
+      subtasks: [],
+      checklist: [],
+      attachments: [],
+      customFields: {},
+      dependencies: [],
+      watchers: [],
+      archived: false,
+    });
+  }
+
+  return { tasks, errors };
+}
+
+// ─── Batch import ──────────────────────────────────────────────
+
+const BATCH_SIZE = 450;
+
+export async function batchImportTasks(
+  tasks: any[],
+  onProgress?: (imported: number, total: number) => void,
+): Promise<number> {
+  let imported = 0;
+
+  for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
+    const chunk = tasks.slice(i, i + BATCH_SIZE);
+    const batch = writeBatch(db);
+
+    for (const task of chunk) {
+      const ref = doc(collection(db, 'tasks'));
+      batch.set(ref, {
+        ...task,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    await batch.commit();
+    imported += chunk.length;
+    onProgress?.(imported, tasks.length);
+  }
+
+  return imported;
+}
+
+// ─── Import log ────────────────────────────────────────────────
+
+export async function createImportLog(log: ImportLog) {
+  return addDoc(collection(db, 'importLogs'), {
+    ...log,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+}

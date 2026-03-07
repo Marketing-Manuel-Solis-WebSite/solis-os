@@ -267,5 +267,20 @@ service cloud.firestore {
       allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
     }
+
+    // Entity Relations
+    match /relations/{relationId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow delete: if isSignedIn() && (request.auth.uid == resource.data.createdBy || isManager(resource.data.orgId));
+      allow update: if false;
+    }
+
+    // Import Logs
+    match /importLogs/{logId} {
+      allow read: if isSignedIn() && isAdmin(resource.data.orgId);
+      allow create: if isSignedIn() && isManager(request.resource.data.orgId);
+      allow update, delete: if false;
+    }
   }
 }

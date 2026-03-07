@@ -4,7 +4,7 @@ import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, X, PanelLeft, Keyboard,
-  ArrowUpDown, LayoutList, LayoutGrid, Calendar,
+  ArrowUpDown, LayoutList, LayoutGrid, Calendar, Upload,
 } from 'lucide-react';
 import {
   VIEWS, STATUSES, PRIORITIES, SORT_OPTIONS, GROUP_OPTIONS,
@@ -50,6 +50,7 @@ interface Props {
   onLoadView: (sv: SavedView) => void;
   onDeleteView?: (id: string) => void;
   onDuplicateView?: (sv: SavedView) => void;
+  onImport?: () => void;
 }
 
 // =============================================
@@ -64,6 +65,7 @@ export default function TaskToolbar({
   onSortByChange, onSortDirToggle, onGroupByChange,
   onNewTask, onClearFilters, onToggleSidebar,
   onPresetChange, onSaveView, onLoadView, onDeleteView, onDuplicateView,
+  onImport,
 }: Props) {
   const { t } = useI18n();
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -253,6 +255,16 @@ export default function TaskToolbar({
           >
             <Keyboard className="h-4 w-4" />
           </button>
+
+          {canCreate && onImport && (
+            <button
+              onClick={onImport}
+              className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+              title={t('import.title')}
+            >
+              <Upload className="h-4 w-4" />
+            </button>
+          )}
 
           {canCreate && (
             <motion.button
