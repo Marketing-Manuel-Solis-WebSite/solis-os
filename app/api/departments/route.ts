@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { collection, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { authenticateRequest } from '@/lib/server-auth';
 
 const ORG = 'solis-center';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const authedUser = await authenticateRequest(req);
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const snap = await getDocs(collection(db, `orgs/${ORG}/teams`));
     const teams = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     return NextResponse.json({ teams });
@@ -16,6 +22,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const authedUser = await authenticateRequest(req);
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const data = await req.json();
     if (!data.name?.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });

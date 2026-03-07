@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { authenticateRequest } from '@/lib/server-auth';
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Solis Center <notifications@soliscenter.com>';
 
@@ -7,8 +8,24 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY || '');
 }
 
+/** Escape HTML special characters to prevent XSS in email templates. */
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const authedUser = await authenticateRequest(request);
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { to, subject, title, message, actorName, type } = body;
 
@@ -32,6 +49,12 @@ export async function POST(request: NextRequest) {
 
     const typeLabel = typeLabels[type] || 'Notification';
 
+    // Escape all user-controlled values before interpolation into HTML
+    const safeTitle = escapeHtml(title);
+    const safeMessage = escapeHtml(message);
+    const safeActorName = escapeHtml(actorName);
+    const safeSubject = escapeHtml(subject);
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -45,9 +68,9 @@ export async function POST(request: NextRequest) {
     </div>
     <div style="background:#111827;border:1px solid #1F293780;border-radius:16px;padding:32px;margin-bottom:24px;">
       <div style="display:inline-block;padding:4px 12px;background:#3B82F618;border:1px solid #3B82F630;border-radius:20px;font-size:11px;color:#3B82F6;font-weight:600;margin-bottom:16px;">${typeLabel.toUpperCase()}</div>
-      <h2 style="color:#F1F5F9;font-size:18px;margin:0 0 8px;font-weight:600;">${title}</h2>
-      <p style="color:#94A3B8;font-size:14px;line-height:1.6;margin:0 0 16px;">${message}</p>
-      ${actorName ? `<p style="color:#64748B;font-size:12px;margin:0;">From: <span style="color:#3B82F6;font-weight:500;">${actorName}</span></p>` : ''}
+      <h2 style="color:#F1F5F9;font-size:18px;margin:0 0 8px;font-weight:600;">${safeTitle}</h2>
+      <p style="color:#94A3B8;font-size:14px;line-height:1.6;margin:0 0 16px;">${safeMessage}</p>
+      ${safeActorName ? `<p style="color:#64748B;font-size:12px;margin:0;">From: <span style="color:#3B82F6;font-weight:500;">${safeActorName}</span></p>` : ''}
     </div>
     <div style="text-align:center;">
       <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://soliscenter.com'}/app" style="display:inline-block;padding:12px 32px;background:#3B82F6;color:#FFFFFF;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">Open Solis Center</a>
@@ -60,7 +83,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to: [to],
-      subject: subject || `${typeLabel}: ${title}`,
+      subject: safeSubject || `${typeLabel}: ${safeTitle}`,
       html,
     });
 

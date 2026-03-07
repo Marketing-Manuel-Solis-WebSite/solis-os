@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWebhookSecret, generateEndpointToken } from '@/lib/integrations-crypto';
 import { addIncomingWebhook } from '@/lib/integrations-db';
+import { authenticateRequest } from '@/lib/server-auth';
 
 export async function POST(req: NextRequest) {
   try {
+    const authedUser = await authenticateRequest(req);
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
-    const { name, provider, actionType, actionConfig, createdBy } = body as {
+    const { name, provider, actionType, actionConfig } = body as {
       name: string;
       provider: string;
       actionType: 'create_task' | 'create_notification' | 'trigger_automation';
       actionConfig: Record<string, any>;
-      createdBy: string;
     };
 
     if (!name?.trim()) {
@@ -27,7 +32,7 @@ export async function POST(req: NextRequest) {
       secret,
       actionType: actionType || 'create_task',
       actionConfig: actionConfig || {},
-      createdBy: createdBy || '',
+      createdBy: authedUser.uid,
     });
 
     return NextResponse.json({ ok: true, id: ref.id, token });

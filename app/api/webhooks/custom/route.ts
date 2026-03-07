@@ -1,7 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queueEvent } from '@/lib/integrations-db';
+import { timingSafeEqual } from 'crypto';
+
+function verifyWebhookSecret(req: NextRequest): boolean {
+  const secret = process.env.WEBHOOK_PROCESSOR_SECRET;
+  if (!secret) return false; // Fail-closed: no secret configured → reject
+
+  const provided = req.headers.get('x-webhook-secret') || '';
+  if (!provided || provided.length !== secret.length) return false;
+
+  try {
+    return timingSafeEqual(Buffer.from(provided), Buffer.from(secret));
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(req: NextRequest) {
+  if (!verifyWebhookSecret(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const bodyText = await req.text();
     let payload: any;

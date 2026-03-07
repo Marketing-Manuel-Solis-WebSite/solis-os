@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
+import { ORG } from './db';
 
-const ORG = 'solis-center';
 const SETTINGS_PATH = `orgs/${ORG}/settings/customFields`;
 
 // Extended field types
@@ -91,8 +91,8 @@ export async function loadFieldDefs(): Promise<CustomFieldSettings> {
         };
       }
     }
-  } catch {
-    // Fall through to migration
+  } catch (err) {
+    console.error('[CustomFields] Failed to load settings, falling back to migration:', err);
   }
 
   // Lazy migrate from hardcoded defaults
@@ -108,8 +108,8 @@ export async function loadFieldDefs(): Promise<CustomFieldSettings> {
       updatedAt: serverTimestamp(),
       updatedBy: 'system-migration',
     });
-  } catch {
-    // Migration write failure is non-fatal
+  } catch (err) {
+    console.error('[CustomFields] Migration write failed (non-fatal):', err);
   }
 
   return settings;

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
+import { auth } from '@/lib/firebase';
 import {
   onWebhooksSnapshot, onIncomingWebhooksSnapshot,
 } from '@/lib/integrations-db';
@@ -50,14 +51,19 @@ function OutgoingWebhooks() {
     if (!name.trim() || !url.trim() || events.length === 0) return;
     setCreating(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error('Not authenticated');
+
       const res = await fetch('/api/integrations/webhooks-manage', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           name: name.trim(),
           url: url.trim(),
           events,
-          createdBy: user?.uid || '',
         }),
       });
       const data = await res.json();
@@ -77,7 +83,13 @@ function OutgoingWebhooks() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/integrations/webhooks-manage/${id}`, { method: 'DELETE' });
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error('Not authenticated');
+
+      const res = await fetch(`/api/integrations/webhooks-manage/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${idToken}` },
+      });
       if (!res.ok) throw new Error();
       toast.success(t('integ.webhook.delete'));
       setDeleteConfirm(null);
@@ -87,9 +99,15 @@ function OutgoingWebhooks() {
   };
 
   const handleToggle = async (id: string, active: boolean) => {
+    const idToken = await auth.currentUser?.getIdToken();
+    if (!idToken) return;
+
     await fetch(`/api/integrations/webhooks-manage/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`,
+      },
       body: JSON.stringify({ active: !active }),
     });
   };
@@ -342,15 +360,20 @@ function IncomingWebhooks() {
     if (!name.trim()) return;
     setCreating(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error('Not authenticated');
+
       const res = await fetch('/api/integrations/incoming-manage', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           name: name.trim(),
           provider: provider.trim() || 'custom',
           actionType,
           actionConfig: {},
-          createdBy: user?.uid || '',
         }),
       });
       const data = await res.json();
@@ -369,7 +392,13 @@ function IncomingWebhooks() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/integrations/incoming-manage/${id}`, { method: 'DELETE' });
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error('Not authenticated');
+
+      const res = await fetch(`/api/integrations/incoming-manage/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${idToken}` },
+      });
       if (!res.ok) throw new Error();
       toast.success(t('integ.incoming.delete'));
       setDeleteConfirm(null);

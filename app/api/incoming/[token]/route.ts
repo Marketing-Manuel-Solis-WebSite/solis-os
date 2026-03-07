@@ -16,10 +16,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
     const bodyText = await req.text();
 
-    // Verify HMAC signature if secret is configured
+    // Verify HMAC signature if secret is configured (fail-closed: reject if no signature provided)
     if (webhook.secret) {
       const signature = req.headers.get('x-webhook-signature') || req.headers.get('x-hub-signature-256') || '';
-      if (signature && !verifySignature(webhook.secret, bodyText, signature)) {
+      if (!signature || !verifySignature(webhook.secret, bodyText, signature)) {
         return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
       }
     }

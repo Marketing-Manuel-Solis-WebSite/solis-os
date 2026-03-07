@@ -2,8 +2,7 @@ import {
   collection, doc, addDoc, deleteDoc, getDocs, query, where, orderBy, limit, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
-
-const ORG = 'solis-center';
+import { ORG } from './db';
 
 export type EntityType = 'task' | 'doc' | 'goal';
 export type RelationType = 'related_to' | 'references' | 'contributes_to' | 'parent_of' | 'child_of' | 'blocks' | 'blocked_by';
@@ -44,6 +43,24 @@ export async function createRelation(data: {
   createdBy: string;
   createdByName: string;
 }): Promise<string> {
+  // Prevent self-relations
+  if (data.sourceId === data.targetId && data.sourceType === data.targetType) {
+    throw new Error('Cannot create a relation from an entity to itself');
+  }
+
+  // Check for duplicate exact relation (same source, target, type)
+  const existing = await getDocs(query(
+    collection(db, 'relations'),
+    where('orgId', '==', ORG),
+    where('sourceId', '==', data.sourceId),
+    where('targetId', '==', data.targetId),
+    where('relationType', '==', data.relationType),
+    limit(1),
+  ));
+  if (!existing.empty) {
+    throw new Error('This relation already exists');
+  }
+
   const ref = await addDoc(collection(db, 'relations'), {
     orgId: ORG,
     ...data,

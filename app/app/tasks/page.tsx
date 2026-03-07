@@ -245,7 +245,10 @@ export default function TasksPage() {
     if (field === 'status' && val === 'done') {
       const task = tasks.find(tk => tk.id === id);
       if (task?.recurrence) {
-        handleTaskCompletion(task).catch(() => {});
+        handleTaskCompletion(task).catch(err => {
+          console.error('[Recurrence] Failed to generate next instance:', err);
+          toast.error(t('recurrence.generationFailed'));
+        });
       }
     }
     load();
@@ -270,6 +273,7 @@ export default function TasksPage() {
   };
 
   const bulkDelete = async () => {
+    if (!can('task', 'delete')) return;
     if (!confirm(t('tasks.bulkDeleteConfirm', { n: selectedIds.size }))) return;
     const promises = Array.from(selectedIds).map(id => softDeleteTask(id));
     await Promise.all(promises);

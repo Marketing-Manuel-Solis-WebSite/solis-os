@@ -1,5 +1,6 @@
 'use client';
 import { useAuth } from '@/lib/auth';
+import { auth } from '@/lib/firebase';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Plus, Trash2, FileText, Search, Lock, Globe, Users, Star, StarOff,
@@ -199,8 +200,9 @@ export default function DocsPage() {
         lastVersionContentRef.current = currentContent;
         lastVersionTimeRef.current = Date.now();
         setDocVersion(newVersion);
-      } catch {
-        // Version creation failure shouldn't block save
+      } catch (err) {
+        console.error('[DocVersioning] Failed to create revision:', err);
+        // Version creation failure shouldn't block save, but log it
       }
     }
 
@@ -235,6 +237,10 @@ export default function DocsPage() {
   // Handle version restore
   const handleRestoreVersion = async (revision: DocRevision) => {
     if (!activeDoc) return;
+    if (!can('doc', 'update')) {
+      toast.error(t('docVersion.restoreError'), t('docVersion.noPermission'));
+      return;
+    }
     try {
       // First save current state as a safety snapshot
       const safetyVersion = docVersion + 1;
@@ -669,9 +675,10 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
     if (template === 'ai' && aiPrompt.trim()) {
       setAiGenerating(true);
       try {
+        const idToken = await auth.currentUser?.getIdToken();
         const res = await fetch('/api/ai', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
           body: JSON.stringify({
             question: `You are a professional document writer for a law office. Create a complete, well-structured document in markdown format.\n\nDocument Title: "${title.trim()}"\n\nDescription: ${aiPrompt.trim()}\n\nWrite the full document content in markdown format:`,
           }),

@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateApiKey } from '@/lib/integrations-crypto';
 import { addApiKey } from '@/lib/integrations-db';
+import { authenticateRequest } from '@/lib/server-auth';
 import type { ApiKeyScope } from '@/lib/integrations-types';
 
 export async function POST(req: NextRequest) {
   try {
+    const authedUser = await authenticateRequest(req);
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
-    const { name, scopes, expiresAt, createdBy } = body as {
+    const { name, scopes, expiresAt } = body as {
       name: string;
       scopes: ApiKeyScope[];
       expiresAt: number | null;
-      createdBy: string;
     };
 
     if (!name?.trim() || !scopes?.length) {
@@ -24,7 +29,7 @@ export async function POST(req: NextRequest) {
       keyHash: hash,
       prefix,
       scopes,
-      createdBy: createdBy || '',
+      createdBy: authedUser.uid,
       expiresAt,
     });
 

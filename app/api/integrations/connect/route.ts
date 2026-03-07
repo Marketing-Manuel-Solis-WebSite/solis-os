@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { encryptToken } from '@/lib/integrations-crypto';
 import { addIntegration, getIntegrationByProvider, updateIntegration } from '@/lib/integrations-db';
+import { authenticateRequest } from '@/lib/server-auth';
 import { INTEGRATION_CATALOG } from '@/lib/integrations-catalog';
 import type { IntegrationProvider } from '@/lib/integrations-types';
 
 export async function POST(req: NextRequest) {
   try {
+    const authedUser = await authenticateRequest(req);
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
-    const { provider, apiKey, createdBy } = body as {
+    const { provider, apiKey } = body as {
       provider: string;
       apiKey: string;
-      createdBy: string;
     };
 
     if (!provider || !apiKey) {
@@ -38,7 +43,7 @@ export async function POST(req: NextRequest) {
         status: 'connected',
         displayName: catalogEntry.name,
         config: { apiKey: encryptedKey },
-        createdBy: createdBy || '',
+        createdBy: authedUser.uid,
       });
     }
 

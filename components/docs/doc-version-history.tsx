@@ -25,8 +25,9 @@ export default function DocVersionHistory({ docId, currentVersion, onRestore, on
     try {
       const revs = await getRevisions(docId);
       setRevisions(revs);
-    } catch {
-      // Silently fail — panel just shows empty state
+    } catch (err) {
+      console.error('[DocVersionHistory] Failed to load revisions:', err);
+      setRevisions([]);
     }
     setLoading(false);
   }, [docId]);

@@ -5,10 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check, CheckSquare, Plus, ChevronDown, Zap } from 'lucide-react';
 import {
   STATUSES, PRIORITIES, TASK_TYPES, VISIBILITY,
-  DEFAULT_CUSTOM_FIELDS, CUSTOM_FIELD_GROUPS,
 } from './constants';
 import RecurrencePicker from './recurrence-picker';
 import type { RecurrenceConfig } from '@/lib/recurrence';
+import { useCustomFieldDefs } from '@/lib/hooks/use-custom-field-defs';
+import { getFieldsByGroup } from '@/lib/custom-fields';
+import CustomFieldRenderer from './custom-field-renderer';
 
 interface Props {
   members: any[];
@@ -19,7 +21,8 @@ interface Props {
 }
 
 export default function TaskCreateModal({ members, teams, activeTeamId, onClose, onCreate }: Props) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const { activeFields, groups, loading: fieldsLoading } = useCustomFieldDefs();
   const [mode, setMode] = useState<'quick' | 'full'>('quick');
   const [d, setD] = useState({
     title: '', description: '', status: 'todo', priority: 'medium', type: 'task',
@@ -72,7 +75,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
   };
 
   const activeFieldIds = Object.keys(d.customFields);
-  const availableFields = DEFAULT_CUSTOM_FIELDS.filter((f) => !activeFieldIds.includes(f.id));
+  const fieldsByGroup = getFieldsByGroup(activeFields);
 
   const sectionSep = (label: string) => (
     <div className="relative py-5">
@@ -90,58 +93,23 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
     }
   };
 
-  const getInputType = (type: string) => {
-    switch (type) {
-      case 'currency':
-      case 'number': return 'number';
-      case 'date': return 'date';
-      case 'email': return 'email';
-      case 'url': return 'url';
-      case 'phone': return 'tel';
-      default: return 'text';
-    }
-  };
-
-  const renderCustomFieldInput = (fid: string) => {
-    const def = DEFAULT_CUSTOM_FIELDS.find((f) => f.id === fid);
-    if (!def) return null;
-    const val = d.customFields[fid];
+  const renderDynamicFieldInput = (fieldDef: typeof activeFields[number]) => {
+    const val = d.customFields[fieldDef.id];
+    const label = lang === 'es' ? fieldDef.nameEs : fieldDef.name;
 
     return (
-      <div key={fid} className="flex items-center gap-2 mb-2">
-        <label className="text-sm text-[var(--text-muted)] w-36 shrink-0">{t(`customField.${def.id}`)}</label>
-        {def.type === 'checkbox' ? (
-          <button
-            onClick={() => setCustomField(fid, !val)}
-            className={`w-5 h-5 rounded-md border flex items-center justify-center transition ${
-              val ? 'bg-emerald-500 border-emerald-500' : 'border-[var(--border)]'
-            }`}
-          >
-            {val && <Check className="h-3 w-3 text-white" />}
-          </button>
-        ) : def.type === 'select' ? (
-          <select
-            value={val || ''}
-            onChange={(e) => setCustomField(fid, e.target.value)}
-            className="select-dark h-10 text-[14px] rounded-xl flex-1"
-          >
-            <option value="">{t('common.search')}...</option>
-            {def.options?.map((o) => (
-              <option key={o} value={o}>{o}</option>
-            ))}
-          </select>
-        ) : (
-          <input
-            type={getInputType(def.type)}
-            value={val || ''}
-            onChange={(e) => setCustomField(fid, e.target.value)}
-            placeholder={def.label}
-            className="input-dark h-10 text-[14px] rounded-xl flex-1"
-            {...(def.type === 'currency' ? { step: '0.01', min: '0' } : {})}
+      <div key={fieldDef.id} className="flex items-center gap-2 mb-2">
+        <label className="text-sm text-[var(--text-muted)] w-36 shrink-0">{label}</label>
+        <div className="flex-1">
+          <CustomFieldRenderer
+            field={fieldDef}
+            value={val}
+            onChange={(v) => setCustomField(fieldDef.id, v)}
+            members={members}
           />
-        )}
+        </div>
         <button
-          onClick={() => removeCustomField(fid)}
+          onClick={() => removeCustomField(fieldDef.id)}
           className="text-[var(--text-muted)] hover:text-red-400 p-1 transition"
         >
           <X className="h-3.5 w-3.5" />
@@ -642,11 +610,15 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
               className="overflow-hidden"
             >
               <div className="space-y-4">
-                {CUSTOM_FIELD_GROUPS.map((group) => {
-                  const groupFields = DEFAULT_CUSTOM_FIELDS.filter((f) => f.group === group.id);
+                {fieldsLoading ? (
+                  <div className="text-[12px] text-[var(--text-muted)] py-2">{t('common.loading')}...</div>
+                ) : groups.map((group) => {
+                  const groupFields = fieldsByGroup[group.id] || [];
+                  if (groupFields.length === 0) return null;
                   const activeInGroup = groupFields.filter((f) => activeFieldIds.includes(f.id));
                   const availableInGroup = groupFields.filter((f) => !activeFieldIds.includes(f.id));
                   const isExpanded = expandedGroups.has(group.id);
+                  const groupLabel = lang === 'es' ? group.nameEs : group.name;
 
                   return (
                     <div key={group.id} className="rounded-2xl bg-[var(--bg-elevated)]/50 p-4">
@@ -661,7 +633,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
                           }`}
                         />
                         <span className="text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)] font-semibold">
-                          {t(group.labelKey)}
+                          {groupLabel}
                         </span>
                         {activeInGroup.length > 0 && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] font-semibold">
@@ -680,7 +652,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
                             className="overflow-hidden"
                           >
                             {/* Active fields in group */}
-                            {activeInGroup.map((f) => renderCustomFieldInput(f.id))}
+                            {activeInGroup.map((f) => renderDynamicFieldInput(f))}
 
                             {/* Available fields as add buttons */}
                             {availableInGroup.length > 0 && (
@@ -688,11 +660,11 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
                                 {availableInGroup.map((f) => (
                                   <button
                                     key={f.id}
-                                    onClick={() => setCustomField(f.id, f.type === 'checkbox' ? false : '')}
+                                    onClick={() => setCustomField(f.id, f.type === 'boolean' ? false : '')}
                                     className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-200"
                                   >
                                     <Plus className="h-3 w-3" />
-                                    {t(`customField.${f.id}`)}
+                                    {lang === 'es' ? f.nameEs : f.name}
                                   </button>
                                 ))}
                               </div>

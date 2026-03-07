@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { auth } from '@/lib/firebase';
 import type { PlatformData } from '@/app/app/analytics/page';
 import {
   Brain, Send, Loader2, Copy, Check, Sparkles, TrendingUp, Target, Globe,
@@ -196,9 +197,10 @@ ${deptContext}${docContext}
       const context = buildContext();
       const fullPrompt = `${context}\n\n--- ANALYSIS REQUEST ---\n${question}\n\nProvide a thorough, data-driven analysis based on the platform data above. Use specific numbers, percentages, and comparisons. Include clear recommendations. Format with markdown headers, bullet points, and tables where appropriate.`;
 
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
         body: JSON.stringify({
           question: fullPrompt,
           mode: 'research',

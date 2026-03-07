@@ -65,16 +65,18 @@ export function calculateNextDueDate(config: RecurrenceConfig, fromDate: Date): 
 }
 
 // Check if we should generate the next instance
-export function shouldGenerateNext(config: RecurrenceConfig): boolean {
+// nextDue: the calculated next due date; used to compare against endDate instead of now
+export function shouldGenerateNext(config: RecurrenceConfig, nextDue?: Date): boolean {
   const count = config.occurrenceCount || 0;
 
   // Check endAfter limit
   if (config.endAfter && count >= config.endAfter) return false;
 
-  // Check endDate
+  // Check endDate — compare next due date (not now) against the end boundary
   if (config.endDate) {
     const endDate = config.endDate.toDate ? config.endDate.toDate() : new Date(config.endDate.seconds * 1000);
-    if (new Date() > endDate) return false;
+    const referenceDate = nextDue || new Date();
+    if (referenceDate > endDate) return false;
   }
 
   return true;

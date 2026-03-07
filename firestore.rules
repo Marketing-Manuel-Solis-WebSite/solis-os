@@ -10,12 +10,12 @@ service cloud.firestore {
 
     function isOrgMember(orgId) {
       return isSignedIn() &&
-        exists(/databases/$(database)/documents/orgs/$(orgId)/memberships/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/orgs/$(orgId)/memberships/$(request.auth.uid)).data.active == true;
+        exists(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.active == true;
     }
 
     function getRole(orgId) {
-      return get(/databases/$(database)/documents/orgs/$(orgId)/memberships/$(request.auth.uid)).data.role;
+      return get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data.role;
     }
 
     function isOwner(orgId) {
@@ -46,11 +46,14 @@ service cloud.firestore {
       allow update: if isAdmin(orgId);
       allow delete: if isOwner(orgId);
 
-      // Memberships
-      match /memberships/{userId} {
+      // Members (was "memberships" — fixed to match code path orgs/{orgId}/members)
+      match /members/{userId} {
         allow read: if isOrgMember(orgId);
         allow create: if isAdmin(orgId);
-        allow update: if isAdmin(orgId) || isSelf(userId);
+        // Admins can update any field; members can only update non-sensitive fields on themselves
+        allow update: if isAdmin(orgId) ||
+          (isSelf(userId) &&
+           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'active', 'hierarchyLevel']));
         allow delete: if isOwner(orgId);
       }
 
@@ -66,6 +69,58 @@ service cloud.firestore {
       match /settings/{settingId} {
         allow read: if isOrgMember(orgId);
         allow write: if isAdmin(orgId);
+      }
+
+      // Teams
+      match /teams/{teamId} {
+        allow read: if isOrgMember(orgId);
+        allow create: if isAdmin(orgId);
+        allow update: if isManager(orgId);
+        allow delete: if isAdmin(orgId);
+      }
+
+      // Presence
+      match /presence/{userId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isSignedIn() && isSelf(userId);
+      }
+
+      // Notifications (code writes to orgs/{orgId}/notifications)
+      match /notifications/{notifId} {
+        allow read: if isSignedIn() && isSelf(resource.data.userId);
+        allow create: if isSignedIn() && isOrgMember(orgId);
+        allow update: if isSignedIn() && isSelf(resource.data.userId); // Mark as read
+        allow delete: if isSignedIn() && isSelf(resource.data.userId);
+      }
+
+      // Dashboards
+      match /dashboards/{dashId} {
+        allow read: if isSignedIn() && isSelf(resource.data.userId);
+        allow create: if isSignedIn() && isOrgMember(orgId);
+        allow update: if isSignedIn() && isSelf(resource.data.userId);
+        allow delete: if isSignedIn() && isSelf(resource.data.userId);
+      }
+
+      // Inbox
+      match /inbox/{itemId} {
+        allow read: if isSignedIn() && isOrgMember(orgId);
+        allow create: if isSignedIn() && isOrgMember(orgId);
+        allow update: if isSignedIn() && isOrgMember(orgId);
+        allow delete: if isSignedIn() && isOrgMember(orgId);
+      }
+
+      // AI Conversations
+      match /ai-conversations/{convId} {
+        allow read: if isSignedIn() && isOrgMember(orgId);
+        allow create: if isSignedIn() && isOrgMember(orgId);
+        allow update: if isSignedIn() && isOrgMember(orgId);
+        allow delete: if isSignedIn() && isOrgMember(orgId);
+
+        match /messages/{msgId} {
+          allow read: if isSignedIn() && isOrgMember(orgId);
+          allow create: if isSignedIn() && isOrgMember(orgId);
+          allow update, delete: if false;
+        }
       }
     }
 
@@ -122,16 +177,17 @@ service cloud.firestore {
       allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
 
+      // Cross-org leak fix: verify parent task's orgId for subcollections
       match /comments/{commentId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.orgId);
+        allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.orgId);
         allow update: if isSignedIn() && request.auth.uid == resource.data.createdBy;
-        allow delete: if isSignedIn() && (request.auth.uid == resource.data.createdBy);
+        allow delete: if isSignedIn() && request.auth.uid == resource.data.createdBy;
       }
 
       match /activity/{activityId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.orgId);
+        allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/tasks/$(taskId)).data.orgId);
         allow update, delete: if false; // Activity log is immutable
       }
     }
@@ -145,8 +201,8 @@ service cloud.firestore {
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
 
       match /revisions/{revisionId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/docs/$(docId)).data.orgId);
+        allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/docs/$(docId)).data.orgId);
         allow update, delete: if false; // Revisions are immutable
       }
     }
@@ -159,12 +215,77 @@ service cloud.firestore {
       allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
 
+      // Cross-org leak fix: verify parent channel's orgId
       match /messages/{messageId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId);
+        allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId);
         allow update: if isSignedIn() && request.auth.uid == resource.data.createdBy;
-        allow delete: if isSignedIn() && (request.auth.uid == resource.data.createdBy);
+        allow delete: if isSignedIn() && request.auth.uid == resource.data.createdBy;
       }
+    }
+
+    // ======== GOALS ========
+
+    match /goals/{goalId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow delete: if isSignedIn() && isManager(resource.data.orgId);
+
+      match /targets/{targetId} {
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
+        allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
+        allow update: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
+        allow delete: if isSignedIn() && isManager(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
+      }
+    }
+
+    // ======== WHITEBOARDS ========
+
+    match /whiteboards/{boardId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow delete: if isSignedIn() && isManager(resource.data.orgId);
+
+      match /elements/{elementId} {
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/whiteboards/$(boardId)).data.orgId);
+        allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/whiteboards/$(boardId)).data.orgId);
+        allow update: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/whiteboards/$(boardId)).data.orgId);
+        allow delete: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/whiteboards/$(boardId)).data.orgId);
+      }
+    }
+
+    // ======== FORMS ========
+
+    match /forms/{formId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      // Public form access by publicToken is handled via API routes, not direct Firestore reads
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow delete: if isSignedIn() && isManager(resource.data.orgId);
+
+      match /submissions/{subId} {
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/forms/$(formId)).data.orgId);
+        allow create: if true; // Public form submissions (validated by publicToken in app logic)
+        allow update, delete: if isSignedIn() && isAdmin(get(/databases/$(database)/documents/forms/$(formId)).data.orgId);
+      }
+
+      match /mappings/{mappingId} {
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/forms/$(formId)).data.orgId);
+        allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/forms/$(formId)).data.orgId);
+        allow update: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/forms/$(formId)).data.orgId);
+        allow delete: if isSignedIn() && isAdmin(get(/databases/$(database)/documents/forms/$(formId)).data.orgId);
+      }
+    }
+
+    // ======== TIME ENTRIES ========
+
+    match /time-entries/{entryId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow delete: if isSignedIn() && (request.auth.uid == resource.data.userId || isManager(resource.data.orgId));
     }
 
     // ======== AUTOMATIONS ========
@@ -176,17 +297,17 @@ service cloud.firestore {
       allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
 
       match /logs/{logId} {
-        allow read: if isSignedIn();
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/automations/$(automationId)).data.orgId);
         allow create: if false; // Only Cloud Functions write logs
         allow update, delete: if false;
       }
     }
 
-    // ======== NOTIFICATIONS ========
+    // ======== NOTIFICATIONS (top-level — legacy, kept for backwards compat) ========
 
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
-      allow create: if false; // Only Cloud Functions create notifications
+      allow create: if isSignedIn(); // Allow client-side notification creation
       allow update: if isSignedIn() && request.auth.uid == resource.data.userId; // Mark as read
       allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
     }
@@ -235,6 +356,48 @@ service cloud.firestore {
     match /customFieldSchemas/{schemaId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && isAdmin(request.resource.data.orgId);
+    }
+
+    // ======== INTEGRATIONS ========
+
+    match /integrations/{integrationId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
+    }
+
+    // ======== API KEYS ========
+
+    match /apiKeys/{keyId} {
+      allow read: if isSignedIn() && isAdmin(resource.data.orgId);
+      allow create: if isSignedIn() && isAdmin(request.resource.data.orgId);
+      allow update: if isSignedIn() && isAdmin(resource.data.orgId);
+      allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
+    }
+
+    // ======== WEBHOOKS ========
+
+    match /webhooks/{webhookId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isManager(request.resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
+
+      match /logs/{logId} {
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/webhooks/$(webhookId)).data.orgId);
+        allow create: if false; // Only server-side
+        allow update, delete: if false;
+      }
+    }
+
+    // ======== INCOMING WEBHOOKS ========
+
+    match /incomingWebhooks/{webhookId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isManager(request.resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
     }
 
     // ======== WEBHOOK EVENTS ========

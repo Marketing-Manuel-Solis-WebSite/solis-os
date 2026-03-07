@@ -19,7 +19,13 @@
       "Read(//c/Users/CARLOS~1/AppData/Local/Temp/claude/C--Users-Carlos-Anaya-Ruiz-solis-os/tasks/**)",
       "Read(//tmp/claude/C--Users-Carlos-Anaya-Ruiz-solis-os/tasks/**)",
       "Read(//c/Users/CARLOS~1/AppData/Local/Temp/claude/**)",
-      "Bash(find /tmp -name \"bg6yup1os*\")"
+      "Bash(find /tmp -name \"bg6yup1os*\")",
+      "Bash(grep:*)",
+      "Bash(for f in components/ai/floating-ai-chat.tsx components/analytics/ai-analysis-panel.tsx components/docs/doc-ai-panel.tsx lib/dashboard-ai.ts app/app/ai/page.tsx app/app/docs/page.tsx)",
+      "Bash(do echo \"=== $f ===\")",
+      "Read(//c/Users/Carlos Anaya Ruiz/solis-os/**)",
+      "Bash(done)",
+      "Bash(for f in app/api/webhooks/*/route.ts)"
     ]
   }
 }

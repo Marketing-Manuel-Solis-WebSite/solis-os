@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { doc, getDoc, updateDoc, deleteDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { authenticateRequest } from '@/lib/server-auth';
 
 const ORG = 'solis-center';
 const RESOURCE_COLLECTIONS = ['tasks', 'goals', 'docs', 'channels', 'forms', 'time-entries', 'whiteboards', 'automations'];
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const authedUser = await authenticateRequest(req);
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const snap = await getDoc(doc(db, `orgs/${ORG}/teams/${id}`));
     if (!snap.exists()) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -18,6 +24,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const authedUser = await authenticateRequest(req);
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const data = await req.json();
     await updateDoc(doc(db, `orgs/${ORG}/teams/${id}`), { ...data, updatedAt: serverTimestamp() });
@@ -29,6 +40,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const authedUser = await authenticateRequest(req);
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const { searchParams } = new URL(req.url);
     const mode = searchParams.get('mode') || 'safe'; // 'safe' | 'purge'

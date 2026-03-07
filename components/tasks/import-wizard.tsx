@@ -13,6 +13,7 @@ import {
   type ColumnMapping,
   type ImportError,
 } from '@/lib/import-csv';
+import { ORG } from '@/lib/db';
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -61,8 +62,10 @@ export default function ImportWizard({ members, teamId, userId, userName, onClos
       setRows(r);
       setMapping(autoDetectMapping(h));
       setStep('map');
-    } catch {
-      // parse error
+    } catch (err) {
+      console.error('[Import] CSV parse failed:', err);
+      setResultErrors([{ row: 0, field: '', value: '', message: t('import.parseError') }]);
+      setStep('results');
     }
   }, []);
 
@@ -121,7 +124,7 @@ export default function ImportWizard({ members, teamId, userId, userName, onClos
 
       // Log the import
       await createImportLog({
-        orgId: 'solis-center',
+        orgId: ORG,
         entityType: 'task',
         fileName,
         totalRows: rows.length,
@@ -138,7 +141,9 @@ export default function ImportWizard({ members, teamId, userId, userName, onClos
       setResultErrors(errors);
       setImportedCount(dryRun ? 0 : tasks.length);
       setStep('results');
-    } catch {
+    } catch (err) {
+      console.error('[Import] Import failed:', err);
+      setResultErrors([{ row: 0, field: '', value: '', message: t('import.importFailed') }]);
       setStep('results');
     } finally {
       setImporting(false);

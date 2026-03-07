@@ -2,7 +2,7 @@ import {
   collection, doc, addDoc, updateDoc, getDocs, query, where,
   orderBy, limit, serverTimestamp, onSnapshot, writeBatch,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 
 const ORG = 'solis-center';
 const NOTIF_COL = `orgs/${ORG}/notifications`;
@@ -40,19 +40,25 @@ export async function createNotification(data: {
     createdAt: serverTimestamp(),
   });
 
-  // Try to send email notification
+  // Try to send email notification (best-effort, requires auth)
   try {
-    await fetch('/api/notifications/email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: data.userId,
-        type: data.type,
-        title: data.title,
-        message: data.message,
-        actorName: data.actorName || '',
-      }),
-    });
+    const idToken = await auth.currentUser?.getIdToken();
+    if (idToken) {
+      await fetch('/api/notifications/email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          userId: data.userId,
+          type: data.type,
+          title: data.title,
+          message: data.message,
+          actorName: data.actorName || '',
+        }),
+      });
+    }
   } catch { /* email is best-effort */ }
 
   return ref;

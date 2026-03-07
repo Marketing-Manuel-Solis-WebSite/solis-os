@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth';
+import { auth } from '@/lib/firebase';
 import { useI18n } from '@/lib/i18n';
 import { usePathname, useRouter } from 'next/navigation';
 import { getTasks, getGoals } from '@/lib/db';
@@ -95,9 +96,10 @@ export default function FloatingAIChat() {
       const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
       const userContext = await buildUserContext();
 
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
         body: JSON.stringify({ question, mode: 'chat', history, stream: true, userContext }),
       });
 

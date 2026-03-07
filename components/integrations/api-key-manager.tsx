@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Key, Copy, Check, AlertTriangle, Trash2, X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
+import { auth } from '@/lib/firebase';
 import { onApiKeysSnapshot } from '@/lib/integrations-db';
 import { ALL_SCOPES } from '@/lib/integrations-types';
 import type { ApiKeyScope } from '@/lib/integrations-types';
@@ -39,14 +40,19 @@ export default function ApiKeyManager() {
       if (expiration === '90') expiresAt = Date.now() + 90 * 86400000;
       if (expiration === '365') expiresAt = Date.now() + 365 * 86400000;
 
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error('Not authenticated');
+
       const res = await fetch('/api/integrations/api-keys', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           name: name.trim(),
           scopes,
           expiresAt,
-          createdBy: user?.uid || '',
         }),
       });
 
@@ -67,7 +73,13 @@ export default function ApiKeyManager() {
 
   const handleRevoke = async (id: string) => {
     try {
-      const res = await fetch(`/api/integrations/api-keys/${id}`, { method: 'DELETE' });
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error('Not authenticated');
+
+      const res = await fetch(`/api/integrations/api-keys/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${idToken}` },
+      });
       if (!res.ok) throw new Error();
       toast.success('API key revoked');
       setRevokeConfirm(null);

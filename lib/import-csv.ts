@@ -5,8 +5,7 @@
 import Papa from 'papaparse';
 import { writeBatch, doc, collection, serverTimestamp, addDoc } from 'firebase/firestore';
 import { db } from './firebase';
-
-const ORG = 'solis-center';
+import { ORG } from './db';
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -93,7 +92,13 @@ export function autoDetectMapping(headers: string[]): ColumnMapping {
 
 // ─── Parse CSV ─────────────────────────────────────────────────
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_ROWS = 5000;
+
 export function parseCSV(file: File): Promise<{ headers: string[]; rows: Record<string, string>[]; rowCount: number }> {
+  if (file.size > MAX_FILE_SIZE) {
+    return Promise.reject(new Error(`File too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max ${MAX_FILE_SIZE / 1024 / 1024} MB.`));
+  }
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: true,
@@ -101,6 +106,10 @@ export function parseCSV(file: File): Promise<{ headers: string[]; rows: Record<
       complete: (results) => {
         const headers = results.meta.fields || [];
         const rows = results.data as Record<string, string>[];
+        if (rows.length > MAX_ROWS) {
+          reject(new Error(`Too many rows (${rows.length}). Max ${MAX_ROWS} rows per import.`));
+          return;
+        }
         resolve({ headers, rows, rowCount: rows.length });
       },
       error: (err) => reject(err),
@@ -133,7 +142,11 @@ function resolveAssignees(value: string, members: any[]): string[] {
 function parseDate(value: string): Date | null {
   if (!value) return null;
   const d = new Date(value);
-  return isNaN(d.getTime()) ? null : d;
+  if (isNaN(d.getTime())) return null;
+  // Reject unreasonable dates (before 2000 or more than 10 years ahead)
+  const year = d.getFullYear();
+  if (year < 2000 || year > new Date().getFullYear() + 10) return null;
+  return d;
 }
 
 export function validateAndTransform(
@@ -150,6 +163,8 @@ export function validateAndTransform(
     reverseMap[fieldId] = csvHeader;
   }
 
+  const seenTitles = new Set<string>();
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const rowNum = i + 2; // +2 for header row + 1-indexed
@@ -164,6 +179,13 @@ export function validateAndTransform(
       errors.push({ row: rowNum, field: 'title', value: '', message: 'Title is required' });
       continue;
     }
+
+    const titleKey = title.toLowerCase().trim();
+    if (seenTitles.has(titleKey)) {
+      errors.push({ row: rowNum, field: 'title', value: title, message: 'Duplicate title in CSV' });
+      continue;
+    }
+    seenTitles.add(titleKey);
 
     const statusRaw = getValue('status').toLowerCase();
     const status = VALID_STATUSES.includes(statusRaw) ? statusRaw : 'todo';
@@ -183,10 +205,29 @@ export function validateAndTransform(
     const visRaw = getValue('visibility').toLowerCase();
     const visibility = VALID_VISIBILITY.includes(visRaw) ? visRaw : 'team';
 
-    const assignees = resolveAssignees(getValue('assignees'), members);
+    const assigneeRaw = getValue('assignees');
+    const assignees = resolveAssignees(assigneeRaw, members);
+    if (assigneeRaw && assignees.length === 0) {
+      errors.push({ row: rowNum, field: 'assignees', value: assigneeRaw, message: 'No matching members found' });
+    } else if (assigneeRaw) {
+      const requestedCount = assigneeRaw.split(/[,;]/).filter(n => n.trim()).length;
+      if (assignees.length < requestedCount) {
+        errors.push({ row: rowNum, field: 'assignees', value: assigneeRaw, message: `${requestedCount - assignees.length} assignee(s) not resolved` });
+      }
+    }
     const tags = getValue('tags') ? getValue('tags').split(/[,;]/).map(t => t.trim()).filter(Boolean) : [];
-    const dueDate = parseDate(getValue('dueDate'));
-    const startDate = parseDate(getValue('startDate'));
+
+    const dueDateRaw = getValue('dueDate');
+    const dueDate = parseDate(dueDateRaw);
+    if (dueDateRaw && !dueDate) {
+      errors.push({ row: rowNum, field: 'dueDate', value: dueDateRaw, message: 'Invalid date format' });
+    }
+
+    const startDateRaw = getValue('startDate');
+    const startDate = parseDate(startDateRaw);
+    if (startDateRaw && !startDate) {
+      errors.push({ row: rowNum, field: 'startDate', value: startDateRaw, message: 'Invalid date format' });
+    }
 
     const timeEstRaw = getValue('timeEstimate');
     const timeEstimate = timeEstRaw ? parseInt(timeEstRaw, 10) || null : null;

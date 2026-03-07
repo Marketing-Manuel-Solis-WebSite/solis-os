@@ -24,7 +24,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const MAX_PER_GROUP = 5;
 
 export function useGlobalSearch() {
-  const { allMembers, can } = useAuth();
+  const { allMembers, can, canSeeResource, canSeeAllTeams } = useAuth();
   const [results, setResults] = useState<SearchResult[]>([]);
   const [actions, setActions] = useState<QuickAction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,18 +44,28 @@ export function useGlobalSearch() {
       can('form', 'read') ? getForms() : Promise.resolve([]),
     ]);
 
+    // Apply RBAC visibility filtering — only include resources the user can see
+    const filterVisible = (items: any[]) => {
+      if (canSeeAllTeams) return items;
+      return items.filter((item: any) => canSeeResource({
+        teamId: item.teamId,
+        createdBy: item.createdBy,
+        visibility: item.visibility,
+      }));
+    };
+
     const cache: SearchCache = {
-      tasks: tasks as any[],
-      docs: docs as any[],
-      channels: channels as any[],
-      goals: goals as any[],
+      tasks: filterVisible(tasks as any[]),
+      docs: filterVisible(docs as any[]),
+      channels: filterVisible(channels as any[]),
+      goals: filterVisible(goals as any[]),
       members: (allMembers || []).filter((m: any) => m.active !== false),
-      forms: forms as any[],
+      forms: filterVisible(forms as any[]),
       loadedAt: now,
     };
     cacheRef.current = cache;
     return cache;
-  }, [allMembers, can]);
+  }, [allMembers, can, canSeeResource, canSeeAllTeams]);
 
   const search = useCallback(async (query: string, lang: 'es' | 'en') => {
     if (!query.trim()) {
@@ -66,7 +76,16 @@ export function useGlobalSearch() {
 
     setLoading(true);
     try {
-      const data = await loadData();
+      let data: SearchCache;
+      try {
+        data = await loadData();
+      } catch (err) {
+        console.error('[GlobalSearch] Failed to load data:', err);
+        setResults([]);
+        setActions([]);
+        setLoading(false);
+        return;
+      }
       const all: SearchResult[] = [];
 
       // Tasks

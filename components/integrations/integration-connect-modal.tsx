@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { X, ExternalLink, AlertTriangle, Copy, Check, Loader2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
+import { auth } from '@/lib/firebase';
 import { useToast } from '@/components/notifications/toast-provider';
 import type { IntegrationDef } from '@/lib/integrations-types';
 
@@ -38,13 +39,18 @@ export default function IntegrationConnectModal({ def, status, onClose, onDiscon
     if (!apiKeyValue.trim()) return;
     setSaving(true);
     try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error('Not authenticated');
+
       const res = await fetch('/api/integrations/connect', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           provider: def.provider,
           apiKey: apiKeyValue.trim(),
-          createdBy: user?.uid || '',
         }),
       });
       const data = await res.json();

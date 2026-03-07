@@ -221,6 +221,13 @@ GUIDELINES:
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify the caller is authenticated
+    const { authenticateRequest } = await import('@/lib/server-auth');
+    const authedUser = await authenticateRequest(request);
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { question, mode = 'chat', history = [] } = body;
 
@@ -228,7 +235,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Question required' }, { status: 400 });
     }
 
-    const key = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    const key = process.env.GEMINI_API_KEY;
     if (!key) {
       return NextResponse.json({ error: 'Gemini API key not configured. Add GEMINI_API_KEY to your .env file.' }, { status: 500 });
     }

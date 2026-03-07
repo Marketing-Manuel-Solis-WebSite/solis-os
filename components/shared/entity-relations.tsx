@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { Link2, Plus, X, Trash2, Loader2, CheckSquare, FileText, Target } from 'lucide-react';
+import { Link2, Plus, X, Trash2, Loader2, CheckSquare, FileText, Target, AlertCircle } from 'lucide-react';
 import {
   getRelationsForEntity, createRelation, deleteRelation,
   type EntityRelation, type EntityType, type RelationType, RELATION_TYPES,
@@ -35,21 +35,28 @@ export default function EntityRelations({ entityType, entityId, entityName, canE
   const [loading, setLoading] = useState(true);
   const [showPicker, setShowPicker] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [error, setError] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const rels = await getRelationsForEntity(entityId);
       setRelations(rels);
-    } catch {
+      setError(false);
+    } catch (err) {
+      console.error('[Relations] Failed to load:', err);
       setRelations([]);
+      setError(true);
     }
     setLoading(false);
   }, [entityId]);
 
   useEffect(() => { load(); }, [load]);
 
+  const [addError, setAddError] = useState<string | null>(null);
+
   const handleAdd = async (targetType: EntityType, targetId: string, targetName: string, relationType: RelationType) => {
     if (!user || !me) return;
+    setAddError(null);
     try {
       await createRelation({
         sourceType: entityType,
@@ -63,8 +70,16 @@ export default function EntityRelations({ entityType, entityId, entityName, canE
         createdByName: me.displayName,
       });
       await load();
-    } catch {
-      // Silent fail
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.includes('already exists')) {
+        setAddError(t('relations.duplicateError'));
+      } else if (msg.includes('itself')) {
+        setAddError(t('relations.selfError'));
+      } else {
+        console.error('[Relations] Failed to create:', err);
+        setAddError(t('relations.createError'));
+      }
     }
   };
 
@@ -72,8 +87,8 @@ export default function EntityRelations({ entityType, entityId, entityName, canE
     try {
       await deleteRelation(id);
       setRelations(prev => prev.filter(r => r.id !== id));
-    } catch {
-      // Silent fail
+    } catch (err) {
+      console.error('[Relations] Failed to delete:', err);
     }
   };
 
@@ -128,7 +143,12 @@ export default function EntityRelations({ entityType, entityId, entityName, canE
 
       {!collapsed && (
         <div className="mt-1 space-y-1">
-          {relations.length === 0 && (
+          {error && (
+            <p className="text-[12px] text-red-400 py-1 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" /> {t('relations.loadError')}
+            </p>
+          )}
+          {!error && relations.length === 0 && (
             <p className="text-[12px] text-[var(--text-muted)] py-1">
               {t('relations.noRelations')}
             </p>
@@ -159,9 +179,13 @@ export default function EntityRelations({ entityType, entityId, entityName, canE
             );
           })}
 
+          {addError && (
+            <p className="text-[11px] text-red-400 py-0.5">{addError}</p>
+          )}
+
           {canEdit && (
             <button
-              onClick={() => setShowPicker(true)}
+              onClick={() => { setShowPicker(true); setAddError(null); }}
               className="flex items-center gap-1.5 text-[12px] text-[var(--accent)] hover:text-[var(--accent-hover)] py-1 transition"
             >
               <Plus className="h-3 w-3" /> {t('relations.add')}

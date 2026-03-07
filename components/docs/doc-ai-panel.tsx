@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { auth } from '@/lib/firebase';
 import { useI18n } from '@/lib/i18n';
 import {
   Bot, Sparkles, Send, X, Copy, Check, ArrowRight, Loader2, Wand2,
@@ -93,9 +94,10 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
     setMessages(prev => [...prev, { role: 'user', text: question }]);
 
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
         body: JSON.stringify({ question: fullPrompt }),
       });
       const data = await res.json();
@@ -121,9 +123,10 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
     const systemPrompt = `You are a professional document writer for a law office. Create a complete, well-structured document in markdown format based on the following description. Use proper headings, sections, bullet points, and formatting. The document should be professional, thorough, and ready to use.\n\nDocument Title: "${doc.title}"\n\nDescription of what to write:\n${generatePrompt.trim()}\n\nWrite the full document content in markdown format:`;
 
     try {
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
         body: JSON.stringify({ question: systemPrompt }),
       });
       const data = await res.json();

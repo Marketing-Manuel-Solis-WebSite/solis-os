@@ -16,11 +16,13 @@ import EntityRelations from '@/components/shared/entity-relations';
 import RecurrencePicker from './recurrence-picker';
 import { getRecurrenceDescription } from '@/lib/recurrence';
 import {
-  STATUSES, PRIORITIES, TASK_TYPES, VISIBILITY,
-  DEFAULT_CUSTOM_FIELDS, CUSTOM_FIELD_GROUPS, ACCEPTED_FILES,
+  STATUSES, PRIORITIES, TASK_TYPES, VISIBILITY, ACCEPTED_FILES,
   getStatusConfig, getPriorityConfig, getTypeConfig, getVisibilityConfig,
   getSubtaskProgress,
 } from './constants';
+import { useCustomFieldDefs } from '@/lib/hooks/use-custom-field-defs';
+import { getFieldsByGroup } from '@/lib/custom-fields';
+import CustomFieldRenderer from './custom-field-renderer';
 import { useToast } from '@/components/notifications/toast-provider';
 
 /* ============================================
@@ -74,8 +76,9 @@ export default function TaskDetailDrawer({
   task, members, teams, userId, userName,
   canUpdate, canDelete, onUpdate, onDelete, onClose,
 }: Props) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
+  const { activeFields, groups: fieldGroups } = useCustomFieldDefs();
 
   // --- UI state ---
   const [expanded, setExpanded] = useState(false);
@@ -120,8 +123,8 @@ export default function TaskDetailDrawer({
 
   // --- Load comments & activity ---
   const loadData = useCallback(async () => {
-    try { setComments(await getTaskComments(task.id)); } catch { setComments([]); }
-    try { setActivity(await getTaskActivity(task.id)); } catch { setActivity([]); }
+    try { setComments(await getTaskComments(task.id)); } catch (err) { console.error('[TaskDrawer] Failed to load comments:', err); setComments([]); }
+    try { setActivity(await getTaskActivity(task.id)); } catch (err) { console.error('[TaskDrawer] Failed to load activity:', err); setActivity([]); }
   }, [task.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -137,7 +140,8 @@ export default function TaskDetailDrawer({
   const { done: doneSub, total: totalSub, pct: progress } = getSubtaskProgress(task);
   const customFields = task.customFields || {};
   const activeFieldIds = Object.keys(customFields);
-  const availableFields = DEFAULT_CUSTOM_FIELDS.filter(f => !activeFieldIds.includes(f.id));
+  const fieldsByGroup = getFieldsByGroup(activeFields);
+  const availableFields = activeFields.filter(f => !activeFieldIds.includes(f.id));
 
   // --- Title save ---
   const saveTitle = () => {
@@ -171,7 +175,7 @@ export default function TaskDetailDrawer({
   };
 
   // --- Custom field handlers ---
-  const setCustomField = (fid: string, val: any) => {
+  const setCustomField = (fid: string, val: unknown) => {
     onUpdate(task.id, 'customFields', { ...customFields, [fid]: val });
   };
   const removeCustomField = (fid: string) => {
@@ -243,7 +247,7 @@ export default function TaskDetailDrawer({
         entityUrl: '/app/tasks',
         actorId: userId,
         actorName: userName,
-      }).catch(() => {});
+      }).catch(err => console.error('[TaskDrawer] Notification failed:', err));
     }
     setNewComment('');
     setMentionIds([]);
@@ -257,65 +261,6 @@ export default function TaskDetailDrawer({
     if (isVideoType(type)) return Video;
     if (isAudioType(type)) return Music;
     return FileText;
-  };
-
-  // --- Render custom field input ---
-  const renderFieldInput = (def: typeof DEFAULT_CUSTOM_FIELDS[0], val: any, fid: string) => {
-    if (def.type === 'checkbox') {
-      return (
-        <button
-          onClick={() => canUpdate && setCustomField(fid, !val)}
-          disabled={!canUpdate}
-          className={`w-5 h-5 rounded-md border flex items-center justify-center transition ${val ? 'bg-emerald-500 border-emerald-500' : 'border-[var(--border)]'}`}
-        >
-          {val && <Check className="h-3 w-3 text-white" />}
-        </button>
-      );
-    }
-    if (def.type === 'select') {
-      return (
-        <select
-          value={val || ''}
-          onChange={e => canUpdate && setCustomField(fid, e.target.value)}
-          disabled={!canUpdate}
-          className="select-dark h-9 text-sm flex-1"
-        >
-          <option value="">{t('common.search')}...</option>
-          {def.options?.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-      );
-    }
-    if (def.type === 'currency') {
-      return (
-        <div className="flex items-center gap-1 flex-1">
-          <span className="text-sm text-[var(--text-muted)]">$</span>
-          <input
-            type="number" step="0.01" min="0"
-            value={val || ''}
-            disabled={!canUpdate}
-            onChange={e => canUpdate && setCustomField(fid, e.target.value)}
-            className="input-dark h-9 text-sm flex-1"
-          />
-        </div>
-      );
-    }
-    const inputType =
-      def.type === 'number' ? 'number'
-      : def.type === 'date' ? 'date'
-      : def.type === 'email' ? 'email'
-      : def.type === 'url' ? 'url'
-      : def.type === 'phone' ? 'tel'
-      : 'text';
-    return (
-      <input
-        type={inputType}
-        value={val || ''}
-        disabled={!canUpdate}
-        onChange={e => canUpdate && setCustomField(fid, e.target.value)}
-        placeholder={def.label}
-        className="input-dark h-9 text-sm flex-1"
-      />
-    );
   };
 
   /* ============================================
@@ -749,12 +694,12 @@ export default function TaskDetailDrawer({
                             <button
                               key={f.id}
                               onClick={() => {
-                                setCustomField(f.id, f.type === 'checkbox' ? false : '');
+                                setCustomField(f.id, f.type === 'boolean' ? false : f.defaultValue ?? '');
                                 setShowFieldPicker(false);
                               }}
                               className="text-sm px-2.5 py-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all duration-200"
                             >
-                              {t(`customField.${f.id}`) !== `customField.${f.id}` ? t(`customField.${f.id}`) : f.label}
+                              {lang === 'es' ? f.nameEs : f.name}
                             </button>
                           ))}
                         </div>
@@ -763,69 +708,75 @@ export default function TaskDetailDrawer({
                   </AnimatePresence>
 
                   {/* Grouped fields */}
-                  {CUSTOM_FIELD_GROUPS.map(group => {
-                    const groupFieldIds = activeFieldIds.filter(fid => {
-                      const def = DEFAULT_CUSTOM_FIELDS.find(f => f.id === fid);
-                      return def && def.group === group.id;
-                    });
-                    if (groupFieldIds.length === 0) return null;
+                  {fieldGroups.map(group => {
+                    const groupFields = activeFieldIds
+                      .map(fid => activeFields.find(f => f.id === fid))
+                      .filter((f): f is NonNullable<typeof f> => !!f && f.group === group.id);
+                    if (groupFields.length === 0) return null;
                     return (
                       <div key={group.id} className="mb-3 rounded-xl p-4 bg-[var(--bg-tertiary)]/50">
                         <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]/50 font-semibold mb-2">
-                          {t(group.labelKey) !== group.labelKey ? t(group.labelKey) : FIELD_GROUP_LABELS[group.id] || group.id}
+                          {lang === 'es' ? group.nameEs : group.name}
                         </div>
-                        {groupFieldIds.map(fid => {
-                          const def = DEFAULT_CUSTOM_FIELDS.find(f => f.id === fid);
-                          if (!def) return null;
-                          const val = customFields[fid];
-                          return (
-                            <div key={fid} className="flex items-center gap-2 mb-2">
-                              <label className="text-[13px] text-[var(--text-muted)] w-32 shrink-0 truncate">
-                                {t(`customField.${def.id}`) !== `customField.${def.id}` ? t(`customField.${def.id}`) : def.label}
-                              </label>
-                              {renderFieldInput(def, val, fid)}
-                              {canUpdate && (
-                                <button
-                                  onClick={() => removeCustomField(fid)}
-                                  className="text-[var(--text-muted)] hover:text-red-400 p-1 transition"
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
-                              )}
+                        {groupFields.map(field => (
+                          <div key={field.id} className="flex items-center gap-2 mb-2">
+                            <label className="text-[13px] text-[var(--text-muted)] w-32 shrink-0 truncate">
+                              {lang === 'es' ? field.nameEs : field.name}
+                            </label>
+                            <div className="flex-1">
+                              <CustomFieldRenderer
+                                field={field}
+                                value={customFields[field.id]}
+                                onChange={v => setCustomField(field.id, v)}
+                                readOnly={!canUpdate}
+                                members={members}
+                              />
                             </div>
-                          );
-                        })}
+                            {field.helpText && (
+                              <span className="text-[11px] text-[var(--text-muted)]" title={lang === 'es' ? field.helpTextEs : field.helpText}>?</span>
+                            )}
+                            {canUpdate && (
+                              <button
+                                onClick={() => removeCustomField(field.id)}
+                                className="text-[var(--text-muted)] hover:text-red-400 p-1 transition"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     );
                   })}
 
                   {/* Ungrouped fields (safety net) */}
                   {activeFieldIds
-                    .filter(fid => {
-                      const def = DEFAULT_CUSTOM_FIELDS.find(f => f.id === fid);
-                      return def && !CUSTOM_FIELD_GROUPS.some(g => g.id === def.group);
-                    })
-                    .map(fid => {
-                      const def = DEFAULT_CUSTOM_FIELDS.find(f => f.id === fid);
-                      if (!def) return null;
-                      const val = customFields[fid];
-                      return (
-                        <div key={fid} className="flex items-center gap-2 mb-2">
-                          <label className="text-[13px] text-[var(--text-muted)] w-32 shrink-0 truncate">
-                            {t(`customField.${def.id}`) !== `customField.${def.id}` ? t(`customField.${def.id}`) : def.label}
-                          </label>
-                          {renderFieldInput(def, val, fid)}
-                          {canUpdate && (
-                            <button
-                              onClick={() => removeCustomField(fid)}
-                              className="text-[var(--text-muted)] hover:text-red-400 p-1 transition"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          )}
+                    .map(fid => activeFields.find(f => f.id === fid))
+                    .filter((f): f is NonNullable<typeof f> => !!f && !fieldGroups.some(g => g.id === f.group))
+                    .map(field => (
+                      <div key={field.id} className="flex items-center gap-2 mb-2">
+                        <label className="text-[13px] text-[var(--text-muted)] w-32 shrink-0 truncate">
+                          {lang === 'es' ? field.nameEs : field.name}
+                        </label>
+                        <div className="flex-1">
+                          <CustomFieldRenderer
+                            field={field}
+                            value={customFields[field.id]}
+                            onChange={v => setCustomField(field.id, v)}
+                            readOnly={!canUpdate}
+                            members={members}
+                          />
                         </div>
-                      );
-                    })}
+                        {canUpdate && (
+                          <button
+                            onClick={() => removeCustomField(field.id)}
+                            className="text-[var(--text-muted)] hover:text-red-400 p-1 transition"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
                 </motion.div>
               )}
             </AnimatePresence>

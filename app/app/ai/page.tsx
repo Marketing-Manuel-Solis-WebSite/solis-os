@@ -1,5 +1,6 @@
 'use client';
 import { useAuth } from '@/lib/auth';
+import { auth } from '@/lib/firebase';
 import { useI18n } from '@/lib/i18n';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
@@ -121,9 +122,10 @@ export default function AIPage() {
       const userContext = await buildUserContext();
 
       // Use real SSE streaming
+      const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
         body: JSON.stringify({ question: content.trim(), mode: aiMode, history, stream: true, userContext }),
       });
 

@@ -1593,6 +1593,7 @@ export const translations: Record<Lang, Dict> = {
     'docVersion.restoredMsg': 'Se restauró la versión v{v}',
     'docVersion.restoreError': 'Error al restaurar',
     'docVersion.restoreErrorMsg': 'No se pudo restaurar la versión',
+    'docVersion.noPermission': 'No tienes permiso para editar este documento',
     'docVersion.versionsStored': 'versiones guardadas',
     'docVersion.max50': 'Máximo 50 versiones',
     'docVersion.justNow': 'Justo ahora',
@@ -1605,6 +1606,7 @@ export const translations: Record<Lang, Dict> = {
     'relations.title': 'Elementos Relacionados',
     'relations.loading': 'Cargando relaciones...',
     'relations.noRelations': 'Sin relaciones',
+    'relations.loadError': 'Error al cargar relaciones',
     'relations.add': 'Agregar relación',
     'relations.addRelation': 'Agregar relación',
     'relations.type': 'Tipo de relación',
@@ -1616,6 +1618,9 @@ export const translations: Record<Lang, Dict> = {
     'relations.blockedBy': 'Bloqueado por',
     'relations.parentOf': 'Padre de',
     'relations.childOf': 'Hijo de',
+    'relations.duplicateError': 'Esta relación ya existe',
+    'relations.selfError': 'No se puede relacionar un elemento consigo mismo',
+    'relations.createError': 'Error al crear relación',
 
     // --- Custom Fields ---
     'customFields.title': 'Campos Personalizados',
@@ -1660,6 +1665,7 @@ export const translations: Record<Lang, Dict> = {
     'recurrence.everyNWeeksOn': 'Cada {n} semanas: {days}',
     'recurrence.partOfSeries': 'Parte de una serie recurrente',
     'recurrence.stopRecurrence': 'Detener recurrencia',
+    'recurrence.generationFailed': 'Error al generar la siguiente tarea recurrente',
 
     // --- Import ---
     'import.title': 'Importar Tareas',
@@ -1686,6 +1692,8 @@ export const translations: Record<Lang, Dict> = {
     'import.validate': 'Validar',
     'import.importNow': 'Importar ahora',
     'import.complete': 'Importación completada',
+    'import.parseError': 'No se pudo leer el archivo CSV. Verifica el formato.',
+    'import.importFailed': 'La importación falló. Algunos datos pueden no haberse guardado.',
     'import.dryRunResult': '{valid} tareas válidas, {errors} con errores',
     'import.importResult': '{count} tareas importadas, {errors} errores',
     'import.skippedRows': 'Filas omitidas',
@@ -3269,6 +3277,7 @@ export const translations: Record<Lang, Dict> = {
     'docVersion.restoredMsg': 'Restored to version v{v}',
     'docVersion.restoreError': 'Restore failed',
     'docVersion.restoreErrorMsg': 'Could not restore the version',
+    'docVersion.noPermission': 'You do not have permission to edit this document',
     'docVersion.versionsStored': 'versions stored',
     'docVersion.max50': 'Max 50 versions',
     'docVersion.justNow': 'Just now',
@@ -3281,6 +3290,7 @@ export const translations: Record<Lang, Dict> = {
     'relations.title': 'Related Items',
     'relations.loading': 'Loading relations...',
     'relations.noRelations': 'No relations',
+    'relations.loadError': 'Failed to load relations',
     'relations.add': 'Add relation',
     'relations.addRelation': 'Add relation',
     'relations.type': 'Relation type',
@@ -3292,6 +3302,9 @@ export const translations: Record<Lang, Dict> = {
     'relations.blockedBy': 'Blocked by',
     'relations.parentOf': 'Parent of',
     'relations.childOf': 'Child of',
+    'relations.duplicateError': 'This relation already exists',
+    'relations.selfError': 'Cannot relate an entity to itself',
+    'relations.createError': 'Failed to create relation',
 
     // --- Custom Fields ---
     'customFields.title': 'Custom Fields',
@@ -3336,6 +3349,7 @@ export const translations: Record<Lang, Dict> = {
     'recurrence.everyNWeeksOn': 'Every {n} weeks on {days}',
     'recurrence.partOfSeries': 'Part of a recurring series',
     'recurrence.stopRecurrence': 'Stop recurrence',
+    'recurrence.generationFailed': 'Failed to generate next recurring task',
 
     // --- Import ---
     'import.title': 'Import Tasks',
@@ -3362,6 +3376,8 @@ export const translations: Record<Lang, Dict> = {
     'import.validate': 'Validate',
     'import.importNow': 'Import now',
     'import.complete': 'Import complete',
+    'import.parseError': 'Could not read CSV file. Check the format.',
+    'import.importFailed': 'Import failed. Some data may not have been saved.',
     'import.dryRunResult': '{valid} valid tasks, {errors} with errors',
     'import.importResult': '{count} tasks imported, {errors} errors',
     'import.skippedRows': 'Skipped rows',

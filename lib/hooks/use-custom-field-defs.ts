@@ -70,8 +70,8 @@ export function useCustomFieldDefs(): UseCustomFieldDefsReturn {
       setGroups(settings.groups);
       setVersion(settings.version);
       setError(false);
-    } catch {
-      // Fallback to legacy hardcoded fields
+    } catch (err) {
+      console.error('[CustomFieldDefs] Failed to load, falling back to legacy:', err);
       const fb = legacyFallback();
       setFields(fb.fields);
       setGroups(fb.groups);
