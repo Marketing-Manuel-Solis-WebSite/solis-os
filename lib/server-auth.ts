@@ -1,9 +1,8 @@
 // ================================================================
-// Server-side Firebase ID token verification (without firebase-admin)
-// Phase 1 containment — will be replaced by Admin SDK in Phase 2
+// Server-side Firebase ID token verification using Admin SDK
 // ================================================================
 
-const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+import { adminAuth } from './firebase-admin';
 
 export interface VerifiedUser {
   uid: string;
@@ -21,29 +20,16 @@ function extractToken(authHeader: string | null): string | null {
 }
 
 /**
- * Verify a Firebase ID token using the REST API.
+ * Verify a Firebase ID token using Admin SDK.
  * Returns the user's uid/email or null if invalid.
  */
 export async function verifyIdToken(idToken: string): Promise<VerifiedUser | null> {
-  if (!FIREBASE_API_KEY || !idToken) return null;
+  if (!idToken) return null;
 
   try {
-    const res = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      },
-    );
-
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    const user = data.users?.[0];
-    if (!user?.localId) return null;
-
-    return { uid: user.localId, email: user.email };
+    const decoded = await adminAuth.verifyIdToken(idToken);
+    if (!decoded.uid) return null;
+    return { uid: decoded.uid, email: decoded.email };
   } catch {
     return null;
   }

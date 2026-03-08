@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { encryptToken } from '@/lib/integrations-crypto';
-import { addIntegration, getIntegrationByProvider, updateIntegration } from '@/lib/integrations-db';
+import { addIntegration, getIntegrationByProvider, updateIntegration } from '@/lib/integrations-db-admin';
 import { authenticateRequest } from '@/lib/server-auth';
 import { INTEGRATION_CATALOG } from '@/lib/integrations-catalog';
 import type { IntegrationProvider } from '@/lib/integrations-types';

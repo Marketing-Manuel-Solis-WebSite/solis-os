@@ -1,14 +1,6 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError } from '../../middleware';
-import { updateTimeEntry, deleteTimeEntry } from '@/lib/db';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-
-async function getEntry(id: string) {
-  const snap = await getDoc(doc(db, `time-entries/${id}`));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() };
-}
+import { getTimeEntry, updateTimeEntry, deleteTimeEntry } from '@/lib/db-admin';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -16,7 +8,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!auth.valid) return auth.error!;
 
     const { id } = await params;
-    const entry = await getEntry(id);
+    const entry = await getTimeEntry(id);
     if (!entry) return apiError('Time entry not found', 404);
 
     return apiResponse(entry);
@@ -31,7 +23,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!auth.valid) return auth.error!;
 
     const { id } = await params;
-    const entry = await getEntry(id);
+    const entry = await getTimeEntry(id);
     if (!entry) return apiError('Time entry not found', 404);
 
     const body = await req.json();
@@ -49,7 +41,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!auth.valid) return auth.error!;
 
     const { id } = await params;
-    const entry = await getEntry(id);
+    const entry = await getTimeEntry(id);
     if (!entry) return apiError('Time entry not found', 404);
 
     await deleteTimeEntry(id);

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError, parsePagination } from '../middleware';
-import { getGoals, createGoal } from '@/lib/db';
-import { queueEvent } from '@/lib/integrations-db';
+import { getGoals, createGoal } from '@/lib/db-admin';
+import { queueEvent } from '@/lib/integrations-db-admin';
 
 export async function GET(req: NextRequest) {
   try {

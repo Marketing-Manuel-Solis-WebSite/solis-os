@@ -1,5 +1,5 @@
 import { signPayload } from './integrations-crypto';
-import { addWebhookLog, updateWebhook } from './integrations-db';
+import { addWebhookLog, updateWebhook } from './integrations-db-admin';
 
 export interface DeliveryResult {
   success: boolean;

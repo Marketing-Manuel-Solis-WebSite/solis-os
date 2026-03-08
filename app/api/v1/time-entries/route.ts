@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError, parsePagination } from '../middleware';
-import { getTimeEntries, getTimeEntriesByDateRange, createTimeEntry } from '@/lib/db';
+import { getTimeEntries, getTimeEntriesByDateRange, createTimeEntry } from '@/lib/db-admin';
 
 export async function GET(req: NextRequest) {
   try {

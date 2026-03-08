@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCode } from '@/lib/oauth-providers';
 import { encryptToken } from '@/lib/integrations-crypto';
-import { addIntegration, getIntegrationByProvider, updateIntegration } from '@/lib/integrations-db';
+import { addIntegration, getIntegrationByProvider, updateIntegration } from '@/lib/integrations-db-admin';
 import type { IntegrationProvider } from '@/lib/integrations-types';
 import { INTEGRATION_CATALOG } from '@/lib/integrations-catalog';
 
@@ -25,10 +25,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
       return NextResponse.redirect(`${redirectUrl}?error=missing_code`);
     }
 
-    // Verify state
+    // Verify state (CSRF)
     const storedState = req.cookies.get(`oauth_state_${provider}`)?.value;
     if (!storedState || storedState !== state) {
       return NextResponse.redirect(`${redirectUrl}?error=invalid_state`);
+    }
+
+    // Verify authenticated user who initiated the flow
+    const storedUid = req.cookies.get(`oauth_uid_${provider}`)?.value;
+    if (!storedUid) {
+      return NextResponse.redirect(`${redirectUrl}?error=auth_required`);
     }
 
     // Exchange code for tokens
@@ -71,13 +77,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
           expiresAt: tokens.expiresIn ? Date.now() + tokens.expiresIn * 1000 : 0,
           scope: tokens.scope,
         },
-        createdBy: 'oauth',
+        createdBy: storedUid,
       });
     }
 
-    // Clear state cookie
+    // Clear cookies
     const response = NextResponse.redirect(`${redirectUrl}?connected=${provider}`);
     response.cookies.delete(`oauth_state_${provider}`);
+    response.cookies.delete(`oauth_uid_${provider}`);
 
     return response;
   } catch (err: any) {

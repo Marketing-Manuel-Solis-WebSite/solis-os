@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateApiKey } from '@/lib/integrations-crypto';
-import { addApiKey } from '@/lib/integrations-db';
+import { addApiKey } from '@/lib/integrations-db-admin';
 import { authenticateRequest } from '@/lib/server-auth';
 import type { ApiKeyScope } from '@/lib/integrations-types';
 

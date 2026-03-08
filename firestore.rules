@@ -267,7 +267,7 @@ service cloud.firestore {
 
       match /submissions/{subId} {
         allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/forms/$(formId)).data.orgId);
-        allow create: if true; // Public form submissions (validated by publicToken in app logic)
+        allow create: if false; // Public submissions go through /api/forms/submit (Admin SDK) — no direct client writes
         allow update, delete: if isSignedIn() && isAdmin(get(/databases/$(database)/documents/forms/$(formId)).data.orgId);
       }
 

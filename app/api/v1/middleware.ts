@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateApiKey } from '@/lib/integrations-db';
+import { validateApiKey } from '@/lib/integrations-db-admin';
 import type { ApiKeyScope } from '@/lib/integrations-types';
 
 // ============================================

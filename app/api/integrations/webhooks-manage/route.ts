@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWebhookSecret } from '@/lib/integrations-crypto';
-import { addWebhook } from '@/lib/integrations-db';
+import { addWebhook } from '@/lib/integrations-db-admin';
 import { authenticateRequest } from '@/lib/server-auth';
 import type { WebhookEvent } from '@/lib/integrations-types';
 

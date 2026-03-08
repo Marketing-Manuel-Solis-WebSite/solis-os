@@ -1,15 +1,7 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError } from '../../middleware';
-import { updateTask, deleteTask } from '@/lib/db';
-import { queueEvent } from '@/lib/integrations-db';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-
-async function getTask(id: string) {
-  const snap = await getDoc(doc(db, `tasks/${id}`));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() };
-}
+import { getTask, updateTask, deleteTask } from '@/lib/db-admin';
+import { queueEvent } from '@/lib/integrations-db-admin';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -38,7 +30,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const body = await req.json();
     await updateTask(id, body);
 
-    // Queue events
     const eventType = body.status && body.status !== (task as any).status ? 'task.status_changed' : 'task.updated';
     queueEvent({
       eventType,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queueEvent } from '@/lib/integrations-db';
+import { queueEvent } from '@/lib/integrations-db-admin';
 import { timingSafeEqual } from 'crypto';
 
 function verifyWebhookSecret(req: NextRequest): boolean {

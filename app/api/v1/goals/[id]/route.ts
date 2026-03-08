@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError } from '../../middleware';
-import { getGoal, updateGoal, deleteGoal } from '@/lib/db';
-import { queueEvent } from '@/lib/integrations-db';
+import { getGoal, updateGoal, deleteGoal } from '@/lib/db-admin';
+import { queueEvent } from '@/lib/integrations-db-admin';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

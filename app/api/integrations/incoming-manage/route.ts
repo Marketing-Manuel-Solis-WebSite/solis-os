@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWebhookSecret, generateEndpointToken } from '@/lib/integrations-crypto';
-import { addIncomingWebhook } from '@/lib/integrations-db';
+import { addIncomingWebhook } from '@/lib/integrations-db-admin';
 import { authenticateRequest } from '@/lib/server-auth';
 
 export async function POST(req: NextRequest) {

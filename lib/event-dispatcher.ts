@@ -1,4 +1,4 @@
-import { getPendingEvents, markEventProcessed, getActiveWebhooksForEvent } from './integrations-db';
+import { getPendingEvents, markEventProcessed, getActiveWebhooksForEvent } from './integrations-db-admin';
 import { deliverWebhookEvent } from './webhook-delivery';
 import type { WebhookEvent } from './integrations-types';
 

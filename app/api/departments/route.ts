@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { collection, getDocs, doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { authenticateRequest } from '@/lib/server-auth';
-
-const ORG = 'solis-center';
+import { getTeams, createTeam } from '@/lib/db-admin';
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,8 +9,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const snap = await getDocs(collection(db, `orgs/${ORG}/teams`));
-    const teams = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const teams = await getTeams();
     return NextResponse.json({ teams });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
@@ -31,15 +27,7 @@ export async function POST(req: NextRequest) {
     if (!data.name?.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
-    const id = data.name.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    await setDoc(doc(db, `orgs/${ORG}/teams/${id}`), {
-      name: data.name,
-      color: data.color || '#6B7280',
-      icon: data.icon || '📁',
-      description: data.description || '',
-      status: 'active',
-      updatedAt: serverTimestamp(),
-    }, { merge: true });
+    const id = await createTeam(data);
     return NextResponse.json({ ok: true, id });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });

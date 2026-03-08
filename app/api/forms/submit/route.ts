@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFormByToken, createFormSubmission, updateForm, getForm } from '@/lib/db';
+import { getFormByToken, createFormSubmission, updateForm } from '@/lib/db-admin';
 import { validateSubmission, sanitizeValue } from '@/lib/form-validation';
-import { notifyMany } from '@/lib/notifications';
-import { queueEvent } from '@/lib/integrations-db';
+import { notifyManyAdmin } from '@/lib/db-admin';
+import { queueEvent } from '@/lib/integrations-db-admin';
 import type { FormDocument } from '@/components/forms/constants';
 
 // ---- In-memory rate limiter ----
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 });
 
-    // Load form by token
+    // Load form by token (server-side via admin SDK)
     const formData = await getFormByToken(token);
     if (!formData) return NextResponse.json({ error: 'Form not found' }, { status: 404 });
     const form = formData as FormDocument;
@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Validation failed', details: errors }, { status: 400 });
     }
 
-    // Create submission
+    // Create submission (server-side via admin SDK — no client SDK needed)
     const userAgent = req.headers.get('user-agent') || '';
     await createFormSubmission(form.id, {
       values: sanitized,
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
     // Notify form creator
     if (form.createdBy) {
       try {
-        await notifyMany([form.createdBy], {
+        await notifyManyAdmin([form.createdBy], {
           type: 'form_submission',
           title: `Nueva respuesta: ${form.title}`,
           message: `Se recibió una nueva respuesta en el formulario "${form.title}"`,
@@ -158,12 +158,12 @@ export async function POST(req: NextRequest) {
       } catch { /* notification failure shouldn't block submission */ }
     }
 
-    // Check if limit is now reached → notify + pause
+    // Check if limit is now reached
     if (form.responseLimit && (form.responseCount || 0) + 1 >= form.responseLimit) {
       await updateForm(form.id, { status: 'paused' });
       if (form.createdBy) {
         try {
-          await notifyMany([form.createdBy], {
+          await notifyManyAdmin([form.createdBy], {
             type: 'form_limit_reached',
             title: `Formulario pausado: ${form.title}`,
             message: `El formulario alcanzó el límite de ${form.responseLimit} respuestas y fue pausado automáticamente.`,

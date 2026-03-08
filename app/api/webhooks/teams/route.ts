@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queueEvent } from '@/lib/integrations-db';
+import { queueEvent } from '@/lib/integrations-db-admin';
 
 export async function POST(req: NextRequest) {
   try {

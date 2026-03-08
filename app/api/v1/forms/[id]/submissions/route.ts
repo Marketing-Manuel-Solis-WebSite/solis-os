@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError, parsePagination } from '../../../middleware';
-import { getForm, getFormSubmissions } from '@/lib/db';
+import { getForm, getFormSubmissions } from '@/lib/db-admin';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

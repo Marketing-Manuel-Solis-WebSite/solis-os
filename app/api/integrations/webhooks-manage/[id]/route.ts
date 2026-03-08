@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { updateWebhook, deleteWebhook } from '@/lib/integrations-db';
+import { updateWebhook, deleteWebhook } from '@/lib/integrations-db-admin';
 import { authenticateRequest } from '@/lib/server-auth';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

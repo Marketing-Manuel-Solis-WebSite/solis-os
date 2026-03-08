@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revokeApiKey } from '@/lib/integrations-db';
+import { revokeApiKey } from '@/lib/integrations-db-admin';
 import { authenticateRequest } from '@/lib/server-auth';
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

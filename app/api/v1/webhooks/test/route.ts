@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deliverWebhookEvent } from '@/lib/webhook-delivery';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getWebhook } from '@/lib/integrations-db-admin';
 
 export async function POST(req: NextRequest) {
   try {
-    // This endpoint requires WEBHOOK_PROCESSOR_SECRET or an API key
+    // This endpoint requires WEBHOOK_PROCESSOR_SECRET
     const authHeader = req.headers.get('authorization') || '';
     const secret = process.env.WEBHOOK_PROCESSOR_SECRET;
 
@@ -19,12 +18,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'webhookId is required' }, { status: 400 });
     }
 
-    // Load webhook
-    const snap = await getDoc(doc(db, `webhooks/${webhookId}`));
-    if (!snap.exists()) {
+    // Load webhook via admin SDK
+    const webhook = await getWebhook(webhookId);
+    if (!webhook) {
       return NextResponse.json({ error: 'Webhook not found' }, { status: 404 });
     }
-    const webhook = { id: snap.id, ...snap.data() } as any;
 
     // Send test event
     const testEvent = {
