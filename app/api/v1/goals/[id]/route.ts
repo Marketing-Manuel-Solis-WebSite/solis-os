@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       entityId: id,
       entityType: 'goal',
       payload: { changes: Object.keys(data) },
-    }).catch(() => {});
+    }).catch((err) => console.error('[GoalsAPI] queue webhook event failed:', err));
 
     return apiResponse({ id, ...data });
   } catch {

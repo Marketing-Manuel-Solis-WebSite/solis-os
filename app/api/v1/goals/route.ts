@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError, parsePagination } from '../middleware';
-import { getGoals, createGoal } from '@/lib/db-admin';
+import { createGoal, countByOrg, queryGoalsPaginated } from '@/lib/db-admin';
 import { queueEvent } from '@/lib/integrations-db-admin';
 import { GoalCreateSchema, formatZodError } from '@/lib/validation';
 
@@ -9,19 +9,18 @@ export async function GET(req: NextRequest) {
     const auth = await validateApiRequest(req, 'goals:read');
     if (!auth.valid) return auth.error!;
 
-    const { limit, offset } = parsePagination(req);
+    const { limit, cursor } = parsePagination(req);
     const url = new URL(req.url);
     const teamId = url.searchParams.get('teamId');
     const status = url.searchParams.get('status');
 
-    let goals = await getGoals(teamId || undefined) as any[];
+    // Firestore-native cursor pagination with pushed filters
+    const [result, total] = await Promise.all([
+      queryGoalsPaginated({ limit, cursor, status, teamId }),
+      countByOrg('goals'),
+    ]);
 
-    if (status) goals = goals.filter((g: any) => g.status === status);
-
-    const total = goals.length;
-    const paginated = goals.slice(offset, offset + limit);
-
-    return apiResponse(paginated, { total, limit, offset });
+    return apiResponse(result.items, { total, limit, hasMore: result.hasMore, nextCursor: result.nextCursor });
   } catch {
     return apiError('Internal error', 500);
   }
@@ -50,7 +49,7 @@ export async function POST(req: NextRequest) {
       entityId: docRef.id,
       entityType: 'goal',
       payload: { name: data.name },
-    }).catch(() => {});
+    }).catch((err) => console.error('[GoalsAPI] queue webhook event failed:', err));
 
     return apiResponse({ id: docRef.id, ...data });
   } catch {

@@ -58,7 +58,7 @@ export default function GoalDetailDrawer({ goal, open, onClose, onUpdate, onDele
   };
 
   const loadTasks = async () => {
-    const ts = await getTasks();
+    const { items: ts } = await getTasks();
     setAllTasks(ts);
   };
 

@@ -11,7 +11,8 @@ function verifyWebhookSecret(req: NextRequest): boolean {
 
   try {
     return timingSafeEqual(Buffer.from(provided), Buffer.from(secret));
-  } catch {
+  } catch (err) {
+    console.error('[CustomWebhook] signature verification failed:', err);
     return false;
   }
 }
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
   try {
     const bodyText = await req.text();
     let payload: any;
-    try { payload = JSON.parse(bodyText); } catch { payload = { raw: bodyText }; }
+    try { payload = JSON.parse(bodyText); } catch (err) { console.error('[CustomWebhook] JSON parse failed:', err); payload = { raw: bodyText }; }
 
     const eventType = payload.event || payload.type || 'custom.event';
 
@@ -41,7 +42,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, received: true });
-  } catch {
+  } catch (err) {
+    console.error('[CustomWebhook] request handling failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

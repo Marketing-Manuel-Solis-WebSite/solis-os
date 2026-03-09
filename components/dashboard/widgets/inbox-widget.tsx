@@ -23,16 +23,18 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 function InboxWidgetInner({ user, tasks, goals }: WidgetProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [items, setItems] = useState<InboxItem[]>([]);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const loadItems = useCallback(async () => {
     if (!user?.uid) return;
     try {
-      await generateInboxItems(user.uid, tasks, goals);
+      await generateInboxItems(user.uid, tasks, goals, lang as 'es' | 'en');
       const result = await getInboxItems(user.uid);
-      setItems(result);
+      setItems(result.items);
+      setHasMore(result.hasMore);
     } catch {
       // silently fail
     } finally {
@@ -77,7 +79,7 @@ function InboxWidgetInner({ user, tasks, goals }: WidgetProps) {
             const Icon = TYPE_ICONS[item.type] || Bell;
             const color = TYPE_COLORS[item.type] || '#3B82F6';
             return (
-              <div key={item.id} className="px-4 py-3 flex items-start gap-3 hover:bg-[var(--bg-hover)] transition group border-b border-[var(--border-subtle)]/40 last:border-b-0">
+              <div key={item.id} className="px-4 py-3 flex items-start gap-3 hover:bg-[var(--bg-hover)] transition group border-b border-[var(--border-subtle)]/40">
                 <div
                   className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
                   style={{ backgroundColor: `${color}12` }}
@@ -92,14 +94,14 @@ function InboxWidgetInner({ user, tasks, goals }: WidgetProps) {
                   <button
                     onClick={() => handleDone(item.id)}
                     className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-[var(--text-muted)] hover:text-emerald-500 transition"
-                    title="Listo"
+                    title={t('inbox.done')}
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => handleArchive(item.id)}
                     className="p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition"
-                    title="Archivar"
+                    title={t('inbox.archive')}
                   >
                     <Archive className="h-3.5 w-3.5" />
                   </button>
@@ -107,6 +109,9 @@ function InboxWidgetInner({ user, tasks, goals }: WidgetProps) {
               </div>
             );
           })
+        )}
+        {hasMore && items.length > 0 && (
+          <p className="text-[11px] text-[var(--text-muted)] text-center py-2 border-t border-[var(--border-subtle)]/40">{t('inbox.morePending')}</p>
         )}
       </div>
     </WidgetShell>

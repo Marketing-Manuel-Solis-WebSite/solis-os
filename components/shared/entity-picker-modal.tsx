@@ -34,13 +34,13 @@ export default function EntityPickerModal({ excludeId, onSelect, onClose }: Prop
       let data: any[] = [];
       switch (tab) {
         case 'task':
-          data = can('task', 'read') ? (await getTasks() as any[]) : [];
+          data = can('task', 'read') ? (await getTasks()).items as any[] : [];
           break;
         case 'doc':
-          data = can('doc', 'read') ? (await getDocuments() as any[]) : [];
+          data = can('doc', 'read') ? (await getDocuments()).items as any[] : [];
           break;
         case 'goal':
-          data = can('goal', 'read') ? (await getGoals() as any[]) : [];
+          data = can('goal', 'read') ? (await getGoals()).items as any[] : [];
           break;
       }
       setItems(data.filter(d => d.id !== excludeId));

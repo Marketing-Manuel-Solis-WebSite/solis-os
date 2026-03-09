@@ -44,7 +44,8 @@ export async function POST(req: NextRequest) {
       responseBody: result.responseBody,
       error: result.error,
     });
-  } catch {
+  } catch (err) {
+    console.error('[WebhookTest] test delivery failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

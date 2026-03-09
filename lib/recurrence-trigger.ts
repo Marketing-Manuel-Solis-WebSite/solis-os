@@ -1,11 +1,12 @@
-import { createTask, updateTask } from './db';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { createTask } from './db';
+import { collection, query, where, getDocs, getDoc, doc, updateDoc, Timestamp, serverTimestamp, runTransaction } from 'firebase/firestore';
 import { db } from './firebase';
 import { ORG } from './db';
 import { calculateNextDueDate, shouldGenerateNext, type RecurrenceConfig } from './recurrence';
 
 // Called when a task with recurrence is marked done
 // Creates the next instance if allowed by config
+// Uses a Firestore transaction on the template to prevent race conditions
 export async function handleTaskCompletion(task: any): Promise<string | null> {
   const config = task.recurrence as RecurrenceConfig | undefined;
   if (!config) return null;
@@ -18,7 +19,6 @@ export async function handleTaskCompletion(task: any): Promise<string | null> {
   if (!shouldGenerateNext(config, nextDue)) return null;
 
   // Idempotency check: targeted query instead of loading ALL tasks
-  // Only fetches instances of THIS template (O(1) vs O(N))
   const nextDueISO = nextDue.toISOString().slice(0, 10); // YYYY-MM-DD
   const instancesSnap = await getDocs(query(
     collection(db, 'tasks'),
@@ -31,8 +31,24 @@ export async function handleTaskCompletion(task: any): Promise<string | null> {
   });
   if (exists) return null;
 
-  // Re-read the template's current occurrenceCount to reduce race window
-  const freshCount = (config.occurrenceCount || 0) + 1;
+  // Use transaction to atomically read fresh occurrence count and update template
+  // This prevents the race condition where concurrent completions both read the same count
+  const templateRef = doc(db, `tasks/${task.id}`);
+  const freshCount = await runTransaction(db, async (transaction) => {
+    const freshSnap = await transaction.get(templateRef);
+    if (!freshSnap.exists()) throw new Error('Template task no longer exists');
+    const freshData = freshSnap.data();
+    const freshConfig = freshData.recurrence as RecurrenceConfig;
+    const newCount = (freshConfig?.occurrenceCount || 0) + 1;
+
+    // Update occurrence count atomically within the transaction
+    transaction.update(templateRef, {
+      recurrence: { ...freshConfig, occurrenceCount: newCount },
+      updatedAt: serverTimestamp(),
+    });
+
+    return newCount;
+  });
 
   // Deep-copy customFields to avoid shared references
   let clonedCustomFields: Record<string, unknown> = {};
@@ -70,14 +86,5 @@ export async function handleTaskCompletion(task: any): Promise<string | null> {
   };
 
   const ref = await createTask(instanceData);
-
-  // Update the original task's occurrence count
-  await updateTask(task.id, {
-    recurrence: {
-      ...config,
-      occurrenceCount: freshCount,
-    },
-  });
-
   return ref.id;
 }

@@ -1,5 +1,5 @@
 import {
-  collection, doc, addDoc, deleteDoc, getDocs, updateDoc, query, where, orderBy, limit, serverTimestamp,
+  collection, doc, addDoc, deleteDoc, getDocs, getDoc, updateDoc, query, where, orderBy, limit, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { ORG } from './db';
@@ -46,6 +46,19 @@ export async function createRelation(data: {
   // Prevent self-relations
   if (data.sourceId === data.targetId && data.sourceType === data.targetType) {
     throw new Error('Cannot create a relation from an entity to itself');
+  }
+
+  // Validate both entities exist
+  const entityCollection = (type: EntityType) => type === 'task' ? 'tasks' : type === 'doc' ? 'docs' : 'goals';
+  const [sourceSnap, targetSnap] = await Promise.all([
+    getDoc(doc(db, `${entityCollection(data.sourceType)}/${data.sourceId}`)),
+    getDoc(doc(db, `${entityCollection(data.targetType)}/${data.targetId}`)),
+  ]);
+  if (!sourceSnap.exists()) {
+    throw new Error(`Source ${data.sourceType} "${data.sourceId}" does not exist`);
+  }
+  if (!targetSnap.exists()) {
+    throw new Error(`Target ${data.targetType} "${data.targetId}" does not exist`);
   }
 
   // Check for duplicate exact relation (same source, target, type)

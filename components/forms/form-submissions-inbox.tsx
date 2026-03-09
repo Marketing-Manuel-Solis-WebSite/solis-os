@@ -18,17 +18,20 @@ export default function FormSubmissionsInbox({ forms }: Props) {
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedSub, setSelectedSub] = useState<FormSubmission | null>(null);
+  const [subsHasMore, setSubsHasMore] = useState(false);
 
   const selectedForm = forms.find(f => f.id === selectedFormId) || null;
 
   useEffect(() => {
     if (!selectedFormId) {
       setSubmissions([]);
+      setSubsHasMore(false);
       return;
     }
     setLoading(true);
-    const unsub = onFormSubmissionsSnapshot(selectedFormId, (subs: any[]) => {
+    const unsub = onFormSubmissionsSnapshot(selectedFormId, (subs: any[], hasMore: boolean) => {
       setSubmissions(subs as FormSubmission[]);
+      setSubsHasMore(hasMore);
       setLoading(false);
     });
     return () => unsub();
@@ -124,6 +127,9 @@ export default function FormSubmissionsInbox({ forms }: Props) {
                 </button>
               );
             })}
+            {subsHasMore && (
+              <p className="text-[12px] text-[var(--text-muted)] text-center py-3">{t('inbox.showingFirst100')}</p>
+            )}
           </div>
         )}
       </div>

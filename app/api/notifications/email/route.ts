@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { authenticateRequest } from '@/lib/server-auth';
+import { adminDb } from '@/lib/firebase-admin';
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Solis Center <notifications@soliscenter.com>';
 
@@ -26,11 +27,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { to, subject, title, message, actorName, type } = body;
+    // Verify the caller has at least manager role to send emails
+    const memberSnap = await adminDb.collection('orgs/solis-center/members').doc(authedUser.uid).get();
+    const callerRole = memberSnap.data()?.role as string | undefined;
+    const ALLOWED_EMAIL_ROLES = ['owner', 'admin', 'manager'];
+    if (!memberSnap.exists || !callerRole || !ALLOWED_EMAIL_ROLES.includes(callerRole)) {
+      return NextResponse.json({ error: 'Insufficient permissions to send emails' }, { status: 403 });
+    }
 
-    if (!to || !title) {
+    const body = await request.json();
+    const { to: explicitTo, userId, subject, title, message, actorName, type } = body;
+
+    if (!title) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Resolve recipient email: use explicit `to` or look up from userId
+    let to = explicitTo;
+    if (!to && userId) {
+      // Validate userId format to prevent path traversal (Firebase UIDs are alphanumeric, 28 chars)
+      if (typeof userId !== 'string' || !/^[a-zA-Z0-9]{1,128}$/.test(userId)) {
+        return NextResponse.json({ error: 'Invalid userId' }, { status: 400 });
+      }
+      const recipientSnap = await adminDb.doc(`orgs/solis-center/members/${userId}`).get();
+      const recipientData = recipientSnap.data();
+      if (!recipientData?.email) {
+        return NextResponse.json({ error: 'Recipient email not found' }, { status: 400 });
+      }
+      // Check if user has email notifications enabled
+      if (recipientData.preferences?.notifications?.email === false) {
+        return NextResponse.json({ skipped: true, reason: 'Email notifications disabled' });
+      }
+      to = recipientData.email;
+    }
+
+    if (!to) {
+      return NextResponse.json({ error: 'Missing recipient (to or userId)' }, { status: 400 });
     }
 
     if (!process.env.RESEND_API_KEY) {

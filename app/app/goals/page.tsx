@@ -19,6 +19,7 @@ export default function GoalsPage() {
 
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [editGoal, setEditGoal] = useState<Goal | null>(null);
   const [detailGoal, setDetailGoal] = useState<Goal | null>(null);
@@ -29,8 +30,9 @@ export default function GoalsPage() {
 
   const loadGoals = useCallback(async () => {
     setLoading(true);
-    const data = await getGoals(activeTeamId === '__all__' ? undefined : activeTeamId);
+    const { items: data, hasMore: more } = await getGoals(activeTeamId === '__all__' ? undefined : activeTeamId);
     setGoals(data as Goal[]);
+    setHasMore(more);
     setLoading(false);
   }, [activeTeamId]);
 
@@ -75,7 +77,7 @@ export default function GoalsPage() {
     await updateGoal(id, data);
     // Propagate name change to relations (fire-and-forget)
     if (data.name && typeof data.name === 'string') {
-      propagateEntityName(id, data.name).catch(() => {});
+      propagateEntityName(id, data.name).catch((err) => console.error('[Goals] propagateEntityName failed:', err));
     }
     loadGoals();
   };
@@ -200,6 +202,15 @@ export default function GoalsPage() {
               </AnimatePresence>
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {/* Has More indicator */}
+      {hasMore && !loading && (
+        <div className="text-center py-4 mt-2">
+          <span className="text-[13px] text-[var(--text-muted)]">
+            {t('common.showingItems', { n: goals.length })} — {t('common.moreAvailable')}
+          </span>
         </div>
       )}
 

@@ -212,7 +212,76 @@ export async function cleanStalePresence(): Promise<RepairResult> {
 }
 
 // ────────────────────────────────────────────────────────────────
-// 5. FULL INTEGRITY REPORT — run all checks (non-destructive)
+// 5. ORPHANED TIME ENTRIES — time entries referencing deleted tasks
+// ────────────────────────────────────────────────────────────────
+
+export async function findOrphanedTimeEntries(): Promise<RepairResult> {
+  const snap = await adminDb.collection('time-entries').where('orgId', '==', ORG).get();
+  const orphaned: string[] = [];
+
+  for (const d of snap.docs) {
+    const taskId = d.data().taskId;
+    if (!taskId || taskId === '') continue; // Already cleaned or no task
+    const taskSnap = await adminDb.doc(`tasks/${taskId}`).get();
+    if (!taskSnap.exists || taskSnap.data()?.deleted) {
+      orphaned.push(d.id);
+    }
+  }
+
+  return { action: 'find_orphaned_time_entries', found: orphaned.length, fixed: 0, details: orphaned.slice(0, 100).map(id => `time-entries/${id}`) };
+}
+
+export async function cleanOrphanedTimeEntries(): Promise<RepairResult> {
+  const { details } = await findOrphanedTimeEntries();
+  let fixed = 0;
+
+  for (const path of details) {
+    const id = path.replace('time-entries/', '');
+    await adminDb.doc(`time-entries/${id}`).update({
+      taskId: '',
+      taskTitle: '(deleted task)',
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    fixed++;
+  }
+
+  return { action: 'clean_orphaned_time_entries', found: details.length, fixed, details: [`Cleaned ${fixed} time entries`] };
+}
+
+// ────────────────────────────────────────────────────────────────
+// 6. STALE WHITEBOARD LINKED TASK REFS
+// ────────────────────────────────────────────────────────────────
+
+export async function findStaleWhiteboardTaskRefs(): Promise<RepairResult> {
+  const snap = await adminDb.collectionGroup('elements').get();
+  const stale: string[] = [];
+
+  for (const d of snap.docs) {
+    const linkedTaskId = d.data().linkedTaskId;
+    if (!linkedTaskId || linkedTaskId === '') continue;
+    const taskSnap = await adminDb.doc(`tasks/${linkedTaskId}`).get();
+    if (!taskSnap.exists || taskSnap.data()?.deleted) {
+      stale.push(d.ref.path);
+    }
+  }
+
+  return { action: 'find_stale_whiteboard_task_refs', found: stale.length, fixed: 0, details: stale.slice(0, 100) };
+}
+
+export async function cleanStaleWhiteboardTaskRefs(): Promise<RepairResult> {
+  const { details, found } = await findStaleWhiteboardTaskRefs();
+  let fixed = 0;
+
+  for (const path of details) {
+    await adminDb.doc(path).update({ linkedTaskId: '', updatedAt: FieldValue.serverTimestamp() });
+    fixed++;
+  }
+
+  return { action: 'clean_stale_whiteboard_task_refs', found, fixed, details: [`Cleaned ${fixed} whiteboard elements`] };
+}
+
+// ────────────────────────────────────────────────────────────────
+// 7. FULL INTEGRITY REPORT — run all checks (non-destructive)
 // ────────────────────────────────────────────────────────────────
 
 export async function runIntegrityReport(): Promise<RepairResult[]> {
@@ -220,12 +289,14 @@ export async function runIntegrityReport(): Promise<RepairResult[]> {
     findOrphanedRelations(),
     findBrokenGoalTargetLinks(),
     findOrphanedTaskSubcollections(),
+    findOrphanedTimeEntries(),
+    findStaleWhiteboardTaskRefs(),
   ]);
   return results;
 }
 
 // ────────────────────────────────────────────────────────────────
-// 6. FULL REPAIR — run all fixes
+// 8. FULL REPAIR — run all fixes
 // ────────────────────────────────────────────────────────────────
 
 export async function runFullRepair(): Promise<RepairResult[]> {
@@ -234,6 +305,8 @@ export async function runFullRepair(): Promise<RepairResult[]> {
     repairBrokenGoalTargetLinks(),
     cleanOrphanedTaskSubcollections(),
     cleanStalePresence(),
+    cleanOrphanedTimeEntries(),
+    cleanStaleWhiteboardTaskRefs(),
   ]);
   return results;
 }

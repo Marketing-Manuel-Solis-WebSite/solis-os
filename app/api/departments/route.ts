@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest } from '@/lib/server-auth';
+import { authenticateRequest, requireAdmin } from '@/lib/server-auth';
 import { getTeams, createTeam } from '@/lib/db-admin';
 import { TeamCreateSchema, formatZodError } from '@/lib/validation';
 
@@ -12,17 +12,16 @@ export async function GET(req: NextRequest) {
 
     const teams = await getTeams();
     return NextResponse.json({ teams });
-  } catch {
+  } catch (err) {
+    console.error('[Departments] GET failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const authedUser = await authenticateRequest(req);
-    if (!authedUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const authedUser = await requireAdmin(req);
+    if (authedUser instanceof Response) return authedUser;
 
     const body = await req.json();
     const parsed = TeamCreateSchema.safeParse(body);
@@ -31,7 +30,8 @@ export async function POST(req: NextRequest) {
     }
     const id = await createTeam(parsed.data);
     return NextResponse.json({ ok: true, id });
-  } catch {
+  } catch (err) {
+    console.error('[Departments] POST failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

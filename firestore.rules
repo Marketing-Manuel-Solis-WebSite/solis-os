@@ -55,6 +55,12 @@ service cloud.firestore {
           (isSelf(userId) &&
            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'active', 'hierarchyLevel']));
         allow delete: if isOwner(orgId);
+
+        // User preferences (stored per-member)
+        match /preferences/{prefKey} {
+          allow read: if isSignedIn() && isSelf(userId);
+          allow write: if isSignedIn() && isSelf(userId);
+        }
       }
 
       // Invitations
@@ -82,6 +88,12 @@ service cloud.firestore {
       // Presence
       match /presence/{userId} {
         allow read: if isOrgMember(orgId);
+        allow write: if isSignedIn() && isSelf(userId);
+      }
+
+      // Read cursors — tracks which messages each user has read per channel
+      match /readCursors/{userId} {
+        allow read: if isSignedIn() && isOrgMember(orgId);
         allow write: if isSignedIn() && isSelf(userId);
       }
 
@@ -222,6 +234,12 @@ service cloud.firestore {
         allow update: if isSignedIn() && request.auth.uid == resource.data.createdBy;
         allow delete: if isSignedIn() && request.auth.uid == resource.data.createdBy;
       }
+
+      // Typing indicators and channel metadata
+      match /meta/{docId} {
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId);
+        allow write: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId);
+      }
     }
 
     // ======== GOALS ========
@@ -316,7 +334,8 @@ service cloud.firestore {
 
     match /auditLogs/{logId} {
       allow read: if isSignedIn() && isAdmin(resource.data.orgId);
-      allow create: if isSignedIn(); // Any authenticated user can create audit entries
+      // Users can only create audit entries where actorId matches their own UID (prevents fabrication)
+      allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
       allow update, delete: if false; // Audit logs are immutable
     }
 

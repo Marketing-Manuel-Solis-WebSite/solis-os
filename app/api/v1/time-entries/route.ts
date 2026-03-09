@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError, parsePagination } from '../middleware';
-import { getTimeEntries, getTimeEntriesByDateRange, createTimeEntry } from '@/lib/db-admin';
+import { createTimeEntry, countByOrg, queryTimeEntriesPaginated } from '@/lib/db-admin';
 import { TimeEntryCreateSchema, formatZodError } from '@/lib/validation';
 
 export async function GET(req: NextRequest) {
@@ -8,25 +8,20 @@ export async function GET(req: NextRequest) {
     const auth = await validateApiRequest(req, 'timeentries:read');
     if (!auth.valid) return auth.error!;
 
-    const { limit, offset } = parsePagination(req);
+    const { limit, cursor } = parsePagination(req);
     const url = new URL(req.url);
     const startDate = url.searchParams.get('startDate');
     const endDate = url.searchParams.get('endDate');
     const userId = url.searchParams.get('userId');
     const teamId = url.searchParams.get('teamId');
 
-    let entries: any[];
+    // Firestore-native cursor pagination with pushed filters
+    const [result, total] = await Promise.all([
+      queryTimeEntriesPaginated({ limit, cursor, startDate, endDate, userId, teamId }),
+      countByOrg('time-entries'),
+    ]);
 
-    if (startDate && endDate) {
-      entries = await getTimeEntriesByDateRange(startDate, endDate, userId || undefined) as any[];
-    } else {
-      entries = await getTimeEntries(teamId || undefined) as any[];
-    }
-
-    const total = entries.length;
-    const paginated = entries.slice(offset, offset + limit);
-
-    return apiResponse(paginated, { total, limit, offset });
+    return apiResponse(result.items, { total, limit, hasMore: result.hasMore, nextCursor: result.nextCursor });
   } catch {
     return apiError('Internal error', 500);
   }

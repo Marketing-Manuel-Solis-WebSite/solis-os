@@ -1,33 +1,28 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError, parsePagination } from '../middleware';
-import { getTasks, createTask } from '@/lib/db-admin';
+import { createTask, countByOrg, getCustomFieldDefs, queryTasksPaginated } from '@/lib/db-admin';
 import { queueEvent } from '@/lib/integrations-db-admin';
-import { TaskCreateSchema, formatZodError } from '@/lib/validation';
+import { TaskCreateSchema, formatZodError, validateCustomFieldValues } from '@/lib/validation';
+import { onTaskCreated } from '@/lib/automation-engine';
 
 export async function GET(req: NextRequest) {
   try {
     const auth = await validateApiRequest(req, 'tasks:read');
     if (!auth.valid) return auth.error!;
 
-    const { limit, offset } = parsePagination(req);
+    const { limit, cursor } = parsePagination(req);
     const url = new URL(req.url);
     const status = url.searchParams.get('status');
     const assignee = url.searchParams.get('assignee');
     const teamId = url.searchParams.get('teamId');
 
-    let tasks = await getTasks(teamId || undefined) as any[];
+    // Firestore-native cursor pagination with pushed filters
+    const [result, total] = await Promise.all([
+      queryTasksPaginated({ limit, cursor, status, teamId, assignee }),
+      countByOrg('tasks'),
+    ]);
 
-    // Filter deleted
-    tasks = tasks.filter((t: any) => !t.deleted);
-
-    // Apply filters
-    if (status) tasks = tasks.filter((t: any) => t.status === status);
-    if (assignee) tasks = tasks.filter((t: any) => t.assignees?.includes(assignee));
-
-    const total = tasks.length;
-    const paginated = tasks.slice(offset, offset + limit);
-
-    return apiResponse(paginated, { total, limit, offset });
+    return apiResponse(result.items, { total, limit, hasMore: result.hasMore, nextCursor: result.nextCursor });
   } catch {
     return apiError('Internal error', 500);
   }
@@ -45,6 +40,16 @@ export async function POST(req: NextRequest) {
     }
     const data = parsed.data;
 
+    // Validate custom fields against definitions (server-side enforcement)
+    if (data.customFields && Object.keys(data.customFields).length > 0) {
+      const fieldDefs = await getCustomFieldDefs();
+      const cfResult = validateCustomFieldValues(data.customFields, fieldDefs);
+      if (!cfResult.valid) {
+        return apiError(`Custom field validation failed: ${cfResult.errors.join('; ')}`, 400);
+      }
+      data.customFields = cfResult.sanitized;
+    }
+
     const docRef = await createTask({
       ...data,
       createdBy: `api:${auth.context!.keyRecord.prefix}`,
@@ -56,7 +61,10 @@ export async function POST(req: NextRequest) {
       entityId: docRef.id,
       entityType: 'task',
       payload: { title: data.title, status: data.status },
-    }).catch(() => {});
+    }).catch((err) => console.error('[TasksAPI] queue webhook event failed:', err));
+
+    // Trigger automation engine (fire-and-forget)
+    onTaskCreated(docRef.id, data).catch((err) => console.error('[TasksAPI] automation trigger failed:', err));
 
     return apiResponse({ id: docRef.id, ...data });
   } catch {

@@ -88,6 +88,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
 
     return response;
   } catch (err: any) {
+    console.error('[OAuth] callback failed:', err);
     return NextResponse.redirect(`${redirectUrl}?error=oauth_error`);
   }
 }

@@ -45,7 +45,7 @@ export async function processEventQueue(): Promise<ProcessResult> {
     } catch {
       result.failed++;
       // Still mark as processed to avoid infinite loops
-      try { await markEventProcessed(ev.id); } catch {}
+      try { await markEventProcessed(ev.id); } catch (markErr) { console.error('[EventDispatcher] failed to mark event processed:', markErr); }
     }
   }
 

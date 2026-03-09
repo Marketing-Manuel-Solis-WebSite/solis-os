@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateApiKey } from '@/lib/integrations-crypto';
 import { addApiKey } from '@/lib/integrations-db-admin';
-import { authenticateAdmin } from '@/lib/server-auth';
+import { requireAdmin } from '@/lib/server-auth';
 import { ApiKeyCreateSchema, formatZodError } from '@/lib/validation';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   try {
-    const authedUser = await authenticateAdmin(req);
-    if (!authedUser) {
-      return NextResponse.json({ error: 'Unauthorized – admin role required' }, { status: 403 });
+    const authedOrErr = await requireAdmin(req);
+    if (authedOrErr instanceof Response) return authedOrErr;
+    const authedUser = authedOrErr;
+
+    const rl = checkRateLimit('integrations', authedUser.uid, 30);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
     }
 
     const body = await req.json();
@@ -30,7 +35,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, raw, prefix });
-  } catch {
+  } catch (err) {
+    console.error('[Integrations] API key creation failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

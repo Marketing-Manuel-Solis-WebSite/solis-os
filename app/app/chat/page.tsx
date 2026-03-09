@@ -31,6 +31,7 @@ export default function ChatPage() {
   const [members, setMembers] = useState<any[]>([]);
   const [active, setActive] = useState<any>(null);
   const [msgs, setMsgs] = useState<any[]>([]);
+  const [msgsHasMore, setMsgsHasMore] = useState(false);
   const [msgsLoading, setMsgsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -67,16 +68,16 @@ export default function ChatPage() {
   // Load channels + members
   const loadChannels = useCallback(async () => {
     if (!user) return;
-    const [chs, mems] = await Promise.all([
+    const [chsResult, mems] = await Promise.all([
       // Admins/directors see ALL channels; others see only their channels
       canSeeAllTeams
-        ? getChannels('__all__').catch(() => [])
+        ? getChannels('__all__').catch(() => ({ items: [], hasMore: false }))
         : getAllUserChannels(user.uid),
       getMembers(),
     ]);
     setMembers(mems);
     // Sort: DMs last, then by lastMessage
-    const sorted = (chs as any[]).sort((a: any, b: any) => {
+    const sorted = (chsResult.items as any[]).sort((a: any, b: any) => {
       if (a.type === 'dm' && b.type !== 'dm') return 1;
       if (a.type !== 'dm' && b.type === 'dm') return -1;
       return (b.lastMessageAt?.seconds || 0) - (a.lastMessageAt?.seconds || 0);
@@ -92,8 +93,9 @@ export default function ChatPage() {
     if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
     if (!active) { setMsgs([]); setMsgsLoading(false); return; }
     setMsgsLoading(true);
-    const unsub = onMessagesSnapshot(active.id, (newMsgs) => {
+    const unsub = onMessagesSnapshot(active.id, (newMsgs, hasMore) => {
       setMsgs(newMsgs);
+      setMsgsHasMore(hasMore);
       setMsgsLoading(false);
     });
     unsubRef.current = unsub;
@@ -188,7 +190,7 @@ export default function ChatPage() {
         entityUrl: '/app/chat',
         actorId: user!.uid,
         actorName: me!.displayName,
-      }).catch(() => {});
+      }).catch((err) => console.error('[Chat] notify channel message failed:', err));
     }
 
     // Notify mentioned users separately
@@ -204,7 +206,7 @@ export default function ChatPage() {
           entityUrl: '/app/chat',
           actorId: user!.uid,
           actorName: me!.displayName,
-        }).catch(() => {});
+        }).catch((err) => console.error('[Chat] notify channel mention failed:', err));
       }
     }
 
@@ -260,7 +262,7 @@ export default function ChatPage() {
     setShowCreate(false);
     await loadChannels();
     // Select new channel
-    const all = await getAllUserChannels(user!.uid);
+    const { items: all } = await getAllUserChannels(user!.uid);
     const newest = (all as any[]).find(c => c.id === ch.id);
     if (newest) setActive(newest);
   };
@@ -408,6 +410,13 @@ export default function ChatPage() {
               onClearView={handleClearView}
               onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
             />
+            {msgsHasMore && !msgsLoading && (
+              <div className="px-5 py-2 text-center">
+                <span className="text-[12px] text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-3 py-1 rounded-full">
+                  Mostrando los últimos 100 mensajes
+                </span>
+              </div>
+            )}
             <MessageList
               messages={displayMsgs}
               members={members}

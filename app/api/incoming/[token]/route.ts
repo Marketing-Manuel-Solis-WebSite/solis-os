@@ -16,18 +16,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
     const bodyText = await req.text();
 
-    // Verify HMAC signature if secret is configured (fail-closed: reject if no signature provided)
-    if (webhook.secret) {
-      const signature = req.headers.get('x-webhook-signature') || req.headers.get('x-hub-signature-256') || '';
-      if (!signature || !verifySignature(webhook.secret, bodyText, signature)) {
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-      }
+    // Verify HMAC signature — fail-closed: always require secret + valid signature
+    if (!webhook.secret) {
+      return NextResponse.json(
+        { error: 'Webhook secret not configured. Please set a secret for this endpoint.' },
+        { status: 400 },
+      );
+    }
+    const signature = req.headers.get('x-webhook-signature') || req.headers.get('x-hub-signature-256') || '';
+    if (!signature || !verifySignature(webhook.secret, bodyText, signature)) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
     let payload: any;
     try {
       payload = JSON.parse(bodyText);
-    } catch {
+    } catch (err) {
+      console.error('[IncomingWebhook] JSON parse failed:', err);
       payload = { raw: bodyText };
     }
 
@@ -81,24 +86,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
           // Placeholder — automations are client-side in this app
           break;
       }
-    } catch {
+    } catch (err) {
       // Action failures shouldn't return errors to the sender
+      console.error('[IncomingWebhook] action execution failed:', err);
     }
 
     // Always return 200 quickly
     return NextResponse.json({ ok: true, received: true });
-  } catch {
+  } catch (err) {
+    console.error('[IncomingWebhook] request handling failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
+const BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 function extractField(payload: any, fieldPath?: string): string {
   if (!fieldPath || !payload) return '';
   const parts = fieldPath.split('.');
+  if (parts.length > 10) return ''; // prevent deep traversal
   let current = payload;
   for (const part of parts) {
-    if (current == null) return '';
+    if (current == null || BLOCKED_KEYS.has(part)) return '';
     current = current[part];
   }
-  return typeof current === 'string' ? current : (current != null ? String(current) : '');
+  return typeof current === 'string' ? current.slice(0, 2000) : (current != null ? String(current).slice(0, 2000) : '');
 }

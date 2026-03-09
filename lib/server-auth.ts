@@ -12,6 +12,11 @@ export interface VerifiedUser {
   role?: string;
 }
 
+export type AdminAuthResult =
+  | { status: 'authenticated'; user: VerifiedUser }
+  | { status: 'unauthenticated' }
+  | { status: 'forbidden' };
+
 /**
  * Extract Bearer token from Authorization header.
  */
@@ -50,11 +55,11 @@ export async function authenticateRequest(request: Request): Promise<VerifiedUse
 
 /**
  * Authenticate a request AND verify the user has an admin/owner role.
- * Returns the verified user with role, or null if not authenticated or not admin.
+ * Returns typed result distinguishing unauthenticated (401) from forbidden (403).
  */
-export async function authenticateAdmin(request: Request): Promise<VerifiedUser | null> {
+export async function authenticateAdmin(request: Request): Promise<AdminAuthResult> {
   const user = await authenticateRequest(request);
-  if (!user) return null;
+  if (!user) return { status: 'unauthenticated' };
 
   try {
     const memberDoc = await adminDb
@@ -62,13 +67,39 @@ export async function authenticateAdmin(request: Request): Promise<VerifiedUser 
       .doc(user.uid)
       .get();
 
-    if (!memberDoc.exists) return null;
+    if (!memberDoc.exists) return { status: 'forbidden' };
 
     const role = memberDoc.data()?.role as string | undefined;
-    if (role !== 'admin' && role !== 'owner') return null;
+    if (role !== 'admin' && role !== 'owner') return { status: 'forbidden' };
 
-    return { ...user, role };
+    return { status: 'authenticated', user: { ...user, role } };
   } catch {
-    return null;
+    return { status: 'unauthenticated' };
   }
+}
+
+/**
+ * Helper: return the appropriate NextResponse for a failed AdminAuthResult.
+ * Returns null if authenticated (caller should proceed).
+ * Acts as a type guard: after `if (adminAuthError(auth)) return ...`, auth is narrowed.
+ */
+export function adminAuthError(result: AdminAuthResult): Response | null {
+  if (result.status === 'authenticated') return null;
+  if (result.status === 'unauthenticated') {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return Response.json({ error: 'Admin role required' }, { status: 403 });
+}
+
+/**
+ * Convenience: authenticate admin and return user directly, or a Response error.
+ * Callers: `const r = await requireAdmin(req); if (r instanceof Response) return r;`
+ * After the guard, `r` is typed as `VerifiedUser`.
+ */
+export async function requireAdmin(request: Request): Promise<VerifiedUser | Response> {
+  const result = await authenticateAdmin(request);
+  if (result.status !== 'authenticated') {
+    return adminAuthError(result)!;
+  }
+  return result.user;
 }

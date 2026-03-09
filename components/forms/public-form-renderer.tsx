@@ -1,5 +1,5 @@
 'use client';
-import { useState, FormEvent } from 'react';
+import { useState, useRef, FormEvent } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
 import type { FormDocument } from './constants';
 import FormFieldRenderer from './form-field-renderer';
@@ -20,6 +20,9 @@ export default function PublicFormRenderer({ form }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [consent, setConsent] = useState(false);
+  // Anti-bot: honeypot field + form load timestamp
+  const [honeypot, setHoneypot] = useState('');
+  const loadedAtRef = useRef(Date.now());
 
   const visibleFields = form.fields.filter(f => evaluateCondition(f.conditionalOn, values));
 
@@ -31,6 +34,10 @@ export default function PublicFormRenderer({ form }: Props) {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitError('');
+
+    // Anti-bot: reject if honeypot filled or submitted faster than 2 seconds
+    if (honeypot) return;
+    if (Date.now() - loadedAtRef.current < 2000) return;
 
     if (form.consentRequired && !consent) {
       setSubmitError(t('publicForm.consentRequired'));
@@ -76,6 +83,8 @@ export default function PublicFormRenderer({ form }: Props) {
           utmMedium: getParam('utm_medium'),
           utmCampaign: getParam('utm_campaign'),
           referrer: typeof document !== 'undefined' ? document.referrer : '',
+          _hp: honeypot,
+          _ts: loadedAtRef.current,
         }),
       });
 
@@ -113,6 +122,11 @@ export default function PublicFormRenderer({ form }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-0">
+      {/* Honeypot field — hidden from humans, filled by bots */}
+      <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, height: 0, overflow: 'hidden' }}>
+        <label htmlFor="website_url">Website</label>
+        <input id="website_url" name="website_url" type="text" tabIndex={-1} autoComplete="off" value={honeypot} onChange={e => setHoneypot(e.target.value)} />
+      </div>
       {/* Header */}
       <div className="px-7 pt-7 pb-5">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">{form.title}</h1>

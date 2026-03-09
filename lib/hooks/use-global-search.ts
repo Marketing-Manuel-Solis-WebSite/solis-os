@@ -36,12 +36,13 @@ export function useGlobalSearch() {
       return cacheRef.current;
     }
 
-    const [tasks, docs, channels, goals, forms] = await Promise.all([
-      can('task', 'read') ? getTasks() : Promise.resolve([]),
-      can('doc', 'read') ? getDocuments() : Promise.resolve([]),
-      can('channel', 'read') ? getChannels() : Promise.resolve([]),
-      can('goal', 'read') ? getGoals() : Promise.resolve([]),
-      can('form', 'read') ? getForms() : Promise.resolve([]),
+    const empty = { items: [] as any[], hasMore: false };
+    const [tasksR, docsR, channelsR, goalsR, formsR] = await Promise.all([
+      can('task', 'read') ? getTasks() : Promise.resolve(empty),
+      can('doc', 'read') ? getDocuments() : Promise.resolve(empty),
+      can('channel', 'read') ? getChannels() : Promise.resolve(empty),
+      can('goal', 'read') ? getGoals() : Promise.resolve(empty),
+      can('form', 'read') ? getForms() : Promise.resolve(empty),
     ]);
 
     // Apply RBAC visibility filtering — only include resources the user can see
@@ -55,12 +56,12 @@ export function useGlobalSearch() {
     };
 
     const cache: SearchCache = {
-      tasks: filterVisible(tasks as any[]),
-      docs: filterVisible(docs as any[]),
-      channels: filterVisible(channels as any[]),
-      goals: filterVisible(goals as any[]),
+      tasks: filterVisible(tasksR.items),
+      docs: filterVisible(docsR.items),
+      channels: filterVisible(channelsR.items),
+      goals: filterVisible(goalsR.items),
       members: (allMembers || []).filter((m: any) => m.active !== false),
-      forms: filterVisible(forms as any[]),
+      forms: filterVisible(formsR.items),
       loadedAt: now,
     };
     cacheRef.current = cache;

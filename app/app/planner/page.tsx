@@ -28,6 +28,7 @@ export default function PlannerPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
 
   // View state
   const [view, setView] = useState<PlannerView>('calendar');
@@ -41,7 +42,7 @@ export default function PlannerPage() {
 
   // Load data
   const load = useCallback(async () => {
-    const [tasksData, m] = await Promise.all([getTasks(activeTeamId), getMembers()]);
+    const [{ items: tasksData, hasMore: more }, m] = await Promise.all([getTasks(activeTeamId), getMembers()]);
     const visible = (tasksData as any[]).filter(task => !task.deleted && canSeeResource({
       teamId: task.teamId,
       createdBy: task.createdBy,
@@ -49,6 +50,7 @@ export default function PlannerPage() {
       assignees: task.assignees,
     }));
     setTasks(visible as Task[]);
+    setHasMore(more);
     setMembers(activeTeamId === '__all__' ? m : m.filter((x: any) => x.teamId === activeTeamId || x.teamIds?.includes(activeTeamId)));
     setLoading(false);
   }, [activeTeamId, canSeeResource]);
@@ -113,7 +115,7 @@ export default function PlannerPage() {
         type: 'task_assigned', title: t('tasks.assigned', { name: me!.displayName }),
         message: data.title || t('tasks.newTaskNotif'), entityType: 'task', entityId: taskRef.id,
         entityUrl: '/app/planner', actorId: user!.uid, actorName: me!.displayName,
-      }).catch(() => {});
+      }).catch((err) => console.error('[Planner] notify task assigned failed:', err));
     }
     setShowCreate(false);
     load();
@@ -122,7 +124,7 @@ export default function PlannerPage() {
   const doUpdate = async (id: string, field: string, val: any, old?: any) => {
     if (!can('task', 'update')) return;
     await updateTask(id, { [field]: val });
-    try { await addTaskActivity(id, { action: t('planner.activityUpdated'), field, from: String(old || ''), to: String(val), actorId: user!.uid, actorName: me!.displayName }); } catch {}
+    try { await addTaskActivity(id, { action: t('planner.activityUpdated'), field, from: String(old || ''), to: String(val), actorId: user!.uid, actorName: me!.displayName }); } catch (err) { console.error('[Planner] add task activity failed:', err); }
     if (field === 'assignees' && Array.isArray(val) && Array.isArray(old)) {
       const newAssignees = val.filter((uid: string) => !old.includes(uid) && uid !== user!.uid);
       const task = tasks.find(t => t.id === id);
@@ -131,7 +133,7 @@ export default function PlannerPage() {
           type: 'task_assigned', title: t('tasks.assignedTo', { name: me!.displayName }),
           message: task?.title || t('tasks.updated'), entityType: 'task', entityId: id,
           entityUrl: '/app/planner', actorId: user!.uid, actorName: me!.displayName,
-        }).catch(() => {});
+        }).catch((err) => console.error('[Planner] notify task reassigned failed:', err));
       }
     }
     load();
@@ -206,6 +208,15 @@ export default function PlannerPage() {
           </AnimatePresence>
         )}
       </div>
+
+      {/* Has More indicator */}
+      {hasMore && !loading && (
+        <div className="px-6 py-2 text-center border-t border-[var(--border-primary)]">
+          <span className="text-[13px] text-[var(--text-muted)]">
+            {t('common.showingItems', { n: tasks.length })} — {t('common.moreAvailable')}
+          </span>
+        </div>
+      )}
 
       {/* Detail Drawer */}
       <AnimatePresence>

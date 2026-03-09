@@ -223,9 +223,24 @@ export async function POST(request: NextRequest) {
   try {
     // Verify the caller is authenticated
     const { authenticateRequest } = await import('@/lib/server-auth');
+    const { checkRateLimit } = await import('@/lib/rate-limit');
     const authedUser = await authenticateRequest(request);
     if (!authedUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Verify the user has at least 'member' role — guests and readonly cannot use AI
+    const { adminDb: _adminDb } = await import('@/lib/firebase-admin');
+    const memberSnap = await _adminDb.collection('orgs/solis-center/members').doc(authedUser.uid).get();
+    const userRole = memberSnap.data()?.role as string | undefined;
+    const BLOCKED_ROLES = ['guest', 'readonly'];
+    if (!memberSnap.exists || !userRole || BLOCKED_ROLES.includes(userRole)) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    }
+
+    const rl = checkRateLimit('ai', authedUser.uid, 20);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Please wait a minute.' }, { status: 429 });
     }
 
     const body = await request.json();
@@ -235,9 +250,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Question required' }, { status: 400 });
     }
 
+    const VALID_MODES = ['chat', 'research', 'deep'];
+    if (!VALID_MODES.includes(mode)) {
+      return NextResponse.json({ error: `Invalid mode. Use: ${VALID_MODES.join(', ')}` }, { status: 400 });
+    }
+
     const key = process.env.GEMINI_API_KEY;
     if (!key) {
-      return NextResponse.json({ error: 'Gemini API key not configured. Add GEMINI_API_KEY to your .env file.' }, { status: 500 });
+      return NextResponse.json({ error: 'AI service not available' }, { status: 503 });
     }
 
     const genAI = new GoogleGenerativeAI(key);

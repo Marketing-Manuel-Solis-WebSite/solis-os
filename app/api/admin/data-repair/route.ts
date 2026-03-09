@@ -1,11 +1,12 @@
 // ================================================================
 // Admin Data Repair API — POST /api/admin/data-repair
 // Requires authenticated admin user.
-// Body: { action: 'report' | 'repair' | 'clean_relations' | 'repair_goals' | 'clean_subcollections' | 'clean_presence' }
+// Body: { action: 'report' | 'repair' | 'clean_relations' | 'repair_goals' | 'clean_subcollections' | 'clean_presence' | 'clean_time_entries' | 'clean_whiteboard_refs' }
 // ================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateAdmin } from '@/lib/server-auth';
+import { requireAdmin } from '@/lib/server-auth';
+import { checkRateLimit } from '@/lib/rate-limit';
 import {
   runIntegrityReport,
   runFullRepair,
@@ -13,9 +14,11 @@ import {
   repairBrokenGoalTargetLinks,
   cleanOrphanedTaskSubcollections,
   cleanStalePresence,
+  cleanOrphanedTimeEntries,
+  cleanStaleWhiteboardTaskRefs,
 } from '@/lib/data-repair';
 
-const VALID_ACTIONS = ['report', 'repair', 'clean_relations', 'repair_goals', 'clean_subcollections', 'clean_presence'] as const;
+const VALID_ACTIONS = ['report', 'repair', 'clean_relations', 'repair_goals', 'clean_subcollections', 'clean_presence', 'clean_time_entries', 'clean_whiteboard_refs'] as const;
 type RepairAction = typeof VALID_ACTIONS[number];
 
 function apiOk(data: any) { return NextResponse.json(data, { status: 200 }); }
@@ -23,14 +26,20 @@ function apiErr(msg: string, status = 500) { return NextResponse.json({ error: m
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await authenticateAdmin(req);
-    if (!user) return apiErr('Unauthorized – admin role required', 403);
+    const authedOrErr = await requireAdmin(req);
+    if (authedOrErr instanceof Response) return authedOrErr;
+    const authedUser = authedOrErr;
+
+    const rl = checkRateLimit('data-repair', authedUser.uid, 10);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
+    }
 
     const body = await req.json();
     const action = body?.action as string;
 
     if (!action || !VALID_ACTIONS.includes(action as RepairAction)) {
-      return apiErr(`Unknown action: "${action ?? ''}". Use: ${VALID_ACTIONS.join(', ')}`, 400);
+      return apiErr(`Unknown action. Use: ${VALID_ACTIONS.join(', ')}`, 400);
     }
 
     switch (action as RepairAction) {
@@ -46,8 +55,13 @@ export async function POST(req: NextRequest) {
         return apiOk({ result: await cleanOrphanedTaskSubcollections() });
       case 'clean_presence':
         return apiOk({ result: await cleanStalePresence() });
+      case 'clean_time_entries':
+        return apiOk({ result: await cleanOrphanedTimeEntries() });
+      case 'clean_whiteboard_refs':
+        return apiOk({ result: await cleanStaleWhiteboardTaskRefs() });
     }
-  } catch {
+  } catch (err) {
+    console.error('[DataRepair] operation failed:', err);
     return apiErr('Internal error', 500);
   }
 }

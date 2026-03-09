@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWebhookSecret, generateEndpointToken } from '@/lib/integrations-crypto';
 import { addIncomingWebhook } from '@/lib/integrations-db-admin';
-import { authenticateAdmin } from '@/lib/server-auth';
+import { requireAdmin } from '@/lib/server-auth';
 import { IncomingWebhookCreateSchema, formatZodError } from '@/lib/validation';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest) {
   try {
-    const authedUser = await authenticateAdmin(req);
-    if (!authedUser) {
-      return NextResponse.json({ error: 'Unauthorized – admin role required' }, { status: 403 });
+    const authedOrErr = await requireAdmin(req);
+    if (authedOrErr instanceof Response) return authedOrErr;
+    const authedUser = authedOrErr;
+
+    const rl = checkRateLimit('integrations', authedUser.uid, 30);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
     }
 
     const body = await req.json();
@@ -32,7 +37,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, id: ref.id, token });
-  } catch {
+  } catch (err) {
+    console.error('[Integrations] incoming webhook creation failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

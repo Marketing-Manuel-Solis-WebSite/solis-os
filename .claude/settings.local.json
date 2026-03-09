@@ -25,7 +25,8 @@
       "Bash(do echo \"=== $f ===\")",
       "Read(//c/Users/Carlos Anaya Ruiz/solis-os/**)",
       "Bash(done)",
-      "Bash(for f in app/api/webhooks/*/route.ts)"
+      "Bash(for f in app/api/webhooks/*/route.ts)",
+      "Bash(find:*)"
     ]
   }
 }

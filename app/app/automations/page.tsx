@@ -82,6 +82,7 @@ export default function AutomationsPage() {
   const { t } = useI18n();
   const [rules, setRules] = useState<AutoRule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
   const [editingRule, setEditingRule] = useState<AutoRule | null>(null);
   const [search, setSearch] = useState('');
@@ -90,8 +91,9 @@ export default function AutomationsPage() {
   const canManage = can('automation', 'create');
 
   const load = useCallback(async () => {
-    const r = await getAutomations(activeTeamId);
+    const { items: r, hasMore: more } = await getAutomations(activeTeamId);
     setRules(r as AutoRule[]);
+    setHasMore(more);
     setLoading(false);
   }, [activeTeamId]);
 
@@ -142,6 +144,15 @@ export default function AutomationsPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
+      {/* Engine status banner */}
+      <div className="mb-6 p-4 rounded-xl bg-emerald-500/[0.06] border border-emerald-500/20 flex items-start gap-3 anim-slide">
+        <Zap className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-emerald-400">{t('automations.engineActiveTitle')}</p>
+          <p className="text-[13px] text-[var(--text-muted)] mt-1">{t('automations.engineActiveDesc')}</p>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6 anim-slide">
         <div>
@@ -277,6 +288,15 @@ export default function AutomationsPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Has More indicator */}
+      {hasMore && !loading && (
+        <div className="text-center py-4 mt-2">
+          <span className="text-[13px] text-[var(--text-muted)]">
+            {t('common.showingItems', { n: rules.length })} — {t('common.moreAvailable')}
+          </span>
         </div>
       )}
 

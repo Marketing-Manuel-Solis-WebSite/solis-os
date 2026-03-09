@@ -17,6 +17,7 @@ export default function WhiteboardsPage() {
 
   const [boards, setBoards] = useState<Whiteboard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [editBoard, setEditBoard] = useState<Whiteboard | null>(null);
   const [activeBoard, setActiveBoard] = useState<Whiteboard | null>(null);
@@ -24,8 +25,9 @@ export default function WhiteboardsPage() {
 
   const loadBoards = useCallback(async () => {
     setLoading(true);
-    const data = await getWhiteboards(activeTeamId === '__all__' ? undefined : activeTeamId);
+    const { items: data, hasMore: more } = await getWhiteboards(activeTeamId === '__all__' ? undefined : activeTeamId);
     setBoards(data as Whiteboard[]);
+    setHasMore(more);
     setLoading(false);
   }, [activeTeamId]);
 
@@ -123,6 +125,15 @@ export default function WhiteboardsPage() {
             setMenuBoard(menuBoard === board.id ? null : board.id);
           }}
         />
+      )}
+
+      {/* Has More indicator */}
+      {hasMore && !loading && (
+        <div className="text-center py-4 mt-2">
+          <span className="text-[13px] text-[var(--text-muted)]">
+            {t('common.showingItems', { n: boards.length })} — {t('common.moreAvailable')}
+          </span>
+        </div>
       )}
 
       {/* Context menus */}

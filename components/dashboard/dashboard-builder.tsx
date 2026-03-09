@@ -36,18 +36,18 @@ export default function DashboardBuilder({ dashboard, editing, isAdmin, onEditin
 
     const updated = [...dashboard.widgets, newWidget];
     onUpdate(updated);
-    saveDashboard(dashboard.id, { widgets: updated }).catch(() => {});
+    saveDashboard(dashboard.id, { widgets: updated }).catch((err) => console.error('[Dashboard] save widget add failed:', err));
   }, [dashboard, onUpdate]);
 
   const handleReset = useCallback(() => {
     const defaults = isAdmin ? ADMIN_DEFAULT_WIDGETS : DEFAULT_WIDGETS;
     onUpdate(defaults);
-    saveDashboard(dashboard.id, { widgets: defaults }).catch(() => {});
+    saveDashboard(dashboard.id, { widgets: defaults }).catch((err) => console.error('[Dashboard] save widget reset failed:', err));
     onEditingChange(false);
   }, [dashboard.id, isAdmin, onUpdate, onEditingChange]);
 
   const handleSave = useCallback(() => {
-    saveDashboard(dashboard.id, { widgets: dashboard.widgets }).catch(() => {});
+    saveDashboard(dashboard.id, { widgets: dashboard.widgets }).catch((err) => console.error('[Dashboard] save widgets failed:', err));
     onEditingChange(false);
   }, [dashboard, onEditingChange]);
 

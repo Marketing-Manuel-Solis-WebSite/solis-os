@@ -95,13 +95,13 @@ export default function Admin() {
         {s === 'users' && <UsersS />}
         {s === 'departments' && <DepartmentsS />}
         {s === 'perms' && <PermsS />}
-        {s === 'struct' && <CrudS label="Workspaces" fields={['name', 'description']} gFn={getWorkspaces} cFn={createWorkspace} dFn={deleteWorkspace} />}
+        {s === 'struct' && <CrudS label={t('admin.structure')} fields={['name', 'description']} gFn={getWorkspaces} cFn={createWorkspace} dFn={deleteWorkspace} />}
         {s === 'fields' && <div className="p-6"><CustomFieldManager /></div>}
-        {s === 'tpl' && <CrudS label="Templates" fields={['name', 'type', 'content']} gFn={getTemplates} cFn={createTemplate} dFn={deleteTemplate} />}
-        {s === 'auto' && <CrudS label="Automations" fields={['name', 'trigger', 'action']} gFn={getAutomations} cFn={createAutomation} dFn={deleteAutomation} />}
-        {s === 'notif' && <SetS k="notifications" label="Notifications" fs={['dailyDigest', 'weeklyReport', 'overdueAlerts', 'fromName', 'replyTo']} />}
-        {s === 'ai' && <SetS k="ai" label="AI Config" fs={['summariesEnabled', 'qaEnabled', 'forecastEnabled', 'contextLimit', 'maxReqPerHour']} />}
-        {s === 'integ' && <SetS k="integrations" label="Integrations" fs={['whatsappEnabled', 'instagramEnabled', 'messengerEnabled', 'tiktokEnabled', 'webhookSecret']} />}
+        {s === 'tpl' && <CrudS label={t('admin.templates')} fields={['name', 'type', 'content']} gFn={getTemplates} cFn={createTemplate} dFn={deleteTemplate} />}
+        {s === 'auto' && <CrudS label={t('admin.automations')} fields={['name', 'trigger', 'action']} gFn={getAutomations} cFn={createAutomation} dFn={deleteAutomation} />}
+        {s === 'notif' && <SetS k="notifications" label={t('admin.notifications')} fs={['dailyDigest', 'weeklyReport', 'overdueAlerts', 'fromName', 'replyTo']} />}
+        {s === 'ai' && <SetS k="ai" label={t('admin.aiConfig')} fs={['summariesEnabled', 'qaEnabled', 'forecastEnabled', 'contextLimit', 'maxReqPerHour']} />}
+        {s === 'integ' && <SetS k="integrations" label={t('admin.integrations')} fs={['whatsappEnabled', 'instagramEnabled', 'messengerEnabled', 'tiktokEnabled', 'webhookSecret']} />}
         {s === 'audit' && <AuditS />}
       </div>
     </div>
@@ -158,7 +158,7 @@ function DepartmentsS() {
     setShowNew(false);
     await load();
     await refreshTeams();
-    toast.success('Departamento creado', form.name);
+    toast.success(t('admin.deptCreated'), form.name);
   };
 
   const handleUpdate = async () => {
@@ -169,7 +169,7 @@ function DepartmentsS() {
     setForm({ name: '', color: '#6B7280', icon: '📁', description: '' });
     await load();
     await refreshTeams();
-    toast.success('Departamento actualizado', form.name);
+    toast.success(t('admin.deptUpdated'), form.name);
   };
 
   const handleArchive = async (dept: Team) => {
@@ -177,7 +177,7 @@ function DepartmentsS() {
     await logAction({ action: 'archived', resource: 'department', detail: dept.name, actorId: user!.uid, actorName: me!.displayName });
     await load();
     await refreshTeams();
-    toast.success('Departamento archivado', dept.name);
+    toast.success(t('admin.deptArchived'), dept.name);
   };
 
   const handleUnarchive = async (dept: Team) => {
@@ -185,7 +185,7 @@ function DepartmentsS() {
     await logAction({ action: 'unarchived', resource: 'department', detail: dept.name, actorId: user!.uid, actorName: me!.displayName });
     await load();
     await refreshTeams();
-    toast.success('Departamento restaurado', dept.name);
+    toast.success(t('admin.deptRestored'), dept.name);
   };
 
   const openDeleteModal = async (dept: Team) => {
@@ -205,11 +205,11 @@ function DepartmentsS() {
   const executeDelete = async () => {
     if (!deleteTarget) return;
     if (confirmText !== deleteTarget.name) {
-      toast.warning('Confirmacion requerida', 'Escribe el nombre del departamento para confirmar.');
+      toast.warning(t('admin.confirmRequired'), t('admin.confirmDeptDelete'));
       return;
     }
     if (deleteMode === 'reassign' && !reassignToId) {
-      toast.warning('Selecciona destino', 'Debes seleccionar un departamento destino para reasignar.');
+      toast.warning(t('admin.selectTarget'), t('admin.selectTargetMsg'));
       return;
     }
     setDeleting(true);
@@ -224,13 +224,13 @@ function DepartmentsS() {
       }
       await deleteTeam(deleteTarget.id);
       await logAction({ action: 'deleted', resource: 'department', detail: deleteTarget.name, actorId: user!.uid, actorName: me!.displayName });
-      toast.success('Departamento eliminado', deleteTarget.name);
+      toast.success(t('admin.deptDeleted'), deleteTarget.name);
       setDeleteTarget(null);
       await load();
       await refreshTeams();
       await refreshMembers();
     } catch (err: any) {
-      toast.error('Error', err?.message || 'No se pudo eliminar el departamento.');
+      toast.error(t('admin.error'), err?.message || t('admin.deptDeleteError'));
     }
     setDeleting(false);
   };
@@ -264,9 +264,9 @@ function DepartmentsS() {
   };
 
   const IMPACT_LABELS: Record<string, string> = {
-    tasks: 'Tareas', goals: 'Objetivos', docs: 'Documentos', channels: 'Canales',
-    forms: 'Formularios', 'time-entries': 'Registros de tiempo', whiteboards: 'Pizarras',
-    automations: 'Automatizaciones', primaryMembers: 'Miembros (primario)', secondaryMembers: 'Miembros (secundario)',
+    tasks: t('admin.impactTasks'), goals: t('admin.impactGoals'), docs: t('admin.impactDocs'), channels: t('admin.impactChannels'),
+    forms: t('admin.impactForms'), 'time-entries': t('admin.impactTimeEntries'), whiteboards: t('admin.impactWhiteboards'),
+    automations: t('admin.impactAutomations'), primaryMembers: t('admin.impactPrimaryMembers'), secondaryMembers: t('admin.impactSecondaryMembers'),
   };
 
   if (loading) return <Sk />;
@@ -275,12 +275,12 @@ function DepartmentsS() {
     <div className="p-6 max-w-5xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl font-bold text-[var(--text-primary)]">Departamentos</h2>
-          <p className="text-sm text-[var(--text-muted)] mt-1">{activeDepts.length} activos · {archivedDepts.length} archivados · {members.length} miembros</p>
+          <h2 className="text-xl font-bold text-[var(--text-primary)]">{t('admin.departmentsTitle')}</h2>
+          <p className="text-sm text-[var(--text-muted)] mt-1">{t('admin.deptSummary', { active: activeDepts.length, archived: archivedDepts.length, members: members.length })}</p>
         </div>
         <button onClick={() => { setShowNew(true); setEditId(null); setForm({ name: '', color: '#6B7280', icon: '📁', description: '' }); }}
           className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2">
-          <Plus className="h-4 w-4" /> Nuevo Departamento
+          <Plus className="h-4 w-4" /> {t('admin.newDepartment')}
         </button>
       </div>
 
@@ -289,22 +289,22 @@ function DepartmentsS() {
         <div className="mb-6 p-5 rounded-lg border border-[var(--accent)]/20 bg-[var(--bg-elevated)] space-y-4 anim-fade">
           <div className="flex items-center gap-2 mb-1">
             <FolderOpen className="h-4 w-4 text-[var(--accent)]" />
-            <span className="text-sm font-semibold text-[var(--text-primary)]">{editId ? 'Editar Departamento' : 'Nuevo Departamento'}</span>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">{editId ? t('admin.editDepartment') : t('admin.newDepartment')}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Nombre *</label>
-              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Nombre del departamento" className="input-dark" autoFocus />
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('admin.nameLabel')}</label>
+              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder={t('admin.deptNamePlaceholder')} className="input-dark" autoFocus />
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Descripcion</label>
-              <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="¿Que hace este equipo?" className="input-dark" />
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('admin.descriptionLabel')}</label>
+              <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder={t('admin.deptDescPlaceholder')} className="input-dark" />
             </div>
           </div>
 
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Icono</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('admin.iconLabel')}</label>
             <div className="flex gap-1.5 flex-wrap">
               {ICONS.map(ic => (
                 <button key={ic} onClick={() => setForm({ ...form, icon: ic })}
@@ -316,7 +316,7 @@ function DepartmentsS() {
           </div>
 
           <div>
-            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Color</label>
+            <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('admin.colorLabel')}</label>
             <div className="flex gap-1.5 flex-wrap items-center">
               {COLORS.map(c => (
                 <button key={c} onClick={() => setForm({ ...form, color: c })}
@@ -333,17 +333,17 @@ function DepartmentsS() {
           <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-base)]">
             <span className="text-lg">{form.icon}</span>
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: form.color }} />
-            <span className="text-sm font-semibold" style={{ color: form.color }}>{form.name || 'Vista previa'}</span>
+            <span className="text-sm font-semibold" style={{ color: form.color }}>{form.name || t('admin.preview')}</span>
             <span className="text-sm text-[var(--text-muted)]">{form.description}</span>
           </div>
 
           <div className="flex gap-2">
             {editId ? (
-              <button onClick={handleUpdate} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">Actualizar</button>
+              <button onClick={handleUpdate} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">{t('admin.update')}</button>
             ) : (
-              <button onClick={handleCreate} disabled={!form.name.trim()} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40">Crear</button>
+              <button onClick={handleCreate} disabled={!form.name.trim()} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40">{t('admin.create')}</button>
             )}
-            <button onClick={() => { setShowNew(false); setEditId(null); }} className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">Cancelar</button>
+            <button onClick={() => { setShowNew(false); setEditId(null); }} className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">{t('admin.cancel')}</button>
           </div>
         </div>
       )}
@@ -364,26 +364,26 @@ function DepartmentsS() {
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold" style={{ color: dept.color }}>{dept.name}</p>
                     <span className="text-[12px] px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor: `${dept.color}15`, color: dept.color, border: `1px solid ${dept.color}25` }}>
-                      {deptMembers.length} miembro{deptMembers.length !== 1 ? 's' : ''}
+                      {t('admin.memberCount', { count: deptMembers.length, plural: deptMembers.length !== 1 ? 's' : '' })}
                     </span>
                   </div>
-                  <p className="text-sm text-[var(--text-muted)] mt-0.5">{dept.description || 'Sin descripcion'}</p>
+                  <p className="text-sm text-[var(--text-muted)] mt-0.5">{dept.description || t('admin.noDescription')}</p>
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => setAssignDeptId(isAssigning ? null : dept.id)}
                     className={`p-2 rounded-lg transition ${isAssigning ? 'bg-emerald-500/10 text-emerald-400' : 'text-[var(--text-muted)] hover:text-emerald-400 hover:bg-emerald-500/10'}`}
-                    title="Asignar miembros">
+                    title={t('admin.assignMembers')}>
                     <UserPlus className="h-4 w-4" />
                   </button>
-                  <button onClick={() => startEdit(dept)} className="p-2 text-[var(--text-muted)] hover:text-blue-400 rounded-lg transition" title="Editar">
+                  <button onClick={() => startEdit(dept)} className="p-2 text-[var(--text-muted)] hover:text-blue-400 rounded-lg transition" title={t('admin.edit')}>
                     <Edit2 className="h-4 w-4" />
                   </button>
-                  <button onClick={() => handleArchive(dept)} className="p-2 text-[var(--text-muted)] hover:text-amber-400 rounded-lg transition" title="Archivar">
+                  <button onClick={() => handleArchive(dept)} className="p-2 text-[var(--text-muted)] hover:text-amber-400 rounded-lg transition" title={t('admin.archive')}>
                     <Archive className="h-4 w-4" />
                   </button>
                   <button onClick={() => openDeleteModal(dept)}
                     className="p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition opacity-0 group-hover:opacity-100"
-                    title="Eliminar">
+                    title={t('admin.delete')}>
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -401,7 +401,7 @@ function DepartmentsS() {
                         <span className="text-[12px] px-1.5 py-0.5 rounded-md bg-[var(--bg-elevated)] text-[var(--text-muted)]">{m.role}</span>
                         <button onClick={() => handleRemoveFromDept(m.id)}
                           className="opacity-0 group-hover/member:opacity-100 p-0.5 text-[var(--text-muted)] hover:text-red-400 transition"
-                          title="Quitar del departamento">
+                          title={t('admin.removeFromDept')}>
                           <X className="h-3 w-3" />
                         </button>
                       </div>
@@ -412,9 +412,9 @@ function DepartmentsS() {
 
               {isAssigning && (
                 <div className="px-5 pb-4 border-t border-[var(--accent)]/20 bg-[var(--accent-subtle)]">
-                  <p className="text-[12px] text-[var(--accent)] uppercase font-semibold tracking-wider py-3">Asignar Miembros a {dept.name}</p>
+                  <p className="text-[12px] text-[var(--accent)] uppercase font-semibold tracking-wider py-3">{t('admin.assignMembersTo', { name: dept.name })}</p>
                   {members.filter((m: any) => m.teamId !== dept.id).length === 0 ? (
-                    <p className="text-sm text-[var(--text-muted)] pb-2">Todos los miembros ya estan en este departamento.</p>
+                    <p className="text-sm text-[var(--text-muted)] pb-2">{t('admin.allMembersAssigned')}</p>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {members.filter((m: any) => m.teamId !== dept.id).map((m: any) => (
@@ -447,7 +447,7 @@ function DepartmentsS() {
           <button onClick={() => setShowArchived(!showArchived)}
             className="flex items-center gap-2 text-sm font-semibold text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition mb-4">
             <Archive className="h-4 w-4" />
-            Departamentos Archivados ({archivedDepts.length})
+            {t('admin.archivedDepartments', { count: archivedDepts.length })}
             <ChevronRight className={`h-4 w-4 transition-transform ${showArchived ? 'rotate-90' : ''}`} />
           </button>
           {showArchived && (
@@ -463,17 +463,17 @@ function DepartmentsS() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-semibold text-[var(--text-muted)]">{dept.name}</p>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-semibold border border-amber-500/20">ARCHIVADO</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-semibold border border-amber-500/20">{t('admin.archivedBadge')}</span>
                           {deptMembers.length > 0 && (
-                            <span className="text-[11px] text-[var(--text-muted)]">{deptMembers.length} miembro{deptMembers.length !== 1 ? 's' : ''}</span>
+                            <span className="text-[11px] text-[var(--text-muted)]">{t('admin.memberCount', { count: deptMembers.length, plural: deptMembers.length !== 1 ? 's' : '' })}</span>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => handleUnarchive(dept)} className="p-2 text-[var(--text-muted)] hover:text-emerald-400 rounded-lg transition" title="Restaurar">
+                        <button onClick={() => handleUnarchive(dept)} className="p-2 text-[var(--text-muted)] hover:text-emerald-400 rounded-lg transition" title={t('admin.restore')}>
                           <ArchiveRestore className="h-4 w-4" />
                         </button>
-                        <button onClick={() => openDeleteModal(dept)} className="p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition" title="Eliminar permanentemente">
+                        <button onClick={() => openDeleteModal(dept)} className="p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition" title={t('admin.deletePermanently')}>
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -494,9 +494,9 @@ function DepartmentsS() {
           <div className="mt-6 rounded-lg border border-amber-500/20 bg-amber-500/5 p-5 anim-slide" style={{ animationDelay: `${activeDepts.length * 40 + 100}ms` }}>
             <div className="flex items-center gap-2 mb-3">
               <AlertTriangle className="h-4 w-4 text-amber-400" />
-              <span className="text-sm font-semibold text-amber-400">Miembros Sin Asignar ({unassigned.length})</span>
+              <span className="text-sm font-semibold text-amber-400">{t('admin.unassignedMembers', { count: unassigned.length })}</span>
             </div>
-            <p className="text-sm text-[var(--text-muted)] mb-3">Estos miembros aun no han sido asignados a ningun departamento.</p>
+            <p className="text-sm text-[var(--text-muted)] mb-3">{t('admin.unassignedMsg')}</p>
             <div className="flex flex-wrap gap-2">
               {unassigned.map((m: any) => (
                 <div key={m.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-tertiary)]">
@@ -508,7 +508,7 @@ function DepartmentsS() {
                     onChange={e => { if (e.target.value) handleAssignMember(m.id, e.target.value); }}
                     value=""
                     className="select-dark h-7 text-[12px] px-2 ml-1">
-                    <option value="">Asignar a...</option>
+                    <option value="">{t('admin.assignTo')}</option>
                     {activeDepts.map(d => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
                   </select>
                 </div>
@@ -529,7 +529,7 @@ function DepartmentsS() {
                   <Trash2 className="h-5 w-5 text-red-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-[var(--text-primary)]">Eliminar Departamento</h3>
+                  <h3 className="text-lg font-bold text-[var(--text-primary)]">{t('admin.deleteDepartment')}</h3>
                   <p className="text-sm text-[var(--text-muted)]">
                     <span style={{ color: deleteTarget.color }}>{deleteTarget.icon} {deleteTarget.name}</span>
                   </p>
@@ -541,13 +541,13 @@ function DepartmentsS() {
               {/* Impact Summary */}
               {loadingImpact ? (
                 <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Calculando impacto...
+                  <Loader2 className="h-4 w-4 animate-spin" /> {t('admin.calculatingImpact')}
                 </div>
               ) : impact && (
                 <div className="rounded-xl bg-[var(--bg-base)] p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Eye className="h-4 w-4 text-blue-400" />
-                    <span className="text-sm font-semibold text-[var(--text-primary)]">Impacto de Eliminacion</span>
+                    <span className="text-sm font-semibold text-[var(--text-primary)]">{t('admin.deletionImpact')}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {Object.entries(impact.counts).filter(([, v]) => v > 0).map(([key, count]) => (
@@ -558,29 +558,29 @@ function DepartmentsS() {
                     ))}
                   </div>
                   {impact.total === 0 && (
-                    <p className="text-sm text-emerald-400 mt-2">Este departamento esta vacio. Se puede eliminar sin efectos.</p>
+                    <p className="text-sm text-emerald-400 mt-2">{t('admin.emptyDeptMsg')}</p>
                   )}
                 </div>
               )}
 
               {/* Mode Selection */}
               <div className="space-y-3">
-                <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">Modo de Eliminacion</label>
+                <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">{t('admin.deletionMode')}</label>
                 <div className="space-y-2">
                   <button onClick={() => setDeleteMode('reassign')}
                     className={`w-full flex items-start gap-3 p-4 rounded-xl border-2 transition text-left ${deleteMode === 'reassign' ? 'border-blue-500/50 bg-blue-500/5' : 'border-transparent bg-[var(--bg-base)] hover:border-gray-600'}`}>
                     <ArrowRightLeft className={`h-5 w-5 mt-0.5 ${deleteMode === 'reassign' ? 'text-blue-400' : 'text-[var(--text-muted)]'}`} />
                     <div>
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">Reasignar y Eliminar</p>
-                      <p className="text-[12px] text-[var(--text-muted)] mt-0.5">Mueve todos los recursos y miembros a otro departamento, luego elimina este.</p>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{t('admin.reassignAndDelete')}</p>
+                      <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{t('admin.reassignDesc')}</p>
                     </div>
                   </button>
                   <button onClick={() => setDeleteMode('purge')}
                     className={`w-full flex items-start gap-3 p-4 rounded-xl border-2 transition text-left ${deleteMode === 'purge' ? 'border-red-500/50 bg-red-500/5' : 'border-transparent bg-[var(--bg-base)] hover:border-gray-600'}`}>
                     <Trash2 className={`h-5 w-5 mt-0.5 ${deleteMode === 'purge' ? 'text-red-400' : 'text-[var(--text-muted)]'}`} />
                     <div>
-                      <p className="text-sm font-semibold text-red-400">Purgar y Eliminar</p>
-                      <p className="text-[12px] text-[var(--text-muted)] mt-0.5">ELIMINA PERMANENTEMENTE todos los recursos asociados (tareas, documentos, canales, etc.) y desasigna miembros.</p>
+                      <p className="text-sm font-semibold text-red-400">{t('admin.purgeAndDelete')}</p>
+                      <p className="text-[12px] text-[var(--text-muted)] mt-0.5">{t('admin.purgeDesc')}</p>
                     </div>
                   </button>
                 </div>
@@ -589,9 +589,9 @@ function DepartmentsS() {
               {/* Reassign target selector */}
               {deleteMode === 'reassign' && (
                 <div>
-                  <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Mover todo a:</label>
+                  <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('admin.moveAllTo')}</label>
                   <select value={reassignToId} onChange={e => setReassignToId(e.target.value)} className="select-dark w-full">
-                    <option value="">Seleccionar departamento destino...</option>
+                    <option value="">{t('admin.selectTargetDept')}</option>
                     {activeDepts.filter(d => d.id !== deleteTarget.id).map(d => (
                       <option key={d.id} value={d.id}>{d.icon} {d.name}</option>
                     ))}
@@ -602,7 +602,7 @@ function DepartmentsS() {
               {/* Type to confirm */}
               <div>
                 <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">
-                  Escribe <span className="text-red-400">{deleteTarget.name}</span> para confirmar
+                  {t('admin.typeToConfirmPrefix')} <span className="text-red-400">{deleteTarget.name}</span> {t('admin.typeToConfirmSuffix')}
                 </label>
                 <input value={confirmText} onChange={e => setConfirmText(e.target.value)}
                   placeholder={deleteTarget.name} className="input-dark w-full" autoFocus />
@@ -612,7 +612,7 @@ function DepartmentsS() {
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
                   <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
                   <p className="text-[12px] text-red-300">
-                    ADVERTENCIA: Esta accion es IRREVERSIBLE. Se eliminaran permanentemente TODOS los recursos asociados a este departamento.
+                    {t('admin.purgeWarning')}
                   </p>
                 </div>
               )}
@@ -622,7 +622,7 @@ function DepartmentsS() {
             <div className="px-6 py-4 border-t border-[var(--accent)]/10 flex justify-end gap-2">
               <button onClick={() => setDeleteTarget(null)} disabled={deleting}
                 className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] disabled:opacity-40">
-                Cancelar
+                {t('admin.cancel')}
               </button>
               <button onClick={executeDelete}
                 disabled={deleting || confirmText !== deleteTarget.name || (deleteMode === 'reassign' && !reassignToId)}
@@ -632,7 +632,7 @@ function DepartmentsS() {
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
                 }`}>
                 {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {deleting ? 'Eliminando...' : deleteMode === 'purge' ? 'Purgar y Eliminar' : 'Reasignar y Eliminar'}
+                {deleting ? t('admin.deleting') : deleteMode === 'purge' ? t('admin.purgeAndDelete') : t('admin.reassignAndDelete')}
               </button>
             </div>
           </div>
@@ -647,6 +647,7 @@ function DepartmentsS() {
 // =====================================================
 function OrgS() {
   const { user, me } = useAuth();
+  const { t } = useI18n();
   const [d, setD] = useState<any>(null);
   const [sv, setSv] = useState(false);
 
@@ -663,25 +664,25 @@ function OrgS() {
   return (
     <div className="p-6 max-w-3xl">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-[var(--text-primary)]">Organization</h2>
+        <h2 className="text-xl font-bold text-[var(--text-primary)]">{t('admin.organizationTitle')}</h2>
         <button onClick={save} disabled={sv} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2">
-          <Save className="h-4 w-4" />{sv ? '...' : 'Save'}
+          <Save className="h-4 w-4" />{sv ? t('admin.saving') : t('admin.save')}
         </button>
       </div>
       <div className="space-y-4 rounded-xl bg-[var(--bg-secondary)] shadow-card p-6">
-        <I l="Name" v={d.name || ''} c={v => setD({ ...d, name: v })} />
-        <I l="Slug" v={d.slug || ''} c={v => setD({ ...d, slug: v })} />
-        <I l="Timezone" v={d.timezone || ''} c={v => setD({ ...d, timezone: v })} />
+        <I l={t('admin.orgName')} v={d.name || ''} c={v => setD({ ...d, name: v })} />
+        <I l={t('admin.orgSlug')} v={d.slug || ''} c={v => setD({ ...d, slug: v })} />
+        <I l={t('admin.orgTimezone')} v={d.timezone || ''} c={v => setD({ ...d, timezone: v })} />
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Primary Color</label>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">{t('admin.primaryColor')}</label>
             <div className="flex gap-2">
               <input type="color" value={d.primaryColor || '#3B82F6'} onChange={e => setD({ ...d, primaryColor: e.target.value })} className="w-10 h-10 rounded-lg bg-transparent cursor-pointer" />
               <input value={d.primaryColor || ''} onChange={e => setD({ ...d, primaryColor: e.target.value })} className="input-dark flex-1" />
             </div>
           </div>
           <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">Secondary</label>
+            <label className="block text-sm text-[var(--text-muted)] mb-1">{t('admin.secondaryColor')}</label>
             <div className="flex gap-2">
               <input type="color" value={d.secondaryColor || '#0C1017'} onChange={e => setD({ ...d, secondaryColor: e.target.value })} className="w-10 h-10 rounded-lg bg-transparent cursor-pointer" />
               <input value={d.secondaryColor || ''} onChange={e => setD({ ...d, secondaryColor: e.target.value })} className="input-dark flex-1" />
@@ -698,6 +699,7 @@ function OrgS() {
 // =====================================================
 function UsersS() {
   const { user, me, teams, refreshMembers } = useAuth();
+  const { t } = useI18n();
   const toast = useToast();
   const [ms, setMs] = useState<any[]>([]);
   const [ld, setLd] = useState(true);
@@ -732,9 +734,9 @@ function UsersS() {
 
   const handleCreateUser = async () => {
     if (!newUser.displayName.trim() || !newUser.email.trim() || !newUser.password.trim()) {
-      setCreateErr('Nombre, email y contraseña son requeridos.'); return;
+      setCreateErr(t('admin.nameEmailPassRequired')); return;
     }
-    if (newUser.password.length < 6) { setCreateErr('La contraseña debe tener al menos 6 caracteres.'); return; }
+    if (newUser.password.length < 6) { setCreateErr(t('admin.passwordMinLength')); return; }
     setCreating(true); setCreateErr('');
     try {
       const secondaryAuth = getSecondaryAuth();
@@ -752,14 +754,14 @@ function UsersS() {
       setShowCreate(false);
       setMs(await getMembers());
       await refreshMembers();
-    } catch (er: any) { setCreateErr(er.message?.replace('Firebase: ', '') || 'Error al crear usuario.'); }
+    } catch (er: any) { setCreateErr(er.message?.replace('Firebase: ', '') || t('admin.createUserError')); }
     setCreating(false);
   };
 
   const handleDeactivate = async (memberId: string) => {
-    if (memberId === user!.uid) { toast.warning('Accion no permitida', 'No puedes desactivar tu propia cuenta.'); setDeleteTarget(null); return; }
+    if (memberId === user!.uid) { toast.warning(t('admin.actionNotAllowed'), t('admin.cannotDeactivateSelf')); setDeleteTarget(null); return; }
     const target = ms.find(m => m.id === memberId);
-    if (target?.role === 'owner') { toast.warning('Accion no permitida', 'No puedes desactivar al owner de la organizacion.'); setDeleteTarget(null); return; }
+    if (target?.role === 'owner') { toast.warning(t('admin.actionNotAllowed'), t('admin.cannotDeactivateOwner')); setDeleteTarget(null); return; }
     setDeleting(true);
     try {
       await softDeleteMember(memberId);
@@ -767,7 +769,7 @@ function UsersS() {
       setDeleteTarget(null);
       setMs(await getMembers());
       await refreshMembers();
-    } catch (er: any) { toast.error('Error', er.message || 'Ocurrio un error desconocido.'); }
+    } catch (er: any) { toast.error(t('admin.error'), er.message || t('admin.unknownError')); }
     setDeleting(false);
   };
 
@@ -789,10 +791,10 @@ function UsersS() {
   return (
     <div className="p-6 max-w-5xl">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold text-[var(--text-primary)]">Users & Teams ({ms.length})</h2>
+        <h2 className="text-xl font-bold text-[var(--text-primary)]">{t('admin.usersTitle', { count: ms.length })}</h2>
         <button onClick={() => { setShowCreate(!showCreate); setCreateErr(''); }}
           className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2">
-          <UserPlus className="h-4 w-4" /> Crear Usuario
+          <UserPlus className="h-4 w-4" /> {t('admin.createUser')}
         </button>
       </div>
 
@@ -801,60 +803,60 @@ function UsersS() {
         <div className="mb-4 p-5 rounded-lg border border-[var(--accent)]/20 bg-[var(--bg-elevated)] space-y-4 anim-fade">
           <div className="flex items-center gap-2 mb-1">
             <UserPlus className="h-4 w-4 text-[var(--accent)]" />
-            <span className="text-sm font-semibold text-[var(--text-primary)]">Crear Nuevo Usuario</span>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">{t('admin.createNewUser')}</span>
           </div>
           {createErr && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{createErr}</div>}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Nombre Completo *</label>
-              <input value={newUser.displayName} onChange={e => setNewUser({ ...newUser, displayName: e.target.value })} placeholder="Juan Pérez" className="input-dark" autoFocus />
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('admin.fullName')}</label>
+              <input value={newUser.displayName} onChange={e => setNewUser({ ...newUser, displayName: e.target.value })} placeholder={t('admin.fullNamePlaceholder')} className="input-dark" autoFocus />
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Email *</label>
-              <input type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} placeholder="juan@ejemplo.com" className="input-dark" />
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('admin.emailLabel')}</label>
+              <input type="email" value={newUser.email} onChange={e => setNewUser({ ...newUser, email: e.target.value })} placeholder={t('admin.emailPlaceholder')} className="input-dark" />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Contraseña *</label>
-              <input type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} placeholder="Min 6 caracteres" minLength={6} className="input-dark" />
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('admin.passwordLabel')}</label>
+              <input type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} placeholder={t('admin.passwordPlaceholder')} minLength={6} className="input-dark" />
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Rol</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('admin.roleLabel')}</label>
               <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value as Role })} className="select-dark h-[42px]">
                 {(['admin', 'manager', 'member', 'guest', 'readonly'] as Role[]).map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">Departamento</label>
+              <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('admin.departmentLabel')}</label>
               <select value={newUser.teamId} onChange={e => setNewUser({ ...newUser, teamId: e.target.value })} className="select-dark h-[42px]">
-                <option value="">Sin Departamento</option>
+                <option value="">{t('admin.noDepartment')}</option>
                 {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
               </select>
             </div>
           </div>
           <div className="flex gap-2">
             <button onClick={handleCreateUser} disabled={creating} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-50">
-              {creating ? 'Creando...' : 'Crear Usuario'}
+              {creating ? t('admin.creating') : t('admin.createUser')}
             </button>
-            <button onClick={() => { setShowCreate(false); setCreateErr(''); }} className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">Cancelar</button>
+            <button onClick={() => { setShowCreate(false); setCreateErr(''); }} className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">{t('admin.cancel')}</button>
           </div>
         </div>
       )}
 
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por nombre, email o departamento..." className="input-dark pl-10" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder={t('admin.searchPlaceholder')} className="input-dark pl-10" />
       </div>
       <div className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr>
-              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Usuario</th>
-              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Rol</th>
-              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Departamento</th>
-              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Estado</th>
-              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Acciones</th>
+              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">{t('admin.userColumnHeader')}</th>
+              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">{t('admin.roleColumnHeader')}</th>
+              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">{t('admin.departmentColumnHeader')}</th>
+              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">{t('admin.statusColumnHeader')}</th>
+              <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">{t('admin.actionsColumnHeader')}</th>
             </tr>
           </thead>
           <tbody>
@@ -884,13 +886,13 @@ function UsersS() {
                     <select value={m.teamId || ''} onChange={e => cT(m.id, e.target.value)}
                       className="select-dark text-sm h-8"
                       style={{ borderColor: tm ? `${tm.color}30` : undefined, color: tm ? tm.color : undefined }}>
-                      <option value="">Sin Departamento</option>
+                      <option value="">{t('admin.noDepartment')}</option>
                       {teams.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
                     </select>
                   </td>
                   <td className="px-5 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-lg font-semibold ${isInactive ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                      {isInactive ? 'Inactivo' : 'Activo'}
+                      {isInactive ? t('admin.inactive') : t('admin.active')}
                     </span>
                   </td>
                   <td className="px-5 py-3">
@@ -898,25 +900,25 @@ function UsersS() {
                       isInactive ? (
                         <button onClick={() => handleReactivate(m.id)}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-[13px] font-semibold hover:bg-emerald-500/20 transition"
-                          title="Reactivar usuario">
-                          <RotateCcw className="h-3 w-3" /> Reactivar
+                          title={t('admin.reactivateUser')}>
+                          <RotateCcw className="h-3 w-3" /> {t('admin.reactivate')}
                         </button>
                       ) : deleteTarget === m.id ? (
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[12px] text-red-400">Confirmar?</span>
+                          <span className="text-[12px] text-red-400">{t('admin.confirm')}</span>
                           <button onClick={() => handleDeactivate(m.id)} disabled={deleting}
                             className="px-2 py-1 rounded-lg bg-red-500/10 text-red-400 text-[12px] font-semibold hover:bg-red-500/20 transition">
-                            {deleting ? '...' : 'Sí'}
+                            {deleting ? '...' : t('admin.yes')}
                           </button>
                           <button onClick={() => setDeleteTarget(null)}
                             className="px-2 py-1 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-secondary)] text-[12px] hover:bg-[var(--bg-elevated)] transition">
-                            No
+                            {t('admin.no')}
                           </button>
                         </div>
                       ) : (
                         <button onClick={() => setDeleteTarget(m.id)}
                           className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition"
-                          title="Desactivar usuario">
+                          title={t('admin.deactivateUser')}>
                           <UserX className="h-4 w-4" />
                         </button>
                       )
@@ -937,6 +939,7 @@ function UsersS() {
 // =====================================================
 function PermsS() {
   const { user, me } = useAuth();
+  const { t } = useI18n();
   const toast = useToast();
   const rs = ['workspace', 'task', 'doc', 'channel', 'automation', 'admin', 'user'];
   const as2 = ['create', 'read', 'update', 'delete', 'manage'];
@@ -962,7 +965,7 @@ function PermsS() {
     });
   }, []);
 
-  const t = (r: string, s: string, a: string) => {
+  const toggle = (r: string, s: string, a: string) => {
     if (r === 'owner') return;
     setMx((p: any) => ({ ...p, [r]: { ...p[r], [s]: { ...p[r]?.[s], [a]: !p[r]?.[s]?.[a] } } }));
   };
@@ -970,21 +973,21 @@ function PermsS() {
   const save = async () => {
     await saveSettings('permissions', { matrix: mx });
     await logAction({ action: 'updated', resource: 'permissions', detail: 'matrix', actorId: user!.uid, actorName: me!.displayName });
-    toast.success('Guardado', 'Los permisos se guardaron correctamente.');
+    toast.success(t('admin.permsSaved'), t('admin.permsSavedMsg'));
   };
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-[var(--text-primary)]">Permissions</h2>
-        <button onClick={save} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2"><Save className="h-4 w-4" />Save</button>
+        <h2 className="text-xl font-bold text-[var(--text-primary)]">{t('admin.permissionsTitle')}</h2>
+        <button onClick={save} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2"><Save className="h-4 w-4" />{t('admin.save')}</button>
       </div>
       <div className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr>
-              <th className="text-left px-3 py-2 text-[var(--text-muted)]">Res</th>
-              <th className="text-left px-2 py-2 text-[var(--text-muted)]">Act</th>
+              <th className="text-left px-3 py-2 text-[var(--text-muted)]">{t('admin.permRes')}</th>
+              <th className="text-left px-2 py-2 text-[var(--text-muted)]">{t('admin.permAct')}</th>
               {rls.map(r => <th key={r} className="text-center px-2 py-2 text-[var(--text-muted)] capitalize">{r}</th>)}
             </tr>
           </thead>
@@ -995,7 +998,7 @@ function PermsS() {
                 <td className="px-2 py-1 text-[var(--text-muted)]">{a}</td>
                 {rls.map(r => (
                   <td key={r} className="text-center px-2 py-1">
-                    <button onClick={() => t(r, s, a)} disabled={r === 'owner'}
+                    <button onClick={() => toggle(r, s, a)} disabled={r === 'owner'}
                       className={`w-5 h-5 rounded inline-flex items-center justify-center ${mx[r]?.[s]?.[a] ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[var(--bg-elevated)] text-[var(--text-muted)]'} ${r === 'owner' ? 'opacity-40' : ''}`}>
                       {mx[r]?.[s]?.[a] ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
                     </button>
@@ -1014,32 +1017,33 @@ function PermsS() {
 // AUDIT LOGS SECTION
 // =====================================================
 function AuditS() {
+  const { t } = useI18n();
   const [ls, setLs] = useState<any[]>([]);
   const [ld, setLd] = useState(true);
   const [q, setQ] = useState('');
 
-  useEffect(() => { getAuditLogs().then(l => { setLs(l); setLd(false); }); }, []);
+  useEffect(() => { getAuditLogs().then(({ items: l }) => { setLs(l); setLd(false); }); }, []);
 
   const f = ls.filter(l => [l.actorName, l.action, l.resource, l.detail].some(v => v?.toLowerCase?.().includes(q.toLowerCase())));
 
   if (ld) return <Sk />;
   return (
     <div className="p-6 max-w-5xl">
-      <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">Audit Logs</h2>
+      <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">{t('admin.auditTitle')}</h2>
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search..." className="input-dark pl-10" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder={t('admin.auditSearch')} className="input-dark pl-10" />
       </div>
-      {!f.length ? <p className="text-center py-12 text-[var(--text-muted)]">No logs yet.</p> :
+      {!f.length ? <p className="text-center py-12 text-[var(--text-muted)]">{t('admin.noLogs')}</p> :
         <div className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr>
-                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Actor</th>
-                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Action</th>
-                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Resource</th>
-                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Detail</th>
-                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">Time</th>
+                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">{t('admin.auditActor')}</th>
+                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">{t('admin.auditAction')}</th>
+                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">{t('admin.auditResource')}</th>
+                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">{t('admin.auditDetail')}</th>
+                <th className="text-left px-5 py-3 text-[12px] uppercase text-[var(--text-muted)]">{t('admin.auditTime')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1065,14 +1069,15 @@ function AuditS() {
 // =====================================================
 // GENERIC CRUD SECTION
 // =====================================================
-function CrudS({ label, fields, gFn, cFn, dFn }: { label: string; fields: string[]; gFn: () => Promise<any[]>; cFn: (d: any) => Promise<any>; dFn: (id: string) => Promise<any> }) {
+function CrudS({ label, fields, gFn, cFn, dFn }: { label: string; fields: string[]; gFn: () => Promise<{ items: any[]; hasMore: boolean }>; cFn: (d: any) => Promise<any>; dFn: (id: string) => Promise<any> }) {
   const { user, me } = useAuth();
+  const { t } = useI18n();
   const [its, setIts] = useState<any[]>([]);
   const [ld, setLd] = useState(true);
   const [sh, setSh] = useState(false);
   const [fm, setFm] = useState<any>({});
 
-  const load = async () => { setIts(await gFn()); setLd(false); };
+  const load = async () => { const { items } = await gFn(); setIts(items); setLd(false); };
   useEffect(() => { load(); }, []);
 
   const add = async () => {
@@ -1084,7 +1089,7 @@ function CrudS({ label, fields, gFn, cFn, dFn }: { label: string; fields: string
   };
 
   const del = async (id: string) => {
-    if (!confirm('Delete?')) return;
+    if (!confirm(t('admin.deleteConfirm'))) return;
     await dFn(id);
     load();
   };
@@ -1094,18 +1099,18 @@ function CrudS({ label, fields, gFn, cFn, dFn }: { label: string; fields: string
     <div className="p-6 max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-[var(--text-primary)]">{label}</h2>
-        <button onClick={() => setSh(!sh)} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2"><Plus className="h-4 w-4" />Add</button>
+        <button onClick={() => setSh(!sh)} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2"><Plus className="h-4 w-4" />{t('admin.add')}</button>
       </div>
       {sh && (
         <div className="mb-4 p-5 rounded-lg border border-[var(--accent)]/20 bg-[var(--bg-elevated)] space-y-3">
           {fields.map(f => <input key={f} value={fm[f] || ''} onChange={e => setFm({ ...fm, [f]: e.target.value })} placeholder={f} className="input-dark" />)}
           <div className="flex gap-2">
-            <button onClick={add} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">Create</button>
-            <button onClick={() => setSh(false)} className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">Cancel</button>
+            <button onClick={add} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">{t('admin.crudCreate')}</button>
+            <button onClick={() => setSh(false)} className="px-4 h-9 rounded-xl bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)]">{t('admin.crudCancel')}</button>
           </div>
         </div>
       )}
-      {!its.length ? <p className="text-center py-12 text-[var(--text-muted)]">No items yet.</p> :
+      {!its.length ? <p className="text-center py-12 text-[var(--text-muted)]">{t('admin.noItems')}</p> :
         <div className="space-y-1.5">
           {its.map(it => (
             <div key={it.id} className="flex items-center gap-3 px-5 py-3.5 rounded-xl bg-[var(--bg-secondary)] shadow-card group">
@@ -1129,6 +1134,7 @@ function CrudS({ label, fields, gFn, cFn, dFn }: { label: string; fields: string
 // =====================================================
 function SetS({ k, label, fs }: { k: string; label: string; fs: string[] }) {
   const { user, me } = useAuth();
+  const { t } = useI18n();
   const toast = useToast();
   const [d, setD] = useState<any>({});
   const [ld, setLd] = useState(true);
@@ -1138,7 +1144,7 @@ function SetS({ k, label, fs }: { k: string; label: string; fs: string[] }) {
   const save = async () => {
     await saveSettings(k, d);
     await logAction({ action: 'updated', resource: label, detail: 'settings', actorId: user!.uid, actorName: me!.displayName });
-    toast.success('Guardado', 'Los cambios se guardaron correctamente.');
+    toast.success(t('admin.settingsSaved'), t('admin.settingsSavedMsg'));
   };
 
   if (ld) return <Sk />;
@@ -1146,7 +1152,7 @@ function SetS({ k, label, fs }: { k: string; label: string; fs: string[] }) {
     <div className="p-6 max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-[var(--text-primary)]">{label}</h2>
-        <button onClick={save} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2"><Save className="h-4 w-4" />Save</button>
+        <button onClick={save} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2"><Save className="h-4 w-4" />{t('admin.save')}</button>
       </div>
       <div className="space-y-4 rounded-xl bg-[var(--bg-secondary)] shadow-card p-6">
         {fs.map(f => {
@@ -1157,7 +1163,7 @@ function SetS({ k, label, fs }: { k: string; label: string; fs: string[] }) {
               {isBool ? (
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input type="checkbox" checked={!!d[f]} onChange={e => setD({ ...d, [f]: e.target.checked })} className="w-4 h-4 rounded bg-[var(--bg-elevated)] border-[var(--border)] accent-[var(--accent)]" />
-                  <span className="text-sm text-[var(--text-secondary)]">{d[f] ? 'Enabled' : 'Disabled'}</span>
+                  <span className="text-sm text-[var(--text-secondary)]">{d[f] ? t('admin.enabled') : t('admin.disabled')}</span>
                 </label>
               ) : (
                 <input value={d[f] || ''} onChange={e => setD({ ...d, [f]: e.target.value })} className="input-dark" />

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFormByToken, createFormSubmission, updateForm } from '@/lib/db-admin';
+import { getFormByToken, createFormSubmission, updateForm, createTask } from '@/lib/db-admin';
 import { validateSubmission, sanitizeValue } from '@/lib/form-validation';
 import { notifyManyAdmin } from '@/lib/db-admin';
 import { queueEvent } from '@/lib/integrations-db-admin';
+import { adminDb } from '@/lib/firebase-admin';
 import type { FormDocument } from '@/components/forms/constants';
 
 // ---- In-memory rate limiter ----
@@ -58,7 +59,12 @@ function serverT(key: string, params?: Record<string, string | number>): string 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { formId, token, values, attachments, consentGiven, utmSource, utmMedium, utmCampaign, referrer } = body;
+    const { formId, token, values, attachments, consentGiven, utmSource, utmMedium, utmCampaign, referrer, _hp, _ts } = body;
+
+    // Anti-bot: reject if honeypot field is filled
+    if (_hp) return NextResponse.json({ ok: true }); // Silent success to not reveal detection
+    // Anti-bot: reject if submitted faster than 2 seconds after page load
+    if (_ts && Date.now() - Number(_ts) < 2000) return NextResponse.json({ ok: true });
 
     if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 });
 
@@ -135,6 +141,53 @@ export async function POST(req: NextRequest) {
       consentGiven: !!consentGiven,
     });
 
+    // Auto-convert to task if enabled
+    if ((form as any).autoConvert && (form as any).defaultMappingId) {
+      try {
+        const mappingSnap = await adminDb.doc(`forms/${form.id}/mappings/${(form as any).defaultMappingId}`).get();
+        if (mappingSnap.exists) {
+          const mapping = mappingSnap.data()!;
+          const fieldMap = mapping.fieldMap || {};
+
+          // Build task title and description from field map
+          let taskTitle = `${form.title} — Submission`;
+          let taskDescription = '';
+          for (const [formFieldId, taskField] of Object.entries(fieldMap)) {
+            const val = sanitized[formFieldId];
+            if (!val) continue;
+            if (taskField === 'title') taskTitle = String(val);
+            else if (taskField === 'description') taskDescription = String(val);
+          }
+
+          const taskRef = await createTask({
+            title: taskTitle,
+            description: taskDescription || Object.entries(sanitized).map(([k, v]) => `**${k}:** ${v}`).join('\n'),
+            status: mapping.defaultStatus || 'todo',
+            priority: mapping.defaultPriority || 'medium',
+            assignees: mapping.defaultAssignees || [],
+            tags: [...(mapping.defaultTags || []), 'form-submission'],
+            teamId: mapping.targetTeamId || '',
+            createdBy: `form:${form.id}`,
+            customFields: sanitized,
+          });
+
+          // Update submission with conversion metadata
+          if (taskRef?.id) {
+            await adminDb.doc(`forms/${form.id}/submissions/${taskRef.id}`).update({
+              convertedToType: 'task',
+              convertedToId: taskRef.id,
+              convertedAt: new Date(),
+              convertedBy: 'auto',
+              status: 'converted',
+            }).catch((err) => console.error('[FormSubmit] update submission conversion metadata failed:', err));
+          }
+        }
+      } catch (err) {
+        console.error('[FormSubmit] auto-convert to task failed:', err);
+        // Don't block submission if auto-convert fails
+      }
+    }
+
     // Increment response count
     await updateForm(form.id, { responseCount: (form.responseCount || 0) + 1 });
 
@@ -144,7 +197,7 @@ export async function POST(req: NextRequest) {
       entityId: form.id,
       entityType: 'form',
       payload: { formTitle: form.title, responseCount: (form.responseCount || 0) + 1 },
-    }).catch(() => {});
+    }).catch((err) => console.error('[FormSubmit] queue webhook event failed:', err));
 
     // Notify form creator
     if (form.createdBy) {
@@ -155,7 +208,7 @@ export async function POST(req: NextRequest) {
           message: `Se recibió una nueva respuesta en el formulario "${form.title}"`,
           entityUrl: '/app/forms',
         });
-      } catch { /* notification failure shouldn't block submission */ }
+      } catch (err) { /* notification failure shouldn't block submission */ console.error('[FormSubmit] notification to creator failed:', err); }
     }
 
     // Check if limit is now reached
@@ -169,12 +222,13 @@ export async function POST(req: NextRequest) {
             message: `El formulario alcanzó el límite de ${form.responseLimit} respuestas y fue pausado automáticamente.`,
             entityUrl: '/app/forms',
           });
-        } catch { /* ignore */ }
+        } catch (err) { /* ignore */ console.error('[FormSubmit] limit-reached notification failed:', err); }
       }
     }
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error('[FormSubmit] submission failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

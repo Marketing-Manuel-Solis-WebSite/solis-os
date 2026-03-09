@@ -47,7 +47,7 @@ export default function FormConversionModal({ submission, form, onClose, onConve
       if (!selectedMappingId && m.length > 0) {
         setSelectedMappingId(m[0].id);
       }
-    }).catch(() => {});
+    }).catch((err) => console.error('[FormConversion] load form mappings failed:', err));
   }, [form.id]);
 
   const selectedMapping = mappings.find(m => m.id === selectedMappingId);

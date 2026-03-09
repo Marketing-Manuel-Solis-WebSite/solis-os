@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest } from '@/lib/server-auth';
+import { authenticateRequest, requireAdmin } from '@/lib/server-auth';
 import {
   getTeam, updateTeam, deleteTeamAdmin,
   reassignTeamResourcesAdmin, purgeTeamResourcesAdmin,
@@ -17,17 +17,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const team = await getTeam(id);
     if (!team) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json({ team });
-  } catch {
+  } catch (err) {
+    console.error('[Departments] GET by ID failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const authedUser = await authenticateRequest(req);
-    if (!authedUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const authedUser = await requireAdmin(req);
+    if (authedUser instanceof Response) return authedUser;
 
     const { id } = await params;
     const body = await req.json();
@@ -37,17 +36,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     await updateTeam(id, parsed.data);
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error('[Departments] PATCH failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const authedUser = await authenticateRequest(req);
-    if (!authedUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const authedUser = await requireAdmin(req);
+    if (authedUser instanceof Response) return authedUser;
 
     const { id } = await params;
     const { searchParams } = new URL(req.url);
@@ -64,7 +62,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     await deleteTeamAdmin(id);
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error('[Departments] DELETE failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

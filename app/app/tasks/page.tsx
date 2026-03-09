@@ -44,6 +44,9 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const maxResultsRef = useRef(500);
 
   // Preferences (loaded from Firestore)
   const [prefs, setPrefs] = useState<TaskPreferences>(DEFAULT_PREFERENCES);
@@ -103,12 +106,13 @@ export default function TasksPage() {
     if (!user?.uid || !prefsLoaded.current) return;
     const next = { ...prefs, ...partial };
     setPrefs(next);
-    saveUserPreferences(user.uid, PREFS_KEY, next).catch(() => {});
+    saveUserPreferences(user.uid, PREFS_KEY, next).catch((err) => console.error('[Tasks] save preferences failed:', err));
   }, [user?.uid, prefs]);
 
   // ─── Load data ─────────────────────────────────────────
-  const load = useCallback(async () => {
-    const [rawTasks, m] = await Promise.all([getTasks(activeTeamId), getMembers()]);
+  const load = useCallback(async (limit?: number) => {
+    const effectiveLimit = limit ?? maxResultsRef.current;
+    const [{ items: rawTasks, hasMore: more }, m] = await Promise.all([getTasks(activeTeamId, effectiveLimit), getMembers()]);
     const visible = (rawTasks as any[]).filter(task => !task.deleted && canSeeResource({
       teamId: task.teamId,
       createdBy: task.createdBy,
@@ -116,6 +120,7 @@ export default function TasksPage() {
       assignees: task.assignees,
     }));
     setTasks(visible as Task[]);
+    setHasMore(more);
     setMembers(activeTeamId === '__all__' ? m : m.filter((x: any) => x.teamId === activeTeamId || x.teamIds?.includes(activeTeamId)));
     setLoading(false);
   }, [activeTeamId, canSeeResource]);
@@ -126,7 +131,7 @@ export default function TasksPage() {
   useEffect(() => {
     getSettings('taskViews').then((data: any) => {
       if (data?.views) setSavedViews(data.views);
-    }).catch(() => {});
+    }).catch((err) => console.error('[Tasks] load saved views failed:', err));
   }, []);
 
   // Sync selected task with updated data
@@ -222,7 +227,7 @@ export default function TasksPage() {
         type: 'task_assigned', title: t('tasks.assigned', { name: me!.displayName }),
         message: data.title || t('tasks.newTaskNotif'), entityType: 'task', entityId: taskRef.id,
         entityUrl: '/app/tasks', actorId: user!.uid, actorName: me!.displayName,
-      }).catch(() => {});
+      }).catch((err) => console.error('[Tasks] notify assignees failed:', err));
     }
     setShowCreate(false);
     load();
@@ -231,7 +236,7 @@ export default function TasksPage() {
   const doUpdate = async (id: string, field: string, val: any, old?: any) => {
     if (!can('task', 'update')) return;
     await updateTask(id, { [field]: val });
-    try { await addTaskActivity(id, { action: 'updated', field, from: String(old || ''), to: String(val), actorId: user!.uid, actorName: me!.displayName }); } catch {}
+    try { await addTaskActivity(id, { action: 'updated', field, from: String(old || ''), to: String(val), actorId: user!.uid, actorName: me!.displayName }); } catch (err) { console.error('[Tasks] add activity failed:', err); }
     if (field === 'assignees' && Array.isArray(val) && Array.isArray(old)) {
       const newAssignees = val.filter((uid: string) => !old.includes(uid) && uid !== user!.uid);
       const task = tasks.find(tk => tk.id === id);
@@ -240,7 +245,7 @@ export default function TasksPage() {
           type: 'task_assigned', title: t('tasks.assignedTo', { name: me!.displayName }),
           message: task?.title || t('tasks.updated'), entityType: 'task', entityId: id,
           entityUrl: '/app/tasks', actorId: user!.uid, actorName: me!.displayName,
-        }).catch(() => {});
+        }).catch((err) => console.error('[Tasks] notify new assignees failed:', err));
       }
     }
     // Recurring task: auto-generate next instance when marked done
@@ -255,11 +260,11 @@ export default function TasksPage() {
     }
     // Sync goal targets when task status changes (fire-and-forget)
     if (field === 'status') {
-      syncGoalTargetsForTask(id).catch(() => {});
+      syncGoalTargetsForTask(id).catch((err) => console.error('[Tasks] sync goal targets failed:', err));
     }
     // Propagate title change to relations (fire-and-forget)
     if (field === 'title' && typeof val === 'string') {
-      propagateEntityName(id, val).catch(() => {});
+      propagateEntityName(id, val).catch((err) => console.error('[Tasks] propagate name failed:', err));
     }
     load();
   };
@@ -320,6 +325,15 @@ export default function TasksPage() {
     await Promise.all(promises);
     setSelectedIds(new Set());
     load();
+  };
+
+  // ─── Load more ──────────────────────────────────────
+  const handleLoadMore = async () => {
+    const next = maxResultsRef.current + 500;
+    maxResultsRef.current = next;
+    setLoadingMore(true);
+    await load(next);
+    setLoadingMore(false);
   };
 
   // ─── Saved views ──────────────────────────────────────
@@ -584,6 +598,22 @@ export default function TasksPage() {
                 </motion.div>
               )}
             </AnimatePresence>
+          )}
+
+          {/* Has More indicator */}
+          {hasMore && !loading && (
+            <div className="px-7 py-3 flex items-center justify-center gap-3 border-t border-[var(--border-primary)]">
+              <span className="text-[13px] text-[var(--text-muted)]">
+                {t('common.showingItems', { n: tasks.length })} — {t('common.moreAvailable')}
+              </span>
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="px-4 py-1.5 rounded-lg bg-[var(--accent-subtle)] text-[var(--accent)] text-[13px] font-medium hover:bg-[var(--accent)]/20 transition disabled:opacity-50"
+              >
+                {loadingMore ? t('common.loading') : t('common.loadMore')}
+              </button>
+            </div>
           )}
 
           {/* Bulk Actions */}

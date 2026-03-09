@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildAuthUrl } from '@/lib/oauth-providers';
 import { randomBytes } from 'crypto';
 import { authenticateRequest } from '@/lib/server-auth';
+import { adminDb } from '@/lib/firebase-admin';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   try {
@@ -12,6 +13,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
         { error: 'Authentication required. Pass Authorization: Bearer <idToken>' },
         { status: 401 },
       );
+    }
+
+    // Verify the user has at least manager role to connect integrations
+    const memberSnap = await adminDb.collection('orgs/solis-center/members').doc(authedUser.uid).get();
+    const callerRole = memberSnap.data()?.role as string | undefined;
+    const ALLOWED_OAUTH_ROLES = ['owner', 'admin', 'manager'];
+    if (!memberSnap.exists || !callerRole || !ALLOWED_OAUTH_ROLES.includes(callerRole)) {
+      return NextResponse.json({ error: 'Manager role required to connect integrations' }, { status: 403 });
     }
 
     const { provider } = await params;
@@ -48,7 +57,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
     });
 
     return response;
-  } catch {
+  } catch (err) {
+    console.error('[OAuth] authorize failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

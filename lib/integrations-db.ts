@@ -139,7 +139,7 @@ export async function validateApiKey(rawKey: string): Promise<{ valid: boolean; 
   }
 
   // Update lastUsedAt (fire-and-forget)
-  updateAt(`apiKeys/${record.id}`, { lastUsedAt: serverTimestamp() }).catch(() => {});
+  updateAt(`apiKeys/${record.id}`, { lastUsedAt: serverTimestamp() }).catch((err) => console.error('[IntegrationsDB] update API key lastUsedAt failed:', err));
 
   return { valid: true, record };
 }

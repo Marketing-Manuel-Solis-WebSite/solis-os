@@ -36,7 +36,8 @@ export async function GET(req: NextRequest) {
       photoURL: m.photoURL,
     }));
 
-    return apiResponse(safe, { total, limit, offset });
+    const hasMore = offset + limit < total;
+    return apiResponse(safe, { total, limit, offset, hasMore });
   } catch {
     return apiError('Internal error', 500);
   }

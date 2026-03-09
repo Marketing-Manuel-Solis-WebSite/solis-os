@@ -115,7 +115,7 @@ export async function validateApiKey(rawKey: string): Promise<{ valid: boolean; 
   }
 
   // Update lastUsedAt (fire-and-forget)
-  adminDb.doc(`apiKeys/${record.id}`).update({ lastUsedAt: FieldValue.serverTimestamp() }).catch(() => {});
+  adminDb.doc(`apiKeys/${record.id}`).update({ lastUsedAt: FieldValue.serverTimestamp() }).catch((err) => console.error('[IntegrationsDB-Admin] update API key lastUsedAt failed:', err));
 
   return { valid: true, record };
 }

@@ -99,14 +99,16 @@ export async function starAIConversation(id: string, starred: boolean) {
 
 // --- Messages ---
 
-export async function getAIMessages(conversationId: string, maxResults = 200): Promise<AIMessage[]> {
+export async function getAIMessages(conversationId: string, maxResults = 200): Promise<{ items: AIMessage[]; hasMore: boolean }> {
   const q = query(
     collection(db, `${AI_COL}/${conversationId}/messages`),
     orderBy('createdAt', 'asc'),
-    limit(maxResults),
+    limit(maxResults + 1),
   );
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as AIMessage));
+  const hasMore = snap.docs.length > maxResults;
+  const docs = hasMore ? snap.docs.slice(0, maxResults) : snap.docs;
+  return { items: docs.map(d => ({ id: d.id, ...d.data() } as AIMessage)), hasMore };
 }
 
 export async function addAIMessage(conversationId: string, data: {

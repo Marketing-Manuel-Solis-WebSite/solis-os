@@ -25,6 +25,7 @@ export default function AIPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loadingConvos, setLoadingConvos] = useState(true);
   const [streamingText, setStreamingText] = useState('');
+  const [messagesHasMore, setMessagesHasMore] = useState(false);
   const skipNextFetch = useRef(false);
 
   const loadConversations = useCallback(async () => {
@@ -40,8 +41,9 @@ export default function AIPage() {
     if (!activeConvo) { setMessages([]); return; }
     if (skipNextFetch.current) { skipNextFetch.current = false; return; }
     (async () => {
-      const msgs = await getAIMessages(activeConvo.id);
-      setMessages(msgs);
+      const { items, hasMore } = await getAIMessages(activeConvo.id);
+      setMessages(items);
+      setMessagesHasMore(hasMore);
     })();
   }, [activeConvo?.id]);
 
@@ -62,7 +64,7 @@ export default function AIPage() {
   const buildUserContext = useCallback(async () => {
     if (!user || !me) return null;
     try {
-      const [allTasks, allGoals] = await Promise.all([getTasks(), getGoals()]);
+      const [{ items: allTasks }, { items: allGoals }] = await Promise.all([getTasks(), getGoals()]);
       // Filter tasks assigned to this user
       const myTasks = allTasks.filter((t: any) =>
         t.assignees?.includes(user.uid) && !t.deleted && !t.archived
@@ -90,7 +92,7 @@ export default function AIPage() {
         tasks: myTasks,
         goals: myGoals,
       };
-    } catch { return null; }
+    } catch (err) { console.error('[AI] build context failed:', err); return null; }
   }, [user, me, teams]);
 
   const handleSend = async (content: string, sendMode: string = 'chat') => {
@@ -246,7 +248,16 @@ export default function AIPage() {
         {!activeConvo && messages.length === 0 ? (
           <WelcomeScreen onQuickStart={handleSend} userName={me?.displayName?.split(' ')[0] || ''} />
         ) : (
-          <AIMessages messages={messages} loading={loading} streamingText={streamingText} userPhoto={me?.photoURL} userName={me?.displayName} />
+          <>
+            {messagesHasMore && !loading && (
+              <div className="px-5 py-2 text-center">
+                <span className="text-[12px] text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-3 py-1 rounded-full">
+                  Mostrando los primeros 200 mensajes de esta conversación
+                </span>
+              </div>
+            )}
+            <AIMessages messages={messages} loading={loading} streamingText={streamingText} userPhoto={me?.photoURL} userName={me?.displayName} />
+          </>
         )}
 
         <AIInput loading={loading} onSend={handleSend} />

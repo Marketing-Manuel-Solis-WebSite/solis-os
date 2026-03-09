@@ -142,5 +142,5 @@ function toLocal(d: any): string {
     const offset = date.getTimezoneOffset();
     const local = new Date(date.getTime() - offset * 60000);
     return local.toISOString().slice(0, 16);
-  } catch { return ''; }
+  } catch (err) { console.error('[FormSettings] toLocal date conversion failed:', err); return ''; }
 }

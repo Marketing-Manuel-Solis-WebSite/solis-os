@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState, use } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
-import { getFormByToken } from '@/lib/db';
 import { useI18n } from '@/lib/i18n';
 import PublicFormShell from '@/components/forms/public-form-shell';
 import PublicFormRenderer from '@/components/forms/public-form-renderer';
@@ -17,11 +16,12 @@ export default function PublicFormPage({ params }: { params: Promise<{ token: st
   useEffect(() => {
     async function load() {
       try {
-        const data = await getFormByToken(token);
-        if (!data) {
+        const res = await fetch(`/api/forms/public/${encodeURIComponent(token)}`);
+        if (!res.ok) {
           setError({ title: t('publicForm.notFound'), message: t('publicForm.notFoundMsg') });
           return;
         }
+        const data = await res.json();
         const f = data as FormDocument;
 
         // Check status
@@ -39,14 +39,14 @@ export default function PublicFormPage({ params }: { params: Promise<{ token: st
         // Check date window
         const now = new Date();
         if (f.openAt) {
-          const openDate = f.openAt?.toDate ? f.openAt.toDate() : new Date(f.openAt?.seconds ? f.openAt.seconds * 1000 : f.openAt);
+          const openDate = f.openAt?.toDate ? f.openAt.toDate() : new Date((f.openAt as any)?.seconds ? (f.openAt as any).seconds * 1000 : f.openAt as any);
           if (now < openDate) {
             setError({ title: t('publicForm.notYetOpen'), message: t('publicForm.notYetOpenMsg') });
             return;
           }
         }
         if (f.closeAt) {
-          const closeDate = f.closeAt?.toDate ? f.closeAt.toDate() : new Date(f.closeAt?.seconds ? f.closeAt.seconds * 1000 : f.closeAt);
+          const closeDate = f.closeAt?.toDate ? f.closeAt.toDate() : new Date((f.closeAt as any)?.seconds ? (f.closeAt as any).seconds * 1000 : f.closeAt as any);
           if (now > closeDate) {
             setError({ title: t('publicForm.expired'), message: t('publicForm.expiredMsg') });
             return;

@@ -243,9 +243,15 @@ ${deptContext}${docContext}
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Markdown renderer (simplified)
+  // Markdown renderer (simplified) — HTML is escaped first to prevent XSS
   const renderMd = (text: string): string => {
-    return text
+    // Escape HTML entities BEFORE any markdown transformation
+    let safe = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    return safe
       .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre class="ai-code-block"><code>$2</code></pre>')
       .replace(/`([^`]+)`/g, '<code class="ai-inline-code">$1</code>')
       .replace(/^#### (.+)$/gm, '<h4 class="ai-h4">$1</h4>')

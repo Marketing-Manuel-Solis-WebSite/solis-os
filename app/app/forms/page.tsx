@@ -19,6 +19,7 @@ export default function FormsPage() {
 
   const [forms, setForms] = useState<FormDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [creating, setCreating] = useState(false);
   const [activeForm, setActiveForm] = useState<FormDocument | null>(null);
   const [shareForm, setShareForm] = useState<FormDocument | null>(null);
@@ -29,8 +30,8 @@ export default function FormsPage() {
 
   const loadForms = useCallback(async () => {
     try {
-      const data = await getForms();
-      if (mountedRef.current) setForms(data as FormDocument[]);
+      const { items: data, hasMore: more } = await getForms();
+      if (mountedRef.current) { setForms(data as FormDocument[]); setHasMore(more); }
     } catch {
       // silent
     }
@@ -41,8 +42,8 @@ export default function FormsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await getForms();
-        if (!cancelled) setForms(data as FormDocument[]);
+        const { items: data, hasMore: more } = await getForms();
+        if (!cancelled) { setForms(data as FormDocument[]); setHasMore(more); }
       } catch {
         // silent
       } finally {
@@ -82,7 +83,7 @@ export default function FormsPage() {
         teamId: '',
       });
       const newId = ref.id;
-      const refreshed = await getForms();
+      const { items: refreshed } = await getForms();
       const all = refreshed as FormDocument[];
       const newForm = all.find(f => f.id === newId);
       setForms(all);
@@ -200,6 +201,15 @@ export default function FormsPage() {
         />
       ) : (
         <FormSubmissionsInbox forms={forms} />
+      )}
+
+      {/* Has More indicator */}
+      {hasMore && !loading && (
+        <div className="text-center py-4 mt-2">
+          <span className="text-[13px] text-[var(--text-muted)]">
+            {t('common.showingItems', { n: forms.length })} — {t('common.moreAvailable')}
+          </span>
+        </div>
       )}
 
       {/* Share modal */}

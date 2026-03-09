@@ -5,7 +5,7 @@
 // ================================================================
 
 import { adminDb } from './firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 const ORG = 'solis-center';
 
@@ -129,6 +129,42 @@ async function removeTaskFromGoalTargetsAdmin(taskId: string): Promise<void> {
   } catch { /* OK if no targets exist */ }
 }
 
+// Clean up time-entries referencing a deleted task (admin SDK)
+async function cleanupOrphanedTimeEntriesAdmin(taskId: string): Promise<number> {
+  try {
+    const snap = await adminDb.collection('time-entries')
+      .where('orgId', '==', ORG)
+      .where('taskId', '==', taskId)
+      .get();
+    if (snap.empty) return 0;
+    for (const d of snap.docs) {
+      await d.ref.update({ taskId: '', taskTitle: '(deleted task)', updatedAt: FieldValue.serverTimestamp() });
+    }
+    return snap.size;
+  } catch (err) { console.error('[DB-Admin] cleanup time entry refs failed:', err); return 0; }
+}
+
+// Clear linkedTaskId from whiteboard elements referencing a deleted task (admin SDK)
+async function cleanupWhiteboardLinkedTaskRefsAdmin(taskId: string): Promise<number> {
+  try {
+    const snap = await adminDb.collectionGroup('elements')
+      .where('linkedTaskId', '==', taskId)
+      .get();
+    if (snap.empty) return 0;
+    for (const d of snap.docs) {
+      await d.ref.update({ linkedTaskId: '', updatedAt: FieldValue.serverTimestamp() });
+    }
+    return snap.size;
+  } catch (err) { console.error('[DB-Admin] cleanup whiteboard linked task refs failed:', err); return 0; }
+}
+
+// ===== CUSTOM FIELD DEFINITIONS (admin SDK) =====
+export async function getCustomFieldDefs(): Promise<any[]> {
+  const snap = await adminDb.doc(`orgs/${ORG}/settings/customFields`).get();
+  if (!snap.exists) return [];
+  return (snap.data() as any)?.fields || [];
+}
+
 // ===== MEMBERS =====
 export async function getMembers() {
   const snap = await adminDb.collection(`orgs/${ORG}/members`).get();
@@ -243,12 +279,18 @@ export async function createTask(data: any) {
 
 export async function updateTask(id: string, data: any) { return updateAt(`tasks/${id}`, data); }
 export async function deleteTask(id: string) {
-  await Promise.allSettled([
-    deleteSubcollectionDocsAdmin(`tasks/${id}`, 'comments'),
-    deleteSubcollectionDocsAdmin(`tasks/${id}`, 'activity'),
-    cleanupEntityRelationsAdmin(id),
-    removeTaskFromGoalTargetsAdmin(id),
-  ]);
+  const cascadeOps = [
+    { name: 'comments', fn: () => deleteSubcollectionDocsAdmin(`tasks/${id}`, 'comments') },
+    { name: 'activity', fn: () => deleteSubcollectionDocsAdmin(`tasks/${id}`, 'activity') },
+    { name: 'relations', fn: () => cleanupEntityRelationsAdmin(id) },
+    { name: 'goalTargets', fn: () => removeTaskFromGoalTargetsAdmin(id) },
+    { name: 'timeEntries', fn: () => cleanupOrphanedTimeEntriesAdmin(id) },
+    { name: 'whiteboardRefs', fn: () => cleanupWhiteboardLinkedTaskRefsAdmin(id) },
+  ];
+  const results = await Promise.allSettled(cascadeOps.map(op => op.fn()));
+  results.forEach((r, i) => {
+    if (r.status === 'rejected') console.error(`[deleteTask-admin] cascade ${cascadeOps[i].name} failed for ${id}:`, r.reason);
+  });
   return deleteAt(`tasks/${id}`);
 }
 
@@ -281,10 +323,14 @@ export async function createGoal(data: any) {
 
 export async function updateGoal(id: string, data: any) { return updateAt(`goals/${id}`, data); }
 export async function deleteGoal(id: string) {
-  await Promise.allSettled([
-    deleteSubcollectionDocsAdmin(`goals/${id}`, 'targets'),
-    cleanupEntityRelationsAdmin(id),
-  ]);
+  const cascadeOps = [
+    { name: 'targets', fn: () => deleteSubcollectionDocsAdmin(`goals/${id}`, 'targets') },
+    { name: 'relations', fn: () => cleanupEntityRelationsAdmin(id) },
+  ];
+  const results = await Promise.allSettled(cascadeOps.map(op => op.fn()));
+  results.forEach((r, i) => {
+    if (r.status === 'rejected') console.error(`[deleteGoal-admin] cascade ${cascadeOps[i].name} failed for ${id}:`, r.reason);
+  });
   return deleteAt(`goals/${id}`);
 }
 
@@ -303,10 +349,12 @@ export async function syncGoalTargetsForTaskAdmin(taskId: string) {
       if (t.type !== 'tasks' || !t.autoSync) continue;
 
       const linkedIds: string[] = t.linkedTaskIds || [];
+      // Batch fetch all linked tasks at once instead of N+1 sequential queries
+      const taskRefs = linkedIds.map(tid => adminDb.doc(`tasks/${tid}`));
+      const taskSnaps = taskRefs.length > 0 ? await adminDb.getAll(...taskRefs) : [];
       let completed = 0;
-      for (const tid of linkedIds) {
-        const task = await adminDb.doc(`tasks/${tid}`).get();
-        if (task.exists && task.data()?.status === 'done' && !task.data()?.deleted) completed++;
+      for (const snap of taskSnaps) {
+        if (snap.exists && snap.data()?.status === 'done' && !snap.data()?.deleted) completed++;
       }
 
       if (completed !== t.currentValue) {
@@ -417,9 +465,168 @@ export async function createFormSubmission(formId: string, data: any) {
 export async function getFormSubmissions(formId: string, maxResults = 500) {
   const snap = await adminDb.collection(`forms/${formId}/submissions`)
     .orderBy('createdAt', 'desc')
-    .limit(maxResults)
+    .limit(maxResults + 1)
     .get();
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const hasMore = snap.docs.length > maxResults;
+  const docs = hasMore ? snap.docs.slice(0, maxResults) : snap.docs;
+  return { items: docs.map(d => ({ id: d.id, ...d.data() })), hasMore };
+}
+
+/** Accurate document count for an org-scoped collection (uses Firestore count aggregation). */
+export async function countByOrg(col: string): Promise<number> {
+  const snap = await adminDb.collection(col)
+    .where('orgId', '==', ORG)
+    .count()
+    .get();
+  return snap.data().count;
+}
+
+/** Accurate document count for a subcollection. */
+export async function countSubcollection(parentPath: string, subcollectionName: string): Promise<number> {
+  const snap = await adminDb.collection(`${parentPath}/${subcollectionName}`)
+    .count()
+    .get();
+  return snap.data().count;
+}
+
+// ===== CURSOR-BASED PAGINATED QUERIES =====
+// Used by v1 API routes for efficient Firestore-native pagination.
+// Pushes filters to Firestore where possible, uses orderBy + startAfter for cursor.
+
+interface PaginatedResult {
+  items: any[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+function extractCursor(doc: FirebaseFirestore.QueryDocumentSnapshot): string {
+  const ts = doc.data().createdAt;
+  const seconds = ts?.seconds || ts?._seconds || 0;
+  return `${seconds}_${doc.id}`;
+}
+
+function parseCursor(cursor: string): { seconds: number; docId: string } | null {
+  const parts = cursor.split('_');
+  if (parts.length < 2) return null;
+  const seconds = parseInt(parts[0], 10);
+  const docId = parts.slice(1).join('_');
+  if (isNaN(seconds)) return null;
+  return { seconds, docId };
+}
+
+export async function queryTasksPaginated(opts: {
+  limit: number;
+  cursor?: string | null;
+  status?: string | null;
+  teamId?: string | null;
+  assignee?: string | null;
+}): Promise<PaginatedResult> {
+  let q: FirebaseFirestore.Query = adminDb.collection('tasks')
+    .where('orgId', '==', ORG);
+
+  if (opts.status) q = q.where('status', '==', opts.status);
+  if (opts.teamId) q = q.where('teamId', '==', opts.teamId);
+  if (opts.assignee) q = q.where('assignees', 'array-contains', opts.assignee);
+
+  q = q.orderBy('createdAt', 'desc');
+
+  if (opts.cursor) {
+    const parsed = parseCursor(opts.cursor);
+    if (parsed) {
+      const ts = Timestamp.fromMillis(parsed.seconds * 1000);
+      q = q.startAfter(ts, parsed.docId);
+    }
+  }
+
+  // Fetch extra to filter deleted + detect hasMore
+  const fetchLimit = opts.limit + 20;
+  const snap = await q.limit(fetchLimit).get();
+
+  const filtered = snap.docs.filter(d => !d.data().deleted);
+  const hasMore = filtered.length > opts.limit;
+  const resultDocs = filtered.slice(0, opts.limit);
+  const items = resultDocs.map(d => ({ id: d.id, ...d.data() }));
+
+  const lastDoc = resultDocs[resultDocs.length - 1];
+  const nextCursor = hasMore && lastDoc ? extractCursor(lastDoc) : null;
+
+  return { items, nextCursor, hasMore };
+}
+
+export async function queryGoalsPaginated(opts: {
+  limit: number;
+  cursor?: string | null;
+  status?: string | null;
+  teamId?: string | null;
+}): Promise<PaginatedResult> {
+  let q: FirebaseFirestore.Query = adminDb.collection('goals')
+    .where('orgId', '==', ORG);
+
+  if (opts.status) q = q.where('status', '==', opts.status);
+  if (opts.teamId) q = q.where('teamId', '==', opts.teamId);
+
+  q = q.orderBy('createdAt', 'desc');
+
+  if (opts.cursor) {
+    const parsed = parseCursor(opts.cursor);
+    if (parsed) {
+      const ts = Timestamp.fromMillis(parsed.seconds * 1000);
+      q = q.startAfter(ts, parsed.docId);
+    }
+  }
+
+  const snap = await q.limit(opts.limit + 1).get();
+  const hasMore = snap.docs.length > opts.limit;
+  const resultDocs = hasMore ? snap.docs.slice(0, opts.limit) : snap.docs;
+  const items = resultDocs.map(d => ({ id: d.id, ...d.data() }));
+
+  const lastDoc = resultDocs[resultDocs.length - 1];
+  const nextCursor = hasMore && lastDoc ? extractCursor(lastDoc) : null;
+
+  return { items, nextCursor, hasMore };
+}
+
+export async function queryTimeEntriesPaginated(opts: {
+  limit: number;
+  cursor?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  userId?: string | null;
+  teamId?: string | null;
+}): Promise<PaginatedResult> {
+  let q: FirebaseFirestore.Query = adminDb.collection('time-entries')
+    .where('orgId', '==', ORG);
+
+  if (opts.userId) q = q.where('userId', '==', opts.userId);
+
+  // When date-bounded, order by date (bounded dataset, no cursor needed).
+  // When unbounded, order by createdAt and use cursor pagination.
+  const dateBounded = !!(opts.startDate || opts.endDate);
+
+  if (dateBounded) {
+    if (opts.startDate) q = q.where('date', '>=', opts.startDate);
+    if (opts.endDate) q = q.where('date', '<=', opts.endDate);
+    q = q.orderBy('date', 'desc');
+  } else {
+    q = q.orderBy('createdAt', 'desc');
+    if (opts.cursor) {
+      const parsed = parseCursor(opts.cursor);
+      if (parsed) {
+        const ts = Timestamp.fromMillis(parsed.seconds * 1000);
+        q = q.startAfter(ts, parsed.docId);
+      }
+    }
+  }
+
+  const snap = await q.limit(opts.limit + 1).get();
+  const hasMore = snap.docs.length > opts.limit;
+  const resultDocs = hasMore ? snap.docs.slice(0, opts.limit) : snap.docs;
+  const items = resultDocs.map(d => ({ id: d.id, ...d.data() }));
+
+  const lastDoc = resultDocs[resultDocs.length - 1];
+  const nextCursor = hasMore && lastDoc && !dateBounded ? extractCursor(lastDoc) : null;
+
+  return { items, nextCursor, hasMore };
 }
 
 // ===== NOTIFICATIONS (server-side) =====

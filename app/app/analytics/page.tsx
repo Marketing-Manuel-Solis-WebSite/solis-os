@@ -8,7 +8,7 @@ import StatsDashboard from '@/components/analytics/stats-dashboard';
 import AIAnalysisPanel from '@/components/analytics/ai-analysis-panel';
 import {
   BarChart3, TrendingUp, Brain, ChevronRight, Sparkles, RefreshCw,
-  Users, FileText, CheckSquare, MessageSquare, Activity, Zap
+  Users, FileText, CheckSquare, MessageSquare, Activity, Zap, AlertTriangle
 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 
@@ -31,26 +31,33 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'dashboard' | 'ai'>('dashboard');
   const [refreshing, setRefreshing] = useState(false);
+  const [truncatedCollections, setTruncatedCollections] = useState<string[]>([]);
 
   const loadAll = useCallback(async () => {
     if (!user) return;
     try {
-      const [tasks, docs, members, teamsList, channels, auditLogs, aiConvos] = await Promise.all([
-        getTasks('__all__').catch(() => []),
-        getDocuments('__all__').catch(() => []),
+      const [tasksRes, docsRes, members, teamsList, channelsRes, auditLogsRes, aiConvos] = await Promise.all([
+        getTasks('__all__').catch(() => ({ items: [], hasMore: false })),
+        getDocuments('__all__').catch(() => ({ items: [], hasMore: false })),
         getMembers().catch(() => []),
         getTeams().catch(() => []),
-        getChannels('__all__').catch(() => []),
-        getAuditLogs().catch(() => []),
+        getChannels('__all__').catch(() => ({ items: [], hasMore: false })),
+        getAuditLogs().catch(() => ({ items: [], hasMore: false })),
         getAIConversations(user.uid).catch(() => []),
       ]);
+      const truncated: string[] = [];
+      if (tasksRes.hasMore) truncated.push(t('analytics.tasks'));
+      if (docsRes.hasMore) truncated.push(t('analytics.documents'));
+      if (channelsRes.hasMore) truncated.push(t('analytics.channels'));
+      if (auditLogsRes.hasMore) truncated.push(t('analytics.activity'));
+      setTruncatedCollections(truncated);
       setData({
-        tasks: tasks as any[],
-        docs: docs as any[],
+        tasks: tasksRes.items as any[],
+        docs: docsRes.items as any[],
         members: members as any[],
         teams: teamsList as any[],
-        channels: channels as any[],
-        auditLogs: auditLogs as any[],
+        channels: channelsRes.items as any[],
+        auditLogs: auditLogsRes.items as any[],
         aiConversations: aiConvos as any[],
         loadedAt: new Date(),
       });
@@ -136,6 +143,16 @@ export default function AnalyticsPage() {
                   <p className="text-sm text-[var(--text-muted)] mt-0.5">{s.label}</p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Truncation warning */}
+          {truncatedCollections.length > 0 && !loading && (
+            <div className="mb-4 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+              <span className="text-[13px] text-amber-300">
+                {t('analytics.dataTruncated', { collections: truncatedCollections.join(', ') })}
+              </span>
             </div>
           )}
 

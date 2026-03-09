@@ -106,7 +106,7 @@ export async function validateApiRequest(
 // ============================================
 // RESPONSE HELPERS
 // ============================================
-export function apiResponse(data: any, meta?: { total?: number; limit?: number; offset?: number }) {
+export function apiResponse(data: any, meta?: { total?: number; limit?: number; offset?: number; hasMore?: boolean; nextCursor?: string | null }) {
   return NextResponse.json({
     data,
     meta: meta || null,
@@ -121,9 +121,10 @@ export function apiError(message: string, status: number) {
   );
 }
 
-export function parsePagination(req: NextRequest): { limit: number; offset: number } {
+export function parsePagination(req: NextRequest): { limit: number; offset: number; cursor: string | null } {
   const url = new URL(req.url);
   const lim = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50', 10) || 50, 1), 100);
   const off = Math.max(parseInt(url.searchParams.get('offset') || '0', 10) || 0, 0);
-  return { limit: lim, offset: off };
+  const cursor = url.searchParams.get('cursor') || null;
+  return { limit: lim, offset: off, cursor };
 }

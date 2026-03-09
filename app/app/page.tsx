@@ -31,11 +31,11 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
     Promise.all([
-      getTasks(activeTeamId).catch(() => []),
-      getDocuments(activeTeamId).catch(() => []),
-      getAuditLogs().catch(() => []),
-      getGoals(activeTeamId === '__all__' ? undefined : activeTeamId).catch(() => []),
-    ]).then(([ts, _d, l, g]) => {
+      getTasks(activeTeamId).catch(() => ({ items: [], hasMore: false })),
+      getDocuments(activeTeamId).catch(() => ({ items: [], hasMore: false })),
+      getAuditLogs().catch(() => ({ items: [], hasMore: false })),
+      getGoals(activeTeamId === '__all__' ? undefined : activeTeamId).catch(() => ({ items: [], hasMore: false })),
+    ]).then(([{ items: ts }, { items: _d }, { items: l }, { items: g }]) => {
       const filteredTasks = canSeeAllTeams
         ? ts
         : (ts as any[]).filter(tk => canSeeResource({ teamId: tk.teamId, createdBy: tk.createdBy, visibility: tk.visibility, assignees: tk.assignees }));
@@ -64,7 +64,7 @@ export default function Dashboard() {
       if (!prev) return prev;
       const updated = prev.widgets.filter(w => w.widgetId !== widgetId);
       // Fire-and-forget save outside the updater via microtask
-      queueMicrotask(() => saveDashboard(prev.id, { widgets: updated }).catch(() => {}));
+      queueMicrotask(() => saveDashboard(prev.id, { widgets: updated }).catch((err) => console.error('[Home] save widget remove failed:', err)));
       return { ...prev, widgets: updated };
     });
   }, []);
@@ -72,7 +72,7 @@ export default function Dashboard() {
   const handleReorder = useCallback((widgets: WidgetLayout[]) => {
     setDashboard(prev => {
       if (!prev) return prev;
-      queueMicrotask(() => saveDashboard(prev.id, { widgets }).catch(() => {}));
+      queueMicrotask(() => saveDashboard(prev.id, { widgets }).catch((err) => console.error('[Home] save widget reorder failed:', err)));
       return { ...prev, widgets };
     });
   }, []);

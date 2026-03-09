@@ -52,6 +52,8 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
   const [mode, setMode] = useState<'edit' | 'preview' | 'split'>('edit');
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  // Track last-saved state for change detection (prevents no-op autosaves)
+  const lastSavedRef = useRef({ content: doc.content || '', title: doc.title || '' });
   const [fullscreen, setFullscreen] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
   const [visibility, setVisibility] = useState(doc.visibility || 'team');
@@ -78,11 +80,17 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
     setCategory(doc.category || '');
     setTags(doc.tags?.join(', ') || '');
     setDirty(false);
+    lastSavedRef.current = { content: doc.content || '', title: doc.title || '' };
   }, [doc.id]);
 
-  // Auto-save timer
+  // Auto-save timer with change detection — skips save if content matches last saved state
   useEffect(() => {
     if (!dirty) return;
+    // Skip if content is identical to last saved version (e.g. undo back to original)
+    if (content === lastSavedRef.current.content && title === lastSavedRef.current.title) {
+      setDirty(false);
+      return;
+    }
     const timer = setTimeout(() => handleSave(), 5000);
     return () => clearTimeout(timer);
   }, [content, title, dirty]);
@@ -150,6 +158,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
         category: category.trim(),
         tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
       });
+      lastSavedRef.current = { content, title };
       setDirty(false);
     } catch (err) {
       toast.error(t('docEditor.saveError'), t('docEditor.saveErrorMsg'));

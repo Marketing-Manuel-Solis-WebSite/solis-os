@@ -57,7 +57,7 @@ export default function FloatingAIChat() {
   const buildUserContext = useCallback(async () => {
     if (!user || !me) return null;
     try {
-      const [allTasks, allGoals] = await Promise.all([getTasks(), getGoals()]);
+      const [{ items: allTasks }, { items: allGoals }] = await Promise.all([getTasks(), getGoals()]);
       const myTasks = allTasks.filter((t: any) =>
         t.assignees?.includes(user.uid) && !t.deleted && !t.archived
       ).map((t: any) => ({
@@ -76,7 +76,7 @@ export default function FloatingAIChat() {
         tasks: myTasks,
         goals: myGoals,
       };
-    } catch { return null; }
+    } catch (err) { console.error('[FloatingAIChat] build context failed:', err); return null; }
   }, [user, me, teams]);
 
   // Don't render on the full AI page

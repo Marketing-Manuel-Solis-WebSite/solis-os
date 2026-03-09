@@ -34,7 +34,7 @@ export default function TimesheetsPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     const userId = canSeeAll ? (filterUserId || undefined) : user?.uid;
-    const [entriesData, tasksData] = await Promise.all([
+    const [entriesData, { items: tasksData }] = await Promise.all([
       getTimeEntriesByDateRange(startDate, endDate, userId),
       getTasks(activeTeamId === '__all__' ? undefined : activeTeamId),
     ]);

@@ -416,13 +416,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return norm !== m.role ? { ...m, role: norm } : m;
           });
           setAllMembers(normalizedAllMems);
-        }).catch(() => {});
+        }).catch((err) => console.error('[Auth] load members failed:', err));
 
         getDoc(doc(db, 'orgs', ORG_ID, 'settings', 'permissions')).then(permSnap => {
           if (permSnap.exists() && permSnap.data()?.matrix) {
             setPermMatrix(permSnap.data().matrix);
           }
-        }).catch(() => {});
+        }).catch((err) => console.error('[Auth] load permissions failed:', err));
 
       } catch (e) {
         setMe(null);

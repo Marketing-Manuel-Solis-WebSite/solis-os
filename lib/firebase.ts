@@ -18,7 +18,7 @@ export const storage = getStorage(app);
 
 // Enable offline persistence — subsequent loads use cache
 if (typeof window !== 'undefined') {
-  enableMultiTabIndexedDbPersistence(db).catch(() => {});
+  enableMultiTabIndexedDbPersistence(db).catch(() => { /* Expected to fail in incognito/SSR */ });
 }
 
 /** Secondary Auth instance for admin user-creation without signing out the admin. */

@@ -123,9 +123,11 @@ export default function TaskDetailDrawer({
   }, [task.id, task.title, task.description]);
 
   // --- Load comments & activity ---
+  const [commentsHasMore, setCommentsHasMore] = useState(false);
+  const [activityHasMore, setActivityHasMore] = useState(false);
   const loadData = useCallback(async () => {
-    try { setComments(await getTaskComments(task.id)); } catch (err) { console.error('[TaskDrawer] Failed to load comments:', err); setComments([]); }
-    try { setActivity(await getTaskActivity(task.id)); } catch (err) { console.error('[TaskDrawer] Failed to load activity:', err); setActivity([]); }
+    try { const r = await getTaskComments(task.id); setComments(r.items); setCommentsHasMore(r.hasMore); } catch (err) { console.error('[TaskDrawer] Failed to load comments:', err); setComments([]); }
+    try { const r = await getTaskActivity(task.id); setActivity(r.items); setActivityHasMore(r.hasMore); } catch (err) { console.error('[TaskDrawer] Failed to load activity:', err); setActivity([]); }
   }, [task.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -254,7 +256,7 @@ export default function TaskDetailDrawer({
     }
     setNewComment('');
     setMentionIds([]);
-    setComments(await getTaskComments(task.id));
+    const r = await getTaskComments(task.id); setComments(r.items); setCommentsHasMore(r.hasMore);
     setTimeout(() => commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
   };
 
@@ -1087,6 +1089,9 @@ export default function TaskDetailDrawer({
                       </div>
                     </div>
                   ))}
+                  {commentsHasMore && (
+                    <p className="text-[12px] text-[var(--text-muted)] text-center py-2">Mostrando los primeros 200 comentarios</p>
+                  )}
                   <div ref={commentsEndRef} />
                 </div>
 
@@ -1168,6 +1173,9 @@ export default function TaskDetailDrawer({
                     </div>
                   </div>
                 ))}
+                {activityHasMore && (
+                  <p className="text-[12px] text-[var(--text-muted)] text-center py-2">Mostrando las primeras 500 entradas</p>
+                )}
               </div>
             )}
 

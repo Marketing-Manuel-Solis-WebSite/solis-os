@@ -22,7 +22,8 @@ export async function POST(req: NextRequest) {
       ...result,
       timestamp: new Date().toISOString(),
     });
-  } catch {
+  } catch (err) {
+    console.error('[WebhookProcess] event processing failed:', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

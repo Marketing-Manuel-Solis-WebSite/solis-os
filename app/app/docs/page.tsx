@@ -49,6 +49,7 @@ export default function DocsPage() {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'updated' | 'created' | 'title' | 'wordCount'>('updated');
   const [filterVisibility, setFilterVisibility] = useState<'all' | 'team' | 'private' | 'public'>('all');
@@ -71,11 +72,12 @@ export default function DocsPage() {
   // Load docs
   const load = useCallback(async () => {
     try {
-      const [rawDocs, rawMembers] = await Promise.all([
+      const [{ items: rawDocs, hasMore: more }, rawMembers] = await Promise.all([
         getDocuments(activeTeamId),
         getMembers()
       ]);
       setMembers(rawMembers);
+      setHasMore(more);
 
       // Role-based filtering using canSeeResource
       let filtered = rawDocs as Doc[];
@@ -164,7 +166,7 @@ export default function DocsPage() {
     setShowCreate(false);
     await load();
     // Open newest
-    const refreshed = await getDocuments(activeTeamId);
+    const { items: refreshed } = await getDocuments(activeTeamId);
     const newest = (refreshed as Doc[]).sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))[0];
     if (newest) setActiveDoc(newest);
   };
@@ -182,7 +184,7 @@ export default function DocsPage() {
 
     // Propagate title change to relations (fire-and-forget)
     if (data.title && typeof data.title === 'string') {
-      propagateEntityName(id, data.title).catch(() => {});
+      propagateEntityName(id, data.title).catch((err) => console.error('[Docs] propagateEntityName failed:', err));
     }
 
     // Version snapshot logic:
@@ -512,6 +514,15 @@ export default function DocsPage() {
               isOwner={d.createdBy === user?.uid || can('doc', 'delete')}
             />
           ))}
+        </div>
+      )}
+
+      {/* Has More indicator */}
+      {hasMore && !loading && (
+        <div className="text-center py-4 mt-2">
+          <span className="text-[13px] text-[var(--text-muted)]">
+            {t('common.showingItems', { n: docs.length })} — {t('common.moreAvailable')}
+          </span>
         </div>
       )}
 

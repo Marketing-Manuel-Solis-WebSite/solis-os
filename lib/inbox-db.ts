@@ -20,17 +20,20 @@ export interface InboxItem {
   createdAt?: any;
 }
 
-export async function getInboxItems(userId: string, maxResults = 200): Promise<InboxItem[]> {
+export async function getInboxItems(userId: string, maxResults = 200): Promise<{ items: InboxItem[]; hasMore: boolean }> {
   const q = query(
     collection(db, INBOX_PATH),
     where('userId', '==', userId),
     where('status', '==', 'pending'),
-    limit(maxResults),
+    limit(maxResults + 1),
   );
   const snap = await getDocs(q);
-  return snap.docs
+  const hasMore = snap.docs.length > maxResults;
+  const docs = hasMore ? snap.docs.slice(0, maxResults) : snap.docs;
+  const items = docs
     .map(d => ({ id: d.id, ...d.data() } as InboxItem))
     .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  return { items, hasMore };
 }
 
 export async function createInboxItem(data: Omit<InboxItem, 'id' | 'createdAt'>): Promise<string> {
@@ -55,9 +58,9 @@ export async function markInboxDone(id: string): Promise<void> {
 }
 
 // Generate inbox items from overdue tasks and at-risk goals
-export async function generateInboxItems(userId: string, tasks: any[], goals: any[]): Promise<void> {
+export async function generateInboxItems(userId: string, tasks: any[], goals: any[], lang: 'es' | 'en' = 'es'): Promise<void> {
   // Get existing pending items to avoid duplicates
-  const existing = await getInboxItems(userId);
+  const { items: existing } = await getInboxItems(userId);
   const existingIds = new Set(existing.map(e => `${e.type}:${e.entityId}`));
 
   const now = new Date();
@@ -73,7 +76,7 @@ export async function generateInboxItems(userId: string, tasks: any[], goals: an
         userId,
         type: 'overdue_task',
         title: task.title,
-        message: `Venció el ${due.toLocaleDateString('es-MX')}`,
+        message: lang === 'es' ? `Venció el ${due.toLocaleDateString('es-MX')}` : `Overdue since ${due.toLocaleDateString('en-US')}`,
         entityType: 'task',
         entityId: task.id,
         status: 'pending',
@@ -92,7 +95,7 @@ export async function generateInboxItems(userId: string, tasks: any[], goals: an
         userId,
         type: 'deadline_tomorrow',
         title: task.title,
-        message: `Vence mañana`,
+        message: lang === 'es' ? 'Vence mañana' : 'Due tomorrow',
         entityType: 'task',
         entityId: task.id,
         status: 'pending',
@@ -108,7 +111,9 @@ export async function generateInboxItems(userId: string, tasks: any[], goals: an
           userId,
           type: 'goal_at_risk',
           title: goal.name,
-          message: `Estado: ${goal.status === 'at_risk' ? 'En riesgo' : 'Atrasada'} — ${goal.progress || 0}%`,
+          message: lang === 'es'
+            ? `Estado: ${goal.status === 'at_risk' ? 'En riesgo' : 'Atrasada'} — ${goal.progress || 0}%`
+            : `Status: ${goal.status === 'at_risk' ? 'At risk' : 'Behind'} — ${goal.progress || 0}%`,
           entityType: 'goal',
           entityId: goal.id,
           status: 'pending',
