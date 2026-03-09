@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     }));
 
     return apiResponse(safe, { total, limit, offset });
-  } catch (err: any) {
-    return apiError(err?.message || 'Internal error', 500);
+  } catch {
+    return apiError('Internal error', 500);
   }
 }

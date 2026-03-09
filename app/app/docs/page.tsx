@@ -10,6 +10,7 @@ import {
   getDocuments, createDocument, updateDocument, deleteDocument, logAction,
   getMembers
 } from '@/lib/db';
+import { propagateEntityName } from '@/lib/relations';
 import { renderMarkdown } from '@/lib/markdown';
 import DocEditor from '@/components/docs/doc-editor';
 import DocAIPanel from '@/components/docs/doc-ai-panel';
@@ -178,6 +179,11 @@ export default function DocsPage() {
       wordCount: wc,
       version: newVersion,
     });
+
+    // Propagate title change to relations (fire-and-forget)
+    if (data.title && typeof data.title === 'string') {
+      propagateEntityName(id, data.title).catch(() => {});
+    }
 
     // Version snapshot logic:
     // Manual save → always create version

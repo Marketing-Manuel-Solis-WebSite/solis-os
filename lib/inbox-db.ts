@@ -1,6 +1,6 @@
 import {
   collection, doc, addDoc, updateDoc, deleteDoc,
-  getDocs, query, where, orderBy, serverTimestamp, Timestamp,
+  getDocs, query, where, orderBy, limit, serverTimestamp, Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -20,11 +20,12 @@ export interface InboxItem {
   createdAt?: any;
 }
 
-export async function getInboxItems(userId: string): Promise<InboxItem[]> {
+export async function getInboxItems(userId: string, maxResults = 200): Promise<InboxItem[]> {
   const q = query(
     collection(db, INBOX_PATH),
     where('userId', '==', userId),
     where('status', '==', 'pending'),
+    limit(maxResults),
   );
   const snap = await getDocs(q);
   return snap.docs

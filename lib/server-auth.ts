@@ -2,11 +2,14 @@
 // Server-side Firebase ID token verification using Admin SDK
 // ================================================================
 
-import { adminAuth } from './firebase-admin';
+import { adminAuth, adminDb } from './firebase-admin';
+
+const ORG = 'solis-center';
 
 export interface VerifiedUser {
   uid: string;
   email?: string;
+  role?: string;
 }
 
 /**
@@ -43,4 +46,29 @@ export async function authenticateRequest(request: Request): Promise<VerifiedUse
   const token = extractToken(request.headers.get('Authorization'));
   if (!token) return null;
   return verifyIdToken(token);
+}
+
+/**
+ * Authenticate a request AND verify the user has an admin/owner role.
+ * Returns the verified user with role, or null if not authenticated or not admin.
+ */
+export async function authenticateAdmin(request: Request): Promise<VerifiedUser | null> {
+  const user = await authenticateRequest(request);
+  if (!user) return null;
+
+  try {
+    const memberDoc = await adminDb
+      .collection(`orgs/${ORG}/members`)
+      .doc(user.uid)
+      .get();
+
+    if (!memberDoc.exists) return null;
+
+    const role = memberDoc.data()?.role as string | undefined;
+    if (role !== 'admin' && role !== 'owner') return null;
+
+    return { ...user, role };
+  } catch {
+    return null;
+  }
 }

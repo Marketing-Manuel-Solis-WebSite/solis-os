@@ -1,26 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { encryptToken } from '@/lib/integrations-crypto';
 import { addIntegration, getIntegrationByProvider, updateIntegration } from '@/lib/integrations-db-admin';
-import { authenticateRequest } from '@/lib/server-auth';
+import { authenticateAdmin } from '@/lib/server-auth';
 import { INTEGRATION_CATALOG } from '@/lib/integrations-catalog';
+import { IntegrationConnectSchema, formatZodError } from '@/lib/validation';
 import type { IntegrationProvider } from '@/lib/integrations-types';
 
 export async function POST(req: NextRequest) {
   try {
-    const authedUser = await authenticateRequest(req);
+    const authedUser = await authenticateAdmin(req);
     if (!authedUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized – admin role required' }, { status: 403 });
     }
 
     const body = await req.json();
-    const { provider, apiKey } = body as {
-      provider: string;
-      apiKey: string;
-    };
-
-    if (!provider || !apiKey) {
-      return NextResponse.json({ error: 'Provider and API key required' }, { status: 400 });
+    const parsed = IntegrationConnectSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation failed', details: formatZodError(parsed.error) }, { status: 400 });
     }
+
+    const { provider, apiKey } = parsed.data;
 
     const catalogEntry = INTEGRATION_CATALOG.find(i => i.provider === provider);
     if (!catalogEntry) {
@@ -48,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

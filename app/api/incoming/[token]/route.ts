@@ -87,8 +87,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
 
     // Always return 200 quickly
     return NextResponse.json({ ok: true, received: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 

@@ -6,8 +6,10 @@ import {
   getTasks, createTask, updateTask, softDeleteTask, logAction,
   addTaskActivity, getMembers, getSettings, saveSettings,
   getUserPreferences, saveUserPreferences,
+  syncGoalTargetsForTask,
 } from '@/lib/db';
 import { notifyMany } from '@/lib/notifications';
+import { propagateEntityName } from '@/lib/relations';
 import { handleTaskCompletion } from '@/lib/recurrence-trigger';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useToast } from '@/components/notifications/toast-provider';
@@ -250,6 +252,14 @@ export default function TasksPage() {
           toast.error(t('recurrence.generationFailed'));
         });
       }
+    }
+    // Sync goal targets when task status changes (fire-and-forget)
+    if (field === 'status') {
+      syncGoalTargetsForTask(id).catch(() => {});
+    }
+    // Propagate title change to relations (fire-and-forget)
+    if (field === 'title' && typeof val === 'string') {
+      propagateEntityName(id, val).catch(() => {});
     }
     load();
   };

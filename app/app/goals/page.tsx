@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { getGoals, createGoal, updateGoal, deleteGoal } from '@/lib/db';
 import { notifyMany } from '@/lib/notifications';
+import { propagateEntityName } from '@/lib/relations';
 import GoalCard from '@/components/goals/goal-card';
 import GoalCreateModal from '@/components/goals/goal-create-modal';
 import GoalDetailDrawer from '@/components/goals/goal-detail-drawer';
@@ -72,6 +73,10 @@ export default function GoalsPage() {
 
   const handleUpdate = async (id: string, data: any) => {
     await updateGoal(id, data);
+    // Propagate name change to relations (fire-and-forget)
+    if (data.name && typeof data.name === 'string') {
+      propagateEntityName(id, data.name).catch(() => {});
+    }
     loadGoals();
   };
 

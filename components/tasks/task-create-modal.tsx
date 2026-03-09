@@ -11,6 +11,7 @@ import type { RecurrenceConfig } from '@/lib/recurrence';
 import { useCustomFieldDefs } from '@/lib/hooks/use-custom-field-defs';
 import { getFieldsByGroup } from '@/lib/custom-fields';
 import CustomFieldRenderer from './custom-field-renderer';
+import { validateCustomFieldValues } from '@/lib/validation';
 
 interface Props {
   members: any[];
@@ -53,8 +54,11 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
 
   const submit = () => {
     if (!d.title.trim()) return;
+    // Validate & sanitize custom fields before creating
+    const { sanitized: cleanCustomFields } = validateCustomFieldValues(d.customFields, activeFields);
     const out: any = {
       ...d,
+      customFields: cleanCustomFields,
       tags: d.tags.split(',').map((t: string) => t.trim()).filter(Boolean),
       points: d.points ? Number(d.points) : null,
       timeEstimate: d.timeEstimate ? Number(d.timeEstimate) : null,

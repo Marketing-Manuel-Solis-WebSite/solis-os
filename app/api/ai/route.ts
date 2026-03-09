@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: error.message || 'AI processing failed. Verify your Gemini API key in .env' },
+      { error: 'AI processing failed. Please try again later.' },
       { status: 500 }
     );
   }

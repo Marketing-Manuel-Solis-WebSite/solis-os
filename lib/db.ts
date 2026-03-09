@@ -1,6 +1,6 @@
 import {
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
-  getDocs, getDoc, query, where, orderBy, limit,
+  getDocs, getDoc, query, where, orderBy, limit, writeBatch, collectionGroup,
   serverTimestamp, onSnapshot, DocumentData, arrayUnion, arrayRemove,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -37,6 +37,64 @@ async function getByOrg(col: string, maxResults = 500) {
     const tb = b.createdAt?.seconds || 0;
     return tb - ta;
   });
+}
+
+// ===== CASCADE DELETE HELPERS =====
+
+// Delete all documents in a subcollection (batched, max 450 per batch)
+async function deleteSubcollectionDocs(parentPath: string, subcollectionName: string): Promise<number> {
+  const ref = collection(db, `${parentPath}/${subcollectionName}`);
+  const snap = await getDocs(ref);
+  if (snap.empty) return 0;
+  let deleted = 0;
+  const CHUNK = 450;
+  for (let i = 0; i < snap.docs.length; i += CHUNK) {
+    const batch = writeBatch(db);
+    snap.docs.slice(i, i + CHUNK).forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    deleted += Math.min(CHUNK, snap.docs.length - i);
+  }
+  return deleted;
+}
+
+// Delete all relations where entity is source or target
+async function cleanupEntityRelations(entityId: string): Promise<number> {
+  const [asSource, asTarget] = await Promise.all([
+    getDocs(query(collection(db, 'relations'), where('orgId', '==', ORG), where('sourceId', '==', entityId))),
+    getDocs(query(collection(db, 'relations'), where('orgId', '==', ORG), where('targetId', '==', entityId))),
+  ]);
+  const toDelete = new Map<string, any>();
+  for (const snap of [asSource, asTarget]) {
+    for (const d of snap.docs) toDelete.set(d.id, d.ref);
+  }
+  if (toDelete.size === 0) return 0;
+  const refs = Array.from(toDelete.values());
+  const CHUNK = 450;
+  for (let i = 0; i < refs.length; i += CHUNK) {
+    const batch = writeBatch(db);
+    refs.slice(i, i + CHUNK).forEach((r: any) => batch.delete(r));
+    await batch.commit();
+  }
+  return toDelete.size;
+}
+
+// Remove a task from all goal targets that reference it, then recalculate progress
+async function removeTaskFromGoalTargets(taskId: string): Promise<void> {
+  try {
+    const snap = await getDocs(query(
+      collectionGroup(db, 'targets'),
+      where('linkedTaskIds', 'array-contains', taskId),
+    ));
+    const goalIdsToRecalc = new Set<string>();
+    for (const d of snap.docs) {
+      await updateDoc(d.ref, { linkedTaskIds: arrayRemove(taskId), updatedAt: serverTimestamp() });
+      const goalId = d.ref.parent.parent?.id;
+      if (goalId) goalIdsToRecalc.add(goalId);
+    }
+    for (const goalId of goalIdsToRecalc) {
+      await recalculateGoalProgress(goalId);
+    }
+  } catch { /* OK if no targets exist */ }
 }
 
 // ===== MEMBERS =====
@@ -155,7 +213,16 @@ export async function purgeTeamResources(teamId: string) {
     const q_ = query(collection(db, col), where('orgId', '==', ORG), where('teamId', '==', teamId));
     const snap = await getDocs(q_);
     for (const d of snap.docs) {
-      await deleteDoc(doc(db, `${col}/${d.id}`));
+      // Use cascade delete for entities with subcollections
+      switch (col) {
+        case 'tasks': await deleteTask(d.id); break;
+        case 'goals': await deleteGoal(d.id); break;
+        case 'docs': await deleteDocument(d.id); break;
+        case 'channels': await deleteChannel(d.id); break;
+        case 'forms': await deleteForm(d.id); break;
+        case 'whiteboards': await deleteWhiteboard(d.id); break;
+        default: await deleteAt(`${col}/${d.id}`); break;
+      }
       deleted++;
     }
   }
@@ -202,12 +269,27 @@ export async function createTask(data: any) {
   });
 }
 export async function updateTask(id: string, data: any) { return updateAt(`tasks/${id}`, data); }
-export async function deleteTask(id: string) { return deleteAt(`tasks/${id}`); }
-export async function softDeleteTask(id: string) { return updateAt(`tasks/${id}`, { deleted: true, deletedAt: serverTimestamp() }); }
+export async function deleteTask(id: string) {
+  await Promise.allSettled([
+    deleteSubcollectionDocs(`tasks/${id}`, 'comments'),
+    deleteSubcollectionDocs(`tasks/${id}`, 'activity'),
+    cleanupEntityRelations(id),
+    removeTaskFromGoalTargets(id),
+  ]);
+  return deleteAt(`tasks/${id}`);
+}
+export async function softDeleteTask(id: string) {
+  // Clean up references that would break other entities; keep subcollections for potential restore
+  await Promise.allSettled([
+    cleanupEntityRelations(id),
+    removeTaskFromGoalTargets(id),
+  ]);
+  return updateAt(`tasks/${id}`, { deleted: true, deletedAt: serverTimestamp() });
+}
 export async function restoreTask(id: string) { return updateAt(`tasks/${id}`, { deleted: false, deletedAt: null }); }
 
-export async function getTaskComments(taskId: string) {
-  const q = query(collection(db, `tasks/${taskId}/comments`), orderBy('createdAt', 'asc'));
+export async function getTaskComments(taskId: string, maxResults = 200) {
+  const q = query(collection(db, `tasks/${taskId}/comments`), orderBy('createdAt', 'asc'), limit(maxResults));
   const s = await getDocs(q);
   return s.docs.map(d => ({ id: d.id, ...d.data() }));
 }
@@ -221,8 +303,8 @@ export async function getCustomFieldDefs() {
 export async function saveCustomFieldDefs(fields: any[]) {
   return setAt(`orgs/${ORG}/settings/customFields`, { fields });
 }
-export async function getTaskActivity(taskId: string) {
-  const q = query(collection(db, `tasks/${taskId}/activity`), orderBy('createdAt', 'asc'));
+export async function getTaskActivity(taskId: string, maxResults = 500) {
+  const q = query(collection(db, `tasks/${taskId}/activity`), orderBy('createdAt', 'asc'), limit(maxResults));
   const s = await getDocs(q);
   return s.docs.map(d => ({ id: d.id, ...d.data() }));
 }
@@ -234,7 +316,13 @@ export async function addTaskActivity(taskId: string, data: { action: string; fi
 export async function getDocuments(teamId?: string) { if (teamId) return getByTeam('docs', teamId); return getByOrg('docs'); }
 export async function createDocument(data: any) { return addTo('docs', { ...data, orgId: ORG, content: data.content || '', teamId: data.teamId || '' }); }
 export async function updateDocument(id: string, data: any) { return updateAt(`docs/${id}`, data); }
-export async function deleteDocument(id: string) { return deleteAt(`docs/${id}`); }
+export async function deleteDocument(id: string) {
+  await Promise.allSettled([
+    deleteSubcollectionDocs(`docs/${id}`, 'revisions'),
+    cleanupEntityRelations(id),
+  ]);
+  return deleteAt(`docs/${id}`);
+}
 
 // ===========================================================
 // CHANNELS & MESSAGING — Complete System
@@ -320,6 +408,10 @@ export async function updateChannel(id: string, data: Partial<ChannelData>) {
 }
 
 export async function deleteChannel(id: string) {
+  await Promise.allSettled([
+    deleteSubcollectionDocs(`channels/${id}`, 'messages'),
+    deleteSubcollectionDocs(`channels/${id}`, 'meta'),
+  ]);
   return deleteAt(`channels/${id}`);
 }
 
@@ -359,8 +451,8 @@ export async function removeChannelAdmin(channelId: string, userId: string) {
 }
 
 // --- Messages ---
-export async function getMessages(channelId: string) {
-  const q = query(collection(db, `channels/${channelId}/messages`), orderBy('createdAt', 'asc'));
+export async function getMessages(channelId: string, maxResults = 200) {
+  const q = query(collection(db, `channels/${channelId}/messages`), orderBy('createdAt', 'asc'), limit(maxResults));
   const s = await getDocs(q);
   return s.docs.map(d => ({ id: d.id, ...d.data() }));
 }
@@ -638,7 +730,13 @@ export async function createGoal(data: any) {
 }
 
 export async function updateGoal(id: string, data: any) { return updateAt(`goals/${id}`, data); }
-export async function deleteGoal(id: string) { return deleteAt(`goals/${id}`); }
+export async function deleteGoal(id: string) {
+  await Promise.allSettled([
+    deleteSubcollectionDocs(`goals/${id}`, 'targets'),
+    cleanupEntityRelations(id),
+  ]);
+  return deleteAt(`goals/${id}`);
+}
 
 // Goal Targets (subcollection)
 export async function getGoalTargets(goalId: string) {
@@ -677,8 +775,8 @@ export async function recalculateGoalProgress(goalId: string) {
   let totalProgress = 0;
   for (const t of targets) {
     const target = t as any;
-    const tv = target.targetValue || 1;
-    const cv = Math.min(target.currentValue || 0, tv);
+    const tv = Math.max(target.targetValue || 1, 1); // Guard: never divide by zero
+    const cv = Math.min(Math.max(target.currentValue || 0, 0), tv);
     totalProgress += (cv / tv) * 100;
   }
   const progress = Math.round(totalProgress / targets.length);
@@ -687,29 +785,43 @@ export async function recalculateGoalProgress(goalId: string) {
 }
 
 // Sync goal targets when a task status changes
+// Uses collectionGroup query to find only targets that reference this task (O(1) lookup)
 export async function syncGoalTargetsForTask(taskId: string) {
-  // Find all goals
-  const allGoals = await getByOrg('goals');
-  for (const goal of allGoals) {
-    const g = goal as any;
-    const targets = await getGoalTargets(g.id);
-    let changed = false;
-    for (const target of targets) {
-      const t = target as any;
-      if (t.type === 'tasks' && t.linkedTaskIds?.includes(taskId) && t.autoSync) {
-        // Count completed tasks among linked
-        let completed = 0;
-        for (const tid of t.linkedTaskIds) {
-          const task = await getOne(`tasks/${tid}`);
-          if ((task as any)?.status === 'done') completed++;
-        }
-        if (completed !== t.currentValue) {
-          await updateAt(`goals/${g.id}/targets/${t.id}`, { currentValue: completed });
-          changed = true;
-        }
+  try {
+    // Find only targets that link to this task (instead of loading ALL goals)
+    const snap = await getDocs(query(
+      collectionGroup(db, 'targets'),
+      where('linkedTaskIds', 'array-contains', taskId),
+    ));
+    if (snap.empty) return;
+
+    const goalIdsToRecalc = new Set<string>();
+
+    for (const targetDoc of snap.docs) {
+      const t = targetDoc.data();
+      if (t.type !== 'tasks' || !t.autoSync) continue;
+
+      // Count completed tasks among linked (batch-safe: limited by linkedTaskIds length)
+      const linkedIds: string[] = t.linkedTaskIds || [];
+      let completed = 0;
+      for (const tid of linkedIds) {
+        const task = await getOne(`tasks/${tid}`);
+        if ((task as any)?.status === 'done' && !(task as any)?.deleted) completed++;
+      }
+
+      if (completed !== t.currentValue) {
+        await updateDoc(targetDoc.ref, { currentValue: completed, updatedAt: serverTimestamp() });
+        const goalId = targetDoc.ref.parent.parent?.id;
+        if (goalId) goalIdsToRecalc.add(goalId);
       }
     }
-    if (changed) await recalculateGoalProgress(g.id);
+
+    // Recalculate progress for affected goals only
+    for (const goalId of goalIdsToRecalc) {
+      await recalculateGoalProgress(goalId);
+    }
+  } catch (err) {
+    console.error('[syncGoalTargetsForTask] Error:', err);
   }
 }
 
@@ -798,7 +910,10 @@ export async function createWhiteboard(data: any) {
 }
 
 export async function updateWhiteboard(id: string, data: any) { return updateAt(`whiteboards/${id}`, data); }
-export async function deleteWhiteboard(id: string) { return deleteAt(`whiteboards/${id}`); }
+export async function deleteWhiteboard(id: string) {
+  await deleteSubcollectionDocs(`whiteboards/${id}`, 'elements').catch(() => {});
+  return deleteAt(`whiteboards/${id}`);
+}
 
 // Whiteboard Elements (subcollection)
 export async function getWhiteboardElements(boardId: string) {
@@ -889,7 +1004,13 @@ export async function createForm(data: any) {
 }
 
 export async function updateForm(formId: string, data: any) { return updateAt(`forms/${formId}`, data); }
-export async function deleteForm(formId: string) { return deleteAt(`forms/${formId}`); }
+export async function deleteForm(formId: string) {
+  await Promise.allSettled([
+    deleteSubcollectionDocs(`forms/${formId}`, 'submissions'),
+    deleteSubcollectionDocs(`forms/${formId}`, 'mappings'),
+  ]);
+  return deleteAt(`forms/${formId}`);
+}
 
 export async function regenerateFormToken(formId: string): Promise<string> {
   const token = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -898,8 +1019,8 @@ export async function regenerateFormToken(formId: string): Promise<string> {
 }
 
 // Form Submissions (subcollection)
-export async function getFormSubmissions(formId: string) {
-  const q = query(collection(db, `forms/${formId}/submissions`), orderBy('createdAt', 'desc'));
+export async function getFormSubmissions(formId: string, maxResults = 500) {
+  const q = query(collection(db, `forms/${formId}/submissions`), orderBy('createdAt', 'desc'), limit(maxResults));
   const s = await getDocs(q);
   return s.docs.map(d => ({ id: d.id, ...d.data() }));
 }

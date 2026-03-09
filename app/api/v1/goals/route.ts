@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError, parsePagination } from '../middleware';
 import { getGoals, createGoal } from '@/lib/db-admin';
 import { queueEvent } from '@/lib/integrations-db-admin';
+import { GoalCreateSchema, formatZodError } from '@/lib/validation';
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,8 +22,8 @@ export async function GET(req: NextRequest) {
     const paginated = goals.slice(offset, offset + limit);
 
     return apiResponse(paginated, { total, limit, offset });
-  } catch (err: any) {
-    return apiError(err?.message || 'Internal error', 500);
+  } catch {
+    return apiError('Internal error', 500);
   }
 }
 
@@ -32,18 +33,14 @@ export async function POST(req: NextRequest) {
     if (!auth.valid) return auth.error!;
 
     const body = await req.json();
-    if (!body.name) return apiError('name is required', 400);
+    const parsed = GoalCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return apiError(JSON.stringify(formatZodError(parsed.error)), 400);
+    }
+    const data = parsed.data;
 
     const docRef = await createGoal({
-      name: body.name,
-      description: body.description || '',
-      dueDate: body.dueDate || null,
-      ownerId: body.ownerId || '',
-      ownerName: body.ownerName || '',
-      teamId: body.teamId || '',
-      status: body.status || 'on_track',
-      tags: body.tags || [],
-      color: body.color || '#7B68EE',
+      ...data,
       createdBy: `api:${auth.context!.keyRecord.prefix}`,
       createdByName: 'API',
     });
@@ -52,11 +49,11 @@ export async function POST(req: NextRequest) {
       eventType: 'goal.created',
       entityId: docRef.id,
       entityType: 'goal',
-      payload: { name: body.name },
+      payload: { name: data.name },
     }).catch(() => {});
 
-    return apiResponse({ id: docRef.id, ...body });
-  } catch (err: any) {
-    return apiError(err?.message || 'Internal error', 500);
+    return apiResponse({ id: docRef.id, ...data });
+  } catch {
+    return apiError('Internal error', 500);
   }
 }

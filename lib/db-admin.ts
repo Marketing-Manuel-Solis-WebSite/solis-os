@@ -60,6 +60,75 @@ async function getByTeam(col: string, teamId: string) {
   return all.filter((d: any) => d.teamId === teamId);
 }
 
+// ===== CASCADE DELETE HELPERS (admin SDK) =====
+
+async function deleteSubcollectionDocsAdmin(parentPath: string, subcollectionName: string): Promise<number> {
+  const snap = await adminDb.collection(`${parentPath}/${subcollectionName}`).get();
+  if (snap.empty) return 0;
+  let deleted = 0;
+  const CHUNK = 450;
+  for (let i = 0; i < snap.docs.length; i += CHUNK) {
+    const batch = adminDb.batch();
+    snap.docs.slice(i, i + CHUNK).forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    deleted += Math.min(CHUNK, snap.docs.length - i);
+  }
+  return deleted;
+}
+
+async function cleanupEntityRelationsAdmin(entityId: string): Promise<number> {
+  const [asSource, asTarget] = await Promise.all([
+    adminDb.collection('relations').where('orgId', '==', ORG).where('sourceId', '==', entityId).get(),
+    adminDb.collection('relations').where('orgId', '==', ORG).where('targetId', '==', entityId).get(),
+  ]);
+  const toDelete = new Map<string, FirebaseFirestore.DocumentReference>();
+  for (const snap of [asSource, asTarget]) {
+    for (const d of snap.docs) toDelete.set(d.id, d.ref);
+  }
+  if (toDelete.size === 0) return 0;
+  const refs = Array.from(toDelete.values());
+  const CHUNK = 450;
+  for (let i = 0; i < refs.length; i += CHUNK) {
+    const batch = adminDb.batch();
+    refs.slice(i, i + CHUNK).forEach(r => batch.delete(r));
+    await batch.commit();
+  }
+  return toDelete.size;
+}
+
+async function removeTaskFromGoalTargetsAdmin(taskId: string): Promise<void> {
+  try {
+    const snap = await adminDb.collectionGroup('targets')
+      .where('linkedTaskIds', 'array-contains', taskId)
+      .get();
+    const goalIdsToRecalc = new Set<string>();
+    for (const d of snap.docs) {
+      await d.ref.update({
+        linkedTaskIds: FieldValue.arrayRemove(taskId),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      const goalId = d.ref.parent.parent?.id;
+      if (goalId) goalIdsToRecalc.add(goalId);
+    }
+    for (const goalId of goalIdsToRecalc) {
+      const targets = await adminDb.collection(`goals/${goalId}/targets`).get();
+      if (targets.empty) {
+        await adminDb.doc(`goals/${goalId}`).update({ progress: 0, updatedAt: FieldValue.serverTimestamp() });
+        continue;
+      }
+      let totalProgress = 0;
+      for (const t of targets.docs) {
+        const data = t.data();
+        const tv = data.targetValue || 1;
+        const cv = Math.min(data.currentValue || 0, tv);
+        totalProgress += (cv / tv) * 100;
+      }
+      const progress = Math.round(totalProgress / targets.size);
+      await adminDb.doc(`goals/${goalId}`).update({ progress, updatedAt: FieldValue.serverTimestamp() });
+    }
+  } catch { /* OK if no targets exist */ }
+}
+
 // ===== MEMBERS =====
 export async function getMembers() {
   const snap = await adminDb.collection(`orgs/${ORG}/members`).get();
@@ -129,7 +198,12 @@ export async function purgeTeamResourcesAdmin(teamId: string) {
       .where('teamId', '==', teamId)
       .get();
     for (const d of snap.docs) {
-      await adminDb.doc(`${col}/${d.id}`).delete();
+      // Use cascade delete for entities with subcollections
+      switch (col) {
+        case 'tasks': await deleteTask(d.id); break;
+        case 'goals': await deleteGoal(d.id); break;
+        default: await adminDb.doc(`${col}/${d.id}`).delete(); break;
+      }
       deleted++;
     }
   }
@@ -168,7 +242,15 @@ export async function createTask(data: any) {
 }
 
 export async function updateTask(id: string, data: any) { return updateAt(`tasks/${id}`, data); }
-export async function deleteTask(id: string) { return deleteAt(`tasks/${id}`); }
+export async function deleteTask(id: string) {
+  await Promise.allSettled([
+    deleteSubcollectionDocsAdmin(`tasks/${id}`, 'comments'),
+    deleteSubcollectionDocsAdmin(`tasks/${id}`, 'activity'),
+    cleanupEntityRelationsAdmin(id),
+    removeTaskFromGoalTargetsAdmin(id),
+  ]);
+  return deleteAt(`tasks/${id}`);
+}
 
 // ===== GOALS =====
 export async function getGoals(teamId?: string) {
@@ -198,7 +280,62 @@ export async function createGoal(data: any) {
 }
 
 export async function updateGoal(id: string, data: any) { return updateAt(`goals/${id}`, data); }
-export async function deleteGoal(id: string) { return deleteAt(`goals/${id}`); }
+export async function deleteGoal(id: string) {
+  await Promise.allSettled([
+    deleteSubcollectionDocsAdmin(`goals/${id}`, 'targets'),
+    cleanupEntityRelationsAdmin(id),
+  ]);
+  return deleteAt(`goals/${id}`);
+}
+
+// Sync goal targets when a task status changes (server-side)
+export async function syncGoalTargetsForTaskAdmin(taskId: string) {
+  try {
+    const snap = await adminDb.collectionGroup('targets')
+      .where('linkedTaskIds', 'array-contains', taskId)
+      .get();
+    if (snap.empty) return;
+
+    const goalIdsToRecalc = new Set<string>();
+
+    for (const targetDoc of snap.docs) {
+      const t = targetDoc.data();
+      if (t.type !== 'tasks' || !t.autoSync) continue;
+
+      const linkedIds: string[] = t.linkedTaskIds || [];
+      let completed = 0;
+      for (const tid of linkedIds) {
+        const task = await adminDb.doc(`tasks/${tid}`).get();
+        if (task.exists && task.data()?.status === 'done' && !task.data()?.deleted) completed++;
+      }
+
+      if (completed !== t.currentValue) {
+        await targetDoc.ref.update({ currentValue: completed, updatedAt: FieldValue.serverTimestamp() });
+        const goalId = targetDoc.ref.parent.parent?.id;
+        if (goalId) goalIdsToRecalc.add(goalId);
+      }
+    }
+
+    for (const goalId of goalIdsToRecalc) {
+      const targets = await adminDb.collection(`goals/${goalId}/targets`).get();
+      if (targets.empty) {
+        await adminDb.doc(`goals/${goalId}`).update({ progress: 0, updatedAt: FieldValue.serverTimestamp() });
+        continue;
+      }
+      let totalProgress = 0;
+      for (const t of targets.docs) {
+        const data = t.data();
+        const tv = Math.max(data.targetValue || 1, 1);
+        const cv = Math.min(Math.max(data.currentValue || 0, 0), tv);
+        totalProgress += (cv / tv) * 100;
+      }
+      const progress = Math.round(totalProgress / targets.size);
+      await adminDb.doc(`goals/${goalId}`).update({ progress, updatedAt: FieldValue.serverTimestamp() });
+    }
+  } catch (err) {
+    console.error('[syncGoalTargetsForTaskAdmin] Error:', err);
+  }
+}
 
 // ===== TIME ENTRIES =====
 export async function getTimeEntries(teamId?: string) {
@@ -277,9 +414,10 @@ export async function createFormSubmission(formId: string, data: any) {
   });
 }
 
-export async function getFormSubmissions(formId: string) {
+export async function getFormSubmissions(formId: string, maxResults = 500) {
   const snap = await adminDb.collection(`forms/${formId}/submissions`)
     .orderBy('createdAt', 'desc')
+    .limit(maxResults)
     .get();
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }

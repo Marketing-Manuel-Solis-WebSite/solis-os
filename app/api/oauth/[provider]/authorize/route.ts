@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
     });
 
     return response;
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

@@ -24,6 +24,7 @@ import { useCustomFieldDefs } from '@/lib/hooks/use-custom-field-defs';
 import { getFieldsByGroup } from '@/lib/custom-fields';
 import CustomFieldRenderer from './custom-field-renderer';
 import { useToast } from '@/components/notifications/toast-provider';
+import { validateCustomFieldValues } from '@/lib/validation';
 
 /* ============================================
    PROPS
@@ -174,9 +175,11 @@ export default function TaskDetailDrawer({
     onUpdate(task.id, 'subtasks', (task.subtasks || []).filter((_: any, j: number) => j !== i));
   };
 
-  // --- Custom field handlers ---
+  // --- Custom field handlers (with validation) ---
   const setCustomField = (fid: string, val: unknown) => {
-    onUpdate(task.id, 'customFields', { ...customFields, [fid]: val });
+    const proposed = { ...customFields, [fid]: val };
+    const { sanitized } = validateCustomFieldValues(proposed, activeFields);
+    onUpdate(task.id, 'customFields', sanitized);
   };
   const removeCustomField = (fid: string) => {
     const u = { ...customFields };

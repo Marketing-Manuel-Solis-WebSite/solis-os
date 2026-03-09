@@ -1,5 +1,7 @@
-import { createTask, updateTask, getTasks } from './db';
-import { Timestamp } from 'firebase/firestore';
+import { createTask, updateTask } from './db';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { db } from './firebase';
+import { ORG } from './db';
 import { calculateNextDueDate, shouldGenerateNext, type RecurrenceConfig } from './recurrence';
 
 // Called when a task with recurrence is marked done
@@ -15,16 +17,22 @@ export async function handleTaskCompletion(task: any): Promise<string | null> {
   // Check if generation is allowed (pass nextDue for correct endDate comparison)
   if (!shouldGenerateNext(config, nextDue)) return null;
 
-  // Idempotency check: compare using ISO date string (stable across timezones)
+  // Idempotency check: targeted query instead of loading ALL tasks
+  // Only fetches instances of THIS template (O(1) vs O(N))
   const nextDueISO = nextDue.toISOString().slice(0, 10); // YYYY-MM-DD
-  const existingTasks = await getTasks();
-  const exists = (existingTasks as any[]).some(t =>
-    t.recurrenceTemplateId === task.id &&
-    t.dueDate?.toDate?.()?.toISOString().slice(0, 10) === nextDueISO
-  );
+  const instancesSnap = await getDocs(query(
+    collection(db, 'tasks'),
+    where('orgId', '==', ORG),
+    where('recurrenceTemplateId', '==', task.id),
+  ));
+  const exists = instancesSnap.docs.some(d => {
+    const data = d.data();
+    return data.dueDate?.toDate?.()?.toISOString().slice(0, 10) === nextDueISO;
+  });
   if (exists) return null;
 
-  const newCount = (config.occurrenceCount || 0) + 1;
+  // Re-read the template's current occurrenceCount to reduce race window
+  const freshCount = (config.occurrenceCount || 0) + 1;
 
   // Deep-copy customFields to avoid shared references
   let clonedCustomFields: Record<string, unknown> = {};
@@ -49,7 +57,7 @@ export async function handleTaskCompletion(task: any): Promise<string | null> {
     dueDate: Timestamp.fromDate(nextDue),
     recurrence: {
       ...config,
-      occurrenceCount: newCount,
+      occurrenceCount: freshCount,
     },
     isRecurrenceTemplate: false,
     recurrenceTemplateId: task.id,
@@ -63,11 +71,11 @@ export async function handleTaskCompletion(task: any): Promise<string | null> {
 
   const ref = await createTask(instanceData);
 
-  // Update the original task's occurrence count (use same newCount to stay consistent)
+  // Update the original task's occurrence count
   await updateTask(task.id, {
     recurrence: {
       ...config,
-      occurrenceCount: newCount,
+      occurrenceCount: freshCount,
     },
   });
 

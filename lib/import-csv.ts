@@ -6,6 +6,7 @@ import Papa from 'papaparse';
 import { writeBatch, doc, collection, serverTimestamp, addDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { ORG } from './db';
+import { TASK_STATUSES, TASK_PRIORITIES, TASK_TYPES, VISIBILITY_OPTIONS } from './validation';
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -119,10 +120,10 @@ export function parseCSV(file: File): Promise<{ headers: string[]; rows: Record<
 
 // ─── Validate + Transform rows ─────────────────────────────────
 
-const VALID_STATUSES = ['todo', 'in_progress', 'review', 'done', 'blocked', 'open'];
-const VALID_PRIORITIES = ['urgent', 'high', 'medium', 'low'];
-const VALID_TYPES = ['task', 'bug', 'feature', 'improvement', 'subtask'];
-const VALID_VISIBILITY = ['team', 'private', 'public'];
+const VALID_STATUSES: readonly string[] = TASK_STATUSES;
+const VALID_PRIORITIES: readonly string[] = TASK_PRIORITIES;
+const VALID_TYPES: readonly string[] = TASK_TYPES;
+const VALID_VISIBILITY: readonly string[] = VISIBILITY_OPTIONS;
 
 function resolveAssignees(value: string, members: any[]): string[] {
   if (!value) return [];
@@ -175,8 +176,12 @@ export function validateAndTransform(
     };
 
     const title = getValue('title');
-    if (!title) {
-      errors.push({ row: rowNum, field: 'title', value: '', message: 'Title is required' });
+    if (!title || !title.trim()) {
+      errors.push({ row: rowNum, field: 'title', value: title || '', message: 'Title is required' });
+      continue;
+    }
+    if (title.length > 500) {
+      errors.push({ row: rowNum, field: 'title', value: title.slice(0, 50) + '...', message: 'Title too long (max 500)' });
       continue;
     }
 
@@ -230,14 +235,24 @@ export function validateAndTransform(
     }
 
     const timeEstRaw = getValue('timeEstimate');
-    const timeEstimate = timeEstRaw ? parseInt(timeEstRaw, 10) || null : null;
+    let timeEstimate: number | null = timeEstRaw ? parseInt(timeEstRaw, 10) : null;
+    if (timeEstimate !== null && (isNaN(timeEstimate) || timeEstimate < 0 || timeEstimate > 525600)) {
+      errors.push({ row: rowNum, field: 'timeEstimate', value: timeEstRaw, message: 'Invalid time estimate (0-525600 min)' });
+      timeEstimate = null;
+    }
 
     const pointsRaw = getValue('points');
-    const points = pointsRaw ? parseInt(pointsRaw, 10) || null : null;
+    let points: number | null = pointsRaw ? parseInt(pointsRaw, 10) : null;
+    if (points !== null && (isNaN(points) || points < 0 || points > 10000)) {
+      errors.push({ row: rowNum, field: 'points', value: pointsRaw, message: 'Invalid points (0-10000)' });
+      points = null;
+    }
+
+    const description = getValue('description').slice(0, 10000); // Cap at 10K chars
 
     tasks.push({
       title,
-      description: getValue('description'),
+      description,
       status,
       priority,
       type,

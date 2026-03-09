@@ -157,6 +157,27 @@ export function validateSubmission(
         }
         break;
       }
+
+      case 'date': {
+        if (typeof val !== 'string' || !val) break;
+        const d = new Date(val);
+        if (isNaN(d.getTime())) {
+          errors[field.id] = t('formValidation.invalidDate', { label: field.label || 'Date' });
+        }
+        break;
+      }
+
+      case 'dropdown':
+      case 'radio': {
+        // Validate that the selected value is one of the defined options
+        if (field.options?.length && val) {
+          const validValues = field.options.map(o => o.value);
+          if (!validValues.includes(val)) {
+            errors[field.id] = t('formValidation.invalidSelection', { label: field.label || field.type });
+          }
+        }
+        break;
+      }
     }
   }
 

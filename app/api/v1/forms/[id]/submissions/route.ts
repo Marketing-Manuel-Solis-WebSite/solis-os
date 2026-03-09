@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const paginated = submissions.slice(offset, offset + limit);
 
     return apiResponse(paginated, { total, limit, offset });
-  } catch (err: any) {
-    return apiError(err?.message || 'Internal error', 500);
+  } catch {
+    return apiError('Internal error', 500);
   }
 }

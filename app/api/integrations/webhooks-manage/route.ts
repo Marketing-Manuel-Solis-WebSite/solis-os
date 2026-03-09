@@ -1,39 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWebhookSecret } from '@/lib/integrations-crypto';
 import { addWebhook } from '@/lib/integrations-db-admin';
-import { authenticateRequest } from '@/lib/server-auth';
-import type { WebhookEvent } from '@/lib/integrations-types';
+import { authenticateAdmin } from '@/lib/server-auth';
+import { WebhookCreateSchema, formatZodError } from '@/lib/validation';
 
 export async function POST(req: NextRequest) {
   try {
-    const authedUser = await authenticateRequest(req);
+    const authedUser = await authenticateAdmin(req);
     if (!authedUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized – admin role required' }, { status: 403 });
     }
 
     const body = await req.json();
-    const { name, url, events } = body as {
-      name: string;
-      url: string;
-      events: WebhookEvent[];
-    };
-
-    if (!name?.trim() || !url?.trim() || !events?.length) {
-      return NextResponse.json({ error: 'Name, url, and events required' }, { status: 400 });
+    const parsed = WebhookCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation failed', details: formatZodError(parsed.error) }, { status: 400 });
     }
 
+    const { name, url, events } = parsed.data;
     const secret = generateWebhookSecret();
 
     const ref = await addWebhook({
-      name: name.trim(),
-      url: url.trim(),
+      name,
+      url,
       events,
       secret,
       createdBy: authedUser.uid,
     });
 
     return NextResponse.json({ ok: true, id: ref.id });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

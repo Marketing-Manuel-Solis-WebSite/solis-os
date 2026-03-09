@@ -1,9 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Loader2, ArrowRight } from 'lucide-react';
-import type { FormDocument, FormSubmission } from './constants';
-import { updateFormSubmission, createTask } from '@/lib/db';
+import type { FormDocument, FormSubmission, FormMapping } from './constants';
+import { updateFormSubmission, createTask, getFormMappings } from '@/lib/db';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useToast } from '@/components/notifications/toast-provider';
@@ -15,23 +15,77 @@ interface Props {
   onConverted: (updated: FormSubmission) => void;
 }
 
+// Apply a fieldMap to extract task fields from submission values
+function applyFieldMap(
+  fieldMap: Record<string, string>,
+  values: Record<string, any>,
+  fields: FormDocument['fields'],
+): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [formFieldId, taskField] of Object.entries(fieldMap)) {
+    if (!taskField || !formFieldId) continue;
+    const val = values[formFieldId];
+    if (val !== undefined && val !== null && val !== '') {
+      result[taskField] = val;
+    }
+  }
+  return result;
+}
+
 export default function FormConversionModal({ submission, form, onClose, onConverted }: Props) {
   const { t } = useI18n();
   const toast = useToast();
   const { user, me } = useAuth();
   const [converting, setConverting] = useState(false);
+  const [mappings, setMappings] = useState<FormMapping[]>([]);
+  const [selectedMappingId, setSelectedMappingId] = useState<string>(form.defaultMappingId || '');
 
-  const [taskTitle, setTaskTitle] = useState(() => {
+  // Load available mappings
+  useEffect(() => {
+    getFormMappings(form.id).then((m) => {
+      setMappings(m as FormMapping[]);
+      if (!selectedMappingId && m.length > 0) {
+        setSelectedMappingId(m[0].id);
+      }
+    }).catch(() => {});
+  }, [form.id]);
+
+  const selectedMapping = mappings.find(m => m.id === selectedMappingId);
+
+  // Build initial values from mapping or defaults
+  const getMappedTitle = () => {
+    if (selectedMapping?.fieldMap) {
+      const mapped = applyFieldMap(selectedMapping.fieldMap, submission.values || {}, form.fields);
+      if (mapped.title) return String(mapped.title);
+    }
     const first = form.fields[0];
     return first ? (submission.values?.[first.id] || '') : '';
-  });
-  const [taskDesc, setTaskDesc] = useState(() => {
+  };
+
+  const getMappedDesc = () => {
+    if (selectedMapping?.fieldMap) {
+      const mapped = applyFieldMap(selectedMapping.fieldMap, submission.values || {}, form.fields);
+      if (mapped.description) return String(mapped.description);
+    }
     return form.fields
       .map(f => `**${f.label || f.type}**: ${submission.values?.[f.id] ?? '—'}`)
       .join('\n');
-  });
-  const [taskPriority, setTaskPriority] = useState('medium');
-  const [taskStatus, setTaskStatus] = useState('todo');
+  };
+
+  const [taskTitle, setTaskTitle] = useState(getMappedTitle);
+  const [taskDesc, setTaskDesc] = useState(getMappedDesc);
+  const [taskPriority, setTaskPriority] = useState(selectedMapping?.defaultPriority || 'medium');
+  const [taskStatus, setTaskStatus] = useState(selectedMapping?.defaultStatus || 'todo');
+
+  // Update fields when mapping changes
+  useEffect(() => {
+    if (selectedMapping) {
+      setTaskTitle(getMappedTitle());
+      setTaskDesc(getMappedDesc());
+      setTaskPriority(selectedMapping.defaultPriority || 'medium');
+      setTaskStatus(selectedMapping.defaultStatus || 'todo');
+    }
+  }, [selectedMappingId]);
 
   const inputCls = 'w-full rounded-xl border border-[var(--border-default)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] px-3.5 py-2.5 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/30 outline-none transition-all';
   const labelCls = 'block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold';
@@ -43,7 +97,8 @@ export default function FormConversionModal({ submission, form, onClose, onConve
     }
     setConverting(true);
     try {
-      const taskRef = await createTask({
+      // Build task data with mapping defaults
+      const taskData: Record<string, any> = {
         title: taskTitle || 'From form submission',
         description: taskDesc,
         status: taskStatus,
@@ -52,17 +107,39 @@ export default function FormConversionModal({ submission, form, onClose, onConve
         visibility: 'team',
         createdBy: user?.uid || '',
         createdByName: me?.displayName || '',
-        teamId: '',
-        assignees: [],
-        tags: [`form:${form.title}`],
-        subtasks: [],
+        teamId: selectedMapping?.targetTeamId || '',
+        assignees: selectedMapping?.defaultAssignees || [],
+        tags: [`form:${form.title}`, ...(selectedMapping?.defaultTags || [])],
+        subtasks: (selectedMapping?.autoSubtasks || []).map((s, i) => ({
+          id: `sub-${Date.now()}-${i}`,
+          title: s.title,
+          done: s.done ?? false,
+        })),
+        checklist: (selectedMapping?.autoChecklist || []).map((c, i) => ({
+          id: `chk-${Date.now()}-${i}`,
+          title: c.text,
+          done: c.checked ?? false,
+        })),
         customFields: {},
         watchers: [],
         dependencies: [],
         points: 0,
         timeEstimate: 0,
-      });
+      };
 
+      // Apply remaining mapped fields (e.g., tags, dueDate from form values)
+      if (selectedMapping?.fieldMap) {
+        const mapped = applyFieldMap(selectedMapping.fieldMap, submission.values || {}, form.fields);
+        if (mapped.tags && typeof mapped.tags === 'string') {
+          taskData.tags = [...taskData.tags, ...mapped.tags.split(/[,;]/).map((t: string) => t.trim()).filter(Boolean)];
+        }
+        if (mapped.dueDate) {
+          const d = new Date(mapped.dueDate);
+          if (!isNaN(d.getTime())) taskData.dueDate = d;
+        }
+      }
+
+      const taskRef = await createTask(taskData);
       const taskId = taskRef.id;
 
       await updateFormSubmission(form.id, submission.id, {
@@ -116,6 +193,17 @@ export default function FormConversionModal({ submission, form, onClose, onConve
 
           {/* Body */}
           <div className="px-5 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
+            {/* Mapping selector */}
+            {mappings.length > 0 && (
+              <div>
+                <label className={labelCls}>{t('conversion.mapping')}</label>
+                <select className={inputCls} value={selectedMappingId} onChange={e => setSelectedMappingId(e.target.value)}>
+                  <option value="">{t('conversion.noMapping')}</option>
+                  {mappings.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+            )}
+
             <div>
               <label className={labelCls}>{t('taskCreate.titlePlaceholder')}</label>
               <input className={inputCls} value={taskTitle} onChange={e => setTaskTitle(e.target.value)} autoFocus />

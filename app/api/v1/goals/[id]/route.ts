@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError } from '../../middleware';
 import { getGoal, updateGoal, deleteGoal } from '@/lib/db-admin';
 import { queueEvent } from '@/lib/integrations-db-admin';
+import { GoalUpdateSchema, formatZodError } from '@/lib/validation';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,8 +14,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!goal) return apiError('Goal not found', 404);
 
     return apiResponse(goal);
-  } catch (err: any) {
-    return apiError(err?.message || 'Internal error', 500);
+  } catch {
+    return apiError('Internal error', 500);
   }
 }
 
@@ -28,19 +29,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!goal) return apiError('Goal not found', 404);
 
     const body = await req.json();
-    await updateGoal(id, body);
+    const parsed = GoalUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return apiError(JSON.stringify(formatZodError(parsed.error)), 400);
+    }
+    const data = parsed.data;
+    await updateGoal(id, data);
 
-    const eventType = body.progress !== undefined ? 'goal.progress_changed' : 'goal.updated';
+    const eventType = data.progress !== undefined ? 'goal.progress_changed' : 'goal.updated';
     queueEvent({
       eventType,
       entityId: id,
       entityType: 'goal',
-      payload: { changes: Object.keys(body) },
+      payload: { changes: Object.keys(data) },
     }).catch(() => {});
 
-    return apiResponse({ id, ...body });
-  } catch (err: any) {
-    return apiError(err?.message || 'Internal error', 500);
+    return apiResponse({ id, ...data });
+  } catch {
+    return apiError('Internal error', 500);
   }
 }
 
@@ -56,7 +62,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     await deleteGoal(id);
 
     return apiResponse({ deleted: true, id });
-  } catch (err: any) {
-    return apiError(err?.message || 'Internal error', 500);
+  } catch {
+    return apiError('Internal error', 500);
   }
 }

@@ -1,6 +1,6 @@
 import {
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc,
-  getDocs, getDoc, query, where, orderBy, serverTimestamp,
+  getDocs, getDoc, query, where, orderBy, limit, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -99,10 +99,11 @@ export async function starAIConversation(id: string, starred: boolean) {
 
 // --- Messages ---
 
-export async function getAIMessages(conversationId: string): Promise<AIMessage[]> {
+export async function getAIMessages(conversationId: string, maxResults = 200): Promise<AIMessage[]> {
   const q = query(
     collection(db, `${AI_COL}/${conversationId}/messages`),
-    orderBy('createdAt', 'asc')
+    orderBy('createdAt', 'asc'),
+    limit(maxResults),
   );
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as AIMessage));

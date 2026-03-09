@@ -1,31 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateApiKey } from '@/lib/integrations-crypto';
 import { addApiKey } from '@/lib/integrations-db-admin';
-import { authenticateRequest } from '@/lib/server-auth';
-import type { ApiKeyScope } from '@/lib/integrations-types';
+import { authenticateAdmin } from '@/lib/server-auth';
+import { ApiKeyCreateSchema, formatZodError } from '@/lib/validation';
 
 export async function POST(req: NextRequest) {
   try {
-    const authedUser = await authenticateRequest(req);
+    const authedUser = await authenticateAdmin(req);
     if (!authedUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized – admin role required' }, { status: 403 });
     }
 
     const body = await req.json();
-    const { name, scopes, expiresAt } = body as {
-      name: string;
-      scopes: ApiKeyScope[];
-      expiresAt: number | null;
-    };
-
-    if (!name?.trim() || !scopes?.length) {
-      return NextResponse.json({ error: 'Name and scopes required' }, { status: 400 });
+    const parsed = ApiKeyCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation failed', details: formatZodError(parsed.error) }, { status: 400 });
     }
 
+    const { name, scopes, expiresAt } = parsed.data;
     const { raw, hash, prefix } = generateApiKey();
 
     await addApiKey({
-      name: name.trim(),
+      name,
       keyHash: hash,
       prefix,
       scopes,
@@ -34,7 +30,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, raw, prefix });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

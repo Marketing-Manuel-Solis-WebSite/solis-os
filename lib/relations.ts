@@ -1,5 +1,5 @@
 import {
-  collection, doc, addDoc, deleteDoc, getDocs, query, where, orderBy, limit, serverTimestamp,
+  collection, doc, addDoc, deleteDoc, getDocs, updateDoc, query, where, orderBy, limit, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { ORG } from './db';
@@ -106,4 +106,36 @@ export async function getRelationsForEntity(entityId: string): Promise<EntityRel
     const tb = b.createdAt?.seconds || 0;
     return tb - ta;
   });
+}
+
+// Propagate entity name changes to all relations that reference it
+// Call this when an entity's title/name changes (fire-and-forget)
+export async function propagateEntityName(entityId: string, newName: string): Promise<void> {
+  try {
+    const [asSource, asTarget] = await Promise.all([
+      getDocs(query(
+        collection(db, 'relations'),
+        where('orgId', '==', ORG),
+        where('sourceId', '==', entityId),
+      )),
+      getDocs(query(
+        collection(db, 'relations'),
+        where('orgId', '==', ORG),
+        where('targetId', '==', entityId),
+      )),
+    ]);
+
+    const updates: Promise<void>[] = [];
+    for (const d of asSource.docs) {
+      if (d.data().sourceName !== newName) {
+        updates.push(updateDoc(d.ref, { sourceName: newName, updatedAt: serverTimestamp() }));
+      }
+    }
+    for (const d of asTarget.docs) {
+      if (d.data().targetName !== newName) {
+        updates.push(updateDoc(d.ref, { targetName: newName, updatedAt: serverTimestamp() }));
+      }
+    }
+    if (updates.length > 0) await Promise.allSettled(updates);
+  } catch { /* non-critical — stale names are cosmetic */ }
 }

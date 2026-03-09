@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError } from '../../middleware';
-import { getTask, updateTask, deleteTask } from '@/lib/db-admin';
+import { getTask, updateTask, deleteTask, syncGoalTargetsForTaskAdmin } from '@/lib/db-admin';
 import { queueEvent } from '@/lib/integrations-db-admin';
+import { TaskUpdateSchema, formatZodError } from '@/lib/validation';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,8 +14,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!task) return apiError('Task not found', 404);
 
     return apiResponse(task);
-  } catch (err: any) {
-    return apiError(err?.message || 'Internal error', 500);
+  } catch {
+    return apiError('Internal error', 500);
   }
 }
 
@@ -28,19 +29,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!task) return apiError('Task not found', 404);
 
     const body = await req.json();
-    await updateTask(id, body);
+    const parsed = TaskUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return apiError(JSON.stringify(formatZodError(parsed.error)), 400);
+    }
+    const data = parsed.data;
+    await updateTask(id, data);
 
-    const eventType = body.status && body.status !== (task as any).status ? 'task.status_changed' : 'task.updated';
+    const statusChanged = data.status && data.status !== (task as any).status;
+    const eventType = statusChanged ? 'task.status_changed' : 'task.updated';
     queueEvent({
       eventType,
       entityId: id,
       entityType: 'task',
-      payload: { changes: Object.keys(body), ...(body.status ? { newStatus: body.status, oldStatus: (task as any).status } : {}) },
+      payload: { changes: Object.keys(data), ...(data.status ? { newStatus: data.status, oldStatus: (task as any).status } : {}) },
     }).catch(() => {});
 
-    return apiResponse({ id, ...body });
-  } catch (err: any) {
-    return apiError(err?.message || 'Internal error', 500);
+    // Sync goal targets when task status changes (fire-and-forget)
+    if (statusChanged) {
+      syncGoalTargetsForTaskAdmin(id).catch(() => {});
+    }
+
+    return apiResponse({ id, ...data });
+  } catch {
+    return apiError('Internal error', 500);
   }
 }
 
@@ -63,7 +75,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }).catch(() => {});
 
     return apiResponse({ deleted: true, id });
-  } catch (err: any) {
-    return apiError(err?.message || 'Internal error', 500);
+  } catch {
+    return apiError('Internal error', 500);
   }
 }

@@ -282,12 +282,10 @@ export default function AIInput({ loading, onSend }: Props) {
             display: 'flex', alignItems: 'flex-end', gap: 8,
             borderRadius: 16, padding: '6px 6px 6px 6px',
             background: 'var(--bg-secondary)',
-            border: '1px solid var(--border)',
+            borderWidth: 1, borderStyle: 'solid',
+            borderColor: focused ? 'var(--border-strong)' : 'var(--border)',
             transition: 'box-shadow 0.2s, border-color 0.2s',
-            ...(focused ? {
-              borderColor: 'var(--border-strong)',
-              boxShadow: 'var(--shadow-sm)',
-            } : {}),
+            boxShadow: focused ? 'var(--shadow-sm)' : undefined,
           }}
         >
           {/* "+" tools button */}

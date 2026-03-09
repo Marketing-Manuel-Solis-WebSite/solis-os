@@ -1,6 +1,6 @@
 import {
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc,
-  getDocs, getDoc, query, where, orderBy, limit,
+  getDocs, getDoc, query, where, orderBy, limit, writeBatch,
   serverTimestamp, onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -179,6 +179,18 @@ export async function updateWebhook(id: string, data: any) {
 }
 
 export async function deleteWebhook(id: string) {
+  // Cascade: delete webhook logs subcollection
+  try {
+    const logsSnap = await getDocs(collection(db, `webhooks/${id}/logs`));
+    if (!logsSnap.empty) {
+      const CHUNK = 450;
+      for (let i = 0; i < logsSnap.docs.length; i += CHUNK) {
+        const batch = writeBatch(db);
+        logsSnap.docs.slice(i, i + CHUNK).forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+    }
+  } catch { /* proceed with parent delete */ }
   return deleteAt(`webhooks/${id}`);
 }
 
@@ -261,6 +273,18 @@ export async function updateIncomingWebhook(id: string, data: any) {
 }
 
 export async function deleteIncomingWebhook(id: string) {
+  // Cascade: delete incoming webhook events subcollection
+  try {
+    const eventsSnap = await getDocs(collection(db, `incomingWebhooks/${id}/events`));
+    if (!eventsSnap.empty) {
+      const CHUNK = 450;
+      for (let i = 0; i < eventsSnap.docs.length; i += CHUNK) {
+        const batch = writeBatch(db);
+        eventsSnap.docs.slice(i, i + CHUNK).forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+    }
+  } catch { /* proceed with parent delete */ }
   return deleteAt(`incomingWebhooks/${id}`);
 }
 

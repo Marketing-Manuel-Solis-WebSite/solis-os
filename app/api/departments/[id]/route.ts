@@ -4,6 +4,7 @@ import {
   getTeam, updateTeam, deleteTeamAdmin,
   reassignTeamResourcesAdmin, purgeTeamResourcesAdmin,
 } from '@/lib/db-admin';
+import { TeamUpdateSchema, formatZodError } from '@/lib/validation';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -16,8 +17,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const team = await getTeam(id);
     if (!team) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json({ team });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
@@ -29,11 +30,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const { id } = await params;
-    const data = await req.json();
-    await updateTeam(id, data);
+    const body = await req.json();
+    const parsed = TeamUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
+    }
+    await updateTeam(id, parsed.data);
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }
 
@@ -59,7 +64,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     await deleteTeamAdmin(id);
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

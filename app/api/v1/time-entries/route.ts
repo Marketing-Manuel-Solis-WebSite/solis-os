@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError, parsePagination } from '../middleware';
 import { getTimeEntries, getTimeEntriesByDateRange, createTimeEntry } from '@/lib/db-admin';
+import { TimeEntryCreateSchema, formatZodError } from '@/lib/validation';
 
 export async function GET(req: NextRequest) {
   try {
@@ -26,8 +27,8 @@ export async function GET(req: NextRequest) {
     const paginated = entries.slice(offset, offset + limit);
 
     return apiResponse(paginated, { total, limit, offset });
-  } catch (err: any) {
-    return apiError(err?.message || 'Internal error', 500);
+  } catch {
+    return apiError('Internal error', 500);
   }
 }
 
@@ -37,24 +38,19 @@ export async function POST(req: NextRequest) {
     if (!auth.valid) return auth.error!;
 
     const body = await req.json();
-    if (!body.userId || !body.date) return apiError('userId and date are required', 400);
+    const parsed = TimeEntryCreateSchema.safeParse(body);
+    if (!parsed.success) {
+      return apiError(JSON.stringify(formatZodError(parsed.error)), 400);
+    }
+    const data = parsed.data;
 
     const docRef = await createTimeEntry({
-      userId: body.userId,
-      userName: body.userName || '',
-      taskId: body.taskId || '',
-      taskTitle: body.taskTitle || '',
-      date: body.date,
-      hours: body.hours || 0,
-      minutes: body.minutes || 0,
-      notes: body.notes || '',
-      billable: body.billable ?? false,
-      teamId: body.teamId || '',
+      ...data,
       createdBy: `api:${auth.context!.keyRecord.prefix}`,
     });
 
-    return apiResponse({ id: docRef.id, ...body });
-  } catch (err: any) {
-    return apiError(err?.message || 'Internal error', 500);
+    return apiResponse({ id: docRef.id, ...data });
+  } catch {
+    return apiError('Internal error', 500);
   }
 }

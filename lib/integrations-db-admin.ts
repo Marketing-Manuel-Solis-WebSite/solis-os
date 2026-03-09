@@ -156,6 +156,18 @@ export async function updateWebhook(id: string, data: any) {
 }
 
 export async function deleteWebhook(id: string) {
+  // Cascade: delete webhook logs subcollection
+  try {
+    const logsSnap = await adminDb.collection(`webhooks/${id}/logs`).get();
+    if (!logsSnap.empty) {
+      const CHUNK = 450;
+      for (let i = 0; i < logsSnap.docs.length; i += CHUNK) {
+        const batch = adminDb.batch();
+        logsSnap.docs.slice(i, i + CHUNK).forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+    }
+  } catch { /* proceed with parent delete */ }
   return deleteAt(`webhooks/${id}`);
 }
 
@@ -185,6 +197,18 @@ export async function addIncomingWebhook(data: {
 }
 
 export async function deleteIncomingWebhook(id: string) {
+  // Cascade: delete incoming webhook events subcollection
+  try {
+    const eventsSnap = await adminDb.collection(`incomingWebhooks/${id}/events`).get();
+    if (!eventsSnap.empty) {
+      const CHUNK = 450;
+      for (let i = 0; i < eventsSnap.docs.length; i += CHUNK) {
+        const batch = adminDb.batch();
+        eventsSnap.docs.slice(i, i + CHUNK).forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+    }
+  } catch { /* proceed with parent delete */ }
   return deleteAt(`incomingWebhooks/${id}`);
 }
 

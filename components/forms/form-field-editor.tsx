@@ -1,7 +1,8 @@
 'use client';
-import { X, Plus, GripVertical } from 'lucide-react';
+import { X, Plus, GripVertical, AlertTriangle } from 'lucide-react';
 import type { FormField } from './constants';
 import { useI18n } from '@/lib/i18n';
+import { validateFieldDefinition } from '@/lib/validation';
 
 interface Props {
   field: FormField;
@@ -21,6 +22,8 @@ export default function FormFieldEditor({ field, allFields, onChange, onClose }:
   const up = (partial: Partial<FormField>) => onChange({ ...field, ...partial });
   const upVal = (key: string, val: any) => onChange({ ...field, validations: { ...field.validations, [key]: val } });
 
+  const fieldErrors = validateFieldDefinition(field);
+
   const inputCls = 'w-full rounded-xl border border-[var(--border-default)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] px-3 py-2.5 focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/30 outline-none transition-all';
   const labelCls = 'block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold';
 
@@ -33,6 +36,17 @@ export default function FormFieldEditor({ field, allFields, onChange, onClose }:
           <X className="h-4 w-4" />
         </button>
       </div>
+
+      {/* Validation warnings */}
+      {fieldErrors.length > 0 && (
+        <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 space-y-1">
+          {fieldErrors.map((err, i) => (
+            <p key={i} className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+              <AlertTriangle className="h-3 w-3 flex-shrink-0" />{err}
+            </p>
+          ))}
+        </div>
+      )}
 
       {/* Label */}
       <div>

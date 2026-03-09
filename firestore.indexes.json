@@ -137,6 +137,13 @@
         { "fieldPath": "orgId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "targets",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "linkedTaskIds", "arrayConfig": "CONTAINS" }
+      ]
     }
   ],
   "fieldOverrides": []
