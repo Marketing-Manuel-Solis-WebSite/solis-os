@@ -4,7 +4,7 @@
 // ================================================================
 
 import { adminDb } from './firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import type {
   IntegrationProvider, IntegrationCategory, IntegrationStatus,
   ApiKeyScope, WebhookEvent,
@@ -307,6 +307,53 @@ export async function addIncomingEvent(webhookId: string, data: {
     sourceIp: data.sourceIp || '',
     processed: false,
     processedAt: null,
+  });
+}
+
+// ===== ATOMIC COUNTER HELPERS =====
+
+export async function incrementIncomingEventCount(webhookId: string) {
+  await adminDb.doc(`incomingWebhooks/${webhookId}`).update({
+    eventCount: FieldValue.increment(1),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+
+export async function incrementWebhookDeliveryStats(webhookId: string, success: boolean) {
+  const update: Record<string, any> = {
+    'deliveryStats.total': FieldValue.increment(1),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+  if (success) {
+    update['deliveryStats.success'] = FieldValue.increment(1);
+    update['deliveryStats.lastDeliveredAt'] = new Date().toISOString();
+  } else {
+    update['deliveryStats.failed'] = FieldValue.increment(1);
+  }
+  await adminDb.doc(`webhooks/${webhookId}`).update(update);
+}
+
+// ===== EVENT QUEUE — RETRY / EXHAUST =====
+
+export async function markEventExhausted(id: string, attempts: number) {
+  await adminDb.doc(`webhookEvents/${id}`).update({
+    processed: true,
+    exhausted: true,
+    attempts,
+    lastAttemptAt: FieldValue.serverTimestamp(),
+    processedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+
+export async function markEventRetry(id: string, attempts: number) {
+  const backoffMs = Math.pow(2, attempts) * 60 * 1000; // 2min, 4min, 8min
+  const nextAttemptAt = new Date(Date.now() + backoffMs);
+  await adminDb.doc(`webhookEvents/${id}`).update({
+    attempts,
+    lastAttemptAt: FieldValue.serverTimestamp(),
+    nextAttemptAt: Timestamp.fromDate(nextAttemptAt),
+    updatedAt: FieldValue.serverTimestamp(),
   });
 }
 

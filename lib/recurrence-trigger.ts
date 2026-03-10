@@ -18,8 +18,9 @@ export async function handleTaskCompletion(task: any): Promise<string | null> {
   // Check if generation is allowed (pass nextDue for correct endDate comparison)
   if (!shouldGenerateNext(config, nextDue)) return null;
 
-  // Idempotency check: targeted query instead of loading ALL tasks
   const nextDueISO = nextDue.toISOString().slice(0, 10); // YYYY-MM-DD
+
+  // Fast-path: skip if instance already exists (non-authoritative, avoids transaction overhead)
   const instancesSnap = await getDocs(query(
     collection(db, 'tasks'),
     where('orgId', '==', ORG),
@@ -31,24 +32,29 @@ export async function handleTaskCompletion(task: any): Promise<string | null> {
   });
   if (exists) return null;
 
-  // Use transaction to atomically read fresh occurrence count and update template
-  // This prevents the race condition where concurrent completions both read the same count
+  // Transaction: atomically check idempotency + increment occurrence count.
+  // lastGeneratedDue on the template is the authoritative gate — prevents duplicates
+  // even if two concurrent completions both pass the fast-path check above.
   const templateRef = doc(db, `tasks/${task.id}`);
   const freshCount = await runTransaction(db, async (transaction) => {
     const freshSnap = await transaction.get(templateRef);
     if (!freshSnap.exists()) throw new Error('Template task no longer exists');
     const freshData = freshSnap.data();
     const freshConfig = freshData.recurrence as RecurrenceConfig;
-    const newCount = (freshConfig?.occurrenceCount || 0) + 1;
 
-    // Update occurrence count atomically within the transaction
+    // Authoritative idempotency: reject if this due date was already generated
+    if (freshConfig?.lastGeneratedDue === nextDueISO) return null;
+
+    const newCount = (freshConfig?.occurrenceCount || 0) + 1;
     transaction.update(templateRef, {
-      recurrence: { ...freshConfig, occurrenceCount: newCount },
+      recurrence: { ...freshConfig, occurrenceCount: newCount, lastGeneratedDue: nextDueISO },
       updatedAt: serverTimestamp(),
     });
 
     return newCount;
   });
+
+  if (freshCount === null) return null;
 
   // Deep-copy customFields to avoid shared references
   let clonedCustomFields: Record<string, unknown> = {};

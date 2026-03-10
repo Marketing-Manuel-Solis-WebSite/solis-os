@@ -246,8 +246,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { question, mode = 'chat', history = [] } = body;
 
-    if (!question) {
+    if (!question || typeof question !== 'string') {
       return NextResponse.json({ error: 'Question required' }, { status: 400 });
+    }
+
+    // Limit input sizes to prevent abuse
+    if (question.length > 10_000) {
+      return NextResponse.json({ error: 'Question too long (max 10000 chars)' }, { status: 400 });
+    }
+    if (!Array.isArray(history) || history.length > 20) {
+      return NextResponse.json({ error: 'Invalid or oversized history' }, { status: 400 });
     }
 
     const VALID_MODES = ['chat', 'research', 'deep'];

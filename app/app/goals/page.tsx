@@ -5,8 +5,7 @@ import { Plus, Target, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { getGoals, createGoal, updateGoal, deleteGoal } from '@/lib/db';
-import { notifyMany } from '@/lib/notifications';
-import { propagateEntityName } from '@/lib/relations';
+import { afterGoalCreated, afterGoalUpdated, afterGoalDeleted } from '@/lib/goal-side-effects';
 import GoalCard from '@/components/goals/goal-card';
 import GoalCreateModal from '@/components/goals/goal-create-modal';
 import GoalDetailDrawer from '@/components/goals/goal-detail-drawer';
@@ -58,33 +57,39 @@ export default function GoalsPage() {
       createdBy: user?.uid || '',
       createdByName: me?.displayName || '',
     });
-
-    // Notify owner if different from creator
-    if (data.ownerId && data.ownerId !== user?.uid) {
-      notifyMany([data.ownerId], {
-        type: 'goal_assigned',
-        title: t('goals.assignedToYou'),
-        message: data.name,
-        entityUrl: '/app/goals',
-        actorId: user?.uid || '',
-        actorName: me?.displayName || '',
-      });
-    }
+    await afterGoalCreated({
+      goalId: ref.id,
+      goal: data,
+      actor: { actorId: user?.uid || '', actorName: me?.displayName || '' },
+    });
     loadGoals();
   };
 
   const handleUpdate = async (id: string, data: any) => {
     await updateGoal(id, data);
-    // Propagate name change to relations (fire-and-forget)
-    if (data.name && typeof data.name === 'string') {
-      propagateEntityName(id, data.name).catch((err) => console.error('[Goals] propagateEntityName failed:', err));
+    // Dispatch per changed field (name is the primary one with side effects)
+    for (const field of Object.keys(data)) {
+      await afterGoalUpdated({
+        goalId: id,
+        goal: data,
+        field,
+        from: undefined,
+        to: data[field],
+        actor: { actorId: user?.uid || '', actorName: me?.displayName || '' },
+      });
     }
     loadGoals();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm(t('goals.deleteConfirm'))) return;
+    const goal = goals.find(g => g.id === id);
     await deleteGoal(id);
+    await afterGoalDeleted({
+      goalId: id,
+      goal: goal || {},
+      actor: { actorId: user?.uid || '', actorName: me?.displayName || '' },
+    });
     setDetailGoal(null);
     loadGoals();
   };

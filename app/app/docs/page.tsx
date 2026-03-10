@@ -7,10 +7,10 @@ import {
   Filter, X, Sparkles, Paperclip, Calendar, User, Loader2,
 } from 'lucide-react';
 import {
-  getDocuments, createDocument, updateDocument, deleteDocument, logAction,
+  getDocuments, createDocument, updateDocument, deleteDocument,
   getMembers
 } from '@/lib/db';
-import { propagateEntityName } from '@/lib/relations';
+import { afterDocCreated, afterDocUpdated, afterDocDeleted, afterDocRestored } from '@/lib/doc-side-effects';
 import { renderMarkdown } from '@/lib/markdown';
 import DocEditor from '@/components/docs/doc-editor';
 import DocAIPanel from '@/components/docs/doc-ai-panel';
@@ -148,7 +148,7 @@ export default function DocsPage() {
 
   // CRUD
   const handleCreate = async (data: Partial<Doc>) => {
-    await createDocument({
+    const docRef = await createDocument({
       ...data,
       teamId: data.teamId || (activeTeamId === '__all__' ? '' : activeTeamId),
       createdBy: user!.uid,
@@ -162,7 +162,11 @@ export default function DocsPage() {
       wordCount: 0,
       contentHtml: '',
     });
-    await logAction({ action: 'created', resource: 'doc', detail: data.title || '', actorId: user!.uid, actorName: me!.displayName });
+    await afterDocCreated({
+      docId: docRef.id,
+      doc: data as Record<string, any>,
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
     setShowCreate(false);
     await load();
     // Open newest
@@ -182,9 +186,16 @@ export default function DocsPage() {
       version: newVersion,
     });
 
-    // Propagate title change to relations (fire-and-forget)
+    // Propagate title change via dispatcher
     if (data.title && typeof data.title === 'string') {
-      propagateEntityName(id, data.title).catch((err) => console.error('[Docs] propagateEntityName failed:', err));
+      await afterDocUpdated({
+        docId: id,
+        doc: data as Record<string, any>,
+        field: 'title',
+        from: activeDoc?.title,
+        to: data.title,
+        actor: { actorId: user!.uid, actorName: me!.displayName },
+      });
     }
 
     // Version snapshot logic:
@@ -223,7 +234,11 @@ export default function DocsPage() {
   const handleDelete = async (doc: Doc) => {
     if (!confirm(t('docEditor.deleteConfirm', { title: doc.title }))) return;
     await deleteDocument(doc.id);
-    await logAction({ action: 'deleted', resource: 'doc', detail: doc.title, actorId: user!.uid, actorName: me!.displayName });
+    await afterDocDeleted({
+      docId: doc.id,
+      doc: doc as Record<string, any>,
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
     if (activeDoc?.id === doc.id) setActiveDoc(null);
     load();
   };
@@ -288,7 +303,12 @@ export default function DocsPage() {
       lastVersionContentRef.current = revision.content;
       lastVersionTimeRef.current = Date.now();
 
-      await logAction({ action: 'restored_version', resource: 'doc', detail: `${activeDoc.title} → v${revision.version}`, actorId: user!.uid, actorName: me!.displayName });
+      await afterDocRestored({
+        docId: activeDoc.id,
+        doc: activeDoc as Record<string, any>,
+        version: revision.version,
+        actor: { actorId: user!.uid, actorName: me!.displayName },
+      });
       setActiveDoc(prev => prev ? {
         ...prev,
         content: revision.content,

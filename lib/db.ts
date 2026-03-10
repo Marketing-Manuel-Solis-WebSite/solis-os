@@ -1,7 +1,7 @@
 import {
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
   getDocs, getDoc, query, where, orderBy, limit, writeBatch, collectionGroup,
-  serverTimestamp, onSnapshot, DocumentData, arrayUnion, arrayRemove,
+  serverTimestamp, onSnapshot, DocumentData, arrayUnion, arrayRemove, runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { validateCustomFieldValues, loadFieldDefs } from './custom-fields';
@@ -82,23 +82,23 @@ async function cleanupEntityRelations(entityId: string): Promise<number> {
   return toDelete.size;
 }
 
-// Remove a task from all goal targets that reference it, then recalculate progress
+// Remove a task from all goal targets that reference it, then recalculate progress.
+// Propagates errors — callers decide whether to gate on failure.
 async function removeTaskFromGoalTargets(taskId: string): Promise<void> {
-  try {
-    const snap = await getDocs(query(
-      collectionGroup(db, 'targets'),
-      where('linkedTaskIds', 'array-contains', taskId),
-    ));
-    const goalIdsToRecalc = new Set<string>();
-    for (const d of snap.docs) {
-      await updateDoc(d.ref, { linkedTaskIds: arrayRemove(taskId), updatedAt: serverTimestamp() });
-      const goalId = d.ref.parent.parent?.id;
-      if (goalId) goalIdsToRecalc.add(goalId);
-    }
-    for (const goalId of goalIdsToRecalc) {
-      await recalculateGoalProgress(goalId);
-    }
-  } catch { /* OK if no targets exist */ }
+  const snap = await getDocs(query(
+    collectionGroup(db, 'targets'),
+    where('linkedTaskIds', 'array-contains', taskId),
+  ));
+  if (snap.empty) return;
+  const goalIdsToRecalc = new Set<string>();
+  for (const d of snap.docs) {
+    await updateDoc(d.ref, { linkedTaskIds: arrayRemove(taskId), updatedAt: serverTimestamp() });
+    const goalId = d.ref.parent.parent?.id;
+    if (goalId) goalIdsToRecalc.add(goalId);
+  }
+  for (const goalId of goalIdsToRecalc) {
+    await recalculateGoalProgress(goalId);
+  }
 }
 
 // Clean up time-entries referencing a deleted task
@@ -328,29 +328,32 @@ export async function updateTask(id: string, data: any) {
   return updateAt(`tasks/${id}`, data);
 }
 export async function deleteTask(id: string) {
-  const cascadeOps = [
+  // Critical: detach from goal targets (affects goal progress integrity)
+  // Must succeed before parent delete — throws on failure
+  await removeTaskFromGoalTargets(id);
+
+  // Best-effort: orphan cleanup (logged, non-blocking)
+  const bestEffort = [
     { name: 'comments', fn: () => deleteSubcollectionDocs(`tasks/${id}`, 'comments') },
     { name: 'activity', fn: () => deleteSubcollectionDocs(`tasks/${id}`, 'activity') },
     { name: 'relations', fn: () => cleanupEntityRelations(id) },
-    { name: 'goalTargets', fn: () => removeTaskFromGoalTargets(id) },
     { name: 'timeEntries', fn: () => cleanupOrphanedTimeEntries(id) },
     { name: 'whiteboardRefs', fn: () => cleanupWhiteboardLinkedTaskRefs(id) },
   ];
-  const results = await Promise.allSettled(cascadeOps.map(op => op.fn()));
+  const results = await Promise.allSettled(bestEffort.map(op => op.fn()));
   results.forEach((r, i) => {
-    if (r.status === 'rejected') console.error(`[deleteTask] cascade ${cascadeOps[i].name} failed for ${id}:`, r.reason);
+    if (r.status === 'rejected') console.error(`[deleteTask] cascade ${bestEffort[i].name} failed for ${id}:`, r.reason);
   });
   return deleteAt(`tasks/${id}`);
 }
 export async function softDeleteTask(id: string) {
-  const cascadeOps = [
-    { name: 'relations', fn: () => cleanupEntityRelations(id) },
-    { name: 'goalTargets', fn: () => removeTaskFromGoalTargets(id) },
-  ];
-  const results = await Promise.allSettled(cascadeOps.map(op => op.fn()));
-  results.forEach((r, i) => {
-    if (r.status === 'rejected') console.error(`[softDeleteTask] cascade ${cascadeOps[i].name} failed for ${id}:`, r.reason);
-  });
+  // Critical: detach from goal targets — must succeed before soft-delete
+  await removeTaskFromGoalTargets(id);
+
+  // Best-effort: relation cleanup
+  await cleanupEntityRelations(id).catch(err =>
+    console.error(`[softDeleteTask] relations cleanup failed for ${id}:`, err));
+
   return updateAt(`tasks/${id}`, { deleted: true, deletedAt: serverTimestamp() });
 }
 export async function restoreTask(id: string) { return updateAt(`tasks/${id}`, { deleted: false, deletedAt: null }); }
@@ -681,6 +684,11 @@ export async function getAutomations(teamId?: string, maxResults = 500) { if (te
 export async function createAutomation(data: any) { return addTo('automations', { ...data, orgId: ORG, enabled: true, teamId: data.teamId || '' }); }
 export async function updateAutomation(id: string, data: any) { return updateAt(`automations/${id}`, data); }
 export async function deleteAutomation(id: string) { return deleteAt(`automations/${id}`); }
+export async function getAutomationLogs(automationId: string, limitCount = 20) {
+  const q = query(collection(db, `automations/${automationId}/logs`), orderBy('createdAt', 'desc'), limit(limitCount));
+  const snap = await getDocs(q);
+  return snap.docs.map((d: DocumentData) => ({ id: d.id, ...d.data() }));
+}
 
 // ===== AUDIT LOG =====
 export async function getAuditLogs() { return getByOrg('auditLogs'); }
@@ -866,7 +874,6 @@ export async function recalculateGoalProgress(goalId: string) {
 // Uses collectionGroup query to find only targets that reference this task (O(1) lookup)
 export async function syncGoalTargetsForTask(taskId: string) {
   try {
-    // Find only targets that link to this task (instead of loading ALL goals)
     const snap = await getDocs(query(
       collectionGroup(db, 'targets'),
       where('linkedTaskIds', 'array-contains', taskId),
@@ -879,22 +886,35 @@ export async function syncGoalTargetsForTask(taskId: string) {
       const t = targetDoc.data();
       if (t.type !== 'tasks' || !t.autoSync) continue;
 
-      // Batch fetch all linked tasks in parallel instead of sequential N+1 queries
+      // Transaction: read fresh target + all linked tasks → compute → write atomically.
+      // Prevents stale-write race when concurrent task completions update the same target.
       const linkedIds: string[] = t.linkedTaskIds || [];
-      const taskResults = await Promise.all(linkedIds.map(tid => getOne(`tasks/${tid}`)));
-      let completed = 0;
-      for (const task of taskResults) {
-        if ((task as any)?.status === 'done' && !(task as any)?.deleted) completed++;
-      }
+      const taskRefs = linkedIds.map(tid => doc(db, `tasks/${tid}`));
 
-      if (completed !== t.currentValue) {
-        await updateDoc(targetDoc.ref, { currentValue: completed, updatedAt: serverTimestamp() });
+      const updated = await runTransaction(db, async (transaction) => {
+        const freshTarget = await transaction.get(targetDoc.ref);
+        const freshData = freshTarget.data();
+        if (!freshData) return false;
+
+        const taskSnaps = await Promise.all(taskRefs.map(ref => transaction.get(ref)));
+        let completed = 0;
+        for (const taskSnap of taskSnaps) {
+          if (taskSnap.exists() && taskSnap.data()?.status === 'done' && !taskSnap.data()?.deleted) completed++;
+        }
+
+        if (completed !== freshData.currentValue) {
+          transaction.update(targetDoc.ref, { currentValue: completed, updatedAt: serverTimestamp() });
+          return true;
+        }
+        return false;
+      });
+
+      if (updated) {
         const goalId = targetDoc.ref.parent.parent?.id;
         if (goalId) goalIdsToRecalc.add(goalId);
       }
     }
 
-    // Recalculate progress for affected goals only
     for (const goalId of goalIdsToRecalc) {
       await recalculateGoalProgress(goalId);
     }

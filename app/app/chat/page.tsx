@@ -12,7 +12,7 @@ import {
   setPresence, onPresenceSnapshot,
   markChannelRead, onReadCursorsSnapshot,
 } from '@/lib/db';
-import { notifyMany } from '@/lib/notifications';
+import { afterMessageSent } from '@/lib/chat-side-effects';
 import ChannelSidebar from '@/components/chat/channel-sidebar';
 import ChannelHeader from '@/components/chat/channel-header';
 import MessageList from '@/components/chat/message-list';
@@ -177,38 +177,17 @@ export default function ChatPage() {
     });
     setReplyTo(null);
 
-    // Notify channel members (except sender)
-    const recipientIds = (active.members || []).filter((id: string) => id !== user!.uid);
-    if (recipientIds.length > 0) {
-      const channelName = active.type === 'dm' ? t('chat.dm') : `#${active.name}`;
-      notifyMany(recipientIds, {
-        type: 'channel_message',
-        title: t('chat.newMessage', { channel: channelName }),
-        message: content.trim().slice(0, 80),
-        entityType: 'channel',
-        entityId: active.id,
-        entityUrl: '/app/chat',
-        actorId: user!.uid,
-        actorName: me!.displayName,
-      }).catch((err) => console.error('[Chat] notify channel message failed:', err));
-    }
-
-    // Notify mentioned users separately
-    if (mentions.length > 0) {
-      const mentionRecipients = mentions.filter(id => id !== user!.uid);
-      if (mentionRecipients.length > 0) {
-        notifyMany(mentionRecipients, {
-          type: 'channel_mention',
-          title: t('chat.mentionedYou', { name: me!.displayName, channel: active.type === 'dm' ? t('chat.mentionedInDm') : '#' + active.name }),
-          message: content.trim().slice(0, 80),
-          entityType: 'channel',
-          entityId: active.id,
-          entityUrl: '/app/chat',
-          actorId: user!.uid,
-          actorName: me!.displayName,
-        }).catch((err) => console.error('[Chat] notify channel mention failed:', err));
-      }
-    }
+    // Unified side effects: channel member + mention notifications
+    await afterMessageSent({
+      channelId: active.id,
+      messageId: '',
+      message: { content: content.trim() },
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+      channelName: active.name || '',
+      channelType: active.type || 'public',
+      memberIds: active.members || [],
+      mentionIds: mentions,
+    });
 
     loadChannels(); // refresh last message
   };

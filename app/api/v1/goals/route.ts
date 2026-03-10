@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError, parsePagination } from '../middleware';
 import { createGoal, countByOrg, queryGoalsPaginated } from '@/lib/db-admin';
-import { queueEvent } from '@/lib/integrations-db-admin';
 import { GoalCreateSchema, formatZodError } from '@/lib/validation';
+import { afterGoalCreatedAdmin } from '@/lib/goal-side-effects-admin';
 
 export async function GET(req: NextRequest) {
   try {
@@ -44,12 +44,12 @@ export async function POST(req: NextRequest) {
       createdByName: 'API',
     });
 
-    queueEvent({
-      eventType: 'goal.created',
-      entityId: docRef.id,
-      entityType: 'goal',
-      payload: { name: data.name },
-    }).catch((err) => console.error('[GoalsAPI] queue webhook event failed:', err));
+    const apiActor = `api:${auth.context!.keyRecord.prefix}`;
+    await afterGoalCreatedAdmin({
+      goalId: docRef.id,
+      goal: data,
+      actor: { actorId: apiActor, actorName: apiActor },
+    });
 
     return apiResponse({ id: docRef.id, ...data });
   } catch {

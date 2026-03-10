@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError } from '../../middleware';
-import { getTask, updateTask, deleteTask, syncGoalTargetsForTaskAdmin, getCustomFieldDefs } from '@/lib/db-admin';
-import { queueEvent } from '@/lib/integrations-db-admin';
+import { getTask, updateTask, deleteTask, getCustomFieldDefs } from '@/lib/db-admin';
 import { TaskUpdateSchema, formatZodError, validateCustomFieldValues } from '@/lib/validation';
-import { onTaskStatusChanged, onTaskAssigned } from '@/lib/automation-engine';
+import { afterTaskUpdatedAdmin, afterTaskDeletedAdmin } from '@/lib/task-side-effects-admin';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -48,27 +47,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     await updateTask(id, data);
 
-    const statusChanged = data.status && data.status !== (task as any).status;
-    const eventType = statusChanged ? 'task.status_changed' : 'task.updated';
-    queueEvent({
-      eventType,
-      entityId: id,
-      entityType: 'task',
-      payload: { changes: Object.keys(data), ...(data.status ? { newStatus: data.status, oldStatus: (task as any).status } : {}) },
-    }).catch((err) => console.error('[TasksAPI] queue webhook event failed:', err));
-
-    // Sync goal targets when task status changes (fire-and-forget)
-    if (statusChanged) {
-      syncGoalTargetsForTaskAdmin(id).catch((err) => console.error('[TasksAPI] sync goal targets failed:', err));
-    }
-
-    // Trigger automation engine (fire-and-forget)
-    const updatedTask = { ...(task as any), ...data };
-    if (statusChanged) {
-      onTaskStatusChanged(id, updatedTask, (task as any).status).catch((err) => console.error('[TasksAPI] automation status trigger failed:', err));
-    }
-    if (data.assignees && JSON.stringify(data.assignees) !== JSON.stringify((task as any).assignees)) {
-      onTaskAssigned(id, updatedTask).catch((err) => console.error('[TasksAPI] automation assign trigger failed:', err));
+    // Unified side effects — all awaited with error tracking
+    const apiActor = `api:${auth.context!.keyRecord.prefix}`;
+    // Process each changed field through the dispatcher
+    for (const field of Object.keys(data)) {
+      await afterTaskUpdatedAdmin({
+        taskId: id,
+        task: task as Record<string, any>,
+        field,
+        from: (task as any)[field],
+        to: (data as any)[field],
+        actor: { actorId: apiActor, actorName: apiActor },
+      });
     }
 
     return apiResponse({ id, ...data });
@@ -88,12 +78,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
     await deleteTask(id);
 
-    queueEvent({
-      eventType: 'task.deleted',
-      entityId: id,
-      entityType: 'task',
-      payload: { title: (task as any).title },
-    }).catch((err) => console.error('[TasksAPI] queue webhook event for delete failed:', err));
+    // Unified side effects — all awaited with error tracking
+    const apiActorDel = `api:${auth.context!.keyRecord.prefix}`;
+    await afterTaskDeletedAdmin({
+      taskId: id,
+      task: task as Record<string, any>,
+      actor: { actorId: apiActorDel, actorName: apiActorDel },
+    });
 
     return apiResponse({ deleted: true, id });
   } catch {

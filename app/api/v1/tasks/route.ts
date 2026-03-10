@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError, parsePagination } from '../middleware';
 import { createTask, countByOrg, getCustomFieldDefs, queryTasksPaginated } from '@/lib/db-admin';
-import { queueEvent } from '@/lib/integrations-db-admin';
 import { TaskCreateSchema, formatZodError, validateCustomFieldValues } from '@/lib/validation';
-import { onTaskCreated } from '@/lib/automation-engine';
+import { afterTaskCreatedAdmin } from '@/lib/task-side-effects-admin';
 
 export async function GET(req: NextRequest) {
   try {
@@ -50,21 +49,18 @@ export async function POST(req: NextRequest) {
       data.customFields = cfResult.sanitized;
     }
 
+    const apiActor = `api:${auth.context!.keyRecord.prefix}`;
     const docRef = await createTask({
       ...data,
-      createdBy: `api:${auth.context!.keyRecord.prefix}`,
+      createdBy: apiActor,
     });
 
-    // Queue event for webhook delivery
-    queueEvent({
-      eventType: 'task.created',
-      entityId: docRef.id,
-      entityType: 'task',
-      payload: { title: data.title, status: data.status },
-    }).catch((err) => console.error('[TasksAPI] queue webhook event failed:', err));
-
-    // Trigger automation engine (fire-and-forget)
-    onTaskCreated(docRef.id, data).catch((err) => console.error('[TasksAPI] automation trigger failed:', err));
+    // Unified side effects — all awaited with error tracking
+    await afterTaskCreatedAdmin({
+      taskId: docRef.id,
+      task: data,
+      actor: { actorId: apiActor, actorName: apiActor },
+    });
 
     return apiResponse({ id: docRef.id, ...data });
   } catch {

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getIncomingWebhookByToken, addIncomingEvent, updateIncomingWebhook } from '@/lib/integrations-db-admin';
+import { getIncomingWebhookByToken, addIncomingEvent, incrementIncomingEventCount } from '@/lib/integrations-db-admin';
 import { createTask } from '@/lib/db-admin';
 import { verifySignature } from '@/lib/integrations-crypto';
 import { notifyManyAdmin } from '@/lib/db-admin';
+import { afterTaskCreatedAdmin } from '@/lib/task-side-effects-admin';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
@@ -15,6 +16,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     }
 
     const bodyText = await req.text();
+    if (bodyText.length > 1_048_576) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+    }
 
     // Verify HMAC signature — fail-closed: always require secret + valid signature
     if (!webhook.secret) {
@@ -46,10 +50,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
       sourceIp: ip,
     });
 
-    // Increment event count
-    await updateIncomingWebhook(webhook.id, {
-      eventCount: (webhook.eventCount || 0) + 1,
-    });
+    // Atomic event count increment — prevents counter drift under concurrent requests
+    await incrementIncomingEventCount(webhook.id);
 
     // Execute action
     try {
@@ -58,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
           const config = webhook.actionConfig || {};
           const title = extractField(payload, config.titleField) || `Incoming: ${webhook.name}`;
           const description = extractField(payload, config.descriptionField) || JSON.stringify(payload).slice(0, 500);
-          await createTask({
+          const taskData = {
             title,
             description,
             status: config.defaultStatus || 'todo',
@@ -66,6 +68,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
             teamId: config.teamId || '',
             tags: config.tags || ['incoming-webhook'],
             createdBy: `webhook:${webhook.id}`,
+            assignees: [] as string[],
+          };
+          const taskRef = await createTask(taskData);
+          // Trigger unified task side effects (audit, webhooks, automations)
+          await afterTaskCreatedAdmin({
+            taskId: taskRef.id,
+            task: taskData,
+            actor: { actorId: `webhook:${webhook.id}`, actorName: `Webhook: ${webhook.name}` },
           });
           break;
         }

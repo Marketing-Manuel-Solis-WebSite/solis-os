@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFormByToken, createFormSubmission, updateForm, createTask } from '@/lib/db-admin';
 import { validateSubmission, sanitizeValue } from '@/lib/form-validation';
-import { notifyManyAdmin } from '@/lib/db-admin';
-import { queueEvent } from '@/lib/integrations-db-admin';
+import { afterTaskCreatedAdmin } from '@/lib/task-side-effects-admin';
+import { afterFormSubmittedAdmin } from '@/lib/form-side-effects-admin';
 import { adminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import type { FormDocument } from '@/components/forms/constants';
 
 // ---- In-memory rate limiter ----
@@ -118,7 +119,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Validation failed', details: errors }, { status: 400 });
     }
 
-    // Create submission (server-side via admin SDK — no client SDK needed)
+    // === Atomic slot reservation (fail-closed) ===
+    // Transaction reads fresh responseCount and checks limit inside the lock.
+    // If no slot available, reject BEFORE creating the submission.
+    const formRef = adminDb.doc(`forms/${form.id}`);
+    const reserveResult = await adminDb.runTransaction(async (txn) => {
+      const freshSnap = await txn.get(formRef);
+      const freshData = freshSnap.data();
+      if (!freshData) return { allowed: false, newCount: 0 };
+      const currentCount = freshData.responseCount || 0;
+      const limit = freshData.responseLimit;
+      if (limit && currentCount >= limit) {
+        return { allowed: false, newCount: currentCount };
+      }
+      const newCount = currentCount + 1;
+      txn.update(formRef, { responseCount: newCount, updatedAt: FieldValue.serverTimestamp() });
+      return { allowed: true, newCount };
+    });
+
+    if (!reserveResult.allowed) {
+      return NextResponse.json({ error: 'Response limit reached' }, { status: 403 });
+    }
+
+    // Create submission (slot already reserved atomically)
     const userAgent = req.headers.get('user-agent') || '';
     await createFormSubmission(form.id, {
       values: sanitized,
@@ -171,8 +194,24 @@ export async function POST(req: NextRequest) {
             customFields: sanitized,
           });
 
-          // Update submission with conversion metadata
+          // Trigger task side effects (audit, notify assignees, webhooks, automations)
           if (taskRef?.id) {
+            const taskData = {
+              title: taskTitle,
+              description: taskDescription,
+              status: mapping.defaultStatus || 'todo',
+              priority: mapping.defaultPriority || 'medium',
+              assignees: mapping.defaultAssignees || [],
+              tags: [...(mapping.defaultTags || []), 'form-submission'],
+              teamId: mapping.targetTeamId || '',
+            };
+            afterTaskCreatedAdmin({
+              taskId: taskRef.id,
+              task: taskData,
+              actor: { actorId: `form:${form.id}`, actorName: `Form: ${form.title}` },
+            }).catch((err) => console.error('[FormSubmit] task side effects failed:', err));
+
+            // Update submission with conversion metadata
             await adminDb.doc(`forms/${form.id}/submissions/${taskRef.id}`).update({
               convertedToType: 'task',
               convertedToId: taskRef.id,
@@ -188,43 +227,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Increment response count
-    await updateForm(form.id, { responseCount: (form.responseCount || 0) + 1 });
-
-    // Queue webhook event
-    queueEvent({
-      eventType: 'form.submitted',
-      entityId: form.id,
-      entityType: 'form',
-      payload: { formTitle: form.title, responseCount: (form.responseCount || 0) + 1 },
-    }).catch((err) => console.error('[FormSubmit] queue webhook event failed:', err));
-
-    // Notify form creator
-    if (form.createdBy) {
-      try {
-        await notifyManyAdmin([form.createdBy], {
-          type: 'form_submission',
-          title: `Nueva respuesta: ${form.title}`,
-          message: `Se recibió una nueva respuesta en el formulario "${form.title}"`,
-          entityUrl: '/app/forms',
-        });
-      } catch (err) { /* notification failure shouldn't block submission */ console.error('[FormSubmit] notification to creator failed:', err); }
-    }
-
-    // Check if limit is now reached
-    if (form.responseLimit && (form.responseCount || 0) + 1 >= form.responseLimit) {
-      await updateForm(form.id, { status: 'paused' });
-      if (form.createdBy) {
-        try {
-          await notifyManyAdmin([form.createdBy], {
-            type: 'form_limit_reached',
-            title: `Formulario pausado: ${form.title}`,
-            message: `El formulario alcanzó el límite de ${form.responseLimit} respuestas y fue pausado automáticamente.`,
-            entityUrl: '/app/forms',
-          });
-        } catch (err) { /* ignore */ console.error('[FormSubmit] limit-reached notification failed:', err); }
-      }
-    }
+    // Canonical form.submitted side effects (slot already reserved above)
+    await afterFormSubmittedAdmin({
+      formId: form.id,
+      form: form as Record<string, any>,
+      responseCount: reserveResult.newCount,
+      actor: { actorId: `form:${form.id}`, actorName: `Form: ${form.title}` },
+    });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

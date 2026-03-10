@@ -3,14 +3,14 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
-  getTasks, createTask, updateTask, softDeleteTask, logAction,
-  addTaskActivity, getMembers, getSettings, saveSettings,
+  getTasks, createTask, updateTask, softDeleteTask,
+  getMembers, getSettings, saveSettings,
   getUserPreferences, saveUserPreferences,
-  syncGoalTargetsForTask,
 } from '@/lib/db';
-import { notifyMany } from '@/lib/notifications';
-import { propagateEntityName } from '@/lib/relations';
-import { handleTaskCompletion } from '@/lib/recurrence-trigger';
+import {
+  afterTaskCreated, afterTaskUpdated, afterTaskDeleted,
+  afterTaskBulkUpdated, afterTaskBulkDeleted,
+} from '@/lib/task-side-effects';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useToast } from '@/components/notifications/toast-provider';
 
@@ -220,15 +220,11 @@ export default function TasksPage() {
       createdBy: user!.uid,
       visibility: data.visibility || 'team',
     });
-    await logAction({ action: 'created', resource: 'task', detail: data.title, actorId: user!.uid, actorName: me!.displayName });
-    const assigneeIds = (data.assignees || []).filter((id: string) => id !== user!.uid);
-    if (assigneeIds.length > 0) {
-      notifyMany(assigneeIds, {
-        type: 'task_assigned', title: t('tasks.assigned', { name: me!.displayName }),
-        message: data.title || t('tasks.newTaskNotif'), entityType: 'task', entityId: taskRef.id,
-        entityUrl: '/app/tasks', actorId: user!.uid, actorName: me!.displayName,
-      }).catch((err) => console.error('[Tasks] notify assignees failed:', err));
-    }
+    await afterTaskCreated({
+      taskId: taskRef.id,
+      task: data,
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
     setShowCreate(false);
     load();
   };
@@ -236,35 +232,21 @@ export default function TasksPage() {
   const doUpdate = async (id: string, field: string, val: any, old?: any) => {
     if (!can('task', 'update')) return;
     await updateTask(id, { [field]: val });
-    try { await addTaskActivity(id, { action: 'updated', field, from: String(old || ''), to: String(val), actorId: user!.uid, actorName: me!.displayName }); } catch (err) { console.error('[Tasks] add activity failed:', err); }
-    if (field === 'assignees' && Array.isArray(val) && Array.isArray(old)) {
-      const newAssignees = val.filter((uid: string) => !old.includes(uid) && uid !== user!.uid);
-      const task = tasks.find(tk => tk.id === id);
-      if (newAssignees.length > 0) {
-        notifyMany(newAssignees, {
-          type: 'task_assigned', title: t('tasks.assignedTo', { name: me!.displayName }),
-          message: task?.title || t('tasks.updated'), entityType: 'task', entityId: id,
-          entityUrl: '/app/tasks', actorId: user!.uid, actorName: me!.displayName,
-        }).catch((err) => console.error('[Tasks] notify new assignees failed:', err));
-      }
-    }
-    // Recurring task: auto-generate next instance when marked done
+    const task = tasks.find(tk => tk.id === id) || {};
+    const result = await afterTaskUpdated({
+      taskId: id,
+      task,
+      field,
+      from: old,
+      to: val,
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
+    // Surface recurrence failures to user
     if (field === 'status' && val === 'done') {
-      const task = tasks.find(tk => tk.id === id);
-      if (task?.recurrence) {
-        handleTaskCompletion(task).catch(err => {
-          console.error('[Recurrence] Failed to generate next instance:', err);
-          toast.error(t('recurrence.generationFailed'));
-        });
+      const recurrenceEffect = result.effects.find(e => e.name === 'handleTaskCompletion');
+      if (recurrenceEffect && !recurrenceEffect.success) {
+        toast.error(t('recurrence.generationFailed'));
       }
-    }
-    // Sync goal targets when task status changes (fire-and-forget)
-    if (field === 'status') {
-      syncGoalTargetsForTask(id).catch((err) => console.error('[Tasks] sync goal targets failed:', err));
-    }
-    // Propagate title change to relations (fire-and-forget)
-    if (field === 'title' && typeof val === 'string') {
-      propagateEntityName(id, val).catch((err) => console.error('[Tasks] propagate name failed:', err));
     }
     load();
   };
@@ -273,7 +255,11 @@ export default function TasksPage() {
     if (!can('task', 'delete') && tk.createdBy !== user?.uid) return;
     if (!confirm(t('tasks.deleteConfirm', { title: tk.title }))) return;
     await softDeleteTask(tk.id);
-    await logAction({ action: 'deleted', resource: 'task', detail: tk.title, actorId: user!.uid, actorName: me!.displayName });
+    await afterTaskDeleted({
+      taskId: tk.id,
+      task: tk,
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
     if (selectedTask?.id === tk.id) setSelectedTask(null);
     load();
   };
@@ -281,8 +267,14 @@ export default function TasksPage() {
   // ─── Bulk actions ──────────────────────────────────────
   const bulkUpdate = async (field: string, value: any) => {
     if (!can('task', 'update')) return;
-    const promises = Array.from(selectedIds).map(id => updateTask(id, { [field]: value }));
-    await Promise.all(promises);
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map(id => updateTask(id, { [field]: value })));
+    await afterTaskBulkUpdated({
+      updates: ids.map(id => ({ taskId: id, task: tasks.find(tk => tk.id === id) || {} })),
+      field,
+      value,
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
     setSelectedIds(new Set());
     load();
   };
@@ -290,8 +282,12 @@ export default function TasksPage() {
   const bulkDelete = async () => {
     if (!can('task', 'delete')) return;
     if (!confirm(t('tasks.bulkDeleteConfirm', { n: selectedIds.size }))) return;
-    const promises = Array.from(selectedIds).map(id => softDeleteTask(id));
-    await Promise.all(promises);
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map(id => softDeleteTask(id)));
+    await afterTaskBulkDeleted({
+      tasks: ids.map(id => ({ taskId: id, task: tasks.find(tk => tk.id === id) || {} })),
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
     setSelectedIds(new Set());
     if (selectedTask && selectedIds.has(selectedTask.id)) setSelectedTask(null);
     load();
@@ -299,30 +295,52 @@ export default function TasksPage() {
 
   const bulkArchive = async () => {
     if (!can('task', 'update')) return;
-    const promises = Array.from(selectedIds).map(id => updateTask(id, { archived: true }));
-    await Promise.all(promises);
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map(id => updateTask(id, { archived: true })));
+    await afterTaskBulkUpdated({
+      updates: ids.map(id => ({ taskId: id, task: tasks.find(tk => tk.id === id) || {} })),
+      field: 'archived',
+      value: true,
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
     setSelectedIds(new Set());
     load();
   };
 
   const bulkAssignee = async (userId: string) => {
     if (!can('task', 'update')) return;
-    const promises = Array.from(selectedIds).map(id => {
+    const ids = Array.from(selectedIds);
+    const updated: string[] = [];
+    await Promise.all(ids.map(id => {
       const task = tasks.find(tk => tk.id === id);
       if (!task) return Promise.resolve();
       const current = task.assignees || [];
       if (current.includes(userId)) return Promise.resolve();
+      updated.push(id);
       return updateTask(id, { assignees: [...current, userId] });
-    });
-    await Promise.all(promises);
+    }));
+    if (updated.length > 0) {
+      await afterTaskBulkUpdated({
+        updates: updated.map(id => ({ taskId: id, task: tasks.find(tk => tk.id === id) || {} })),
+        field: 'assignees',
+        value: userId,
+        actor: { actorId: user!.uid, actorName: me!.displayName },
+      });
+    }
     setSelectedIds(new Set());
     load();
   };
 
   const bulkTeamChange = async (teamId: string) => {
     if (!can('task', 'update')) return;
-    const promises = Array.from(selectedIds).map(id => updateTask(id, { teamId }));
-    await Promise.all(promises);
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map(id => updateTask(id, { teamId })));
+    await afterTaskBulkUpdated({
+      updates: ids.map(id => ({ taskId: id, task: tasks.find(tk => tk.id === id) || {} })),
+      field: 'teamId',
+      value: teamId,
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
     setSelectedIds(new Set());
     load();
   };

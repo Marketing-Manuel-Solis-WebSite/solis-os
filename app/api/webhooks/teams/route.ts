@@ -1,30 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queueEvent } from '@/lib/integrations-db-admin';
 
-export async function POST(req: NextRequest) {
-  try {
-    const bodyText = await req.text();
-    let payload: any;
-    try { payload = JSON.parse(bodyText); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
+// FAIL-CLOSED: Microsoft Teams webhook integration is disabled until proper
+// Bot Framework authentication is configured.
+// To enable: implement Bot Framework token validation with TEAMS_APP_ID.
 
-    const eventType = payload.type || 'message';
-
-    await queueEvent({
-      eventType: 'task.created',
-      entityId: payload.id || '',
-      entityType: 'teams_event',
-      payload: {
-        provider: 'teams',
-        teamsEventType: eventType,
-        channelId: payload.channelData?.channel?.id || '',
-        teamId: payload.channelData?.team?.id || '',
-        text: payload.text || '',
-        from: payload.from?.name || '',
-      },
-    });
-
-    return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
-  }
+export async function POST(_req: NextRequest) {
+  return NextResponse.json(
+    { error: 'Teams webhook integration is not configured. Contact admin.' },
+    { status: 422 },
+  );
 }

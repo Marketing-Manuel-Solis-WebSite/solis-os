@@ -1,24 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { queueEvent } from '@/lib/integrations-db-admin';
 
-export async function POST(req: NextRequest) {
-  try {
-    const bodyText = await req.text();
-    let payload: any;
-    try { payload = JSON.parse(bodyText); } catch { payload = { raw: bodyText }; }
+// FAIL-CLOSED: Zapier webhook integration is disabled until a verification
+// secret is configured. Zapier supports custom headers for authentication.
+// To enable: set ZAPIER_WEBHOOK_SECRET env var and configure Zapier to send
+// the secret in x-webhook-secret header.
 
-    await queueEvent({
-      eventType: 'task.created',
-      entityId: payload.id?.toString() || '',
-      entityType: 'zapier_trigger',
-      payload: {
-        provider: 'zapier',
-        data: payload,
-      },
-    });
-
-    return NextResponse.json({ ok: true, received: true });
-  } catch {
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
-  }
+export async function POST(_req: NextRequest) {
+  return NextResponse.json(
+    { error: 'Zapier webhook integration is not configured. Contact admin.' },
+    { status: 422 },
+  );
 }

@@ -2,11 +2,11 @@
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useEffect, useState, useCallback } from 'react';
-import { getAutomations, createAutomation, updateAutomation, deleteAutomation, logAction } from '@/lib/db';
+import { getAutomations, createAutomation, updateAutomation, deleteAutomation, logAction, getAutomationLogs } from '@/lib/db';
 import {
   Plus, Trash2, Zap, ArrowRight, Power, PowerOff, ChevronDown, ChevronRight,
   Play, Pause, Filter, Clock, CheckSquare, Bell, Mail, MessageSquare, Bot,
-  Users, Tag, Calendar, AlertTriangle, Edit2, Copy, Search, X, Settings
+  Users, Tag, Calendar, AlertTriangle, Edit2, Copy, Search, X, Settings, History
 } from 'lucide-react';
 
 // === TRIGGER CONFIGS ===
@@ -14,10 +14,8 @@ const TRIGGERS = [
   { id: 'task_created', label: 'Task Created', icon: Plus, color: '#22C55E', desc: 'When a new task is created' },
   { id: 'task_status_changed', label: 'Status Changed', icon: CheckSquare, color: '#3B82F6', desc: 'When a task status changes' },
   { id: 'task_assigned', label: 'Task Assigned', icon: Users, color: '#A855F7', desc: 'When someone is assigned to a task' },
-  { id: 'task_due_approaching', label: 'Due Approaching', icon: Clock, color: '#F59E0B', desc: 'When a task due date is approaching' },
-  { id: 'task_overdue', label: 'Task Overdue', icon: AlertTriangle, color: '#EF4444', desc: 'When a task passes its due date' },
-  { id: 'schedule_daily', label: 'Daily Schedule', icon: Calendar, color: '#06B6D4', desc: 'Run every day at a specific time' },
-  { id: 'schedule_weekly', label: 'Weekly Schedule', icon: Calendar, color: '#8B5CF6', desc: 'Run every week on a specific day' },
+  { id: 'task_due_approaching', label: 'Due Approaching', icon: Clock, color: '#F59E0B', desc: 'When a task due date is approaching', comingSoon: true },
+  { id: 'task_overdue', label: 'Task Overdue', icon: AlertTriangle, color: '#EF4444', desc: 'When a task passes its due date', comingSoon: true },
 ];
 
 // === CONDITION FIELDS ===
@@ -43,9 +41,9 @@ const ACTIONS = [
   { id: 'set_priority', label: 'Set Priority', icon: Tag, color: '#F59E0B', desc: 'Update task priority', configFields: [{ key: 'toPriority', label: 'New Priority', options: ['urgent', 'high', 'medium', 'low'] }] },
   { id: 'assign_user', label: 'Assign User', icon: Users, color: '#A855F7', desc: 'Assign a team member', configFields: [{ key: 'assigneeId', label: 'User', type: 'member' }] },
   { id: 'add_tag', label: 'Add Tag', icon: Tag, color: '#22C55E', desc: 'Add a tag to the task', configFields: [{ key: 'tagName', label: 'Tag', type: 'text' }] },
+  { id: 'remove_tag', label: 'Remove Tag', icon: X, color: '#EF4444', desc: 'Remove a tag from the task', configFields: [{ key: 'tagName', label: 'Tag', type: 'text' }] },
   { id: 'post_comment', label: 'Post Comment', icon: MessageSquare, color: '#06B6D4', desc: 'Auto-comment on the task', configFields: [{ key: 'commentText', label: 'Comment', type: 'text' }] },
   { id: 'send_notification', label: 'Send Notification', icon: Bell, color: '#EC4899', desc: 'Notify team members', configFields: [{ key: 'message', label: 'Message', type: 'text' }] },
-  { id: 'ai_summary', label: 'AI Summary', icon: Bot, color: '#3B82F6', desc: 'Generate an AI summary', configFields: [] },
 ];
 
 interface Condition {
@@ -72,8 +70,20 @@ interface AutoRule {
   enabled: boolean;
   teamId: string;
   runCount: number;
+  errorCount?: number;
   lastRunAt: any;
   createdAt: any;
+}
+
+interface LogEntry {
+  id: string;
+  status: string;
+  actionsExecuted?: { actionType: string; status: string; error?: string }[];
+  duration?: number;
+  triggerData?: { taskId: string; taskTitle: string };
+  actorId?: string;
+  error?: string;
+  createdAt?: any;
 }
 
 // === MAIN ===
@@ -85,6 +95,10 @@ export default function AutomationsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
   const [editingRule, setEditingRule] = useState<AutoRule | null>(null);
+  const [expandedLogs, setExpandedLogs] = useState<string | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logFilter, setLogFilter] = useState<'all' | 'success' | 'failure' | 'skipped'>('all');
   const [search, setSearch] = useState('');
   const [filterEnabled, setFilterEnabled] = useState<'all' | 'active' | 'inactive'>('all');
 
@@ -109,6 +123,18 @@ export default function AutomationsPage() {
     await deleteAutomation(rule.id);
     await logAction({ action: 'deleted', resource: 'automation', detail: rule.name, actorId: user!.uid, actorName: me!.displayName });
     load();
+  };
+
+  const toggleLogs = async (ruleId: string) => {
+    if (expandedLogs === ruleId) { setExpandedLogs(null); return; }
+    setExpandedLogs(ruleId);
+    setLogsLoading(true);
+    setLogFilter('all');
+    try {
+      const data = await getAutomationLogs(ruleId, 20);
+      setLogs(data as LogEntry[]);
+    } catch { setLogs([]); }
+    setLogsLoading(false);
   };
 
   const handleDuplicate = (rule: AutoRule) => {
@@ -276,15 +302,66 @@ export default function AutomationsPage() {
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {ruleTeam && <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: `${ruleTeam.color}15`, color: ruleTeam.color }}>{ruleTeam.icon} {ruleTeam.name}</span>}
                     {rule.runCount > 0 && <span className="text-[12px] text-[var(--text-muted)]">{t('automations.runs', { n: rule.runCount })}</span>}
+                    {(rule.errorCount || 0) > 0 && <span className="text-[12px] text-red-400">{t('automations.errors', { n: rule.errorCount || 0 })}</span>}
                     {rule.lastRunAt && <span className="text-[12px] text-[var(--text-muted)]">{t('automations.lastRun', { date: rule.lastRunAt?.toDate?.()?.toLocaleDateString?.() || '—' })}</span>}
                   </div>
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
+                    <button onClick={() => toggleLogs(rule.id)} className={`p-2 rounded-lg ${expandedLogs === rule.id ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--accent)]'}`} title={t('automations.executionHistory')}><History className="h-4 w-4" /></button>
                     <button onClick={() => handleDuplicate(rule)} className="p-2 text-[var(--text-muted)] hover:text-blue-400 rounded-lg" title={t('automations.duplicate')}><Copy className="h-4 w-4" /></button>
                     <button onClick={() => handleDelete(rule)} className="p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg" title={t('common.delete')}><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </div>
+
+                {/* Execution Log Viewer */}
+                {expandedLogs === rule.id && (
+                  <div className="border-t border-[var(--border-primary)] px-5 py-4 bg-[var(--bg-base)]/50">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[13px] font-semibold text-[var(--text-secondary)]">{t('automations.executionHistory')}</p>
+                      <div className="flex gap-1">
+                        {(['all', 'success', 'failure', 'skipped'] as const).map(f => (
+                          <button key={f} onClick={() => setLogFilter(f)}
+                            className={`text-[11px] px-2 py-0.5 rounded-full font-medium transition ${logFilter === f ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}>
+                            {t(`automations.filter${f.charAt(0).toUpperCase() + f.slice(1)}` as any)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {logsLoading ? (
+                      <div className="space-y-2">{[1, 2, 3].map(k => <div key={k} className="h-10 skeleton rounded-lg" />)}</div>
+                    ) : logs.filter(l => logFilter === 'all' || l.status === logFilter).length === 0 ? (
+                      <p className="text-sm text-[var(--text-muted)] py-4 text-center">{t('automations.noExecutions')}</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                        {logs.filter(l => logFilter === 'all' || l.status === logFilter).map(log => (
+                          <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-[var(--bg-elevated)] text-[13px]">
+                            <span className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full font-bold ${log.status === 'success' ? 'bg-emerald-500/10 text-emerald-400' : log.status === 'failure' ? 'bg-red-500/10 text-red-400' : 'bg-gray-500/10 text-gray-400'}`}>
+                              {log.status === 'success' ? t('automations.logSuccess') : log.status === 'failure' ? t('automations.logFailure') : t('automations.logSkipped')}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              {log.triggerData?.taskTitle && <p className="text-[var(--text-secondary)] truncate">{t('automations.logTask', { title: log.triggerData.taskTitle })}</p>}
+                              {log.actionsExecuted && log.actionsExecuted.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {log.actionsExecuted.map((a, ai) => (
+                                    <span key={ai} className={`text-[11px] px-1.5 py-0.5 rounded ${a.status === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                                      {ACTIONS.find(ac => ac.id === a.actionType)?.label || a.actionType}{a.error ? `: ${a.error.slice(0, 60)}` : ''}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {log.error && <p className="text-red-400 text-[12px] mt-1 truncate">{log.error}</p>}
+                            </div>
+                            <div className="flex flex-col items-end gap-0.5 shrink-0 text-[var(--text-muted)]">
+                              <span className="text-[11px]">{log.createdAt?.toDate?.()?.toLocaleString?.() || '—'}</span>
+                              {log.duration != null && <span className="text-[11px]">{t('automations.logDuration', { ms: log.duration })}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -346,7 +423,14 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
     setActions(actions.map(a => a.id === id ? { ...a, config: { ...a.config, [key]: val } } : a));
   };
 
-  const canSubmit = name.trim() && trigger && actions.length > 0;
+  // Validate all action config fields are filled
+  const actionsConfigured = actions.length > 0 && actions.every(a => {
+    const conf = ACTIONS.find(ac => ac.id === a.type);
+    if (!conf?.configFields?.length) return true;
+    return conf.configFields.every(f => a.config[f.key]?.trim());
+  });
+  const triggerNotComingSoon = trigger && !TRIGGERS.find(t => t.id === trigger && (t as any).comingSoon);
+  const canSubmit = !!(name.trim() && triggerNotComingSoon && actionsConfigured);
   const triggerConf = TRIGGERS.find(t => t.id === trigger);
 
   const submit = () => {
@@ -414,17 +498,23 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
             <div>
               <label className="block text-[12px] uppercase tracking-wider text-[#3B82F6] mb-2 font-semibold">{t('automations.when')}</label>
               <div className="grid grid-cols-2 gap-2">
-                {TRIGGERS.map(t => (
-                  <button key={t.id} onClick={() => setTrigger(t.id)}
-                    className={`flex items-start gap-3 p-4 rounded-xl text-left transition-all duration-200 ${trigger === t.id ? 'shadow-card' : 'bg-[var(--bg-elevated)] hover:shadow-card-hover'}`}
-                    style={trigger === t.id ? { backgroundColor: `${t.color}08`, borderColor: `${t.color}30` } : {}}>
-                    <t.icon className="h-5 w-5 shrink-0 mt-0.5" style={{ color: t.color }} />
-                    <div>
-                      <p className={`text-sm font-semibold ${trigger === t.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{t.label}</p>
-                      <p className="text-sm text-[var(--text-muted)] mt-0.5">{t.desc}</p>
-                    </div>
-                  </button>
-                ))}
+                {TRIGGERS.map(tr => {
+                  const disabled = (tr as any).comingSoon;
+                  return (
+                    <button key={tr.id} onClick={() => !disabled && setTrigger(tr.id)} disabled={disabled}
+                      className={`flex items-start gap-3 p-4 rounded-xl text-left transition-all duration-200 ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${trigger === tr.id ? 'shadow-card' : 'bg-[var(--bg-elevated)] hover:shadow-card-hover'}`}
+                      style={trigger === tr.id && !disabled ? { backgroundColor: `${tr.color}08`, borderColor: `${tr.color}30` } : {}}>
+                      <tr.icon className="h-5 w-5 shrink-0 mt-0.5" style={{ color: tr.color }} />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className={`text-sm font-semibold ${trigger === tr.id ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{tr.label}</p>
+                          {disabled && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-bold">COMING SOON</span>}
+                        </div>
+                        <p className="text-sm text-[var(--text-muted)] mt-0.5">{tr.desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -547,7 +637,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                 {!canSubmit && (
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/5 border border-red-500/20">
                     <AlertTriangle className="h-4 w-4 text-red-400" />
-                    <p className="text-sm text-red-400">{t('automations.missingFields', { fields: [!name.trim() ? t('automations.ruleName') : '', !trigger ? t('automations.trigger') : '', actions.length === 0 ? t('automations.actions') : ''].filter(Boolean).join(', ') })}</p>
+                    <p className="text-sm text-red-400">{t('automations.missingFields', { fields: [!name.trim() ? t('automations.ruleName') : '', !triggerNotComingSoon ? t('automations.trigger') : '', actions.length === 0 ? t('automations.actions') : '', !actionsConfigured && actions.length > 0 ? 'Action config' : ''].filter(Boolean).join(', ') })}</p>
                   </div>
                 )}
               </div>

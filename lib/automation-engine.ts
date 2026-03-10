@@ -5,7 +5,7 @@
 
 import { adminDb } from './firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { createNotificationAdmin } from './db-admin';
+import { notifyUsersAdmin } from './notify-admin';
 
 const ORG = 'solis-center';
 
@@ -29,6 +29,9 @@ interface TriggerContext {
   actorId?: string;
   actorName?: string;
 }
+
+// Recursion guard — prevents automation actions from re-triggering the engine
+const _activeTaskIds = new Set<string>();
 
 // ---- Condition Evaluation ----
 
@@ -56,7 +59,7 @@ function evaluateCondition(condition: RuleDoc['conditions'][0], task: Record<str
     case 'less_than':
       return Number(fieldValue) < Number(condValue);
     default:
-      return true; // Unknown operator — don't block execution
+      return false; // Unknown operator — fail-closed
   }
 }
 
@@ -125,12 +128,10 @@ async function executeAction(
       }
       case 'send_notification': {
         const message = action.config.message || `Automation triggered on "${ctx.task.title}"`;
-        // Notify task assignees
         const assignees: string[] = ctx.task.assignees || [];
-        for (const uid of assignees) {
-          await createNotificationAdmin({
-            userId: uid,
-            type: 'system',
+        if (assignees.length > 0) {
+          await notifyUsersAdmin(assignees, {
+            eventType: 'system',
             title: 'Automation',
             message,
             entityType: 'task',
@@ -141,7 +142,7 @@ async function executeAction(
         break;
       }
       default:
-        return { success: true }; // Unsupported action — skip silently
+        return { success: false, error: `Unsupported action type: ${action.type}` };
     }
     return { success: true };
   } catch (err: any) {
@@ -222,7 +223,8 @@ async function writeLog(
       status,
       actionsExecuted: actions,
       duration,
-      triggerData: { taskId: ctx.taskId, taskTitle: ctx.task.title },
+      triggerData: { taskId: ctx.taskId, taskTitle: ctx.task.title || '' },
+      actorId: ctx.actorId || null,
       error: error || null,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -234,10 +236,16 @@ async function writeLog(
 // ---- Public API: trigger entry points ----
 
 export async function onTaskCreated(taskId: string, task: Record<string, any>, actorId?: string): Promise<void> {
-  const rules = await getMatchingRules('task_created', task.teamId);
-  const ctx: TriggerContext = { taskId, task, actorId };
-  for (const rule of rules) {
-    await executeRule(rule, ctx);
+  if (_activeTaskIds.has(taskId)) return; // recursion guard
+  _activeTaskIds.add(taskId);
+  try {
+    const rules = await getMatchingRules('task_created', task.teamId);
+    const ctx: TriggerContext = { taskId, task, actorId };
+    for (const rule of rules) {
+      await executeRule(rule, ctx);
+    }
+  } finally {
+    _activeTaskIds.delete(taskId);
   }
 }
 
@@ -247,10 +255,16 @@ export async function onTaskStatusChanged(
   previousStatus: string,
   actorId?: string,
 ): Promise<void> {
-  const rules = await getMatchingRules('task_status_changed', task.teamId);
-  const ctx: TriggerContext = { taskId, task, previousData: { status: previousStatus }, actorId };
-  for (const rule of rules) {
-    await executeRule(rule, ctx);
+  if (_activeTaskIds.has(taskId)) return; // recursion guard
+  _activeTaskIds.add(taskId);
+  try {
+    const rules = await getMatchingRules('task_status_changed', task.teamId);
+    const ctx: TriggerContext = { taskId, task, previousData: { status: previousStatus }, actorId };
+    for (const rule of rules) {
+      await executeRule(rule, ctx);
+    }
+  } finally {
+    _activeTaskIds.delete(taskId);
   }
 }
 
@@ -259,9 +273,15 @@ export async function onTaskAssigned(
   task: Record<string, any>,
   actorId?: string,
 ): Promise<void> {
-  const rules = await getMatchingRules('task_assigned', task.teamId);
-  const ctx: TriggerContext = { taskId, task, actorId };
-  for (const rule of rules) {
-    await executeRule(rule, ctx);
+  if (_activeTaskIds.has(taskId)) return; // recursion guard
+  _activeTaskIds.add(taskId);
+  try {
+    const rules = await getMatchingRules('task_assigned', task.teamId);
+    const ctx: TriggerContext = { taskId, task, actorId };
+    for (const rule of rules) {
+      await executeRule(rule, ctx);
+    }
+  } finally {
+    _activeTaskIds.delete(taskId);
   }
 }

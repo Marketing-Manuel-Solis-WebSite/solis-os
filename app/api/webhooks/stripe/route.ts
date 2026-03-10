@@ -2,18 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { queueEvent } from '@/lib/integrations-db-admin';
 
+const MAX_PAYLOAD = 1_048_576; // 1MB
+
 export async function POST(req: NextRequest) {
   try {
-    const bodyText = await req.text();
-    const signature = req.headers.get('stripe-signature') || '';
-
-    // Verify Stripe webhook signature
+    // FAIL-CLOSED: reject if secret not configured
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (endpointSecret && signature) {
-      const isValid = verifyStripeSignature(bodyText, signature, endpointSecret);
-      if (!isValid) {
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-      }
+    if (!endpointSecret) {
+      return NextResponse.json(
+        { error: 'Stripe webhook secret not configured. Contact admin.' },
+        { status: 422 },
+      );
+    }
+
+    const bodyText = await req.text();
+    if (bodyText.length > MAX_PAYLOAD) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+    }
+
+    // Require valid Stripe signature
+    const signature = req.headers.get('stripe-signature') || '';
+    if (!signature || !verifyStripeSignature(bodyText, signature, endpointSecret)) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
     let payload: any;
@@ -25,9 +35,8 @@ export async function POST(req: NextRequest) {
 
     const eventType = payload.type || 'stripe.event';
 
-    // Queue event for internal processing
     await queueEvent({
-      eventType: 'form.submitted', // Map to closest internal event
+      eventType: 'form.submitted',
       entityId: payload.id || '',
       entityType: 'stripe_event',
       payload: {

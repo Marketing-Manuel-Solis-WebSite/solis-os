@@ -98,11 +98,30 @@ service cloud.firestore {
       }
 
       // Notifications (code writes to orgs/{orgId}/notifications)
+      // Hardened: actorId must match caller, type must be from known set,
+      // title/message must be strings with sane lengths.
       match /notifications/{notifId} {
         allow read: if isSignedIn() && isSelf(resource.data.userId);
-        allow create: if isSignedIn() && isOrgMember(orgId);
+        allow create: if isSignedIn() && isOrgMember(orgId)
+          && (!request.resource.data.keys().hasAny(['actorId']) || request.resource.data.actorId == request.auth.uid)
+          && request.resource.data.userId is string
+          && request.resource.data.type is string && request.resource.data.type.size() <= 50
+          && request.resource.data.title is string && request.resource.data.title.size() <= 200
+          && request.resource.data.message is string && request.resource.data.message.size() <= 500;
         allow update: if isSignedIn() && isSelf(resource.data.userId); // Mark as read
         allow delete: if isSignedIn() && isSelf(resource.data.userId);
+      }
+
+      // Event Logs — persistent trace of dispatched events
+      // Write-only for members (append-only audit trail).
+      // Read restricted to manager+ for debugging/auditing.
+      match /eventLogs/{logId} {
+        allow read: if isSignedIn() && isManager(orgId);
+        allow create: if isSignedIn() && isOrgMember(orgId)
+          && request.resource.data.correlationId is string
+          && request.resource.data.event is string
+          && request.resource.data.entityType is string;
+        allow update, delete: if false; // Immutable audit trail
       }
 
       // Dashboards
@@ -113,36 +132,38 @@ service cloud.firestore {
         allow delete: if isSignedIn() && isSelf(resource.data.userId);
       }
 
-      // Inbox
+      // Inbox — self-only: users can only access their own inbox items
       match /inbox/{itemId} {
-        allow read: if isSignedIn() && isOrgMember(orgId);
+        allow read: if isSignedIn() && isOrgMember(orgId) && resource.data.userId == request.auth.uid;
         allow create: if isSignedIn() && isOrgMember(orgId);
-        allow update: if isSignedIn() && isOrgMember(orgId);
-        allow delete: if isSignedIn() && isOrgMember(orgId);
+        allow update: if isSignedIn() && isOrgMember(orgId) && resource.data.userId == request.auth.uid;
+        allow delete: if isSignedIn() && isOrgMember(orgId) && resource.data.userId == request.auth.uid;
       }
 
-      // AI Conversations
+      // AI Conversations — self-only: users can only access their own conversations
       match /ai-conversations/{convId} {
-        allow read: if isSignedIn() && isOrgMember(orgId);
-        allow create: if isSignedIn() && isOrgMember(orgId);
-        allow update: if isSignedIn() && isOrgMember(orgId);
-        allow delete: if isSignedIn() && isOrgMember(orgId);
+        allow read: if isSignedIn() && isOrgMember(orgId) && resource.data.userId == request.auth.uid;
+        allow create: if isSignedIn() && isOrgMember(orgId) && request.resource.data.userId == request.auth.uid;
+        allow update: if isSignedIn() && isOrgMember(orgId) && resource.data.userId == request.auth.uid;
+        allow delete: if isSignedIn() && isOrgMember(orgId) && resource.data.userId == request.auth.uid;
 
         match /messages/{msgId} {
-          allow read: if isSignedIn() && isOrgMember(orgId);
-          allow create: if isSignedIn() && isOrgMember(orgId);
+          allow read: if isSignedIn() && isOrgMember(orgId)
+            && get(/databases/$(database)/documents/orgs/$(orgId)/ai-conversations/$(convId)).data.userId == request.auth.uid;
+          allow create: if isSignedIn() && isOrgMember(orgId)
+            && get(/databases/$(database)/documents/orgs/$(orgId)/ai-conversations/$(convId)).data.userId == request.auth.uid;
           allow update, delete: if false;
         }
       }
     }
 
-    // ======== USER PROFILES ========
+    // ======== USER PROFILES (UNUSED — app uses orgs/{orgId}/members) ========
+    // Locked: no app code reads/writes this collection. Kept for backwards compat
+    // with any pre-existing data; read is self-only, all writes denied.
 
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSelf(userId);
-      allow update: if isSelf(userId);
-      allow delete: if false; // Prevent user self-deletion
+      allow read: if isSignedIn() && isSelf(userId);
+      allow create, update, delete: if false;
     }
 
     // ======== WORKSPACES ========
@@ -321,21 +342,33 @@ service cloud.firestore {
       }
     }
 
-    // ======== NOTIFICATIONS (top-level — legacy, kept for backwards compat) ========
+    // ======== NOTIFICATIONS (top-level — legacy, LOCKED) ========
+    // App uses orgs/{orgId}/notifications. This legacy collection is locked to prevent
+    // abuse by any signed-in user. Read/update/delete for existing docs only.
 
     match /notifications/{notificationId} {
       allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
-      allow create: if isSignedIn(); // Allow client-side notification creation
-      allow update: if isSignedIn() && request.auth.uid == resource.data.userId; // Mark as read
+      allow create: if false; // LOCKED — use orgs/{orgId}/notifications instead
+      allow update: if isSignedIn() && request.auth.uid == resource.data.userId;
       allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
     }
 
     // ======== AUDIT LOGS ========
+    // Client-writable by design (UI pages log actions directly).
+    // Hardened: org membership required, actorId must match auth, known fields only,
+    // string types enforced, lengths capped. NOT forensically trustworthy — treat as
+    // best-effort operational log, not as security evidence.
 
     match /auditLogs/{logId} {
       allow read: if isSignedIn() && isAdmin(resource.data.orgId);
-      // Users can only create audit entries where actorId matches their own UID (prevents fabrication)
-      allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
+      allow create: if isSignedIn()
+        && isOrgMember(request.resource.data.orgId)
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.keys().hasAll(['action', 'resource', 'detail', 'actorId', 'actorName', 'orgId'])
+        && request.resource.data.action is string && request.resource.data.action.size() <= 50
+        && request.resource.data.resource is string && request.resource.data.resource.size() <= 50
+        && request.resource.data.detail is string && request.resource.data.detail.size() <= 500
+        && request.resource.data.actorName is string && request.resource.data.actorName.size() <= 100;
       allow update, delete: if false; // Audit logs are immutable
     }
 
@@ -363,18 +396,16 @@ service cloud.firestore {
       allow write: if isSignedIn() && isAdmin(resource.data.orgId);
     }
 
-    // ======== ROLES ========
+    // ======== ROLES (UNUSED — no app code references this collection) ========
 
     match /roles/{roleId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isAdmin(resource.data.orgId);
+      allow read, write: if false;
     }
 
-    // ======== CUSTOM FIELD SCHEMAS ========
+    // ======== CUSTOM FIELD SCHEMAS (UNUSED — app uses orgs/{orgId}/settings/customFields) ========
 
     match /customFieldSchemas/{schemaId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isAdmin(request.resource.data.orgId);
+      allow read, write: if false;
     }
 
     // ======== INTEGRATIONS ========

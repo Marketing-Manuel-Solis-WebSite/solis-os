@@ -24,10 +24,12 @@ service firebase.storage {
                    && request.resource.size < 25 * 1024 * 1024;
     }
 
-    // Public form uploads — anonymous users can upload (rate-limited at API layer)
+    // Public form uploads — anonymous users can upload with restrictions
+    // Rate limiting enforced at API layer; storage rules enforce size + content type
     match /form-uploads/{formId}/{fileName} {
       allow read: if true;
-      allow write: if request.resource.size < 10 * 1024 * 1024; // 10MB per file
+      allow write: if request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('(image|application/pdf|text)/.*');
     }
 
     // Default deny

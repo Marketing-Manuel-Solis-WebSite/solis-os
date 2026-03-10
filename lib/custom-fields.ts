@@ -1,8 +1,7 @@
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
-import { ORG } from './db';
 
-const SETTINGS_PATH = `orgs/${ORG}/settings/customFields`;
+const SETTINGS_PATH = `orgs/solis-center/settings/customFields`;
 
 // Extended field types
 export type CustomFieldType =

@@ -1,5 +1,5 @@
 import { signPayload } from './integrations-crypto';
-import { addWebhookLog, updateWebhook } from './integrations-db-admin';
+import { addWebhookLog, incrementWebhookDeliveryStats } from './integrations-db-admin';
 
 export interface DeliveryResult {
   success: boolean;
@@ -75,16 +75,8 @@ export async function deliverWebhookEvent(
       nextRetryAt: result.success ? undefined : getNextRetryTime(1),
     });
 
-    // Update stats
-    const stats = webhook.deliveryStats || { total: 0, success: 0, failed: 0 };
-    await updateWebhook(webhook.id, {
-      deliveryStats: {
-        total: (stats.total || 0) + 1,
-        success: (stats.success || 0) + (result.success ? 1 : 0),
-        failed: (stats.failed || 0) + (result.success ? 0 : 1),
-        lastDeliveredAt: result.success ? new Date().toISOString() : stats.lastDeliveredAt,
-      },
-    });
+    // Atomic stats increment — prevents counter drift under concurrent deliveries
+    await incrementWebhookDeliveryStats(webhook.id, result.success);
   } catch {
     // Log failures shouldn't block the main flow
   }

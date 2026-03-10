@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError } from '../../middleware';
 import { getGoal, updateGoal, deleteGoal } from '@/lib/db-admin';
-import { queueEvent } from '@/lib/integrations-db-admin';
 import { GoalUpdateSchema, formatZodError } from '@/lib/validation';
+import { afterGoalUpdatedAdmin, afterGoalDeletedAdmin } from '@/lib/goal-side-effects-admin';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -36,13 +36,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const data = parsed.data;
     await updateGoal(id, data);
 
-    const eventType = data.progress !== undefined ? 'goal.progress_changed' : 'goal.updated';
-    queueEvent({
-      eventType,
-      entityId: id,
-      entityType: 'goal',
-      payload: { changes: Object.keys(data) },
-    }).catch((err) => console.error('[GoalsAPI] queue webhook event failed:', err));
+    const apiActor = `api:${auth.context!.keyRecord.prefix}`;
+    for (const field of Object.keys(data)) {
+      await afterGoalUpdatedAdmin({
+        goalId: id,
+        goal: goal as Record<string, any>,
+        field,
+        from: (goal as any)[field],
+        to: (data as any)[field],
+        actor: { actorId: apiActor, actorName: apiActor },
+      });
+    }
 
     return apiResponse({ id, ...data });
   } catch {
@@ -60,6 +64,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!goal) return apiError('Goal not found', 404);
 
     await deleteGoal(id);
+
+    const apiActorDel = `api:${auth.context!.keyRecord.prefix}`;
+    await afterGoalDeletedAdmin({
+      goalId: id,
+      goal: goal as Record<string, any>,
+      actor: { actorId: apiActorDel, actorName: apiActorDel },
+    });
 
     return apiResponse({ deleted: true, id });
   } catch {

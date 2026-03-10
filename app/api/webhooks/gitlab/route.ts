@@ -1,18 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { queueEvent } from '@/lib/integrations-db-admin';
+
+const MAX_PAYLOAD = 1_048_576; // 1MB
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify GitLab webhook token
+    // FAIL-CLOSED: reject if secret not configured
     const secret = process.env.GITLAB_WEBHOOK_SECRET;
-    if (secret) {
-      const token = req.headers.get('x-gitlab-token') || '';
-      if (token !== secret) {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-      }
+    if (!secret) {
+      return NextResponse.json(
+        { error: 'GitLab webhook secret not configured. Contact admin.' },
+        { status: 422 },
+      );
+    }
+
+    // Require valid token (timing-safe comparison)
+    const token = req.headers.get('x-gitlab-token') || '';
+    if (!token || token.length !== secret.length ||
+        !timingSafeEqual(Buffer.from(token), Buffer.from(secret))) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const bodyText = await req.text();
+    if (bodyText.length > MAX_PAYLOAD) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+    }
+
     let payload: any;
     try { payload = JSON.parse(bodyText); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 

@@ -1,8 +1,8 @@
 'use client';
 import { useAuth } from '@/lib/auth';
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { getTasks, createTask, updateTask, softDeleteTask, logAction, addTaskActivity, getMembers } from '@/lib/db';
-import { notifyMany } from '@/lib/notifications';
+import { getTasks, createTask, updateTask, softDeleteTask, getMembers } from '@/lib/db';
+import { afterTaskCreated, afterTaskUpdated, afterTaskDeleted } from '@/lib/task-side-effects';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CalendarDays } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
@@ -108,15 +108,11 @@ export default function PlannerPage() {
       createdBy: user!.uid,
       visibility: data.visibility || 'team',
     });
-    await logAction({ action: 'created', resource: 'task', detail: data.title, actorId: user!.uid, actorName: me!.displayName });
-    const assigneeIds = (data.assignees || []).filter((id: string) => id !== user!.uid);
-    if (assigneeIds.length > 0) {
-      notifyMany(assigneeIds, {
-        type: 'task_assigned', title: t('tasks.assigned', { name: me!.displayName }),
-        message: data.title || t('tasks.newTaskNotif'), entityType: 'task', entityId: taskRef.id,
-        entityUrl: '/app/planner', actorId: user!.uid, actorName: me!.displayName,
-      }).catch((err) => console.error('[Planner] notify task assigned failed:', err));
-    }
+    await afterTaskCreated({
+      taskId: taskRef.id,
+      task: data,
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
     setShowCreate(false);
     load();
   };
@@ -124,16 +120,20 @@ export default function PlannerPage() {
   const doUpdate = async (id: string, field: string, val: any, old?: any) => {
     if (!can('task', 'update')) return;
     await updateTask(id, { [field]: val });
-    try { await addTaskActivity(id, { action: t('planner.activityUpdated'), field, from: String(old || ''), to: String(val), actorId: user!.uid, actorName: me!.displayName }); } catch (err) { console.error('[Planner] add task activity failed:', err); }
-    if (field === 'assignees' && Array.isArray(val) && Array.isArray(old)) {
-      const newAssignees = val.filter((uid: string) => !old.includes(uid) && uid !== user!.uid);
-      const task = tasks.find(t => t.id === id);
-      if (newAssignees.length > 0) {
-        notifyMany(newAssignees, {
-          type: 'task_assigned', title: t('tasks.assignedTo', { name: me!.displayName }),
-          message: task?.title || t('tasks.updated'), entityType: 'task', entityId: id,
-          entityUrl: '/app/planner', actorId: user!.uid, actorName: me!.displayName,
-        }).catch((err) => console.error('[Planner] notify task reassigned failed:', err));
+    const task = tasks.find(t => t.id === id) || {};
+    const result = await afterTaskUpdated({
+      taskId: id,
+      task,
+      field,
+      from: old,
+      to: val,
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
+    // Surface recurrence failures to user
+    if (field === 'status' && val === 'done') {
+      const recurrenceEffect = result.effects.find(e => e.name === 'handleTaskCompletion');
+      if (recurrenceEffect && !recurrenceEffect.success) {
+        toast.error(t('recurrence.generationFailed'));
       }
     }
     load();
@@ -143,7 +143,11 @@ export default function PlannerPage() {
     if (!can('task', 'delete') && task.createdBy !== user?.uid) return toast.warning(t('tasks.noPermission'), t('tasks.noPermDelete'));
     if (!confirm(t('tasks.deleteConfirm', { title: task.title }))) return;
     await softDeleteTask(task.id);
-    await logAction({ action: 'deleted', resource: 'task', detail: task.title, actorId: user!.uid, actorName: me!.displayName });
+    await afterTaskDeleted({
+      taskId: task.id,
+      task,
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
     if (selectedTask?.id === task.id) setSelectedTask(null);
     load();
   };

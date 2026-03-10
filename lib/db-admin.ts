@@ -96,37 +96,37 @@ async function cleanupEntityRelationsAdmin(entityId: string): Promise<number> {
   return toDelete.size;
 }
 
+// Propagates errors — callers decide whether to gate on failure.
 async function removeTaskFromGoalTargetsAdmin(taskId: string): Promise<void> {
-  try {
-    const snap = await adminDb.collectionGroup('targets')
-      .where('linkedTaskIds', 'array-contains', taskId)
-      .get();
-    const goalIdsToRecalc = new Set<string>();
-    for (const d of snap.docs) {
-      await d.ref.update({
-        linkedTaskIds: FieldValue.arrayRemove(taskId),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      const goalId = d.ref.parent.parent?.id;
-      if (goalId) goalIdsToRecalc.add(goalId);
+  const snap = await adminDb.collectionGroup('targets')
+    .where('linkedTaskIds', 'array-contains', taskId)
+    .get();
+  if (snap.empty) return;
+  const goalIdsToRecalc = new Set<string>();
+  for (const d of snap.docs) {
+    await d.ref.update({
+      linkedTaskIds: FieldValue.arrayRemove(taskId),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    const goalId = d.ref.parent.parent?.id;
+    if (goalId) goalIdsToRecalc.add(goalId);
+  }
+  for (const goalId of goalIdsToRecalc) {
+    const targets = await adminDb.collection(`goals/${goalId}/targets`).get();
+    if (targets.empty) {
+      await adminDb.doc(`goals/${goalId}`).update({ progress: 0, updatedAt: FieldValue.serverTimestamp() });
+      continue;
     }
-    for (const goalId of goalIdsToRecalc) {
-      const targets = await adminDb.collection(`goals/${goalId}/targets`).get();
-      if (targets.empty) {
-        await adminDb.doc(`goals/${goalId}`).update({ progress: 0, updatedAt: FieldValue.serverTimestamp() });
-        continue;
-      }
-      let totalProgress = 0;
-      for (const t of targets.docs) {
-        const data = t.data();
-        const tv = data.targetValue || 1;
-        const cv = Math.min(data.currentValue || 0, tv);
-        totalProgress += (cv / tv) * 100;
-      }
-      const progress = Math.round(totalProgress / targets.size);
-      await adminDb.doc(`goals/${goalId}`).update({ progress, updatedAt: FieldValue.serverTimestamp() });
+    let totalProgress = 0;
+    for (const t of targets.docs) {
+      const data = t.data();
+      const tv = Math.max(data.targetValue || 1, 1);
+      const cv = Math.min(data.currentValue || 0, tv);
+      totalProgress += (cv / tv) * 100;
     }
-  } catch { /* OK if no targets exist */ }
+    const progress = Math.round(totalProgress / targets.size);
+    await adminDb.doc(`goals/${goalId}`).update({ progress, updatedAt: FieldValue.serverTimestamp() });
+  }
 }
 
 // Clean up time-entries referencing a deleted task (admin SDK)
@@ -279,17 +279,21 @@ export async function createTask(data: any) {
 
 export async function updateTask(id: string, data: any) { return updateAt(`tasks/${id}`, data); }
 export async function deleteTask(id: string) {
-  const cascadeOps = [
+  // Critical: detach from goal targets (affects goal progress integrity)
+  // Must succeed before parent delete — throws on failure
+  await removeTaskFromGoalTargetsAdmin(id);
+
+  // Best-effort: orphan cleanup (logged, non-blocking)
+  const bestEffort = [
     { name: 'comments', fn: () => deleteSubcollectionDocsAdmin(`tasks/${id}`, 'comments') },
     { name: 'activity', fn: () => deleteSubcollectionDocsAdmin(`tasks/${id}`, 'activity') },
     { name: 'relations', fn: () => cleanupEntityRelationsAdmin(id) },
-    { name: 'goalTargets', fn: () => removeTaskFromGoalTargetsAdmin(id) },
     { name: 'timeEntries', fn: () => cleanupOrphanedTimeEntriesAdmin(id) },
     { name: 'whiteboardRefs', fn: () => cleanupWhiteboardLinkedTaskRefsAdmin(id) },
   ];
-  const results = await Promise.allSettled(cascadeOps.map(op => op.fn()));
+  const results = await Promise.allSettled(bestEffort.map(op => op.fn()));
   results.forEach((r, i) => {
-    if (r.status === 'rejected') console.error(`[deleteTask-admin] cascade ${cascadeOps[i].name} failed for ${id}:`, r.reason);
+    if (r.status === 'rejected') console.error(`[deleteTask-admin] cascade ${bestEffort[i].name} failed for ${id}:`, r.reason);
   });
   return deleteAt(`tasks/${id}`);
 }
@@ -348,37 +352,53 @@ export async function syncGoalTargetsForTaskAdmin(taskId: string) {
       const t = targetDoc.data();
       if (t.type !== 'tasks' || !t.autoSync) continue;
 
+      // Transaction: read fresh target + all linked tasks → compute → write atomically.
+      // Prevents stale-write race when concurrent task completions update the same target.
       const linkedIds: string[] = t.linkedTaskIds || [];
-      // Batch fetch all linked tasks at once instead of N+1 sequential queries
       const taskRefs = linkedIds.map(tid => adminDb.doc(`tasks/${tid}`));
-      const taskSnaps = taskRefs.length > 0 ? await adminDb.getAll(...taskRefs) : [];
-      let completed = 0;
-      for (const snap of taskSnaps) {
-        if (snap.exists && snap.data()?.status === 'done' && !snap.data()?.deleted) completed++;
-      }
 
-      if (completed !== t.currentValue) {
-        await targetDoc.ref.update({ currentValue: completed, updatedAt: FieldValue.serverTimestamp() });
+      const updated = await adminDb.runTransaction(async (txn) => {
+        const freshTarget = await txn.get(targetDoc.ref);
+        const freshData = freshTarget.data();
+        if (!freshData) return false;
+
+        const taskSnaps = taskRefs.length > 0 ? await txn.getAll(...taskRefs) : [];
+        let completed = 0;
+        for (const taskSnap of taskSnaps) {
+          if (taskSnap.exists && taskSnap.data()?.status === 'done' && !taskSnap.data()?.deleted) completed++;
+        }
+
+        if (completed !== freshData.currentValue) {
+          txn.update(targetDoc.ref, { currentValue: completed, updatedAt: FieldValue.serverTimestamp() });
+          return true;
+        }
+        return false;
+      });
+
+      if (updated) {
         const goalId = targetDoc.ref.parent.parent?.id;
         if (goalId) goalIdsToRecalc.add(goalId);
       }
     }
 
+    // Goal progress recalculation — transactional to prevent stale reads
     for (const goalId of goalIdsToRecalc) {
-      const targets = await adminDb.collection(`goals/${goalId}/targets`).get();
-      if (targets.empty) {
-        await adminDb.doc(`goals/${goalId}`).update({ progress: 0, updatedAt: FieldValue.serverTimestamp() });
-        continue;
-      }
-      let totalProgress = 0;
-      for (const t of targets.docs) {
-        const data = t.data();
-        const tv = Math.max(data.targetValue || 1, 1);
-        const cv = Math.min(Math.max(data.currentValue || 0, 0), tv);
-        totalProgress += (cv / tv) * 100;
-      }
-      const progress = Math.round(totalProgress / targets.size);
-      await adminDb.doc(`goals/${goalId}`).update({ progress, updatedAt: FieldValue.serverTimestamp() });
+      await adminDb.runTransaction(async (txn) => {
+        const targetsSnap = await txn.get(adminDb.collection(`goals/${goalId}/targets`));
+        if (targetsSnap.empty) {
+          txn.update(adminDb.doc(`goals/${goalId}`), { progress: 0, updatedAt: FieldValue.serverTimestamp() });
+          return;
+        }
+        let totalProgress = 0;
+        for (const t of targetsSnap.docs) {
+          const data = t.data();
+          const tv = Math.max(data.targetValue || 1, 1);
+          const cv = Math.min(Math.max(data.currentValue || 0, 0), tv);
+          totalProgress += (cv / tv) * 100;
+        }
+        const progress = Math.round(totalProgress / targetsSnap.size);
+        txn.update(adminDb.doc(`goals/${goalId}`), { progress, updatedAt: FieldValue.serverTimestamp() });
+      });
     }
   } catch (err) {
     console.error('[syncGoalTargetsForTaskAdmin] Error:', err);
@@ -654,6 +674,31 @@ export async function notifyManyAdmin(
   data: Omit<Parameters<typeof createNotificationAdmin>[0], 'userId'>,
 ) {
   return Promise.all(userIds.map(userId => createNotificationAdmin({ ...data, userId })));
+}
+
+// ===== AUDIT LOG (server-side) =====
+
+export async function logActionAdmin(data: {
+  action: string;
+  resource: string;
+  detail: string;
+  actorId: string;
+  actorName: string;
+}) {
+  return addTo('auditLogs', { ...data, orgId: ORG });
+}
+
+// ===== TASK ACTIVITY (server-side) =====
+
+export async function addTaskActivityAdmin(taskId: string, data: {
+  action: string;
+  field?: string;
+  from?: string;
+  to?: string;
+  actorId: string;
+  actorName: string;
+}) {
+  return addTo(`tasks/${taskId}/activity`, data);
 }
 
 export { ORG };

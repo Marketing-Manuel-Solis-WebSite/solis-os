@@ -17,6 +17,8 @@ function verifyWebhookSecret(req: NextRequest): boolean {
   }
 }
 
+const MAX_PAYLOAD = 1_048_576; // 1MB
+
 export async function POST(req: NextRequest) {
   if (!verifyWebhookSecret(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -24,6 +26,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const bodyText = await req.text();
+    if (bodyText.length > MAX_PAYLOAD) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+    }
     let payload: any;
     try { payload = JSON.parse(bodyText); } catch (err) { console.error('[CustomWebhook] JSON parse failed:', err); payload = { raw: bodyText }; }
 
