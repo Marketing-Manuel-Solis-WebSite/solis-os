@@ -1,4 +1,5 @@
 'use client';
+import React, { useMemo } from 'react';
 import { useAuth } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -102,49 +103,57 @@ export default function DocsPage() {
     load();
   }, [load]);
 
-  // Filter + Sort
-  let visible = docs.filter(d => {
-    if (search) {
-      const q = search.toLowerCase();
-      if (!d.title?.toLowerCase().includes(q) &&
-          !d.content?.toLowerCase().includes(q) &&
-          !d.tags?.some((t: string) => t.toLowerCase().includes(q))) return false;
-    }
-    if (filterVisibility !== 'all' && d.visibility !== filterVisibility) return false;
-    if (filterCategory !== 'all' && d.category !== filterCategory) return false;
-    if (filterDept !== 'all' && d.teamId !== filterDept) return false;
-    if (filterAuthor !== 'all' && d.createdBy !== filterAuthor) return false;
-    if (filterStarred && !d.starred) return false;
-    if (filterDate !== 'all') {
-      const days = parseInt(filterDate);
-      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-      const docTime = d.updatedAt?.seconds ? d.updatedAt.seconds * 1000 : 0;
-      if (docTime < cutoff) return false;
-    }
-    return true;
-  });
+  // Filter + Sort (memoized)
+  const visible = useMemo(() => {
+    let result = docs.filter(d => {
+      if (search) {
+        const q = search.toLowerCase();
+        if (!d.title?.toLowerCase().includes(q) &&
+            !d.content?.toLowerCase().includes(q) &&
+            !d.tags?.some((t: string) => t.toLowerCase().includes(q))) return false;
+      }
+      if (filterVisibility !== 'all' && d.visibility !== filterVisibility) return false;
+      if (filterCategory !== 'all' && d.category !== filterCategory) return false;
+      if (filterDept !== 'all' && d.teamId !== filterDept) return false;
+      if (filterAuthor !== 'all' && d.createdBy !== filterAuthor) return false;
+      if (filterStarred && !d.starred) return false;
+      if (filterDate !== 'all') {
+        const days = parseInt(filterDate);
+        const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+        const docTime = d.updatedAt?.seconds ? d.updatedAt.seconds * 1000 : 0;
+        if (docTime < cutoff) return false;
+      }
+      return true;
+    });
 
-  visible.sort((a, b) => {
-    if (a.starred && !b.starred) return -1;
-    if (!a.starred && b.starred) return 1;
-    switch (sortBy) {
-      case 'title': return (a.title || '').localeCompare(b.title || '');
-      case 'wordCount': return (b.wordCount || 0) - (a.wordCount || 0);
-      case 'created': return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
-      default: return (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0);
-    }
-  });
+    result.sort((a, b) => {
+      if (a.starred && !b.starred) return -1;
+      if (!a.starred && b.starred) return 1;
+      switch (sortBy) {
+        case 'title': return (a.title || '').localeCompare(b.title || '');
+        case 'wordCount': return (b.wordCount || 0) - (a.wordCount || 0);
+        case 'created': return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
+        default: return (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0);
+      }
+    });
 
-  // Extract unique values
-  const categories = [...new Set(docs.map(d => d.category).filter(Boolean))];
-  const uniqueAuthors: { id: string; name: string }[] = [];
-  const seenAuthors = new Set<string>();
-  for (const d of docs) {
-    if (d.createdBy && !seenAuthors.has(d.createdBy)) {
-      seenAuthors.add(d.createdBy);
-      uniqueAuthors.push({ id: d.createdBy, name: d.createdByName || 'Unknown' });
+    return result;
+  }, [docs, search, filterVisibility, filterCategory, filterDept, filterAuthor, filterStarred, filterDate, sortBy]);
+
+  // Extract unique values (memoized)
+  const categories = useMemo(() => [...new Set(docs.map(d => d.category).filter(Boolean))], [docs]);
+
+  const uniqueAuthors = useMemo(() => {
+    const authors: { id: string; name: string }[] = [];
+    const seenAuthors = new Set<string>();
+    for (const d of docs) {
+      if (d.createdBy && !seenAuthors.has(d.createdBy)) {
+        seenAuthors.add(d.createdBy);
+        authors.push({ id: d.createdBy, name: d.createdByName || 'Unknown' });
+      }
     }
-  }
+    return authors;
+  }, [docs]);
 
   // CRUD
   const handleCreate = async (data: Partial<Doc>) => {
@@ -559,8 +568,8 @@ export default function DocsPage() {
   );
 }
 
-// ========== DOC CARD ==========
-function DocCard({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }: {
+// ========== DOC CARD (memoized) ==========
+const DocCard = React.memo(function DocCard({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }: {
   doc: Doc; index: number; teams: any[];
   onClick: () => void; onDelete: () => void; onToggleStar: () => void; isOwner: boolean;
 }) {
@@ -632,10 +641,10 @@ function DocCard({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }
       </div>
     </div>
   );
-}
+});
 
-// ========== DOC LIST ITEM ==========
-function DocListItem({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }: {
+// ========== DOC LIST ITEM (memoized) ==========
+const DocListItem = React.memo(function DocListItem({ doc, index, teams, onClick, onDelete, onToggleStar, isOwner }: {
   doc: Doc; index: number; teams: any[];
   onClick: () => void; onDelete: () => void; onToggleStar: () => void; isOwner: boolean;
 }) {
@@ -679,7 +688,7 @@ function DocListItem({ doc, index, teams, onClick, onDelete, onToggleStar, isOwn
       )}
     </div>
   );
-}
+});
 
 // ========== CREATE DOC MODAL ==========
 function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {

@@ -1,6 +1,7 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useI18n } from '@/lib/i18n';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown, ChevronRight, ChevronUp, Calendar,
@@ -300,10 +301,10 @@ function SubtaskExpandedList({
 }
 
 /* ============================================= */
-/* TASK ROW                                      */
+/* TASK ROW (memoized)                           */
 /* ============================================= */
 
-function TaskRow({
+const TaskRow = React.memo(function TaskRow({
   task,
   index,
   members,
@@ -614,6 +615,128 @@ function TaskRow({
       )}
     </>
   );
+});
+
+/* ============================================= */
+/* VIRTUALIZED GROUP CONTENT                     */
+/* ============================================= */
+
+function VirtualizedGroupContent({
+  tasks,
+  members,
+  teams,
+  selectedTask,
+  selectedIds,
+  canUpdate,
+  density,
+  columns,
+  subtaskDisplay,
+  onSelect,
+  onToggleSelect,
+  onUpdate,
+  onDelete,
+}: {
+  tasks: Task[];
+  members: any[];
+  teams: any[];
+  selectedTask: Task | null;
+  selectedIds: Set<string>;
+  canUpdate: boolean;
+  density: Density;
+  columns: string[];
+  subtaskDisplay: SubtaskDisplay;
+  onSelect: (task: Task) => void;
+  onToggleSelect: (id: string) => void;
+  onUpdate: (id: string, field: string, value: any, old?: any) => void;
+  onDelete: (task: Task) => void;
+}) {
+  const rowHeight = Math.max(DENSITY_HEIGHT[density], 44) + 4; // +4 for spacing
+  const VIRTUALIZE_THRESHOLD = 50;
+
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: tasks.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => rowHeight,
+    overscan: 10,
+  });
+
+  // Only virtualize if many tasks
+  if (tasks.length < VIRTUALIZE_THRESHOLD) {
+    return (
+      <div className="space-y-1">
+        {tasks.map((task, i) => (
+          <TaskRow
+            key={task.id}
+            task={task}
+            index={i}
+            members={members}
+            teams={teams}
+            isSelected={selectedTask?.id === task.id}
+            isChecked={selectedIds.has(task.id)}
+            canUpdate={canUpdate}
+            density={density}
+            columns={columns}
+            subtaskDisplay={subtaskDisplay}
+            onSelect={() => onSelect(task)}
+            onCheck={() => onToggleSelect(task.id)}
+            onUpdate={onUpdate}
+            onDelete={() => onDelete(task)}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={parentRef}
+      style={{ maxHeight: '60vh', overflow: 'auto' }}
+    >
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const task = tasks[virtualRow.index];
+          return (
+            <div
+              key={task.id}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              <TaskRow
+                task={task}
+                index={virtualRow.index}
+                members={members}
+                teams={teams}
+                isSelected={selectedTask?.id === task.id}
+                isChecked={selectedIds.has(task.id)}
+                canUpdate={canUpdate}
+                density={density}
+                columns={columns}
+                subtaskDisplay={subtaskDisplay}
+                onSelect={() => onSelect(task)}
+                onCheck={() => onToggleSelect(task.id)}
+                onUpdate={onUpdate}
+                onDelete={() => onDelete(task)}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 /* ============================================= */
@@ -656,11 +779,11 @@ export default function TaskListView({
   };
 
   /* Selection helpers */
-  const toggleSelect = (id: string) => {
+  const toggleSelect = useCallback((id: string) => {
     const next = new Set(selectedIds);
     next.has(id) ? next.delete(id) : next.add(id);
     onSelectionChange(next);
-  };
+  }, [selectedIds, onSelectionChange]);
 
   const selectAllInGroup = (tasks: Task[]) => {
     const next = new Set(selectedIds);
@@ -752,27 +875,21 @@ export default function TaskListView({
                     transition={{ duration: 0.2, ease: 'easeInOut' }}
                     className="overflow-hidden"
                   >
-                    <div className="space-y-1">
-                      {group.tasks.map((task, i) => (
-                        <TaskRow
-                          key={task.id}
-                          task={task}
-                          index={i}
-                          members={members}
-                          teams={teams}
-                          isSelected={selectedTask?.id === task.id}
-                          isChecked={selectedIds.has(task.id)}
-                          canUpdate={canUpdate}
-                          density={density}
-                          columns={columns}
-                          subtaskDisplay={subtaskDisplay}
-                          onSelect={() => onSelect(task)}
-                          onCheck={() => toggleSelect(task.id)}
-                          onUpdate={onUpdate}
-                          onDelete={() => onDelete(task)}
-                        />
-                      ))}
-                    </div>
+                    <VirtualizedGroupContent
+                      tasks={group.tasks}
+                      members={members}
+                      teams={teams}
+                      selectedTask={selectedTask}
+                      selectedIds={selectedIds}
+                      canUpdate={canUpdate}
+                      density={density}
+                      columns={columns}
+                      subtaskDisplay={subtaskDisplay}
+                      onSelect={onSelect}
+                      onToggleSelect={toggleSelect}
+                      onUpdate={onUpdate}
+                      onDelete={onDelete}
+                    />
 
                     {/* Quick Add at bottom of group */}
                     {canUpdate && (

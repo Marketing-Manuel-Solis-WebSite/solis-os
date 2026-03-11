@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getIncomingWebhookByToken, addIncomingEvent, incrementIncomingEventCount } from '@/lib/integrations-db-admin';
 import { createTask } from '@/lib/db-admin';
 import { verifySignature } from '@/lib/integrations-crypto';
-import { notifyManyAdmin } from '@/lib/db-admin';
+import { notifyUsersAdmin } from '@/lib/notify-admin';
 import { afterTaskCreatedAdmin } from '@/lib/task-side-effects-admin';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
@@ -83,8 +83,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
           const config = webhook.actionConfig || {};
           const recipients = config.notifyUsers || [];
           if (recipients.length > 0) {
-            await notifyManyAdmin(recipients, {
-              type: 'system',
+            await notifyUsersAdmin(recipients, {
+              eventType: 'system',
               title: config.notificationTitle || `Webhook: ${webhook.name}`,
               message: extractField(payload, config.messageField) || 'Nuevo evento recibido',
               entityUrl: '/app/integrations',

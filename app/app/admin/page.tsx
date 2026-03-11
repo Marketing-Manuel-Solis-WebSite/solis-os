@@ -1,7 +1,7 @@
 'use client';
 import { useAuth, Role, Team } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import CustomFieldManager from '@/components/admin/custom-field-manager';
 import {
   getMembers, updateMember, getAuditLogs, logAction, getOrg, updateOrg,
@@ -144,8 +144,24 @@ function DepartmentsS() {
   };
   useEffect(() => { load(); }, []);
 
-  const activeDepts = depts.filter(d => d.status !== 'archived');
-  const archivedDepts = depts.filter(d => d.status === 'archived');
+  const activeDepts = useMemo(() => depts.filter(d => d.status !== 'archived'), [depts]);
+  const archivedDepts = useMemo(() => depts.filter(d => d.status === 'archived'), [depts]);
+
+  // Memoize members-by-dept lookup
+  const membersByDeptId = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    members.forEach((m: any) => {
+      const key = m.teamId || '__unassigned__';
+      if (!map[key]) map[key] = [];
+      map[key].push(m);
+    });
+    return map;
+  }, [members]);
+
+  const unassignedMembers = useMemo(() =>
+    members.filter((m: any) => !m.teamId || m.teamId === ''),
+    [members]
+  );
 
   const ICONS = ['📣', '🚀', '🎯', '👔', '⚖️', '💼', '📁', '📊', '🏢', '⚙️', '💡', '📱', '🎨', '📋', '🔧', '💰', '🤝', '📞', '✉️', '🗂️'];
   const COLORS = ['#8B5CF6', '#3B82F6', '#22C55E', '#D4A843', '#EF4444', '#F59E0B', '#EC4899', '#06B6D4', '#6B7280', '#14B8A6', '#F97316', '#84CC16'];
@@ -351,7 +367,7 @@ function DepartmentsS() {
       {/* Active Department Cards */}
       <div className="space-y-4">
         {activeDepts.map((dept, i) => {
-          const deptMembers = members.filter((m: any) => m.teamId === dept.id);
+          const deptMembers = membersByDeptId[dept.id] || [];
           const isAssigning = assignDeptId === dept.id;
 
           return (
@@ -453,7 +469,7 @@ function DepartmentsS() {
           {showArchived && (
             <div className="space-y-3">
               {archivedDepts.map((dept) => {
-                const deptMembers = members.filter((m: any) => m.teamId === dept.id);
+                const deptMembers = membersByDeptId[dept.id] || [];
                 return (
                   <div key={dept.id} className="rounded-xl bg-[var(--bg-secondary)] shadow-card overflow-hidden opacity-60 hover:opacity-100 transition-opacity">
                     <div className="flex items-center gap-4 px-5 py-3">
@@ -487,36 +503,32 @@ function DepartmentsS() {
       )}
 
       {/* Unassigned Members */}
-      {(() => {
-        const unassigned = members.filter((m: any) => !m.teamId || m.teamId === '');
-        if (unassigned.length === 0) return null;
-        return (
-          <div className="mt-6 rounded-lg border border-amber-500/20 bg-amber-500/5 p-5 anim-slide" style={{ animationDelay: `${activeDepts.length * 40 + 100}ms` }}>
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle className="h-4 w-4 text-amber-400" />
-              <span className="text-sm font-semibold text-amber-400">{t('admin.unassignedMembers', { count: unassigned.length })}</span>
-            </div>
-            <p className="text-sm text-[var(--text-muted)] mb-3">{t('admin.unassignedMsg')}</p>
-            <div className="flex flex-wrap gap-2">
-              {unassigned.map((m: any) => (
-                <div key={m.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-tertiary)]">
-                  <div className="w-6 h-6 rounded-full bg-amber-500/10 flex items-center justify-center text-[12px] font-bold text-amber-400">
-                    {m.displayName?.[0]?.toUpperCase() || '?'}
-                  </div>
-                  <span className="text-sm text-[var(--text-secondary)]">{m.displayName}</span>
-                  <select
-                    onChange={e => { if (e.target.value) handleAssignMember(m.id, e.target.value); }}
-                    value=""
-                    className="select-dark h-7 text-[12px] px-2 ml-1">
-                    <option value="">{t('admin.assignTo')}</option>
-                    {activeDepts.map(d => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
+      {unassignedMembers.length > 0 && (
+        <div className="mt-6 rounded-lg border border-amber-500/20 bg-amber-500/5 p-5 anim-slide" style={{ animationDelay: `${activeDepts.length * 40 + 100}ms` }}>
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="h-4 w-4 text-amber-400" />
+            <span className="text-sm font-semibold text-amber-400">{t('admin.unassignedMembers', { count: unassignedMembers.length })}</span>
           </div>
-        );
-      })()}
+          <p className="text-sm text-[var(--text-muted)] mb-3">{t('admin.unassignedMsg')}</p>
+          <div className="flex flex-wrap gap-2">
+            {unassignedMembers.map((m: any) => (
+              <div key={m.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--bg-tertiary)]">
+                <div className="w-6 h-6 rounded-full bg-amber-500/10 flex items-center justify-center text-[12px] font-bold text-amber-400">
+                  {m.displayName?.[0]?.toUpperCase() || '?'}
+                </div>
+                <span className="text-sm text-[var(--text-secondary)]">{m.displayName}</span>
+                <select
+                  onChange={e => { if (e.target.value) handleAssignMember(m.id, e.target.value); }}
+                  value=""
+                  className="select-dark h-7 text-[12px] px-2 ml-1">
+                  <option value="">{t('admin.assignTo')}</option>
+                  {activeDepts.map(d => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* =================== DELETE CONFIRMATION MODAL =================== */}
       {deleteTarget && (
@@ -781,11 +793,11 @@ function UsersS() {
     await refreshMembers();
   };
 
-  const f = ms.filter(m =>
+  const f = useMemo(() => ms.filter(m =>
     m.displayName?.toLowerCase().includes(q.toLowerCase()) ||
     m.email?.toLowerCase().includes(q.toLowerCase()) ||
     m.department?.toLowerCase().includes(q.toLowerCase())
-  );
+  ), [ms, q]);
 
   if (ld) return <Sk />;
   return (
@@ -1024,7 +1036,7 @@ function AuditS() {
 
   useEffect(() => { getAuditLogs().then(({ items: l }) => { setLs(l); setLd(false); }); }, []);
 
-  const f = ls.filter(l => [l.actorName, l.action, l.resource, l.detail].some(v => v?.toLowerCase?.().includes(q.toLowerCase())));
+  const f = useMemo(() => ls.filter(l => [l.actorName, l.action, l.resource, l.detail].some(v => v?.toLowerCase?.().includes(q.toLowerCase()))), [ls, q]);
 
   if (ld) return <Sk />;
   return (

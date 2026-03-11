@@ -54,10 +54,17 @@ async function getByOrg(col: string, maxResults = 500) {
   });
 }
 
-async function getByTeam(col: string, teamId: string) {
-  const all = await getByOrg(col);
-  if (teamId === '__all__') return all;
-  return all.filter((d: any) => d.teamId === teamId);
+async function getByTeam(col: string, teamId: string, maxResults = 500) {
+  if (teamId === '__all__') return getByOrg(col, maxResults);
+  // Compound query: filter at Firestore level instead of loading entire org
+  const snap = await adminDb
+    .collection(col)
+    .where('orgId', '==', ORG)
+    .where('teamId', '==', teamId)
+    .orderBy('createdAt', 'desc')
+    .limit(maxResults)
+    .get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 // ===== CASCADE DELETE HELPERS (admin SDK) =====
@@ -201,27 +208,41 @@ const TEAM_RESOURCE_COLLECTIONS = ['tasks', 'goals', 'docs', 'channels', 'forms'
 
 export async function reassignTeamResourcesAdmin(fromTeamId: string, toTeamId: string, toTeamName: string) {
   let moved = 0;
+  const BATCH_LIMIT = 500;
+
   for (const col of TEAM_RESOURCE_COLLECTIONS) {
     const snap = await adminDb.collection(col)
       .where('orgId', '==', ORG)
       .where('teamId', '==', fromTeamId)
       .get();
-    for (const d of snap.docs) {
-      await adminDb.doc(`${col}/${d.id}`).update({ teamId: toTeamId, updatedAt: FieldValue.serverTimestamp() });
-      moved++;
+    if (snap.empty) continue;
+
+    for (let i = 0; i < snap.docs.length; i += BATCH_LIMIT) {
+      const batch = adminDb.batch();
+      const chunk = snap.docs.slice(i, i + BATCH_LIMIT);
+      for (const d of chunk) {
+        batch.update(adminDb.doc(`${col}/${d.id}`), { teamId: toTeamId, updatedAt: FieldValue.serverTimestamp() });
+      }
+      await batch.commit();
+      moved += chunk.length;
     }
   }
+
   const membersSnap = await adminDb.collection(`orgs/${ORG}/members`).get();
-  for (const d of membersSnap.docs) {
-    const data = d.data();
-    if (data.teamId === fromTeamId) {
+  const affectedMembers = membersSnap.docs.filter(d => d.data().teamId === fromTeamId);
+  for (let i = 0; i < affectedMembers.length; i += BATCH_LIMIT) {
+    const batch = adminDb.batch();
+    const chunk = affectedMembers.slice(i, i + BATCH_LIMIT);
+    for (const d of chunk) {
+      const data = d.data();
       const newIds = (data.teamIds || []).filter((t: string) => t !== fromTeamId);
       if (!newIds.includes(toTeamId)) newIds.push(toTeamId);
-      await adminDb.doc(`orgs/${ORG}/members/${d.id}`).update({
+      batch.update(adminDb.doc(`orgs/${ORG}/members/${d.id}`), {
         teamId: toTeamId, teamIds: newIds, department: toTeamName, updatedAt: FieldValue.serverTimestamp(),
       });
-      moved++;
     }
+    await batch.commit();
+    moved += chunk.length;
   }
   return moved;
 }
@@ -233,24 +254,43 @@ export async function purgeTeamResourcesAdmin(teamId: string) {
       .where('orgId', '==', ORG)
       .where('teamId', '==', teamId)
       .get();
-    for (const d of snap.docs) {
-      // Use cascade delete for entities with subcollections
-      switch (col) {
-        case 'tasks': await deleteTask(d.id); break;
-        case 'goals': await deleteGoal(d.id); break;
-        default: await adminDb.doc(`${col}/${d.id}`).delete(); break;
+    if (snap.empty) continue;
+
+    // Tasks and goals require cascade delete (subcollections), so they
+    // must be deleted individually. All other collections use batch writes.
+    if (col === 'tasks') {
+      for (const d of snap.docs) { await deleteTask(d.id); deleted++; }
+    } else if (col === 'goals') {
+      for (const d of snap.docs) { await deleteGoal(d.id); deleted++; }
+    } else {
+      // Firestore batches support up to 500 operations
+      const BATCH_LIMIT = 500;
+      for (let i = 0; i < snap.docs.length; i += BATCH_LIMIT) {
+        const batch = adminDb.batch();
+        const chunk = snap.docs.slice(i, i + BATCH_LIMIT);
+        for (const d of chunk) {
+          batch.delete(adminDb.doc(`${col}/${d.id}`));
+        }
+        await batch.commit();
+        deleted += chunk.length;
       }
-      deleted++;
     }
   }
+
+  // Batch-update members to detach from deleted team
   const membersSnap = await adminDb.collection(`orgs/${ORG}/members`).get();
-  for (const d of membersSnap.docs) {
-    const data = d.data();
-    if (data.teamId === teamId) {
-      await adminDb.doc(`orgs/${ORG}/members/${d.id}`).update({
+  const affectedMembers = membersSnap.docs.filter(d => d.data().teamId === teamId);
+  const BATCH_LIMIT = 500;
+  for (let i = 0; i < affectedMembers.length; i += BATCH_LIMIT) {
+    const batch = adminDb.batch();
+    const chunk = affectedMembers.slice(i, i + BATCH_LIMIT);
+    for (const d of chunk) {
+      const data = d.data();
+      batch.update(adminDb.doc(`orgs/${ORG}/members/${d.id}`), {
         teamId: '', teamIds: (data.teamIds || []).filter((t: string) => t !== teamId), department: '', updatedAt: FieldValue.serverTimestamp(),
       });
     }
+    await batch.commit();
   }
   return deleted;
 }

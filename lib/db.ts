@@ -1,7 +1,8 @@
 import {
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
-  getDocs, getDoc, query, where, orderBy, limit, writeBatch, collectionGroup,
+  getDocs, getDoc, getCountFromServer, query, where, orderBy, limit, writeBatch, collectionGroup,
   serverTimestamp, onSnapshot, DocumentData, arrayUnion, arrayRemove, runTransaction,
+  startAfter, QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { validateCustomFieldValues, loadFieldDefs } from './custom-fields';
@@ -194,20 +195,21 @@ const TEAM_RESOURCE_COLLECTIONS = ['tasks', 'goals', 'docs', 'channels', 'forms'
 // Dry-run: count all resources and members that would be affected by deleting a department
 export async function getDepartmentImpact(teamId: string) {
   const counts: Record<string, number> = {};
-  for (const col of TEAM_RESOURCE_COLLECTIONS) {
+  // Use Firestore count aggregation — no full doc loads needed
+  const countPromises = TEAM_RESOURCE_COLLECTIONS.map(async (col) => {
     const q_ = query(collection(db, col), where('orgId', '==', ORG), where('teamId', '==', teamId));
-    const snap = await getDocs(q_);
-    counts[col] = snap.size;
-  }
-  // Count members with this as primary team
-  const membersSnap = await getDocs(collection(db, `orgs/${ORG}/members`));
-  const primaryMembers = membersSnap.docs.filter(d => d.data().teamId === teamId);
-  const secondaryMembers = membersSnap.docs.filter(d => {
-    const tids = d.data().teamIds || [];
-    return tids.includes(teamId) && d.data().teamId !== teamId;
+    const snap = await getCountFromServer(q_);
+    counts[col] = snap.data().count;
   });
-  counts['primaryMembers'] = primaryMembers.length;
-  counts['secondaryMembers'] = secondaryMembers.length;
+  await Promise.all(countPromises);
+  // Members: count by primary team (requires reading members — small collection)
+  const primaryQ = query(collection(db, `orgs/${ORG}/members`), where('teamId', '==', teamId));
+  const primarySnap = await getCountFromServer(primaryQ);
+  counts['primaryMembers'] = primarySnap.data().count;
+  // Secondary members: teamIds array-contains (those where teamId is not primary)
+  const secondaryQ = query(collection(db, `orgs/${ORG}/members`), where('teamIds', 'array-contains', teamId));
+  const secondarySnap = await getCountFromServer(secondaryQ);
+  counts['secondaryMembers'] = Math.max(0, secondarySnap.data().count - counts['primaryMembers']);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   return { counts, total };
 }
@@ -285,9 +287,20 @@ export async function purgeTeamResources(teamId: string) {
 
 // ===== TEAM-FILTERED GETTER =====
 async function getByTeam(col: string, teamId: string, maxResults = 500): Promise<{ items: any[]; hasMore: boolean }> {
-  const result = await getByOrg(col, maxResults);
-  if (teamId === '__all__') return result;
-  return { items: result.items.filter((d: any) => d.teamId === teamId), hasMore: result.hasMore };
+  if (teamId === '__all__') return getByOrg(col, maxResults);
+  // Compound query: filter at Firestore level instead of loading entire org
+  const q = query(
+    collection(db, col),
+    where('orgId', '==', ORG),
+    where('teamId', '==', teamId),
+    orderBy('createdAt', 'desc'),
+    limit(maxResults + 1),
+  );
+  const s = await getDocs(q);
+  const hasMore = s.docs.length > maxResults;
+  const docs = hasMore ? s.docs.slice(0, maxResults) : s.docs;
+  const items = docs.map(d => ({ id: d.id, ...d.data() }));
+  return { items, hasMore };
 }
 
 // ===== TASKS =====
@@ -295,6 +308,36 @@ export async function getTasks(teamId?: string, maxResults = 500) {
   if (teamId) return getByTeam('tasks', teamId, maxResults);
   return getByOrg('tasks', maxResults);
 }
+
+export async function getTasksPaginated({
+  teamId,
+  pageSize = 50,
+  lastDoc,
+  status,
+  sortBy = 'createdAt',
+}: {
+  teamId?: string;
+  pageSize?: number;
+  lastDoc?: QueryDocumentSnapshot | null;
+  status?: string;
+  sortBy?: string;
+}): Promise<{ items: any[]; lastDoc: QueryDocumentSnapshot | null; hasMore: boolean }> {
+  const constraints: any[] = [where('orgId', '==', ORG)];
+  if (teamId && teamId !== '__all__') constraints.push(where('teamId', '==', teamId));
+  if (status) constraints.push(where('status', '==', status));
+  constraints.push(orderBy(sortBy, 'desc'));
+  if (lastDoc) constraints.push(startAfter(lastDoc));
+  constraints.push(limit(pageSize + 1));
+
+  const q = query(collection(db, 'tasks'), ...constraints);
+  const snap = await getDocs(q);
+  const hasMore = snap.docs.length > pageSize;
+  const docs = hasMore ? snap.docs.slice(0, pageSize) : snap.docs;
+  const items = docs.map(d => ({ id: d.id, ...d.data() }));
+  const newLastDoc = docs.length > 0 ? docs[docs.length - 1] : null;
+  return { items, lastDoc: newLastDoc, hasMore };
+}
+
 export async function createTask(data: any) {
   // Validate custom fields if present
   if (data.customFields && Object.keys(data.customFields).length > 0) {
@@ -445,16 +488,33 @@ export async function getChannels(teamId?: string, maxResults = 500) {
 }
 
 export async function getAllUserChannels(userId: string): Promise<{ items: any[]; hasMore: boolean }> {
-  // Get all channels where user is a member OR channel is public
-  const { items: allChannels, hasMore } = await getByOrg('channels');
-  const filtered = allChannels.filter((ch: any) => {
-    if (ch.archived) return false;
-    if (ch.type === 'public') return true;
-    if (ch.members?.includes(userId)) return true;
-    if (ch.createdBy === userId) return true;
-    return false;
-  });
-  return { items: filtered, hasMore };
+  // Two targeted queries: channels where user is member + public channels
+  const [memberSnap, publicSnap] = await Promise.all([
+    getDocs(query(
+      collection(db, 'channels'),
+      where('orgId', '==', ORG),
+      where('members', 'array-contains', userId),
+      limit(200),
+    )),
+    getDocs(query(
+      collection(db, 'channels'),
+      where('orgId', '==', ORG),
+      where('type', '==', 'public'),
+      limit(100),
+    )),
+  ]);
+  const seen = new Set<string>();
+  const items: any[] = [];
+  for (const snap of [memberSnap, publicSnap]) {
+    for (const d of snap.docs) {
+      if (seen.has(d.id)) continue;
+      seen.add(d.id);
+      const ch = { id: d.id, ...d.data() } as any;
+      if (!ch.archived) items.push(ch);
+    }
+  }
+  items.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  return { items, hasMore: false };
 }
 
 export async function createChannel(data: Partial<ChannelData>) {
@@ -597,27 +657,31 @@ export async function unpinMessage(channelId: string, messageId: string) {
   });
 }
 
-// Reactions
+// Reactions — use transaction to prevent race conditions
 export async function addReaction(channelId: string, messageId: string, emoji: string, userId: string) {
   const msgRef = doc(db, `channels/${channelId}/messages/${messageId}`);
-  const msgSnap = await getDoc(msgRef);
-  if (!msgSnap.exists()) return;
-  const reactions = msgSnap.data().reactions || {};
-  if (!reactions[emoji]) reactions[emoji] = [];
-  if (!reactions[emoji].includes(userId)) reactions[emoji].push(userId);
-  return updateDoc(msgRef, { reactions });
+  return runTransaction(db, async (transaction) => {
+    const msgSnap = await transaction.get(msgRef);
+    if (!msgSnap.exists()) return;
+    const reactions = { ...(msgSnap.data().reactions || {}) };
+    if (!reactions[emoji]) reactions[emoji] = [];
+    if (!reactions[emoji].includes(userId)) reactions[emoji] = [...reactions[emoji], userId];
+    transaction.update(msgRef, { reactions });
+  });
 }
 
 export async function removeReaction(channelId: string, messageId: string, emoji: string, userId: string) {
   const msgRef = doc(db, `channels/${channelId}/messages/${messageId}`);
-  const msgSnap = await getDoc(msgRef);
-  if (!msgSnap.exists()) return;
-  const reactions = msgSnap.data().reactions || {};
-  if (reactions[emoji]) {
-    reactions[emoji] = reactions[emoji].filter((id: string) => id !== userId);
-    if (reactions[emoji].length === 0) delete reactions[emoji];
-  }
-  return updateDoc(msgRef, { reactions });
+  return runTransaction(db, async (transaction) => {
+    const msgSnap = await transaction.get(msgRef);
+    if (!msgSnap.exists()) return;
+    const reactions = { ...(msgSnap.data().reactions || {}) };
+    if (reactions[emoji]) {
+      reactions[emoji] = reactions[emoji].filter((id: string) => id !== userId);
+      if (reactions[emoji].length === 0) delete reactions[emoji];
+    }
+    transaction.update(msgRef, { reactions });
+  });
 }
 
 // Mark as read
@@ -640,14 +704,18 @@ export function onMessagesSnapshot(channelId: string, callback: (msgs: any[], ha
 
 // DM channel helpers
 export async function findOrCreateDM(userId1: string, user1Name: string, userId2: string, user2Name: string) {
-  // Look for existing DM between these two users
-  const { items: allChannels } = await getByOrg('channels');
-  const existingDM = allChannels.find((ch: any) =>
-    ch.type === 'dm' &&
-    ch.members?.length === 2 &&
-    ch.members?.includes(userId1) &&
-    ch.members?.includes(userId2)
+  // Targeted query: only fetch DM channels where current user is a member
+  const q = query(
+    collection(db, 'channels'),
+    where('orgId', '==', ORG),
+    where('type', '==', 'dm'),
+    where('members', 'array-contains', userId1),
+    limit(50),
   );
+  const snap = await getDocs(q);
+  const existingDM = snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as any))
+    .find((ch: any) => ch.members?.length === 2 && ch.members?.includes(userId2));
   if (existingDM) return existingDM;
 
   // Create new DM
@@ -683,7 +751,10 @@ export async function sendSystemMessage(channelId: string, content: string) {
 export async function getAutomations(teamId?: string, maxResults = 500) { if (teamId) return getByTeam('automations', teamId, maxResults); return getByOrg('automations', maxResults); }
 export async function createAutomation(data: any) { return addTo('automations', { ...data, orgId: ORG, enabled: true, teamId: data.teamId || '' }); }
 export async function updateAutomation(id: string, data: any) { return updateAt(`automations/${id}`, data); }
-export async function deleteAutomation(id: string) { return deleteAt(`automations/${id}`); }
+export async function deleteAutomation(id: string) {
+  await deleteSubcollectionDocs(`automations/${id}`, 'logs').catch(() => {});
+  return deleteAt(`automations/${id}`);
+}
 export async function getAutomationLogs(automationId: string, limitCount = 20) {
   const q = query(collection(db, `automations/${automationId}/logs`), orderBy('createdAt', 'desc'), limit(limitCount));
   const snap = await getDocs(q);
@@ -752,17 +823,24 @@ export function setPresence(userId: string, online: boolean) {
   return setDoc(doc(db, `orgs/${ORG}/presence/${userId}`), { online, lastSeen: serverTimestamp() }, { merge: true });
 }
 
+// Polling-based presence — replaces O(n²) listener with O(n) periodic fetch
+export async function getPresenceMap(): Promise<Record<string, boolean>> {
+  const snap = await getDocs(query(collection(db, `orgs/${ORG}/presence`), limit(500)));
+  const map: Record<string, boolean> = {};
+  const now = Date.now() / 1000;
+  snap.docs.forEach(d => {
+    const data = d.data();
+    const lastSeen = data.lastSeen?.seconds || 0;
+    map[d.id] = data.online && (now - lastSeen) < 120;
+  });
+  return map;
+}
+
+/** @deprecated Use getPresenceMap() with polling instead. Kept for backward compat. */
 export function onPresenceSnapshot(callback: (presence: Record<string, boolean>) => void) {
-  return onSnapshot(collection(db, `orgs/${ORG}/presence`), (snap) => {
-    const map: Record<string, boolean> = {};
-    const now = Date.now() / 1000;
-    snap.docs.forEach(d => {
-      const data = d.data();
-      const lastSeen = data.lastSeen?.seconds || 0;
-      map[d.id] = data.online && (now - lastSeen) < 120;
-    });
-    callback(map);
-  }, () => callback({}));
+  // Immediately fetch once, then return a no-op unsubscribe
+  getPresenceMap().then(callback).catch(() => callback({}));
+  return () => {};
 }
 
 // ===== READ CURSORS =====
@@ -1044,9 +1122,9 @@ export async function deleteWhiteboardElement(boardId: string, elementId: string
   return deleteAt(`whiteboards/${boardId}/elements/${elementId}`);
 }
 
-// Real-time listener for whiteboard elements (collaboration)
+// Real-time listener for whiteboard elements (collaboration) — capped at 500
 export function onWhiteboardElementsSnapshot(boardId: string, callback: (elements: any[]) => void) {
-  const q = query(collection(db, `whiteboards/${boardId}/elements`), orderBy('zIndex', 'asc'));
+  const q = query(collection(db, `whiteboards/${boardId}/elements`), orderBy('zIndex', 'asc'), limit(500));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   }, () => callback([]));

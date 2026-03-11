@@ -9,7 +9,7 @@ import {
   addChannelMember, removeChannelMember, addChannelAdmin, removeChannelAdmin,
   findOrCreateDM, sendSystemMessage, onMessagesSnapshot, getMembers, logAction,
   setTyping, clearTyping, onTypingSnapshot,
-  setPresence, onPresenceSnapshot,
+  setPresence, getPresenceMap,
   markChannelRead, onReadCursorsSnapshot,
 } from '@/lib/db';
 import { afterMessageSent } from '@/lib/chat-side-effects';
@@ -113,23 +113,26 @@ export default function ChatPage() {
     return () => { if (typingUnsubRef.current) typingUnsubRef.current(); };
   }, [active?.id, user?.uid]);
 
-  // Presence: set online + heartbeat + listen
+  // Presence: set online + heartbeat + poll (replaces O(n²) listener)
   useEffect(() => {
     if (!user) return;
     setPresence(user.uid, true);
-    const interval = setInterval(() => setPresence(user.uid, true), 60000);
+    // Heartbeat every 60s
+    const heartbeat = setInterval(() => setPresence(user.uid, true), 60000);
+    // Poll presence every 30s instead of realtime listener
+    const fetchPresence = () => getPresenceMap().then(setOnlineMap).catch(() => {});
+    fetchPresence();
+    const poll = setInterval(fetchPresence, 30000);
     const handleVisibility = () => setPresence(user.uid, !document.hidden);
     document.addEventListener('visibilitychange', handleVisibility);
     const handleUnload = () => setPresence(user.uid, false);
     window.addEventListener('beforeunload', handleUnload);
-    const unsub = onPresenceSnapshot(setOnlineMap);
-    presenceUnsubRef.current = unsub;
     return () => {
-      clearInterval(interval);
+      clearInterval(heartbeat);
+      clearInterval(poll);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('beforeunload', handleUnload);
       setPresence(user.uid, false);
-      if (presenceUnsubRef.current) presenceUnsubRef.current();
     };
   }, [user?.uid]);
 

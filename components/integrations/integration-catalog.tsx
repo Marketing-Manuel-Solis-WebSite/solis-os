@@ -1,11 +1,11 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Check, ExternalLink } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { INTEGRATION_CATALOG, CATEGORIES } from '@/lib/integrations-catalog';
-import { onIntegrationsSnapshot, deleteIntegration } from '@/lib/integrations-db';
+import { getIntegrations, deleteIntegration } from '@/lib/integrations-db';
 import { useToast } from '@/components/notifications/toast-provider';
 import IntegrationConnectModal from './integration-connect-modal';
 import type { IntegrationDef, IntegrationCategory } from '@/lib/integrations-types';
@@ -20,10 +20,11 @@ export default function IntegrationCatalog() {
   const [selectedDef, setSelectedDef] = useState<IntegrationDef | null>(null);
   const [groupByCategory, setGroupByCategory] = useState(true);
 
-  useEffect(() => {
-    const unsub = onIntegrationsSnapshot(setConnected);
-    return () => unsub();
+  const loadConnected = useCallback(() => {
+    getIntegrations().then(setConnected).catch(() => setConnected([]));
   }, []);
+
+  useEffect(() => { loadConnected(); }, [loadConnected]);
 
   const getStatus = (provider: string) => {
     const conn = connected.find((c: any) => c.provider === provider);
@@ -53,6 +54,7 @@ export default function IntegrationCatalog() {
     if (!conn) return;
     try {
       await deleteIntegration(conn.id);
+      loadConnected();
       toast.success(t('integ.catalog.disconnect'));
     } catch {
       toast.error('Error');
@@ -212,7 +214,7 @@ export default function IntegrationCatalog() {
           <IntegrationConnectModal
             def={selectedDef}
             status={getStatus(selectedDef.provider)}
-            onClose={() => setSelectedDef(null)}
+            onClose={() => { setSelectedDef(null); loadConnected(); }}
             onDisconnect={() => {
               handleDisconnect(selectedDef.provider);
               setSelectedDef(null);

@@ -2,8 +2,7 @@
 import { createContext, useContext, useCallback, useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle2, AlertCircle, AlertTriangle, Info, Loader2 } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
-import { onNotificationsSnapshot, type AppNotification } from '@/lib/notifications';
+import { useNotifications } from './notification-context';
 import { useI18n } from '@/lib/i18n';
 
 /* ============================================
@@ -241,38 +240,32 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
    shows them as toasts automatically
    ============================================ */
 export function FirebaseToastBridge() {
-  const { user } = useAuth();
+  const { notifications } = useNotifications();
   const toastCtx = useContext(ToastContext);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const initialLoadRef = useRef(true);
 
   useEffect(() => {
-    if (!user || !toastCtx) return;
-    initialLoadRef.current = true;
-    seenIdsRef.current = new Set();
+    if (!toastCtx) return;
 
-    const unsub = onNotificationsSnapshot(user.uid, (notifs) => {
-      if (initialLoadRef.current) {
-        notifs.forEach(n => seenIdsRef.current.add(n.id));
-        initialLoadRef.current = false;
-        return;
-      }
+    if (initialLoadRef.current) {
+      notifications.forEach(n => seenIdsRef.current.add(n.id));
+      initialLoadRef.current = false;
+      return;
+    }
 
-      const newOnes = notifs.filter(n => !seenIdsRef.current.has(n.id) && !n.read);
-      newOnes.forEach(n => seenIdsRef.current.add(n.id));
+    const newOnes = notifications.filter(n => !seenIdsRef.current.has(n.id) && !n.read);
+    newOnes.forEach(n => seenIdsRef.current.add(n.id));
 
-      newOnes.forEach(n => {
-        toastCtx.toast({
-          type: 'info',
-          title: n.title,
-          message: n.message,
-          duration: 5000,
-        });
+    newOnes.forEach(n => {
+      toastCtx.toast({
+        type: 'info',
+        title: n.title,
+        message: n.message,
+        duration: 5000,
       });
     });
-
-    return () => unsub();
-  }, [user?.uid, toastCtx]);
+  }, [notifications, toastCtx]);
 
   return null;
 }

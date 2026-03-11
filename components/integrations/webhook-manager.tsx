@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Webhook, Send, Trash2, X, Copy, Check,
@@ -9,7 +9,7 @@ import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
 import {
-  onWebhooksSnapshot, onIncomingWebhooksSnapshot,
+  getWebhooks, getIncomingWebhooks,
 } from '@/lib/integrations-db';
 import { ALL_EVENTS } from '@/lib/integrations-types';
 import type { WebhookEvent } from '@/lib/integrations-types';
@@ -42,10 +42,11 @@ function OutgoingWebhooks() {
   const [events, setEvents] = useState<WebhookEvent[]>([]);
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    const unsub = onWebhooksSnapshot(setWebhooks);
-    return () => unsub();
+  const loadWebhooks = useCallback(() => {
+    getWebhooks().then(setWebhooks).catch(() => setWebhooks([]));
   }, []);
+
+  useEffect(() => { loadWebhooks(); }, [loadWebhooks]);
 
   const handleCreate = async () => {
     if (!name.trim() || !url.trim() || events.length === 0) return;
@@ -73,6 +74,7 @@ function OutgoingWebhooks() {
       setName('');
       setUrl('');
       setEvents([]);
+      loadWebhooks();
       toast.success(t('integ.webhook.add'));
     } catch {
       toast.error('Error');
@@ -93,6 +95,7 @@ function OutgoingWebhooks() {
       if (!res.ok) throw new Error();
       toast.success(t('integ.webhook.delete'));
       setDeleteConfirm(null);
+      loadWebhooks();
     } catch {
       toast.error('Error');
     }
@@ -110,6 +113,7 @@ function OutgoingWebhooks() {
       },
       body: JSON.stringify({ active: !active }),
     });
+    loadWebhooks();
   };
 
   const handleTest = async (id: string) => {
@@ -349,10 +353,11 @@ function IncomingWebhooks() {
   const [actionType, setActionType] = useState<'create_task' | 'create_notification' | 'trigger_automation'>('create_task');
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    const unsub = onIncomingWebhooksSnapshot(setEndpoints);
-    return () => unsub();
+  const loadEndpoints = useCallback(() => {
+    getIncomingWebhooks().then(setEndpoints).catch(() => setEndpoints([]));
   }, []);
+
+  useEffect(() => { loadEndpoints(); }, [loadEndpoints]);
 
   const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -382,6 +387,7 @@ function IncomingWebhooks() {
       setShowCreate(false);
       setName('');
       setProvider('');
+      loadEndpoints();
       toast.success(t('integ.incoming.add'));
     } catch {
       toast.error('Error');
@@ -402,6 +408,7 @@ function IncomingWebhooks() {
       if (!res.ok) throw new Error();
       toast.success(t('integ.incoming.delete'));
       setDeleteConfirm(null);
+      loadEndpoints();
     } catch {
       toast.error('Error');
     }

@@ -1,11 +1,13 @@
 'use client';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, CheckCheck, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { onNotificationsSnapshot, markNotificationRead, markAllRead, type AppNotification } from '@/lib/notifications';
+import { markNotificationRead, markAllRead, type AppNotification } from '@/lib/notifications';
+import { useNotifications } from './notification-context';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n';
+import { useState } from 'react';
 
 const TYPE_LABEL_KEYS: Record<string, string> = {
   task_assigned: 'notif.typeTask',
@@ -50,16 +52,10 @@ export default function NotificationBell() {
   const { user } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
-  const [notifs, setNotifs] = useState<AppNotification[]>([]);
+  const { notifications: notifs } = useNotifications();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const unread = notifs.filter(n => !n.read).length;
-
-  useEffect(() => {
-    if (!user) return;
-    const unsub = onNotificationsSnapshot(user.uid, setNotifs);
-    return () => unsub();
-  }, [user?.uid]);
 
   useEffect(() => {
     if (!open) return;

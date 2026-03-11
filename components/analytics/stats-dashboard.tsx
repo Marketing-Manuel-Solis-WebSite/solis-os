@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useI18n } from '@/lib/i18n';
 import type { PlatformData } from '@/app/app/analytics/page';
 import {
@@ -16,7 +16,7 @@ export default function StatsDashboard({ data }: Props) {
   const { t } = useI18n();
   const [section, setSection] = useState<'overview' | 'tasks' | 'docs' | 'team' | 'activity'>('overview');
 
-  // ========== COMPUTED METRICS ==========
+  // ========== COMPUTED METRICS (memoized) ==========
   const tasks = data.tasks;
   const docs = data.docs;
   const members = data.members;
@@ -24,75 +24,114 @@ export default function StatsDashboard({ data }: Props) {
   const logs = data.auditLogs;
 
   // Task stats
-  const tasksByStatus: Record<string, number> = {};
-  tasks.forEach((t: any) => { tasksByStatus[t.status || 'unknown'] = (tasksByStatus[t.status || 'unknown'] || 0) + 1; });
-  const tasksByPriority: Record<string, number> = {};
-  tasks.forEach((t: any) => { tasksByPriority[t.priority || 'medium'] = (tasksByPriority[t.priority || 'medium'] || 0) + 1; });
-  const tasksByDept: Record<string, number> = {};
-  tasks.forEach((t: any) => {
-    const team = teams.find((tm: any) => tm.id === t.teamId);
-    const name = team ? team.name : 'Unassigned';
-    tasksByDept[name] = (tasksByDept[name] || 0) + 1;
-  });
-  const completedTasks = tasks.filter((t: any) => t.status === 'done' || t.status === 'completed').length;
-  const completionRate = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
-  const overdueTasks = tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done' && t.status !== 'completed').length;
+  const tasksByStatus = useMemo(() => {
+    const result: Record<string, number> = {};
+    tasks.forEach((t: any) => { result[t.status || 'unknown'] = (result[t.status || 'unknown'] || 0) + 1; });
+    return result;
+  }, [tasks]);
+
+  const tasksByPriority = useMemo(() => {
+    const result: Record<string, number> = {};
+    tasks.forEach((t: any) => { result[t.priority || 'medium'] = (result[t.priority || 'medium'] || 0) + 1; });
+    return result;
+  }, [tasks]);
+
+  const tasksByDept = useMemo(() => {
+    const result: Record<string, number> = {};
+    tasks.forEach((t: any) => {
+      const team = teams.find((tm: any) => tm.id === t.teamId);
+      const name = team ? team.name : 'Unassigned';
+      result[name] = (result[name] || 0) + 1;
+    });
+    return result;
+  }, [tasks, teams]);
+
+  const { completedTasks, completionRate, overdueTasks } = useMemo(() => {
+    const completed = tasks.filter((t: any) => t.status === 'done' || t.status === 'completed').length;
+    const rate = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0;
+    const overdue = tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done' && t.status !== 'completed').length;
+    return { completedTasks: completed, completionRate: rate, overdueTasks: overdue };
+  }, [tasks]);
 
   // Doc stats
-  const docsByDept: Record<string, number> = {};
-  docs.forEach((d: any) => {
-    const team = teams.find((tm: any) => tm.id === d.teamId);
-    const name = team ? team.name : 'Unassigned';
-    docsByDept[name] = (docsByDept[name] || 0) + 1;
-  });
-  const docsByVisibility: Record<string, number> = {};
-  docs.forEach((d: any) => { docsByVisibility[d.visibility || 'team'] = (docsByVisibility[d.visibility || 'team'] || 0) + 1; });
-  const totalWords = docs.reduce((sum: number, d: any) => sum + (d.wordCount || 0), 0);
+  const docsByDept = useMemo(() => {
+    const result: Record<string, number> = {};
+    docs.forEach((d: any) => {
+      const team = teams.find((tm: any) => tm.id === d.teamId);
+      const name = team ? team.name : 'Unassigned';
+      result[name] = (result[name] || 0) + 1;
+    });
+    return result;
+  }, [docs, teams]);
+
+  const docsByVisibility = useMemo(() => {
+    const result: Record<string, number> = {};
+    docs.forEach((d: any) => { result[d.visibility || 'team'] = (result[d.visibility || 'team'] || 0) + 1; });
+    return result;
+  }, [docs]);
+
+  const totalWords = useMemo(() =>
+    docs.reduce((sum: number, d: any) => sum + (d.wordCount || 0), 0),
+    [docs]
+  );
 
   // Team stats
-  const membersByDept: Record<string, number> = {};
-  members.forEach((m: any) => {
-    const team = teams.find((tm: any) => tm.id === m.teamId);
-    const name = team ? team.name : 'Unassigned';
-    membersByDept[name] = (membersByDept[name] || 0) + 1;
-  });
-  const membersByRole: Record<string, number> = {};
-  members.forEach((m: any) => { membersByRole[m.role || 'member'] = (membersByRole[m.role || 'member'] || 0) + 1; });
+  const membersByDept = useMemo(() => {
+    const result: Record<string, number> = {};
+    members.forEach((m: any) => {
+      const team = teams.find((tm: any) => tm.id === m.teamId);
+      const name = team ? team.name : 'Unassigned';
+      result[name] = (result[name] || 0) + 1;
+    });
+    return result;
+  }, [members, teams]);
+
+  const membersByRole = useMemo(() => {
+    const result: Record<string, number> = {};
+    members.forEach((m: any) => { result[m.role || 'member'] = (result[m.role || 'member'] || 0) + 1; });
+    return result;
+  }, [members]);
 
   // Activity (last 7 days)
-  const now = Date.now();
-  const weekAgo = now - 7 * 86400000;
-  const recentLogs = logs.filter((l: any) => (l.createdAt?.seconds || 0) * 1000 > weekAgo);
-  const activityByDay: Record<string, number> = {};
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now - i * 86400000);
-    const key = d.toLocaleDateString('en-US', { weekday: 'short' });
-    activityByDay[key] = 0;
-  }
-  recentLogs.forEach((l: any) => {
-    const d = new Date((l.createdAt?.seconds || 0) * 1000);
-    const key = d.toLocaleDateString('en-US', { weekday: 'short' });
-    if (activityByDay[key] !== undefined) activityByDay[key]++;
-  });
-  const activityByAction: Record<string, number> = {};
-  recentLogs.forEach((l: any) => { activityByAction[l.action || 'unknown'] = (activityByAction[l.action || 'unknown'] || 0) + 1; });
+  const { recentLogs, activityByDay, activityByAction } = useMemo(() => {
+    const now = Date.now();
+    const weekAgo = now - 7 * 86400000;
+    const recent = logs.filter((l: any) => (l.createdAt?.seconds || 0) * 1000 > weekAgo);
+    const byDay: Record<string, number> = {};
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now - i * 86400000);
+      const key = d.toLocaleDateString('en-US', { weekday: 'short' });
+      byDay[key] = 0;
+    }
+    recent.forEach((l: any) => {
+      const d = new Date((l.createdAt?.seconds || 0) * 1000);
+      const key = d.toLocaleDateString('en-US', { weekday: 'short' });
+      if (byDay[key] !== undefined) byDay[key]++;
+    });
+    const byAction: Record<string, number> = {};
+    recent.forEach((l: any) => { byAction[l.action || 'unknown'] = (byAction[l.action || 'unknown'] || 0) + 1; });
+    return { recentLogs: recent, activityByDay: byDay, activityByAction: byAction };
+  }, [logs]);
 
   // Department performance
-  const deptPerformance = teams.map((t: any) => {
-    const dTasks = tasks.filter((tk: any) => tk.teamId === t.id);
-    const dDocs = docs.filter((d: any) => d.teamId === t.id);
-    const dMembers = members.filter((m: any) => m.teamId === t.id);
-    const dCompleted = dTasks.filter((tk: any) => tk.status === 'done' || tk.status === 'completed').length;
-    return {
-      team: t,
-      tasks: dTasks.length,
-      completed: dCompleted,
-      rate: dTasks.length > 0 ? Math.round((dCompleted / dTasks.length) * 100) : 0,
-      docs: dDocs.length,
-      members: dMembers.length,
-      words: dDocs.reduce((s: number, d: any) => s + (d.wordCount || 0), 0),
-    };
-  });
+  const deptPerformance = useMemo(() =>
+    teams.map((t: any) => {
+      const dTasks = tasks.filter((tk: any) => tk.teamId === t.id);
+      const dDocs = docs.filter((d: any) => d.teamId === t.id);
+      const dMembers = members.filter((m: any) => m.teamId === t.id);
+      const dCompleted = dTasks.filter((tk: any) => tk.status === 'done' || tk.status === 'completed').length;
+      return {
+        team: t,
+        tasks: dTasks.length,
+        completed: dCompleted,
+        rate: dTasks.length > 0 ? Math.round((dCompleted / dTasks.length) * 100) : 0,
+        docs: dDocs.length,
+        members: dMembers.length,
+        words: dDocs.reduce((s: number, d: any) => s + (d.wordCount || 0), 0),
+      };
+    }),
+    [teams, tasks, docs, members]
+  );
 
   const NAV = [
     { id: 'overview' as const, label: t('statsDash.overview'), icon: BarChart3 },
@@ -329,7 +368,7 @@ export default function StatsDashboard({ data }: Props) {
           <div className="rounded-xl shadow-card bg-[var(--bg-elevated)] p-6 anim-slide" style={{ animationDelay: '80ms' }}>
             <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Top Documents by Word Count</h3>
             <div className="space-y-2">
-              {docs.sort((a: any, b: any) => (b.wordCount || 0) - (a.wordCount || 0)).slice(0, 8).map((d: any, i: number) => {
+              {[...docs].sort((a: any, b: any) => (b.wordCount || 0) - (a.wordCount || 0)).slice(0, 8).map((d: any, i: number) => {
                 const team = teams.find((t: any) => t.id === d.teamId);
                 return (
                   <div key={d.id} className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/[0.01]">

@@ -1,7 +1,7 @@
 'use client';
 import { useAuth, Team } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { getMembers, updateMember, logAction, getTeams } from '@/lib/db';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -69,7 +69,7 @@ export default function OrgChartPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const buildTree = (list: OrgMember[]): OrgNode[] => {
+  const buildTree = useCallback((list: OrgMember[]): OrgNode[] => {
     const map = new Map<string, OrgNode>();
     list.forEach(m => map.set(m.id, { ...m, children: [] }));
 
@@ -150,16 +150,22 @@ export default function OrgChartPage() {
     };
     sortNodes(roots);
     return roots;
-  };
+  }, [allTeams]);
 
-  const tree = buildTree(members);
+  const tree = useMemo(() => buildTree(members), [members, buildTree]);
 
-  const byDepartment = allTeams.map(t => ({
-    team: t,
-    members: members.filter(m => m.teamId === t.id).sort((a, b) => getLevelConfig(a.hierarchyLevel).order - getLevelConfig(b.hierarchyLevel).order),
-  })).filter(g => g.members.length > 0);
+  const byDepartment = useMemo(() =>
+    allTeams.map(t => ({
+      team: t,
+      members: members.filter(m => m.teamId === t.id).sort((a, b) => getLevelConfig(a.hierarchyLevel).order - getLevelConfig(b.hierarchyLevel).order),
+    })).filter(g => g.members.length > 0),
+    [allTeams, members]
+  );
 
-  const unassignedMembers = members.filter(m => !m.teamId || m.teamId === '');
+  const unassignedMembers = useMemo(() =>
+    members.filter(m => !m.teamId || m.teamId === ''),
+    [members]
+  );
 
   const getManagerName = (managerId: string) => {
     const mgr = members.find(m => m.id === managerId);

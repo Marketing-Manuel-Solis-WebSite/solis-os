@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useI18n } from '@/lib/i18n';
 import { Calendar, Paperclip, MessageSquare, GitBranch, CheckSquare, Repeat } from 'lucide-react';
 import {
@@ -26,7 +27,7 @@ interface Props {
   onDragEnd?: (e: React.DragEvent) => void;
 }
 
-export default function TaskCard({
+export default React.memo(function TaskCard({
   task,
   members,
   teams,
@@ -295,4 +296,4 @@ export default function TaskCard({
       </div>
     </div>
   );
-}
+});

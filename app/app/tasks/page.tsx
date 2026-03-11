@@ -3,7 +3,7 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
-  getTasks, createTask, updateTask, softDeleteTask,
+  getTasksPaginated, createTask, updateTask, softDeleteTask,
   getMembers, getSettings, saveSettings,
   getUserPreferences, saveUserPreferences,
 } from '@/lib/db';
@@ -46,7 +46,8 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const maxResultsRef = useRef(500);
+  const lastDocCursorRef = useRef<any>(null);
+  const PAGE_SIZE = 50;
 
   // Preferences (loaded from Firestore)
   const [prefs, setPrefs] = useState<TaskPreferences>(DEFAULT_PREFERENCES);
@@ -110,9 +111,13 @@ export default function TasksPage() {
   }, [user?.uid, prefs]);
 
   // ─── Load data ─────────────────────────────────────────
-  const load = useCallback(async (limit?: number) => {
-    const effectiveLimit = limit ?? maxResultsRef.current;
-    const [{ items: rawTasks, hasMore: more }, m] = await Promise.all([getTasks(activeTeamId, effectiveLimit), getMembers()]);
+  const load = useCallback(async () => {
+    lastDocCursorRef.current = null;
+    const [{ items: rawTasks, lastDoc: cursor, hasMore: more }, m] = await Promise.all([
+      getTasksPaginated({ teamId: activeTeamId, pageSize: PAGE_SIZE }),
+      getMembers(),
+    ]);
+    lastDocCursorRef.current = cursor;
     const visible = (rawTasks as any[]).filter(task => !task.deleted && canSeeResource({
       teamId: task.teamId,
       createdBy: task.createdBy,
@@ -345,13 +350,28 @@ export default function TasksPage() {
     load();
   };
 
-  // ─── Load more ──────────────────────────────────────
+  // ─── Load more (cursor-based) ───────────────────────
   const handleLoadMore = async () => {
-    const next = maxResultsRef.current + 500;
-    maxResultsRef.current = next;
+    if (!lastDocCursorRef.current) return;
     setLoadingMore(true);
-    await load(next);
-    setLoadingMore(false);
+    try {
+      const { items: rawTasks, lastDoc: cursor, hasMore: more } = await getTasksPaginated({
+        teamId: activeTeamId,
+        pageSize: PAGE_SIZE,
+        lastDoc: lastDocCursorRef.current,
+      });
+      lastDocCursorRef.current = cursor;
+      const visible = (rawTasks as any[]).filter(task => !task.deleted && canSeeResource({
+        teamId: task.teamId,
+        createdBy: task.createdBy,
+        visibility: task.visibility || 'team',
+        assignees: task.assignees,
+      }));
+      setTasks(prev => [...prev, ...(visible as Task[])]);
+      setHasMore(more);
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   // ─── Saved views ──────────────────────────────────────

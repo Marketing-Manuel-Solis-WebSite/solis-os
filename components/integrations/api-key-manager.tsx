@@ -1,11 +1,11 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Key, Copy, Check, AlertTriangle, Trash2, X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
-import { onApiKeysSnapshot } from '@/lib/integrations-db';
+import { getApiKeys } from '@/lib/integrations-db';
 import { ALL_SCOPES } from '@/lib/integrations-types';
 import type { ApiKeyScope } from '@/lib/integrations-types';
 import { useToast } from '@/components/notifications/toast-provider';
@@ -26,10 +26,11 @@ export default function ApiKeyManager() {
   const [creating, setCreating] = useState(false);
   const [revokeConfirm, setRevokeConfirm] = useState<string | null>(null);
 
-  useEffect(() => {
-    const unsub = onApiKeysSnapshot(setKeys);
-    return () => unsub();
+  const loadKeys = useCallback(() => {
+    getApiKeys().then(setKeys).catch(() => setKeys([]));
   }, []);
+
+  useEffect(() => { loadKeys(); }, [loadKeys]);
 
   const handleCreate = async () => {
     if (!name.trim() || scopes.length === 0) return;
@@ -64,6 +65,7 @@ export default function ApiKeyManager() {
       setName('');
       setScopes([]);
       setExpiration('never');
+      loadKeys();
     } catch {
       toast.error('Error creating API key');
     } finally {
@@ -83,6 +85,7 @@ export default function ApiKeyManager() {
       if (!res.ok) throw new Error();
       toast.success('API key revoked');
       setRevokeConfirm(null);
+      loadKeys();
     } catch {
       toast.error('Error');
     }

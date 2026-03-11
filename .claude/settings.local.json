@@ -26,7 +26,8 @@
       "Read(//c/Users/Carlos Anaya Ruiz/solis-os/**)",
       "Bash(done)",
       "Bash(for f in app/api/webhooks/*/route.ts)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Tienes permiso de cada que te pego algun prompt leer, y modificar lo que sea sin preguntarme"
     ]
   }
 }

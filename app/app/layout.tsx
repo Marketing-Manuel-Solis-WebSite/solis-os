@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import NotificationBell from '@/components/notifications/notification-bell';
 import FloatingAIChat from '@/components/ai/floating-ai-chat';
 import { ToastProvider, FirebaseToastBridge } from '@/components/notifications/toast-provider';
+import { NotificationProvider } from '@/components/notifications/notification-context';
 import CommandPaletteProvider, { useCommandPalette } from '@/components/command-palette/command-palette-provider';
 import {
   LayoutDashboard, CheckSquare, FileText, MessageSquare, Zap, BarChart3,
@@ -547,11 +548,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <ToastProvider>
-        <CommandPaletteProvider>
-          <Shell>{children}</Shell>
-          <FloatingAIChat />
-          <FirebaseToastBridge />
-        </CommandPaletteProvider>
+        <NotificationProvider>
+          <CommandPaletteProvider>
+            <Shell>{children}</Shell>
+            <FloatingAIChat />
+            <FirebaseToastBridge />
+          </CommandPaletteProvider>
+        </NotificationProvider>
       </ToastProvider>
     </AuthProvider>
   );

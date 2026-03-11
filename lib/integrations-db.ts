@@ -1,7 +1,7 @@
 import {
   collection, doc, addDoc, setDoc, updateDoc, deleteDoc,
   getDocs, getDoc, query, where, orderBy, limit, writeBatch,
-  serverTimestamp, onSnapshot,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type {
@@ -352,50 +352,47 @@ export async function markEventProcessed(id: string) {
 }
 
 // ============================================
-// REAL-TIME LISTENERS
+// REAL-TIME LISTENERS (deprecated — use existing one-shot fetchers above)
 // ============================================
+/** @deprecated Use getIntegrations() with manual refresh instead. */
 export function onIntegrationsSnapshot(callback: (items: any[]) => void) {
-  const q2 = query(collection(db, 'integrations'), where('orgId', '==', ORG));
-  return onSnapshot(q2, (snap) => {
-    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    callback(items);
-  }, () => callback([]));
+  getIntegrations().then(callback).catch(() => callback([]));
+  return () => {};
 }
 
+/** @deprecated Use getApiKeys() with manual refresh instead. */
 export function onApiKeysSnapshot(callback: (items: any[]) => void) {
-  const q2 = query(collection(db, 'apiKeys'), where('orgId', '==', ORG));
-  return onSnapshot(q2, (snap) => {
-    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    callback(items);
-  }, () => callback([]));
+  getApiKeys().then(callback).catch(() => callback([]));
+  return () => {};
 }
 
+/** @deprecated Use getWebhooks() with manual refresh instead. */
 export function onWebhooksSnapshot(callback: (items: any[]) => void) {
-  const q2 = query(collection(db, 'webhooks'), where('orgId', '==', ORG));
-  return onSnapshot(q2, (snap) => {
-    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    callback(items);
-  }, () => callback([]));
+  getWebhooks().then(callback).catch(() => callback([]));
+  return () => {};
 }
 
+/** @deprecated Use getIncomingWebhooks() with manual refresh instead. */
 export function onIncomingWebhooksSnapshot(callback: (items: any[]) => void) {
-  const q2 = query(collection(db, 'incomingWebhooks'), where('orgId', '==', ORG));
-  return onSnapshot(q2, (snap) => {
-    const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    callback(items);
-  }, () => callback([]));
+  getIncomingWebhooks().then(callback).catch(() => callback([]));
+  return () => {};
 }
 
-export function onWebhookEventsSnapshot(callback: (items: any[]) => void, max = 50) {
+export async function getWebhookEvents(max = 50): Promise<any[]> {
   const q2 = query(
     collection(db, 'webhookEvents'),
     where('orgId', '==', ORG),
     orderBy('createdAt', 'desc'),
     limit(max),
   );
-  return onSnapshot(q2, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  }, () => callback([]));
+  const snap = await getDocs(q2);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+/** @deprecated Use getWebhookEvents() with manual refresh instead. */
+export function onWebhookEventsSnapshot(callback: (items: any[]) => void, max = 50) {
+  getWebhookEvents(max).then(callback).catch(() => callback([]));
+  return () => {};
 }
 
 export { ORG };

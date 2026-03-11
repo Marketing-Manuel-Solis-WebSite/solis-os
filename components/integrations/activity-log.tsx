@@ -1,9 +1,9 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Webhook, Key, Link2, Plug, Zap } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
-import { onWebhookEventsSnapshot } from '@/lib/integrations-db';
+import { getWebhookEvents } from '@/lib/integrations-db';
 
 const EVENT_ICONS: Record<string, any> = {
   'task.created': Zap,
@@ -36,13 +36,11 @@ export default function ActivityLog() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const unsub = onWebhookEventsSnapshot((items) => {
-      setEvents(items);
-      setLoading(false);
-    });
-    return () => unsub();
+  const loadEvents = useCallback(() => {
+    getWebhookEvents(50).then(setEvents).catch(() => setEvents([])).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { loadEvents(); }, [loadEvents]);
 
   const formatDate = (d: any) => {
     if (!d) return '';
