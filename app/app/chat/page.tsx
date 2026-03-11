@@ -1,7 +1,7 @@
 'use client';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   getAllUserChannels, getChannels, createChannel, updateChannel, deleteChannel, archiveChannel,
   getMessages, sendMessage, editMessage, deleteMessage as deleteMsg,
@@ -9,8 +9,9 @@ import {
   addChannelMember, removeChannelMember, addChannelAdmin, removeChannelAdmin,
   findOrCreateDM, sendSystemMessage, onMessagesSnapshot, getMembers, logAction,
   setTyping, clearTyping, onTypingSnapshot,
-  setPresence, getPresenceMap,
+  setPresence, getPresenceForUsers,
   markChannelRead, onReadCursorsSnapshot,
+  createTask,
 } from '@/lib/db';
 import { afterMessageSent } from '@/lib/chat-side-effects';
 import ChannelSidebar from '@/components/chat/channel-sidebar';
@@ -22,11 +23,13 @@ import CreateChannelModal from '@/components/chat/create-channel-modal';
 import MemberDrawer from '@/components/chat/member-drawer';
 import PinnedDrawer from '@/components/chat/pinned-drawer';
 import { MessageSquare, WifiOff } from 'lucide-react';
+import { useToast } from '@/components/notifications/toast-provider';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ChatPage() {
   const { t } = useI18n();
   const { user, me, isAdmin, activeTeamId, teams, can, canSeeAllTeams } = useAuth();
+  const toast = useToast();
   const [channels, setChannels] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [active, setActive] = useState<any>(null);
@@ -113,28 +116,43 @@ export default function ChatPage() {
     return () => { if (typingUnsubRef.current) typingUnsubRef.current(); };
   }, [active?.id, user?.uid]);
 
-  // Presence: set online + heartbeat + poll (replaces O(n²) listener)
+  // Presence: heartbeat + visibility/unload (stable, user-only)
   useEffect(() => {
     if (!user) return;
     setPresence(user.uid, true);
-    // Heartbeat every 60s
     const heartbeat = setInterval(() => setPresence(user.uid, true), 60000);
-    // Poll presence every 30s instead of realtime listener
-    const fetchPresence = () => getPresenceMap().then(setOnlineMap).catch(() => {});
-    fetchPresence();
-    const poll = setInterval(fetchPresence, 30000);
     const handleVisibility = () => setPresence(user.uid, !document.hidden);
     document.addEventListener('visibilitychange', handleVisibility);
     const handleUnload = () => setPresence(user.uid, false);
     window.addEventListener('beforeunload', handleUnload);
     return () => {
       clearInterval(heartbeat);
-      clearInterval(poll);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('beforeunload', handleUnload);
       setPresence(user.uid, false);
     };
   }, [user?.uid]);
+
+  // Contextual presence: poll only for DM partners + active channel members
+  // Reads O(relevant_users) docs instead of O(org_size) — Phase 7
+  const relevantPresenceIds = useMemo(() => {
+    const ids = new Set<string>();
+    channels.filter(ch => ch.type === 'dm').forEach(ch => {
+      ch.members?.forEach((id: string) => { if (id !== user?.uid) ids.add(id); });
+    });
+    if (active?.members) {
+      active.members.forEach((id: string) => { if (id !== user?.uid) ids.add(id); });
+    }
+    return Array.from(ids);
+  }, [channels, active?.id, user?.uid]);
+
+  useEffect(() => {
+    if (!user || relevantPresenceIds.length === 0) { setOnlineMap({}); return; }
+    const fetchPresence = () => getPresenceForUsers(relevantPresenceIds).then(setOnlineMap).catch(() => {});
+    fetchPresence();
+    const poll = setInterval(fetchPresence, 30000);
+    return () => clearInterval(poll);
+  }, [user?.uid, relevantPresenceIds.join(',')]);
 
   // Read cursors listener
   useEffect(() => {
@@ -313,6 +331,32 @@ export default function ChatPage() {
     setActive(dm);
   };
 
+  const handleCreateTask = async (msg: any) => {
+    if (!user || !me || !active) return;
+    try {
+      const content = (msg.content || '').replace(/(https?:\/\/[^\s]+)/g, '').trim();
+      const taskName = content.slice(0, 80) || 'Task from chat';
+      const channelLabel = active.type === 'dm' ? 'DM' : `#${active.name}`;
+      const taskDoc = await createTask({
+        name: taskName,
+        description: `${msg.content || ''}\n\n---\n_Created from ${channelLabel} — ${msg.displayName}_`,
+        createdBy: user.uid,
+        teamId: activeTeamId === '__all__' ? '' : activeTeamId,
+        tags: ['from-chat'],
+        // Source metadata: traces origin back to chat message
+        sourceType: 'chat_message',
+        sourceChannelId: active.id,
+        sourceChannelName: active.name || channelLabel,
+        sourceMessagePreview: content.slice(0, 120),
+      });
+      // System message in channel: visible trace of the conversion
+      await sendSystemMessage(active.id, `${me.displayName} created a task: "${taskName.slice(0, 50)}${taskName.length > 50 ? '...' : ''}"`);
+      toast.success(t('chat.taskCreated') || 'Task created', taskName);
+    } catch (err: any) {
+      toast.error('Error', err.message || 'Failed to create task');
+    }
+  };
+
   const pinnedMsgs = msgs.filter(m => m.pinned);
   const displayMsgs = active && clearedChannels.has(active.id) ? [] : msgs;
 
@@ -411,6 +455,7 @@ export default function ChatPage() {
               onDelete={handleDelete}
               onPin={handlePin}
               onReaction={handleReaction}
+              onCreateTask={handleCreateTask}
             />
             {/* Typing indicator */}
             <AnimatePresence>

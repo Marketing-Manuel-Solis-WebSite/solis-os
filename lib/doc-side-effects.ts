@@ -5,8 +5,8 @@
 // DESIGN DECISIONS:
 // - Activity log: NO — docs don't have activity subcollections, and autosave
 //   would generate excessive writes. Version history serves this purpose.
-// - Notifications: NO — docs are collaborative real-time. No notification
-//   on edit (too noisy). Share/mention is not yet a product feature.
+// - Notifications: NO for edits (too noisy). doc_mentioned defined in matrix but
+//   not yet wired — requires mention detection in content. Phase 7 candidate.
 // - Webhooks: NO — doc events are not in the webhook event catalog
 //   (WebhookEvent type). Docs are internal-only.
 // - Automations: NO — automation engine is task-trigger only.

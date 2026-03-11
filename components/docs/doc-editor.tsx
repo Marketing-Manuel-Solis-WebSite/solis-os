@@ -110,6 +110,14 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
     return () => window.removeEventListener('keydown', handler);
   }, [content, undoStack, redoStack]);
 
+  // Warn on tab close with unsaved changes
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
   // Close download menu on outside click
   useEffect(() => {
     if (!showDownloadMenu) return;

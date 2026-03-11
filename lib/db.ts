@@ -824,6 +824,7 @@ export function setPresence(userId: string, online: boolean) {
 }
 
 // Polling-based presence — replaces O(n²) listener with O(n) periodic fetch
+/** @deprecated Use getPresenceForUsers() for contextual presence. Kept for backward compat. */
 export async function getPresenceMap(): Promise<Record<string, boolean>> {
   const snap = await getDocs(query(collection(db, `orgs/${ORG}/presence`), limit(500)));
   const map: Record<string, boolean> = {};
@@ -833,6 +834,29 @@ export async function getPresenceMap(): Promise<Record<string, boolean>> {
     const lastSeen = data.lastSeen?.seconds || 0;
     map[d.id] = data.online && (now - lastSeen) < 120;
   });
+  return map;
+}
+
+// Contextual presence — fetch only for specific users (Phase 7)
+// Reads O(userIds.length) docs instead of O(org_size).
+// Used to scope presence to DM partners + active channel members.
+export async function getPresenceForUsers(userIds: string[]): Promise<Record<string, boolean>> {
+  if (userIds.length === 0) return {};
+  const now = Date.now() / 1000;
+  const map: Record<string, boolean> = {};
+  const reads = userIds.map(uid =>
+    getDoc(doc(db, `orgs/${ORG}/presence/${uid}`))
+      .then(snap => {
+        if (snap.exists()) {
+          const data = snap.data();
+          map[uid] = !!(data.online && (now - (data.lastSeen?.seconds || 0)) < 120);
+        } else {
+          map[uid] = false;
+        }
+      })
+      .catch(() => { map[uid] = false; })
+  );
+  await Promise.all(reads);
   return map;
 }
 

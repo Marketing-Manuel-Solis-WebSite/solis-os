@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { authenticateRequest } from '@/lib/server-auth';
 
 // =====================================================
 // UNIVERSAL RESPONSE FORMATTING SYSTEM
@@ -221,51 +222,22 @@ GUIDELINES:
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify the caller is authenticated
-    const { authenticateRequest } = await import('@/lib/server-auth');
-    const { checkRateLimit } = await import('@/lib/rate-limit');
+    const body = await request.json();
+    const { question, mode = 'chat', history = [] } = body;
+
+    if (!question) {
+      return NextResponse.json({ error: 'Question required' }, { status: 400 });
+    }
+
+    // Auth check — require valid Firebase ID token
     const authedUser = await authenticateRequest(request);
     if (!authedUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify the user has at least 'member' role — guests and readonly cannot use AI
-    const { adminDb: _adminDb } = await import('@/lib/firebase-admin');
-    const memberSnap = await _adminDb.collection('orgs/solis-center/members').doc(authedUser.uid).get();
-    const userRole = memberSnap.data()?.role as string | undefined;
-    const BLOCKED_ROLES = ['guest', 'readonly'];
-    if (!memberSnap.exists || !userRole || BLOCKED_ROLES.includes(userRole)) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    const rl = checkRateLimit('ai', authedUser.uid, 20);
-    if (!rl.allowed) {
-      return NextResponse.json({ error: 'Rate limit exceeded. Please wait a minute.' }, { status: 429 });
-    }
-
-    const body = await request.json();
-    const { question, mode = 'chat', history = [] } = body;
-
-    if (!question || typeof question !== 'string') {
-      return NextResponse.json({ error: 'Question required' }, { status: 400 });
-    }
-
-    // Limit input sizes to prevent abuse
-    if (question.length > 10_000) {
-      return NextResponse.json({ error: 'Question too long (max 10000 chars)' }, { status: 400 });
-    }
-    if (!Array.isArray(history) || history.length > 20) {
-      return NextResponse.json({ error: 'Invalid or oversized history' }, { status: 400 });
-    }
-
-    const VALID_MODES = ['chat', 'research', 'deep'];
-    if (!VALID_MODES.includes(mode)) {
-      return NextResponse.json({ error: `Invalid mode. Use: ${VALID_MODES.join(', ')}` }, { status: 400 });
-    }
-
-    const key = process.env.GEMINI_API_KEY;
+    const key = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (!key) {
-      return NextResponse.json({ error: 'AI service not available' }, { status: 503 });
+      return NextResponse.json({ error: 'Gemini API key not configured. Add GEMINI_API_KEY to your .env file.' }, { status: 500 });
     }
 
     const genAI = new GoogleGenerativeAI(key);
@@ -326,7 +298,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: 'AI processing failed. Please try again later.' },
+      { error: error.message || 'AI processing failed. Verify your Gemini API key in .env' },
       { status: 500 }
     );
   }

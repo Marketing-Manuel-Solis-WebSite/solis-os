@@ -149,6 +149,14 @@ export interface DocDeletedEvent {
   actor: ActorContext;
 }
 
+export interface DocMentionedEvent {
+  type: 'doc.mentioned';
+  docId: string;
+  doc: Record<string, any>;
+  mentionedUserId: string;
+  actor: ActorContext;
+}
+
 // ============================================================
 // FORM EVENTS
 // ============================================================
@@ -254,6 +262,10 @@ export type DomainEvent =
 //
 // DOC.RESTORED
 //   [critical]  logAction — audit log (version restore)
+//
+// DOC.MENTIONED (NOT YET WIRED — policy defined, dispatch pending)
+//   [important] notifyUser — in-app + email + inbox via notifyUsersAdmin pipeline
+//   Note: Requires mention detection in doc content (rich text parsing). Phase 7 candidate.
 //
 // MESSAGE.SENT
 //   [important] notifyChannelMembers — all members except sender (client-only)

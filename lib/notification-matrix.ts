@@ -21,6 +21,7 @@ export type NotificationEventType =
   | 'goal_overdue'
   | 'channel_message'
   | 'channel_mention'
+  | 'doc_mentioned'
   | 'form_submission'
   | 'form_limit_reached'
   | 'webhook_delivery_failed'
@@ -147,6 +148,16 @@ export const NOTIFICATION_MATRIX: Record<NotificationEventType, NotificationPoli
     urgency: 'high',
     dedupeStrategy: 'by_actor_and_entity',
     emailSubjectPrefix: 'Chat Mention',
+    criticality: 'important',
+    inboxType: 'mention',
+  },
+  doc_mentioned: {
+    inApp: true,
+    email: true,
+    inbox: true,
+    urgency: 'high',
+    dedupeStrategy: 'by_actor_and_entity',
+    emailSubjectPrefix: 'Document Mention',
     criticality: 'important',
     inboxType: 'mention',
   },

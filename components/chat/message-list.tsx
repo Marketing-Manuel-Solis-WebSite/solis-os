@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Reply, Pin, Trash2, Edit2, SmilePlus, Image as ImageIcon, FileText, Play, Download, ArrowRight, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
+import { Reply, Pin, Trash2, Edit2, SmilePlus, Image as ImageIcon, FileText, Play, Download, ArrowRight, ChevronDown, Maximize2, Minimize2, ListTodo } from 'lucide-react';
 import { formatFileSize } from '@/lib/upload';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '🔥', '👀', '✅', '💯'];
@@ -19,6 +19,7 @@ interface Props {
   onDelete: (msgId: string) => void;
   onPin: (msgId: string, isPinned: boolean) => void;
   onReaction: (msgId: string, emoji: string) => void;
+  onCreateTask?: (msg: any) => void;
 }
 
 // ========== SKELETON ==========
@@ -167,7 +168,7 @@ type GroupedItem =
   | { type: 'group'; messages: any[]; id: string };
 
 // ========== COMPONENT ==========
-export default function MessageList({ messages, members, userId, channelType, canManage, loading, onReply, onEdit, onDelete, onPin, onReaction }: Props) {
+export default function MessageList({ messages, members, userId, channelType, canManage, loading, onReply, onEdit, onDelete, onPin, onReaction, onCreateTask }: Props) {
   const { t, lang } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -342,6 +343,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
                   onDelete={onDelete}
                   onPin={onPin}
                   onReaction={onReaction}
+                  onCreateTask={onCreateTask}
                 />
               </div>
             </div>
@@ -373,6 +375,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
                     onDelete={onDelete}
                     onPin={onPin}
                     onReaction={onReaction}
+                    onCreateTask={onCreateTask}
                   />
                 </div>
               </div>
@@ -404,7 +407,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
 // ========== MESSAGE CONTENT ==========
 function MessageContent({
   msg, members, userId, canManage, hoverId, showEmoji, setHoverId, setShowEmoji,
-  onReply, onEdit, onDelete, onPin, onReaction,
+  onReply, onEdit, onDelete, onPin, onReaction, onCreateTask,
 }: {
   msg: any; members: any[]; userId: string; canManage: boolean;
   hoverId: string | null; showEmoji: string | null;
@@ -412,6 +415,7 @@ function MessageContent({
   onReply: (msg: any) => void; onEdit: (msg: any) => void;
   onDelete: (msgId: string) => void; onPin: (msgId: string, isPinned: boolean) => void;
   onReaction: (msgId: string, emoji: string) => void;
+  onCreateTask?: (msg: any) => void;
 }) {
   const { t } = useI18n();
   const media = extractMediaUrls(msg.content || '');
@@ -536,6 +540,11 @@ function MessageContent({
             <button onClick={() => onReply(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-md hover:bg-[var(--bg-hover)] transition" title={t('chat.reply')} aria-label={t('chat.reply')}>
               <Reply className="h-4 w-4" />
             </button>
+            {onCreateTask && msg.type !== 'system' && (
+              <button onClick={() => onCreateTask(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-green-400 rounded-md hover:bg-[var(--bg-hover)] transition" title={t('chat.createTask') || 'Create task'}>
+                <ListTodo className="h-4 w-4" />
+              </button>
+            )}
             {(canManage || msg.userId === userId) && (
               <button onClick={() => onPin(msg.id, msg.pinned)} className={`p-1.5 rounded-md hover:bg-[var(--bg-hover)] transition ${msg.pinned ? 'text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--accent)]'}`} title={msg.pinned ? t('chat.unpin') : t('chat.pin')}>
                 <Pin className="h-4 w-4" />

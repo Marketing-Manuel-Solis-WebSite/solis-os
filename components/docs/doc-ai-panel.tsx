@@ -87,8 +87,11 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
 
   const askAI = async (question: string, includeDoc: boolean = true) => {
     setLoading(true);
+    const docContent = (doc.content || '').length > 30000
+      ? doc.content.slice(0, 30000) + '\n\n[... document truncated for AI processing ...]'
+      : doc.content || '';
     const fullPrompt = includeDoc
-      ? `Document Title: "${doc.title}"\n\nDocument Content:\n${doc.content}\n\n---\n\nInstruction: ${question}`
+      ? `Document Title: "${doc.title}"\n\nDocument Content:\n${docContent}\n\n---\n\nInstruction: ${question}`
       : question;
 
     setMessages(prev => [...prev, { role: 'user', text: question }]);

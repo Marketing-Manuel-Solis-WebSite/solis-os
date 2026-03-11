@@ -208,12 +208,15 @@ export default function DocsPage() {
     }
 
     // Version snapshot logic:
-    // Manual save → always create version
-    // Autosave → only if >100 chars changed OR >5 min since last version
+    // Both manual and autosave require content to have actually changed.
+    // Manual save → version if content changed at all
+    // Autosave → version if >100 chars delta OR >5 min since last version
     const currentContent = data.content || '';
     const charDelta = Math.abs(currentContent.length - lastVersionContentRef.current.length);
     const timeSinceLastVersion = Date.now() - lastVersionTimeRef.current;
-    const shouldVersion = isManualSave || charDelta > 100 || timeSinceLastVersion > 5 * 60 * 1000;
+    const hasMaterialChange = charDelta > 100 || timeSinceLastVersion > 5 * 60 * 1000;
+    const contentActuallyChanged = currentContent !== lastVersionContentRef.current;
+    const shouldVersion = contentActuallyChanged && (isManualSave || hasMaterialChange);
 
     if (shouldVersion && currentContent.trim()) {
       try {
@@ -755,7 +758,7 @@ function CreateDocModal({ teams, activeTeamId, onClose, onCreate }: {
     onCreate({
       title: title.trim(),
       content: tpl?.content || '',
-      contentHtml: tpl?.content || '',
+      contentHtml: renderMarkdown(tpl?.content || ''),
       visibility,
       category: category.trim(),
       tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),

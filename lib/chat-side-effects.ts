@@ -12,12 +12,21 @@
 // - Unread/accounting: YES — handled by markChannelRead in db.ts via
 //   readCursors. Not a side effect of sending.
 //
+// NOTIFICATION PIPELINE (Phase 7):
+// - Notifications route through /api/chat/notify which calls
+//   notifyUsersAdmin (Phase 3 pipeline: dedup + email + inbox).
+// - This ensures notification-matrix.ts is respected:
+//   - channel_message: inApp only (email:false, inbox:false)
+//   - channel_mention: inApp + email + inbox + dedup
+// - Previous implementation used client-side notifyMany() which
+//   bypassed the matrix (no dedup, no inbox, email spam).
+//
 // What this dispatcher covers:
-// - notifyChannelMembers for messages
-// - notifyMentionedUsers for @mentions
+// - notifyChannelMembers for messages (via server pipeline)
+// - notifyMentionedUsers for @mentions (via server pipeline)
 // - Persistent trace via eventLog
 
-import { notifyMany } from './notifications';
+import { auth } from './firebase';
 import type {
   MessageSentEvent,
   SideEffectResult,
@@ -53,12 +62,39 @@ function buildResult(correlationId: string, event: string, effects: SideEffectRe
   };
 }
 
+// Route notifications through server pipeline (Phase 3: dedup + email + inbox)
+async function notifyViaServer(userIds: string[], params: {
+  eventType: string;
+  title: string;
+  message: string;
+  entityType?: string;
+  entityId?: string;
+  entityUrl?: string;
+  actorId?: string;
+  actorName?: string;
+}): Promise<void> {
+  const idToken = await auth.currentUser?.getIdToken();
+  if (!idToken) throw new Error('Not authenticated');
+  const res = await fetch('/api/chat/notify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+    body: JSON.stringify({ userIds, ...params }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Unknown' }));
+    throw new Error(err.error || `HTTP ${res.status}`);
+  }
+}
+
 // ============================================================
 // afterMessageSent
 // ============================================================
 // Effects:
 //   [important] notifyChannelMembers (all members except sender)
 //   [important] notifyMentionedUsers (mentioned users except sender)
+//
+// Both effects go through /api/chat/notify → notifyUsersAdmin
+// which respects notification-matrix.ts policies.
 
 export async function afterMessageSent(event: Omit<MessageSentEvent, 'type'> & {
   channelName: string;
@@ -72,12 +108,12 @@ export async function afterMessageSent(event: Omit<MessageSentEvent, 'type'> & {
   const content = (message.content || '').slice(0, 80);
   const displayChannel = channelType === 'dm' ? 'mensaje directo' : `#${channelName}`;
 
-  // Notify channel members
+  // Notify channel members (matrix: channel_message → inApp only, no email)
   const recipientIds = memberIds.filter(id => id !== actor.actorId);
   if (recipientIds.length > 0) {
     effects.push(await runEffect('notifyChannelMembers', 'important', () =>
-      notifyMany(recipientIds, {
-        type: 'channel_message',
+      notifyViaServer(recipientIds, {
+        eventType: 'channel_message',
         title: `Nuevo mensaje en ${displayChannel}`,
         message: content,
         entityType: 'channel',
@@ -85,16 +121,16 @@ export async function afterMessageSent(event: Omit<MessageSentEvent, 'type'> & {
         entityUrl: '/app/chat',
         actorId: actor.actorId,
         actorName: actor.actorName,
-      }).then(() => {}),
+      }),
     ));
   }
 
-  // Notify mentioned users
+  // Notify mentioned users (matrix: channel_mention → inApp + email + inbox + dedup)
   const mentionRecipients = mentionIds.filter(id => id !== actor.actorId);
   if (mentionRecipients.length > 0) {
     effects.push(await runEffect('notifyMentionedUsers', 'important', () =>
-      notifyMany(mentionRecipients, {
-        type: 'channel_mention',
+      notifyViaServer(mentionRecipients, {
+        eventType: 'channel_mention',
         title: `${actor.actorName} te mencionó en ${displayChannel}`,
         message: content,
         entityType: 'channel',
@@ -102,7 +138,7 @@ export async function afterMessageSent(event: Omit<MessageSentEvent, 'type'> & {
         entityUrl: '/app/chat',
         actorId: actor.actorId,
         actorName: actor.actorName,
-      }).then(() => {}),
+      }),
     ));
   }
 

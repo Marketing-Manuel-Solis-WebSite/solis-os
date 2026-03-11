@@ -92,8 +92,9 @@ service cloud.firestore {
       }
 
       // Read cursors — tracks which messages each user has read per channel
+      // Self-only: no reason for other users to read your cursors (no "seen" feature).
       match /readCursors/{userId} {
-        allow read: if isSignedIn() && isOrgMember(orgId);
+        allow read: if isSignedIn() && isSelf(userId);
         allow write: if isSignedIn() && isSelf(userId);
       }
 
@@ -241,25 +242,55 @@ service cloud.firestore {
     }
 
     // ======== CHANNELS ========
+    // Privacy model: public channels accessible to all org members.
+    // Private/DM channels require membership in the members array.
+    // Managers+ can always access all channels for oversight/moderation.
 
     match /channels/{channelId} {
-      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) &&
+        (resource.data.type == 'public' ||
+         request.auth.uid in resource.data.members ||
+         isManager(resource.data.orgId));
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) &&
+        (resource.data.type == 'public' ||
+         request.auth.uid in resource.data.members ||
+         isManager(resource.data.orgId));
       allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
 
-      // Cross-org leak fix: verify parent channel's orgId
+      // Messages: channel membership enforced for private/DM channels.
+      // Fix: userId (not createdBy) is the author field on messages.
       match /messages/{messageId} {
-        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId);
-        allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId);
-        allow update: if isSignedIn() && request.auth.uid == resource.data.createdBy;
-        allow delete: if isSignedIn() && request.auth.uid == resource.data.createdBy;
+        allow read: if isSignedIn() &&
+          isOrgMember(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId) &&
+          (get(/databases/$(database)/documents/channels/$(channelId)).data.type == 'public' ||
+           request.auth.uid in get(/databases/$(database)/documents/channels/$(channelId)).data.members ||
+           isManager(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId));
+        allow create: if isSignedIn() &&
+          isOrgMember(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId) &&
+          (get(/databases/$(database)/documents/channels/$(channelId)).data.type == 'public' ||
+           request.auth.uid in get(/databases/$(database)/documents/channels/$(channelId)).data.members ||
+           isManager(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId));
+        allow update: if isSignedIn() &&
+          (request.auth.uid == resource.data.userId ||
+           isManager(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId));
+        allow delete: if isSignedIn() &&
+          (request.auth.uid == resource.data.userId ||
+           isManager(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId));
       }
 
-      // Typing indicators and channel metadata
+      // Typing indicators and channel metadata — same access as channel
       match /meta/{docId} {
-        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId);
-        allow write: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId);
+        allow read: if isSignedIn() &&
+          isOrgMember(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId) &&
+          (get(/databases/$(database)/documents/channels/$(channelId)).data.type == 'public' ||
+           request.auth.uid in get(/databases/$(database)/documents/channels/$(channelId)).data.members ||
+           isManager(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId));
+        allow write: if isSignedIn() &&
+          isOrgMember(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId) &&
+          (get(/databases/$(database)/documents/channels/$(channelId)).data.type == 'public' ||
+           request.auth.uid in get(/databases/$(database)/documents/channels/$(channelId)).data.members ||
+           isManager(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId));
       }
     }
 
