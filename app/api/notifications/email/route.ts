@@ -70,13 +70,13 @@ export async function POST(request: NextRequest) {
     }
 
     const typeLabels: Record<string, string> = {
-      task_assigned: 'Task Assignment',
-      task_mentioned: 'Mention',
-      task_completed: 'Task Completed',
-      task_due_soon: 'Due Date Reminder',
-      channel_mention: 'Chat Mention',
-      doc_mentioned: 'Document Update',
-      system: 'System Notification',
+      task_assigned: 'Asignación de tarea',
+      task_mentioned: 'Mención',
+      task_completed: 'Tarea completada',
+      task_due_soon: 'Tarea próxima a vencer',
+      channel_mention: 'Mención en canal',
+      doc_mentioned: 'Mención en documento',
+      system: 'Notificación del sistema',
     };
 
     const typeLabel = typeLabels[type] || 'Notification';
@@ -105,9 +105,9 @@ export async function POST(request: NextRequest) {
       ${safeActorName ? `<p style="color:#64748B;font-size:12px;margin:0;">From: <span style="color:#3B82F6;font-weight:500;">${safeActorName}</span></p>` : ''}
     </div>
     <div style="text-align:center;">
-      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://soliscenter.com'}/app" style="display:inline-block;padding:12px 32px;background:#3B82F6;color:#FFFFFF;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">Open Solis Center</a>
+      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://soliscenter.com'}/app" style="display:inline-block;padding:12px 32px;background:#3B82F6;color:#FFFFFF;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">Abrir Solis Center</a>
     </div>
-    <p style="text-align:center;color:#475569;font-size:11px;margin-top:32px;">You're receiving this because you have email notifications enabled in Solis Center.</p>
+    <p style="text-align:center;color:#475569;font-size:11px;margin-top:32px;">Recibes este correo porque tienes las notificaciones por email habilitadas en Solis Center.</p>
   </div>
 </body>
 </html>`;

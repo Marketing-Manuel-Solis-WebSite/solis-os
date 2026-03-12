@@ -258,8 +258,8 @@ export async function GET(req: NextRequest) {
 
     for (const doc of snap.docs) {
       try {
-        await deleteSubcollection(`tasks/${doc.id}`, 'comments').catch(() => {});
-        await deleteSubcollection(`tasks/${doc.id}`, 'activity').catch(() => {});
+        await deleteSubcollection(`tasks/${doc.id}`, 'comments').catch(err => console.error('[Housekeeping] Failed to clean subcollection:', err?.message));
+        await deleteSubcollection(`tasks/${doc.id}`, 'activity').catch(err => console.error('[Housekeeping] Failed to clean subcollection:', err?.message));
 
         const batch = adminDb.batch();
         batch.delete(doc.ref);

@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 import type { AnalyticsSnapshot } from '@/app/app/analytics/page';
 import { checkAIUsage, incrementAIUsage, logAIAction } from '@/lib/ai-usage';
 import {
@@ -85,6 +86,7 @@ const ANALYSIS_CATEGORIES = [
 ];
 
 export default function AIAnalysisPanel({ data, userId, userName, userRole }: Props) {
+  const { t } = useI18n();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentQ, setCurrentQ] = useState('');
@@ -210,7 +212,7 @@ ${deptContext}
           questionLength: question.length, contextLength: fullPrompt.length,
           responseLength: 0, truncated: false, durationMs,
           success: false, error: errorMsg, estimatedTokens: 0,
-        }).catch(() => {});
+        }).catch(() => { /* best-effort tracking */ });
       } else {
         const answer = result.answer || 'No response from AI.';
 
@@ -220,13 +222,13 @@ ${deptContext}
 
         // Increment usage + log
         const tokens = result.usage?.estimatedInputTokens + result.usage?.estimatedOutputTokens || 0;
-        incrementAIUsage(userId, 'research', tokens).catch(() => {});
+        incrementAIUsage(userId, 'research', tokens).catch(() => { /* best-effort tracking */ });
         logAIAction({
           userId, userName, feature: 'analytics', mode: 'research',
           questionLength: question.length, contextLength: fullPrompt.length,
           responseLength: answer.length, truncated: result.truncated || false,
           durationMs, success: true, estimatedTokens: tokens,
-        }).catch(() => {});
+        }).catch(() => { /* best-effort tracking */ });
       }
     } catch (err: any) {
       setAnalyses(prev => [...prev, {
@@ -360,7 +362,7 @@ ${deptContext}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCustom(); } }} />
           <button onClick={handleCustom} disabled={loading || !customQ.trim()}
             className="h-[52px] px-5 rounded-xl bg-purple-500/15 text-purple-400 text-sm font-semibold flex items-center gap-2 hover:bg-purple-500/25 transition-all duration-200 disabled:opacity-30 shrink-0">
-            <Send className="h-4 w-4" /> Analyze
+            <Send className="h-4 w-4" /> {t('aiAnalysis.analyze')}
           </button>
         </div>
         <div className="flex gap-2 mt-2 flex-wrap">

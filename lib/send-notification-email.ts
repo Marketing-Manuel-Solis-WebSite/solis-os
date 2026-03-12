@@ -40,6 +40,26 @@ const TYPE_LABELS: Record<string, string> = {
   system: 'System Notification',
 };
 
+// TODO: use recipient language preference to select label map
+const TYPE_LABELS_ES: Record<string, string> = {
+  task_assigned: 'Asignación de tarea',
+  task_mentioned: 'Mención',
+  task_completed: 'Tarea completada',
+  task_comment: 'Comentario en tarea',
+  task_due_soon: 'Tarea próxima a vencer',
+  task_overdue: 'Tarea vencida',
+  goal_assigned: 'Meta asignada',
+  goal_completed: 'Meta completada',
+  goal_overdue: 'Meta vencida',
+  channel_message: 'Mensaje de canal',
+  channel_mention: 'Mención en canal',
+  doc_mentioned: 'Mención en documento',
+  form_submission: 'Envío de formulario',
+  form_limit_reached: 'Límite de respuestas alcanzado',
+  webhook_delivery_failed: 'Error en webhook',
+  system: 'Notificación del sistema',
+};
+
 export interface SendEmailParams {
   to: string;
   type: string;
@@ -89,9 +109,9 @@ export async function sendNotificationEmail(params: SendEmailParams): Promise<Se
       ${safeActorName ? `<p style="color:#64748B;font-size:12px;margin:0;">From: <span style="color:#3B82F6;font-weight:500;">${safeActorName}</span></p>` : ''}
     </div>
     <div style="text-align:center;">
-      <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;padding:12px 32px;background:#3B82F6;color:#FFFFFF;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">Open Solis Center</a>
+      <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;padding:12px 32px;background:#3B82F6;color:#FFFFFF;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600;">Abrir Solis Center</a>
     </div>
-    <p style="text-align:center;color:#475569;font-size:11px;margin-top:32px;">You&#39;re receiving this because you have email notifications enabled in Solis Center.</p>
+    <p style="text-align:center;color:#475569;font-size:11px;margin-top:32px;">Recibes este correo porque tienes las notificaciones por email habilitadas en Solis Center.</p>
   </div>
 </body>
 </html>`;

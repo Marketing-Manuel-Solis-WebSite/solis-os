@@ -58,6 +58,7 @@ export const translations: Record<Lang, Dict> = {
     'common.showingItems': 'Mostrando {n} elementos',
     'common.moreAvailable': 'hay más disponibles',
     'common.loadMore': 'Cargar más',
+    'common.error': 'Error',
 
     // --- Task Statuses ---
     'status.todo': 'Por Hacer',
@@ -307,6 +308,7 @@ export const translations: Record<Lang, Dict> = {
     'chat.react': 'Reaccionar',
     'chat.createTask': 'Crear tarea',
     'chat.taskCreated': 'Tarea creada',
+    'chat.taskCreationFailed': 'Error al crear tarea',
     'chat.deleteConfirm': '¿Eliminar este mensaje?',
     'chat.newMessagesNotif': 'Nuevos mensajes',
     'chat.replyingTo': 'Respondiendo a',
@@ -1927,6 +1929,7 @@ export const translations: Record<Lang, Dict> = {
     'common.showingItems': 'Showing {n} items',
     'common.moreAvailable': 'more available',
     'common.loadMore': 'Load more',
+    'common.error': 'Error',
 
     // --- Task Statuses ---
     'status.todo': 'To Do',
@@ -2168,6 +2171,7 @@ export const translations: Record<Lang, Dict> = {
     'chat.react': 'React',
     'chat.createTask': 'Create task',
     'chat.taskCreated': 'Task created',
+    'chat.taskCreationFailed': 'Failed to create task',
     'chat.deleteConfirm': 'Delete this message?',
     'chat.newMessagesNotif': 'New messages',
     'chat.replyingTo': 'Replying to',

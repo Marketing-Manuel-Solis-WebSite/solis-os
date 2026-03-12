@@ -789,7 +789,7 @@ export async function getAutomations(teamId?: string, maxResults = 500) { if (te
 export async function createAutomation(data: any) { return addTo('automations', { ...data, orgId: ORG, enabled: true, teamId: data.teamId || '' }); }
 export async function updateAutomation(id: string, data: any) { return updateAt(`automations/${id}`, data); }
 export async function deleteAutomation(id: string) {
-  await deleteSubcollectionDocs(`automations/${id}`, 'logs').catch(() => {});
+  await deleteSubcollectionDocs(`automations/${id}`, 'logs').catch(err => console.error('[DB] Failed to delete automation logs:', err?.message));
   return deleteAt(`automations/${id}`);
 }
 export async function getAutomationLogs(automationId: string, limitCount = 20) {

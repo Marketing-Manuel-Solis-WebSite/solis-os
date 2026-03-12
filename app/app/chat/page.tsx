@@ -148,7 +148,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!user || relevantPresenceIds.length === 0) { setOnlineMap({}); return; }
-    const fetchPresence = () => getPresenceForUsers(relevantPresenceIds).then(setOnlineMap).catch(() => {});
+    const fetchPresence = () => getPresenceForUsers(relevantPresenceIds).then(setOnlineMap).catch(() => { /* presence is best-effort */ });
     fetchPresence();
     const poll = setInterval(fetchPresence, 30000);
     return () => clearInterval(poll);
@@ -353,7 +353,7 @@ export default function ChatPage() {
       await sendSystemMessage(active.id, `${me.displayName} created a task: "${taskName.slice(0, 50)}${taskName.length > 50 ? '...' : ''}"`);
       toast.success(t('chat.taskCreated') || 'Task created', taskName);
     } catch (err: any) {
-      toast.error('Error', err.message || 'Failed to create task');
+      toast.error(t('common.error') || 'Error', t('chat.taskCreationFailed'));
     }
   };
 

@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ teams });
   } catch (err) {
     console.error('[Departments] GET failed:', err);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ error: 'Department operation failed', code: 'INTERNAL' }, { status: 500 });
   }
 }
 
@@ -32,6 +32,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, id });
   } catch (err) {
     console.error('[Departments] POST failed:', err);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ error: 'Department operation failed', code: 'INTERNAL' }, { status: 500 });
   }
 }

@@ -198,12 +198,12 @@ export default function AIPage() {
       await loadConversations();
 
       // Track usage + log
-      incrementAIUsage(user.uid, aiMode, tokenCount).catch(() => {});
+      incrementAIUsage(user.uid, aiMode, tokenCount).catch(() => { /* best-effort tracking */ });
       logAIAction({
         userId: user.uid, userName: me.displayName || '', feature: 'chat', mode: aiMode,
         questionLength: content.length, contextLength: 0, responseLength: answer.length,
         truncated: false, durationMs, success: true, estimatedTokens: tokenCount,
-      }).catch(() => {});
+      }).catch(() => { /* best-effort tracking */ });
     } catch (err: any) {
       setStreamingText('');
       const durationMs = Date.now() - start;
@@ -215,7 +215,7 @@ export default function AIPage() {
         questionLength: content.length, contextLength: 0, responseLength: 0,
         truncated: false, durationMs, success: false, error: err.message,
         estimatedTokens: 0,
-      }).catch(() => {});
+      }).catch(() => { /* best-effort tracking */ });
     } finally {
       setLoading(false);
     }

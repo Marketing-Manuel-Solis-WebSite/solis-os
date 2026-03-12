@@ -205,7 +205,7 @@ async function executeRule(rule: RuleDoc, ctx: TriggerContext): Promise<void> {
     await adminDb.doc(`automations/${rule.id}`).update({
       errorCount: FieldValue.increment(1),
       updatedAt: FieldValue.serverTimestamp(),
-    }).catch(() => {});
+    }).catch(err => console.error('[AutomationEngine] Failed to update rule stats:', err?.message));
     await writeLog(rule.id, 'failure', logEntries, Date.now() - start, ctx, err?.message);
   }
 }

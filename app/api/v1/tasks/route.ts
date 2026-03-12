@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
     return apiResponse(result.items, { total, limit, hasMore: result.hasMore, nextCursor: result.nextCursor });
   } catch {
-    return apiError('Internal error', 500);
+    return apiError('Task operation failed', 500, 'INTERNAL');
   }
 }
 
@@ -64,6 +64,6 @@ export async function POST(req: NextRequest) {
 
     return apiResponse({ id: docRef.id, ...data });
   } catch {
-    return apiError('Internal error', 500);
+    return apiError('Task operation failed', 500, 'INTERNAL');
   }
 }

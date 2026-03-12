@@ -59,12 +59,12 @@ function AIInsightsInner({ tasks, goals, teams, user, me, activeTeamId }: Widget
 
       // Track usage + log
       const estimatedTokens = Math.ceil(result.length / 4);
-      incrementAIUsage(user.uid, 'chat', estimatedTokens).catch(() => {});
+      incrementAIUsage(user.uid, 'chat', estimatedTokens).catch(() => { /* best-effort tracking */ });
       logAIAction({
         userId: user.uid, userName: me.displayName || '', feature: 'dashboard', mode: 'chat',
         questionLength: 200, contextLength: 0, responseLength: result.length,
         truncated: false, durationMs, success: true, estimatedTokens,
-      }).catch(() => {});
+      }).catch(() => { /* best-effort tracking */ });
     } catch (err: any) {
       const durationMs = Date.now() - start;
       // Surface classified errors
@@ -81,7 +81,7 @@ function AIInsightsInner({ tasks, goals, teams, user, me, activeTeamId }: Widget
         questionLength: 200, contextLength: 0, responseLength: 0,
         truncated: false, durationMs, success: false, error: err.message,
         estimatedTokens: 0,
-      }).catch(() => {});
+      }).catch(() => { /* best-effort tracking */ });
     } finally {
       setLoading(false);
     }

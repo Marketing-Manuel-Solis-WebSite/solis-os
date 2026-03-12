@@ -159,12 +159,12 @@ export default function FloatingAIChat() {
 
       // Track usage + log
       const estimatedTokens = Math.ceil(answer.length / 4);
-      incrementAIUsage(user.uid, 'chat', estimatedTokens).catch(() => {});
+      incrementAIUsage(user.uid, 'chat', estimatedTokens).catch(() => { /* best-effort tracking */ });
       logAIAction({
         userId: user.uid, userName: me.displayName || '', feature: 'floating', mode: 'chat',
         questionLength: question.length, contextLength: 0, responseLength: answer.length,
         truncated: false, durationMs, success: true, estimatedTokens,
-      }).catch(() => {});
+      }).catch(() => { /* best-effort tracking */ });
     } catch (err: any) {
       setStreamingText('');
       const errMsg: MiniMessage = { id: `e-${Date.now()}`, role: 'assistant', content: `Error: ${err.message}` };
@@ -175,7 +175,7 @@ export default function FloatingAIChat() {
         questionLength: question.length, contextLength: 0, responseLength: 0,
         truncated: false, durationMs: Date.now() - start, success: false,
         error: err.message, estimatedTokens: 0,
-      }).catch(() => {});
+      }).catch(() => { /* best-effort tracking */ });
     } finally {
       setLoading(false);
     }

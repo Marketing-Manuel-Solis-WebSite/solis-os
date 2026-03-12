@@ -85,16 +85,18 @@ export async function validateApiRequest(
 // RESPONSE HELPERS
 // ============================================
 export function apiResponse(data: any, meta?: { total?: number; limit?: number; offset?: number; hasMore?: boolean; nextCursor?: string | null }) {
+  const requestId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
   return NextResponse.json({
     data,
-    meta: meta || null,
+    meta: meta ? { ...meta, requestId } : { requestId },
     error: null,
   });
 }
 
-export function apiError(message: string, status: number) {
+export function apiError(message: string, status: number, code?: string) {
+  const requestId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
   return NextResponse.json(
-    { data: null, meta: null, error: message },
+    { data: null, meta: { requestId }, error: message, ...(code ? { code } : {}) },
     { status },
   );
 }

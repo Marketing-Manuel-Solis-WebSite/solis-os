@@ -161,13 +161,13 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
         // Track usage
         if (user && me) {
           const tokens = (data.usage?.estimatedInputTokens || 0) + (data.usage?.estimatedOutputTokens || 0);
-          incrementAIUsage(user.uid, 'chat', tokens).catch(() => {});
+          incrementAIUsage(user.uid, 'chat', tokens).catch(() => { /* best-effort tracking */ });
           logAIAction({
             userId: user.uid, userName: me.displayName || '', feature: 'docs', mode: 'chat',
             questionLength: question.length, contextLength: fullPrompt.length,
             responseLength: answer.length, truncated: data.truncated || false,
             durationMs, success: true, estimatedTokens: tokens,
-          }).catch(() => {});
+          }).catch(() => { /* best-effort tracking */ });
         }
       }
     } catch {
@@ -217,13 +217,13 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
         // Track usage
         if (user && me) {
           const tokens = (data.usage?.estimatedInputTokens || 0) + (data.usage?.estimatedOutputTokens || 0);
-          incrementAIUsage(user.uid, 'chat', tokens).catch(() => {});
+          incrementAIUsage(user.uid, 'chat', tokens).catch(() => { /* best-effort tracking */ });
           logAIAction({
             userId: user.uid, userName: me.displayName || '', feature: 'docs', mode: 'chat',
             questionLength: generatePrompt.length, contextLength: systemPrompt.length,
             responseLength: answer.length, truncated: false,
             durationMs, success: true, estimatedTokens: tokens,
-          }).catch(() => {});
+          }).catch(() => { /* best-effort tracking */ });
         }
       } else {
         let errorMsg = data.error || t('docAI.failedGenerate');
@@ -363,7 +363,7 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && !generating && (
           <div className="text-center py-8">
-            <Bot className="h-10 w-10 text-gray-800 mx-auto mb-3" />
+            <Bot className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
             <p className="text-sm text-[var(--text-muted)]">{t('docAI.askHint1')}</p>
             <p className="text-sm text-[var(--text-muted)]">{t('docAI.askHint2')}</p>
           </div>

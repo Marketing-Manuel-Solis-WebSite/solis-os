@@ -91,7 +91,7 @@ export default function Admin() {
     <div className="flex h-[calc(100vh-64px)]">
       <Nav />
       <div className="flex-1 overflow-y-auto">
-        {s === 'org' && <OrgS />}
+        {s === 'org' && <ComingSoonS label={t('admin.organizationTitle')} />}
         {s === 'users' && <UsersS />}
         {s === 'departments' && <DepartmentsS />}
         {s === 'perms' && <PermsS />}
@@ -655,56 +655,9 @@ function DepartmentsS() {
 }
 
 // =====================================================
-// ORGANIZATION SECTION
+// ORGANIZATION SECTION — Ghost settings (nothing reads them).
+// Replaced with ComingSoonS placeholder. Original code removed.
 // =====================================================
-function OrgS() {
-  const { user, me } = useAuth();
-  const { t } = useI18n();
-  const [d, setD] = useState<any>(null);
-  const [sv, setSv] = useState(false);
-
-  useEffect(() => { getOrg().then(o => setD(o || {})); }, []);
-
-  const save = async () => {
-    setSv(true);
-    await updateOrg(d);
-    await logAction({ action: 'updated', resource: 'org', detail: 'settings', actorId: user!.uid, actorName: me!.displayName });
-    setSv(false);
-  };
-
-  if (!d) return <Sk />;
-  return (
-    <div className="p-6 max-w-3xl">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-[var(--text-primary)]">{t('admin.organizationTitle')}</h2>
-        <button onClick={save} disabled={sv} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2">
-          <Save className="h-4 w-4" />{sv ? t('admin.saving') : t('admin.save')}
-        </button>
-      </div>
-      <div className="space-y-4 rounded-xl bg-[var(--bg-secondary)] shadow-card p-6">
-        <I l={t('admin.orgName')} v={d.name || ''} c={v => setD({ ...d, name: v })} />
-        <I l={t('admin.orgSlug')} v={d.slug || ''} c={v => setD({ ...d, slug: v })} />
-        <I l={t('admin.orgTimezone')} v={d.timezone || ''} c={v => setD({ ...d, timezone: v })} />
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">{t('admin.primaryColor')}</label>
-            <div className="flex gap-2">
-              <input type="color" value={d.primaryColor || '#3B82F6'} onChange={e => setD({ ...d, primaryColor: e.target.value })} className="w-10 h-10 rounded-lg bg-transparent cursor-pointer" />
-              <input value={d.primaryColor || ''} onChange={e => setD({ ...d, primaryColor: e.target.value })} className="input-dark flex-1" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm text-[var(--text-muted)] mb-1">{t('admin.secondaryColor')}</label>
-            <div className="flex gap-2">
-              <input type="color" value={d.secondaryColor || '#0C1017'} onChange={e => setD({ ...d, secondaryColor: e.target.value })} className="w-10 h-10 rounded-lg bg-transparent cursor-pointer" />
-              <input value={d.secondaryColor || ''} onChange={e => setD({ ...d, secondaryColor: e.target.value })} className="input-dark flex-1" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // =====================================================
 // USERS & TEAMS SECTION
@@ -1202,52 +1155,7 @@ function ComingSoonS({ label }: { label: string }) {
   );
 }
 
-// =====================================================
-// SETTINGS SECTION
-// =====================================================
-function SetS({ k, label, fs }: { k: string; label: string; fs: string[] }) {
-  const { user, me } = useAuth();
-  const { t } = useI18n();
-  const toast = useToast();
-  const [d, setD] = useState<any>({});
-  const [ld, setLd] = useState(true);
-
-  useEffect(() => { getSettings(k).then(v => { setD(v || {}); setLd(false); }); }, [k]);
-
-  const save = async () => {
-    await saveSettings(k, d);
-    await logAction({ action: 'updated', resource: label, detail: 'settings', actorId: user!.uid, actorName: me!.displayName });
-    toast.success(t('admin.settingsSaved'), t('admin.settingsSavedMsg'));
-  };
-
-  if (ld) return <Sk />;
-  return (
-    <div className="p-6 max-w-3xl">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-[var(--text-primary)]">{label}</h2>
-        <button onClick={save} className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2"><Save className="h-4 w-4" />{t('admin.save')}</button>
-      </div>
-      <div className="space-y-4 rounded-xl bg-[var(--bg-secondary)] shadow-card p-6">
-        {fs.map(f => {
-          const isBool = f.toLowerCase().includes('enabled') || f.toLowerCase().includes('digest') || f.toLowerCase().includes('report') || f.toLowerCase().includes('alert');
-          return (
-            <div key={f}>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-1.5 capitalize">{f.replace(/([A-Z])/g, ' $1')}</label>
-              {isBool ? (
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" checked={!!d[f]} onChange={e => setD({ ...d, [f]: e.target.checked })} className="w-4 h-4 rounded bg-[var(--bg-elevated)] border-[var(--border)] accent-[var(--accent)]" />
-                  <span className="text-sm text-[var(--text-secondary)]">{d[f] ? t('admin.enabled') : t('admin.disabled')}</span>
-                </label>
-              ) : (
-                <input value={d[f] || ''} onChange={e => setD({ ...d, [f]: e.target.value })} className="input-dark" />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+// SetS (dead code) — deleted. Was never instantiated anywhere.
 
 // =====================================================
 // HELPERS
