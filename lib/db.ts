@@ -162,6 +162,22 @@ export async function createMember(uid: string, data: any) {
   });
 }
 export async function softDeleteMember(uid: string) { return updateAt(`orgs/${ORG}/members/${uid}`, { active: false }); }
+
+// Dry-run: count resources assigned to a member that would become orphaned on deactivation
+export async function getMemberImpact(uid: string) {
+  const counts: Record<string, number> = {};
+  const cols = ['tasks', 'goals', 'docs', 'time-entries'] as const;
+  const promises = cols.map(async (col) => {
+    const field = col === 'time-entries' ? 'userId' : 'assignees';
+    const op = field === 'assignees' ? 'array-contains' : '==';
+    const q_ = query(collection(db, col), where('orgId', '==', ORG), where(field, op, uid));
+    const snap = await getCountFromServer(q_);
+    counts[col] = snap.data().count;
+  });
+  await Promise.all(promises);
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  return { counts, total };
+}
 export async function reactivateMember(uid: string) { return updateAt(`orgs/${ORG}/members/${uid}`, { active: true }); }
 
 // ===== ORG =====
@@ -214,36 +230,57 @@ export async function getDepartmentImpact(teamId: string) {
   return { counts, total };
 }
 
-// Reassign all resources from one team to another
+// Reassign all resources from one team to another (batched writes for consistency)
 export async function reassignTeamResources(fromTeamId: string, toTeamId: string, toTeamName: string) {
   let moved = 0;
+  const CHUNK = 450;
   for (const col of TEAM_RESOURCE_COLLECTIONS) {
     const q_ = query(collection(db, col), where('orgId', '==', ORG), where('teamId', '==', fromTeamId));
     const snap = await getDocs(q_);
-    for (const d of snap.docs) {
-      await updateDoc(doc(db, `${col}/${d.id}`), { teamId: toTeamId, updatedAt: serverTimestamp() });
-      moved++;
+    for (let i = 0; i < snap.docs.length; i += CHUNK) {
+      const batch = writeBatch(db);
+      const chunk = snap.docs.slice(i, i + CHUNK);
+      for (const d of chunk) {
+        batch.update(doc(db, `${col}/${d.id}`), { teamId: toTeamId, updatedAt: serverTimestamp() });
+      }
+      await batch.commit();
+      moved += chunk.length;
     }
   }
-  // Reassign members: primary team
+  // Reassign members: primary and secondary
   const membersSnap = await getDocs(collection(db, `orgs/${ORG}/members`));
-  for (const d of membersSnap.docs) {
-    const data = d.data();
-    if (data.teamId === fromTeamId) {
+  const primaryMembers = membersSnap.docs.filter(d => d.data().teamId === fromTeamId);
+  for (let i = 0; i < primaryMembers.length; i += CHUNK) {
+    const batch = writeBatch(db);
+    const chunk = primaryMembers.slice(i, i + CHUNK);
+    for (const d of chunk) {
+      const data = d.data();
       const newTeamIds = (data.teamIds || []).filter((t: string) => t !== fromTeamId);
       if (!newTeamIds.includes(toTeamId)) newTeamIds.push(toTeamId);
-      await updateDoc(doc(db, `orgs/${ORG}/members/${d.id}`), {
+      batch.update(doc(db, `orgs/${ORG}/members/${d.id}`), {
         teamId: toTeamId, teamIds: newTeamIds, department: toTeamName, updatedAt: serverTimestamp(),
       });
-      moved++;
-    } else if ((data.teamIds || []).includes(fromTeamId)) {
+    }
+    await batch.commit();
+    moved += chunk.length;
+  }
+  const secondaryMembers = membersSnap.docs.filter(d => {
+    const data = d.data();
+    return data.teamId !== fromTeamId && (data.teamIds || []).includes(fromTeamId);
+  });
+  for (let i = 0; i < secondaryMembers.length; i += CHUNK) {
+    const batch = writeBatch(db);
+    const chunk = secondaryMembers.slice(i, i + CHUNK);
+    for (const d of chunk) {
+      const data = d.data();
       const newTeamIds = (data.teamIds || []).filter((t: string) => t !== fromTeamId);
       if (!newTeamIds.includes(toTeamId)) newTeamIds.push(toTeamId);
-      await updateDoc(doc(db, `orgs/${ORG}/members/${d.id}`), {
+      batch.update(doc(db, `orgs/${ORG}/members/${d.id}`), {
         teamIds: newTeamIds, updatedAt: serverTimestamp(),
       });
-      moved++;
     }
+    await batch.commit();
+    moved += chunk.length;
   }
   return moved;
 }

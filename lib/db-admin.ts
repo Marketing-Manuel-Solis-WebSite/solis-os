@@ -229,16 +229,36 @@ export async function reassignTeamResourcesAdmin(fromTeamId: string, toTeamId: s
   }
 
   const membersSnap = await adminDb.collection(`orgs/${ORG}/members`).get();
-  const affectedMembers = membersSnap.docs.filter(d => d.data().teamId === fromTeamId);
-  for (let i = 0; i < affectedMembers.length; i += BATCH_LIMIT) {
+  // Primary members: teamId matches
+  const primaryMembers = membersSnap.docs.filter(d => d.data().teamId === fromTeamId);
+  for (let i = 0; i < primaryMembers.length; i += BATCH_LIMIT) {
     const batch = adminDb.batch();
-    const chunk = affectedMembers.slice(i, i + BATCH_LIMIT);
+    const chunk = primaryMembers.slice(i, i + BATCH_LIMIT);
     for (const d of chunk) {
       const data = d.data();
       const newIds = (data.teamIds || []).filter((t: string) => t !== fromTeamId);
       if (!newIds.includes(toTeamId)) newIds.push(toTeamId);
       batch.update(adminDb.doc(`orgs/${ORG}/members/${d.id}`), {
         teamId: toTeamId, teamIds: newIds, department: toTeamName, updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+    moved += chunk.length;
+  }
+  // Secondary members: teamIds array contains fromTeamId but teamId is different
+  const secondaryMembers = membersSnap.docs.filter(d => {
+    const data = d.data();
+    return data.teamId !== fromTeamId && (data.teamIds || []).includes(fromTeamId);
+  });
+  for (let i = 0; i < secondaryMembers.length; i += BATCH_LIMIT) {
+    const batch = adminDb.batch();
+    const chunk = secondaryMembers.slice(i, i + BATCH_LIMIT);
+    for (const d of chunk) {
+      const data = d.data();
+      const newIds = (data.teamIds || []).filter((t: string) => t !== fromTeamId);
+      if (!newIds.includes(toTeamId)) newIds.push(toTeamId);
+      batch.update(adminDb.doc(`orgs/${ORG}/members/${d.id}`), {
+        teamIds: newIds, updatedAt: FieldValue.serverTimestamp(),
       });
     }
     await batch.commit();
@@ -279,15 +299,32 @@ export async function purgeTeamResourcesAdmin(teamId: string) {
 
   // Batch-update members to detach from deleted team
   const membersSnap = await adminDb.collection(`orgs/${ORG}/members`).get();
-  const affectedMembers = membersSnap.docs.filter(d => d.data().teamId === teamId);
   const BATCH_LIMIT = 500;
-  for (let i = 0; i < affectedMembers.length; i += BATCH_LIMIT) {
+  // Primary members: teamId matches — clear teamId, department, filter teamIds
+  const primaryMembers = membersSnap.docs.filter(d => d.data().teamId === teamId);
+  for (let i = 0; i < primaryMembers.length; i += BATCH_LIMIT) {
     const batch = adminDb.batch();
-    const chunk = affectedMembers.slice(i, i + BATCH_LIMIT);
+    const chunk = primaryMembers.slice(i, i + BATCH_LIMIT);
     for (const d of chunk) {
       const data = d.data();
       batch.update(adminDb.doc(`orgs/${ORG}/members/${d.id}`), {
         teamId: '', teamIds: (data.teamIds || []).filter((t: string) => t !== teamId), department: '', updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
+  // Secondary members: teamIds contains teamId but teamId is different — just filter teamIds
+  const secondaryMembers = membersSnap.docs.filter(d => {
+    const data = d.data();
+    return data.teamId !== teamId && (data.teamIds || []).includes(teamId);
+  });
+  for (let i = 0; i < secondaryMembers.length; i += BATCH_LIMIT) {
+    const batch = adminDb.batch();
+    const chunk = secondaryMembers.slice(i, i + BATCH_LIMIT);
+    for (const d of chunk) {
+      const data = d.data();
+      batch.update(adminDb.doc(`orgs/${ORG}/members/${d.id}`), {
+        teamIds: (data.teamIds || []).filter((t: string) => t !== teamId), updatedAt: FieldValue.serverTimestamp(),
       });
     }
     await batch.commit();

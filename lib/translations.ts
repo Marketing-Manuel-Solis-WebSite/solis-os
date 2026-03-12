@@ -736,6 +736,8 @@ export const translations: Record<Lang, Dict> = {
     'admin.actionNotAllowed': 'Accion no permitida',
     'admin.cannotDeactivateSelf': 'No puedes desactivar tu propia cuenta.',
     'admin.cannotDeactivateOwner': 'No puedes desactivar al owner de la organizacion.',
+    'admin.onlyOwnerCanAssignOwner': 'Solo el owner actual puede asignar el rol de owner.',
+    'admin.comingSoonMsg': 'Esta seccion esta en desarrollo y estara disponible en una proxima actualizacion.',
     'admin.unknownError': 'Ocurrio un error desconocido.',
 
     // Admin — Permissions
@@ -2595,6 +2597,8 @@ export const translations: Record<Lang, Dict> = {
     'admin.actionNotAllowed': 'Action not allowed',
     'admin.cannotDeactivateSelf': 'You cannot deactivate your own account.',
     'admin.cannotDeactivateOwner': 'You cannot deactivate the organization owner.',
+    'admin.onlyOwnerCanAssignOwner': 'Only the current owner can assign the owner role.',
+    'admin.comingSoonMsg': 'This section is under development and will be available in a future update.',
     'admin.unknownError': 'An unknown error occurred.',
 
     // Admin — Permissions

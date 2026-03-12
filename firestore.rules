@@ -50,8 +50,13 @@ service cloud.firestore {
       match /members/{userId} {
         allow read: if isOrgMember(orgId);
         allow create: if isAdmin(orgId);
-        // Admins can update any field; members can only update non-sensitive fields on themselves
-        allow update: if isAdmin(orgId) ||
+        // Admins can update any field EXCEPT: only owner can assign role='owner'.
+        // Self-edits cannot touch role, active, or hierarchyLevel.
+        allow update: if (isAdmin(orgId) &&
+          // Anti-escalation: only the current owner can grant the 'owner' role
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) ||
+           request.resource.data.role != 'owner' ||
+           isOwner(orgId))) ||
           (isSelf(userId) &&
            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'active', 'hierarchyLevel']));
         allow delete: if isOwner(orgId);

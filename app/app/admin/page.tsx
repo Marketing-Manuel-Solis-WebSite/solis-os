@@ -9,7 +9,7 @@ import {
   getTemplates, createTemplate, deleteTemplate, getAutomations, createAutomation,
   deleteAutomation, getTeams, createTeam, updateTeam, deleteTeam, archiveTeam, unarchiveTeam,
   getDepartmentImpact, reassignTeamResources, purgeTeamResources, ORG,
-  createMember, softDeleteMember, reactivateMember,
+  createMember, softDeleteMember, reactivateMember, getMemberImpact,
 } from '@/lib/db';
 import { createUserWithEmailAndPassword, updateProfile, signOut as firebaseSignOut } from 'firebase/auth';
 import { getSecondaryAuth } from '@/lib/firebase';
@@ -99,9 +99,9 @@ export default function Admin() {
         {s === 'fields' && <div className="p-6"><CustomFieldManager /></div>}
         {s === 'tpl' && <CrudS label={t('admin.templates')} fields={['name', 'type', 'content']} gFn={getTemplates} cFn={createTemplate} dFn={deleteTemplate} />}
         {s === 'auto' && <CrudS label={t('admin.automations')} fields={['name', 'trigger', 'action']} gFn={getAutomations} cFn={createAutomation} dFn={deleteAutomation} />}
-        {s === 'notif' && <SetS k="notifications" label={t('admin.notifications')} fs={['dailyDigest', 'weeklyReport', 'overdueAlerts', 'fromName', 'replyTo']} />}
-        {s === 'ai' && <SetS k="ai" label={t('admin.aiConfig')} fs={['summariesEnabled', 'qaEnabled', 'forecastEnabled', 'contextLimit', 'maxReqPerHour']} />}
-        {s === 'integ' && <SetS k="integrations" label={t('admin.integrations')} fs={['whatsappEnabled', 'instagramEnabled', 'messengerEnabled', 'tiktokEnabled', 'webhookSecret']} />}
+        {s === 'notif' && <ComingSoonS label={t('admin.notifications')} />}
+        {s === 'ai' && <ComingSoonS label={t('admin.aiConfig')} />}
+        {s === 'integ' && <ComingSoonS label={t('admin.integrations')} />}
         {s === 'audit' && <AuditS />}
       </div>
     </div>
@@ -726,12 +726,16 @@ function UsersS() {
   // Delete user state
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deactivateImpact, setDeactivateImpact] = useState<{ counts: Record<string, number>; total: number } | null>(null);
 
   useEffect(() => { getMembers().then(m => { setMs(m); setLd(false); }); }, []);
 
   const cR = async (id: string, r: Role) => {
+    if (r === 'owner' && me!.role !== 'owner') { toast.warning(t('admin.actionNotAllowed'), t('admin.onlyOwnerCanAssignOwner')); return; }
+    const target = ms.find(m => m.id === id);
+    const oldRole = target?.role || 'unknown';
     await updateMember(id, { role: r });
-    await logAction({ action: 'role_changed', resource: 'member', detail: r, actorId: user!.uid, actorName: me!.displayName });
+    await logAction({ action: 'role_changed', resource: 'member', detail: `${target?.displayName || id}: ${oldRole} → ${r}`, actorId: user!.uid, actorName: me!.displayName });
     setMs(await getMembers());
     await refreshMembers();
   };
@@ -891,7 +895,7 @@ function UsersS() {
                   </td>
                   <td className="px-5 py-3">
                     <select value={m.role} onChange={e => cR(m.id, e.target.value as Role)} className="select-dark text-sm h-8">
-                      {['owner', 'admin', 'manager', 'member', 'guest', 'readonly'].map(r => <option key={r}>{r}</option>)}
+                      {(['owner', 'admin', 'manager', 'member', 'guest', 'readonly'] as Role[]).filter(r => r !== 'owner' || me!.role === 'owner').map(r => <option key={r}>{r}</option>)}
                     </select>
                   </td>
                   <td className="px-5 py-3">
@@ -916,19 +920,27 @@ function UsersS() {
                           <RotateCcw className="h-3 w-3" /> {t('admin.reactivate')}
                         </button>
                       ) : deleteTarget === m.id ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[12px] text-red-400">{t('admin.confirm')}</span>
-                          <button onClick={() => handleDeactivate(m.id)} disabled={deleting}
-                            className="px-2 py-1 rounded-lg bg-red-500/10 text-red-400 text-[12px] font-semibold hover:bg-red-500/20 transition">
-                            {deleting ? '...' : t('admin.yes')}
-                          </button>
-                          <button onClick={() => setDeleteTarget(null)}
-                            className="px-2 py-1 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-secondary)] text-[12px] hover:bg-[var(--bg-elevated)] transition">
-                            {t('admin.no')}
-                          </button>
+                        <div className="flex flex-col gap-1">
+                          {deactivateImpact && deactivateImpact.total > 0 && (
+                            <div className="text-[11px] text-amber-400 flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              {Object.entries(deactivateImpact.counts).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${k}`).join(', ')}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[12px] text-red-400">{t('admin.confirm')}</span>
+                            <button onClick={() => handleDeactivate(m.id)} disabled={deleting}
+                              className="px-2 py-1 rounded-lg bg-red-500/10 text-red-400 text-[12px] font-semibold hover:bg-red-500/20 transition">
+                              {deleting ? '...' : t('admin.yes')}
+                            </button>
+                            <button onClick={() => { setDeleteTarget(null); setDeactivateImpact(null); }}
+                              className="px-2 py-1 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-secondary)] text-[12px] hover:bg-[var(--bg-elevated)] transition">
+                              {t('admin.no')}
+                            </button>
+                          </div>
                         </div>
                       ) : (
-                        <button onClick={() => setDeleteTarget(m.id)}
+                        <button onClick={async () => { setDeleteTarget(m.id); const impact = await getMemberImpact(m.id); setDeactivateImpact(impact); }}
                           className="p-1.5 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition"
                           title={t('admin.deactivateUser')}>
                           <UserX className="h-4 w-4" />
@@ -953,7 +965,7 @@ function PermsS() {
   const { user, me } = useAuth();
   const { t } = useI18n();
   const toast = useToast();
-  const rs = ['workspace', 'task', 'doc', 'channel', 'automation', 'admin', 'user'];
+  const rs = ['workspace', 'task', 'doc', 'channel', 'automation', 'analytics', 'admin', 'user', 'org', 'goal', 'timesheet', 'whiteboard', 'form', 'integration'];
   const as2 = ['create', 'read', 'update', 'delete', 'manage'];
   const rls: Role[] = ['owner', 'admin', 'manager', 'member', 'guest'];
   const [mx, setMx] = useState<any>({});
@@ -962,13 +974,42 @@ function PermsS() {
     getSettings('permissions').then((d: any) => {
       if (d?.matrix) setMx(d.matrix);
       else {
+        // Seed from DEFAULT_PERMS in auth.tsx for consistency
         const m: any = {};
         rls.forEach(r => {
           m[r] = {};
           rs.forEach(s => {
             m[r][s] = {};
             as2.forEach(a => {
-              m[r][s][a] = r === 'owner' || r === 'admin' || (r === 'manager' && a !== 'manage' && s !== 'admin') || (r === 'member' && (a === 'read' || a === 'create') && !['admin', 'user'].includes(s));
+              // Use the canonical default permissions matrix
+              const defPerms: any = { owner: true, admin: true };
+              if (defPerms[r]) { m[r][s][a] = true; return; }
+              // Manager defaults
+              if (r === 'manager') {
+                const noAccess = ['admin'];
+                const readOnly = ['analytics', 'org', 'user', 'integration'];
+                if (noAccess.includes(s)) { m[r][s][a] = false; return; }
+                if (readOnly.includes(s)) { m[r][s][a] = a === 'read'; return; }
+                m[r][s][a] = a !== 'manage' || ['task', 'doc', 'goal', 'timesheet', 'whiteboard', 'channel'].includes(s);
+                return;
+              }
+              // Member defaults
+              if (r === 'member') {
+                const canCRU = ['task', 'doc', 'goal', 'timesheet', 'whiteboard'];
+                const canRead = ['workspace', 'channel', 'automation', 'analytics', 'user', 'org'];
+                if (canCRU.includes(s)) { m[r][s][a] = a === 'create' || a === 'read' || a === 'update'; return; }
+                if (canRead.includes(s)) { m[r][s][a] = a === 'read'; return; }
+                if (s === 'channel') { m[r][s][a] = a === 'create' || a === 'read'; return; }
+                m[r][s][a] = false; return;
+              }
+              // Guest defaults
+              if (r === 'guest') {
+                if (s === 'task') { m[r][s][a] = a === 'create' || a === 'read'; return; }
+                const canRead = ['workspace', 'doc', 'channel', 'user', 'goal', 'timesheet', 'whiteboard'];
+                if (canRead.includes(s)) { m[r][s][a] = a === 'read'; return; }
+                m[r][s][a] = false; return;
+              }
+              m[r][s][a] = false;
             });
           });
         });
@@ -1102,7 +1143,9 @@ function CrudS({ label, fields, gFn, cFn, dFn }: { label: string; fields: string
 
   const del = async (id: string) => {
     if (!confirm(t('admin.deleteConfirm'))) return;
+    const target = its.find(it => it.id === id);
     await dFn(id);
+    await logAction({ action: 'deleted', resource: label, detail: target?.name || target?.title || id, actorId: user!.uid, actorName: me!.displayName });
     load();
   };
 
@@ -1137,6 +1180,24 @@ function CrudS({ label, fields, gFn, cFn, dFn }: { label: string; fields: string
           ))}
         </div>
       }
+    </div>
+  );
+}
+
+// =====================================================
+// COMING SOON PLACEHOLDER — replaces ghost settings
+// =====================================================
+function ComingSoonS({ label }: { label: string }) {
+  const { t } = useI18n();
+  return (
+    <div className="p-6 max-w-3xl">
+      <h2 className="text-xl font-bold text-[var(--text-primary)] mb-6">{label}</h2>
+      <div className="rounded-xl bg-[var(--bg-secondary)] shadow-card p-8 text-center">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-semibold mb-3">
+          <Eye className="h-4 w-4" /> COMING SOON
+        </div>
+        <p className="text-sm text-[var(--text-muted)] mt-2">{t('admin.comingSoonMsg') || 'This section is under development and will be available in a future update.'}</p>
+      </div>
     </div>
   );
 }
