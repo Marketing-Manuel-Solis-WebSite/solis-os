@@ -328,7 +328,7 @@ function Shell({ children }: { children: React.ReactNode }) {
               >
                 {active && (
                   <motion.div
-                    layoutId="nav-indicator"
+                    layoutId={`nav-indicator-main-${n.href}`}
                     className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]"
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                   />
@@ -384,7 +384,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                           >
                             {active && (
                               <motion.div
-                                layoutId="nav-indicator"
+                                layoutId={`nav-indicator-more-${n.href}`}
                                 className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]"
                                 transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                               />
@@ -461,7 +461,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 } ${!open ? 'justify-center px-0' : ''}`}
               >
                 {path.startsWith('/app/admin') && (
-                  <motion.div layoutId="nav-indicator" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]" />
+                  <motion.div layoutId="nav-indicator-admin" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
                 )}
                 <Shield className="h-5 w-5 shrink-0" strokeWidth={1.75} />
                 <AnimatePresence>{open && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{t('admin.console')}</motion.span>}</AnimatePresence>

@@ -100,7 +100,7 @@ export default function TaskViewTabs({
               {sv.name}
               {active && (
                 <motion.div
-                  layoutId="preset-indicator"
+                  layoutId="preset-indicator-saved"
                   className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-[var(--accent)]"
                   transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                 />
