@@ -277,13 +277,6 @@
       ]
     },
     {
-      "collectionGroup": "targets",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "linkedTaskIds", "arrayConfig": "CONTAINS" }
-      ]
-    },
-    {
       "collectionGroup": "docs",
       "queryScope": "COLLECTION",
       "fields": [
