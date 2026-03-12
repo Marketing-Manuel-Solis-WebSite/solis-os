@@ -21,7 +21,7 @@ interface Props {
 
 export default function GoalDetailDrawer({ goal, open, onClose, onUpdate, onDelete, onRefresh }: Props) {
   const { t } = useI18n();
-  const { me, user, allMembers, teams } = useAuth();
+  const { me, user, allMembers, teams, canSeeAllTeams, activeTeamId } = useAuth();
   const [targets, setTargets] = useState<GoalTarget[]>([]);
   const [loadingTargets, setLoadingTargets] = useState(false);
   const [showAddTarget, setShowAddTarget] = useState(false);
@@ -58,7 +58,8 @@ export default function GoalDetailDrawer({ goal, open, onClose, onUpdate, onDele
   };
 
   const loadTasks = async () => {
-    const { items: ts } = await getTasks();
+    const teamScope = canSeeAllTeams ? undefined : (activeTeamId !== '__all__' ? activeTeamId : me?.teamId);
+    const { items: ts } = await getTasks(teamScope);
     setAllTasks(ts);
   };
 

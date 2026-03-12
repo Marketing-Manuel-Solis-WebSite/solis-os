@@ -17,7 +17,7 @@ interface MiniMessage {
 }
 
 export default function FloatingAIChat() {
-  const { user, me, teams } = useAuth();
+  const { user, me, teams, canSeeAllTeams, activeTeamId } = useAuth();
   const { t } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
@@ -58,7 +58,8 @@ export default function FloatingAIChat() {
   const buildUserContext = useCallback(async () => {
     if (!user || !me) return null;
     try {
-      const [{ items: allTasks }, { items: allGoals }] = await Promise.all([getTasks(), getGoals()]);
+      const teamScope = canSeeAllTeams ? undefined : (activeTeamId !== '__all__' ? activeTeamId : me?.teamId);
+      const [{ items: allTasks }, { items: allGoals }] = await Promise.all([getTasks(teamScope), getGoals(teamScope)]);
       const myTasks = allTasks.filter((t: any) =>
         t.assignees?.includes(user.uid) && !t.deleted && !t.archived
       ).map((t: any) => ({

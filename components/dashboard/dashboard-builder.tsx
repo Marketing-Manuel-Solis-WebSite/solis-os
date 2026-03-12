@@ -106,6 +106,7 @@ export default function DashboardBuilder({ dashboard, editing, isAdmin, onEditin
         onClose={() => setPickerOpen(false)}
         onAdd={handleAddWidget}
         existingWidgets={dashboard.widgets}
+        isAdmin={isAdmin}
       />
     </>
   );

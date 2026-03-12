@@ -47,6 +47,7 @@ export interface DashboardConfig {
   title: string;
   isDefault: boolean;
   widgets: WidgetLayout[];
+  spaceId?: string;       // If set, this dashboard belongs to a specific space
   createdAt?: any;
   updatedAt?: any;
 }
@@ -76,7 +77,14 @@ export interface WidgetProps {
   onDrillDown?: (type: string, data: any) => void;
 }
 
-// Default dashboard for regular members
+// Widgets that require admin/director privileges to view
+// Enforced at: widget picker, widget grid runtime, default layouts
+export const ADMIN_ONLY_TYPES: Set<WidgetType> = new Set([
+  'team-performance',
+  'activity-feed',
+]);
+
+// Default dashboard for regular members — personal scope only
 export const DEFAULT_WIDGETS: WidgetLayout[] = [
   { widgetId: 'w1', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'totalTasks' } },
   { widgetId: 'w2', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'inProgress' } },
@@ -84,10 +92,10 @@ export const DEFAULT_WIDGETS: WidgetLayout[] = [
   { widgetId: 'w4', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'overdue' } },
   { widgetId: 'w5', type: 'my-tasks', x: 0, y: 0, w: 2, h: 2, config: { limit: 8 } },
   { widgetId: 'w6', type: 'upcoming-deadlines', x: 0, y: 0, w: 2, h: 2, config: {} },
-  { widgetId: 'w7', type: 'tasks-by-status', x: 0, y: 0, w: 2, h: 2, config: {} },
+  { widgetId: 'w7', type: 'inbox', x: 0, y: 0, w: 2, h: 2, config: {} },
   { widgetId: 'w8', type: 'goals-progress', x: 0, y: 0, w: 2, h: 2, config: {} },
-  { widgetId: 'w9', type: 'completion-trend', x: 0, y: 0, w: 2, h: 2, config: { dateRange: '30d' } },
-  { widgetId: 'w10', type: 'activity-feed', x: 0, y: 0, w: 2, h: 2, config: { limit: 10 } },
+  { widgetId: 'w9', type: 'tasks-by-status', x: 0, y: 0, w: 2, h: 2, config: {} },
+  { widgetId: 'w10', type: 'completion-trend', x: 0, y: 0, w: 2, h: 2, config: { dateRange: '30d' } },
 ];
 
 // Admin/Director dashboard — includes team performance + inbox + AI insights
@@ -106,6 +114,20 @@ export const ADMIN_DEFAULT_WIDGETS: WidgetLayout[] = [
   { widgetId: 'w12', type: 'upcoming-deadlines', x: 0, y: 0, w: 2, h: 2, config: {} },
   { widgetId: 'w13', type: 'goals-progress', x: 0, y: 0, w: 2, h: 2, config: {} },
   { widgetId: 'w14', type: 'activity-feed', x: 0, y: 0, w: 2, h: 2, config: { limit: 10 } },
+];
+
+// Default dashboard for spaces — focused on team metrics
+export const SPACE_DEFAULT_WIDGETS: WidgetLayout[] = [
+  { widgetId: 'sw1', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'totalTasks' } },
+  { widgetId: 'sw2', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'inProgress' } },
+  { widgetId: 'sw3', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'completed' } },
+  { widgetId: 'sw4', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'overdue' } },
+  { widgetId: 'sw5', type: 'tasks-by-status', x: 0, y: 0, w: 2, h: 2, config: {} },
+  { widgetId: 'sw6', type: 'completion-trend', x: 0, y: 0, w: 2, h: 2, config: { dateRange: '30d' } },
+  { widgetId: 'sw7', type: 'priority-breakdown', x: 0, y: 0, w: 2, h: 2, config: {} },
+  { widgetId: 'sw8', type: 'goals-progress', x: 0, y: 0, w: 2, h: 2, config: {} },
+  { widgetId: 'sw9', type: 'upcoming-deadlines', x: 0, y: 0, w: 2, h: 2, config: {} },
+  { widgetId: 'sw10', type: 'my-tasks', x: 0, y: 0, w: 2, h: 2, config: { limit: 8 } },
 ];
 
 // Widget type catalog

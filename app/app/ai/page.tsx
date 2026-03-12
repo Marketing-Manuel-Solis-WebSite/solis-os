@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, PanelLeftOpen } from 'lucide-react';
 
 export default function AIPage() {
-  const { user, me, teams } = useAuth();
+  const { user, me, teams, canSeeAllTeams, activeTeamId } = useAuth();
   const { t } = useI18n();
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [activeConvo, setActiveConvo] = useState<AIConversation | null>(null);
@@ -65,7 +65,8 @@ export default function AIPage() {
   const buildUserContext = useCallback(async () => {
     if (!user || !me) return null;
     try {
-      const [{ items: allTasks }, { items: allGoals }] = await Promise.all([getTasks(), getGoals()]);
+      const teamScope = canSeeAllTeams ? undefined : (activeTeamId !== '__all__' ? activeTeamId : me?.teamId);
+      const [{ items: allTasks }, { items: allGoals }] = await Promise.all([getTasks(teamScope), getGoals(teamScope)]);
       // Filter tasks assigned to this user
       const myTasks = allTasks.filter((t: any) =>
         t.assignees?.includes(user.uid) && !t.deleted && !t.archived

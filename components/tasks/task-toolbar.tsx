@@ -23,9 +23,9 @@ interface Props {
   sortDir: 'asc' | 'desc';
   groupBy: string;
   canCreate: boolean;
-  activeTeam: any;
-  canSeeAllTeams: boolean;
-  activeTeamId: string;
+  activeTeam?: any;
+  canSeeAllTeams?: boolean;
+  activeTeamId?: string;
   taskCount: number;
   doneCount: number;
   overdueCount: number;
@@ -51,6 +51,7 @@ interface Props {
   onDeleteView?: (id: string) => void;
   onDuplicateView?: (sv: SavedView) => void;
   onImport?: () => void;
+  allPresets?: any[];
 }
 
 // =============================================
@@ -65,7 +66,7 @@ export default function TaskToolbar({
   onSortByChange, onSortDirToggle, onGroupByChange,
   onNewTask, onClearFilters, onToggleSidebar,
   onPresetChange, onSaveView, onLoadView, onDeleteView, onDuplicateView,
-  onImport,
+  onImport, allPresets,
 }: Props) {
   const { t } = useI18n();
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -129,7 +130,7 @@ export default function TaskToolbar({
     if (filters.hasAttachments) {
       chips.push({
         key: 'hasAttachments',
-        label: t('common.filters') + ' Attachments',
+        label: t('filter.hasAttachments'),
         onRemove: () => onFiltersChange({ ...filters, hasAttachments: false }),
       });
     }
@@ -137,7 +138,7 @@ export default function TaskToolbar({
     if (filters.hasDependencies) {
       chips.push({
         key: 'hasDependencies',
-        label: t('common.filters') + ' Dependencies',
+        label: t('filter.hasDependencies'),
         onRemove: () => onFiltersChange({ ...filters, hasDependencies: false }),
       });
     }
@@ -153,7 +154,7 @@ export default function TaskToolbar({
     if (filters.noDate) {
       chips.push({
         key: 'noDate',
-        label: 'Sin fecha',
+        label: t('filter.noDate'),
         onRemove: () => onFiltersChange({ ...filters, noDate: false }),
       });
     }
@@ -161,7 +162,7 @@ export default function TaskToolbar({
     if (filters.noAssignee) {
       chips.push({
         key: 'noAssignee',
-        label: 'Sin asignar',
+        label: t('filter.noAssignee'),
         onRemove: () => onFiltersChange({ ...filters, noAssignee: false }),
       });
     }
@@ -235,7 +236,7 @@ export default function TaskToolbar({
               {subtitle}
               {overdueCount > 0 && (
                 <span className="text-[var(--error)] font-semibold">
-                  {overdueCount} {overdueCount === 1 ? 'vencida' : 'vencidas'}
+                  {overdueCount === 1 ? t('tasks.overdueOne', { n: overdueCount }) : t('tasks.overdue', { n: overdueCount })}
                 </span>
               )}
             </p>
@@ -251,7 +252,7 @@ export default function TaskToolbar({
                 ? 'text-[var(--accent)] bg-[var(--accent-subtle)]'
                 : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
             }`}
-            title="Atajos de teclado"
+            title={t('common.keyboardShortcuts')}
           >
             <Keyboard className="h-4 w-4" />
           </button>
@@ -326,6 +327,7 @@ export default function TaskToolbar({
         onLoadView={onLoadView}
         onDeleteView={onDeleteView}
         onDuplicateView={onDuplicateView}
+        allPresets={allPresets}
       />
 
       {/* ============================================= */}
@@ -408,7 +410,7 @@ export default function TaskToolbar({
             onClick={onSortDirToggle}
             className="h-8 w-8 rounded-r-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition flex items-center justify-center shadow-sm"
             style={{ background: 'var(--bg-elevated)', border: '1.5px solid var(--border-strong)' }}
-            title={sortDir === 'asc' ? 'Ascendente' : 'Descendente'}
+            title={sortDir === 'asc' ? t('sort.ascending') : t('sort.descending')}
           >
             <ArrowUpDown
               className={`h-3.5 w-3.5 transition-transform duration-200 ${

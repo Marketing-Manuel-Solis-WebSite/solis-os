@@ -4,7 +4,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { DashboardConfig, WidgetLayout } from './dashboard-types';
-import { DEFAULT_WIDGETS, ADMIN_DEFAULT_WIDGETS } from './dashboard-types';
+import { DEFAULT_WIDGETS, ADMIN_DEFAULT_WIDGETS, SPACE_DEFAULT_WIDGETS } from './dashboard-types';
 
 const ORG = 'solis-center';
 const DASHBOARDS_PATH = `orgs/${ORG}/dashboards`;
@@ -23,9 +23,11 @@ export async function getDashboard(id: string): Promise<DashboardConfig | null> 
 
 export async function getDefaultDashboard(userId: string): Promise<DashboardConfig | null> {
   const dashboards = await getDashboards(userId);
-  const defaultOne = dashboards.find(d => d.isDefault);
+  // Exclude space-scoped dashboards from the main default lookup
+  const mainDashboards = dashboards.filter(d => !d.spaceId);
+  const defaultOne = mainDashboards.find(d => d.isDefault);
   if (defaultOne) return defaultOne;
-  if (dashboards.length > 0) return dashboards[0];
+  if (mainDashboards.length > 0) return mainDashboards[0];
   return null;
 }
 
@@ -76,6 +78,37 @@ export async function ensureDefaultDashboard(userId: string, isAdmin?: boolean):
     userId,
     title: 'Mi Dashboard',
     isDefault: true,
+    widgets,
+  };
+}
+
+// ===== Space-scoped dashboards =====
+
+export async function getSpaceDashboard(userId: string, spaceId: string): Promise<DashboardConfig | null> {
+  const dashboards = await getDashboards(userId);
+  return dashboards.find(d => d.spaceId === spaceId) || null;
+}
+
+export async function ensureSpaceDashboard(userId: string, spaceId: string): Promise<DashboardConfig> {
+  const existing = await getSpaceDashboard(userId, spaceId);
+  if (existing) return existing;
+
+  const widgets = SPACE_DEFAULT_WIDGETS;
+  const ref = await addDoc(collection(db, DASHBOARDS_PATH), {
+    userId,
+    title: `Space Dashboard`,
+    isDefault: false,
+    spaceId,
+    widgets,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return {
+    id: ref.id,
+    userId,
+    title: 'Space Dashboard',
+    isDefault: false,
+    spaceId,
     widgets,
   };
 }

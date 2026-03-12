@@ -38,7 +38,7 @@ export default React.memo(function TaskCard({
   onDragStart,
   onDragEnd,
 }: Props) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
 
   const priorityConfig = getPriorityConfig(task.priority);
   const statusConfig = getStatusConfig(task.status);
@@ -205,7 +205,7 @@ export default React.memo(function TaskCard({
             `}
           >
             <Calendar className="h-3 w-3" />
-            {due.toLocaleDateString('es-MX', {
+            {due.toLocaleDateString(lang === 'es' ? 'es-MX' : 'en-US', {
               month: 'short',
               day: 'numeric',
             })}
@@ -240,7 +240,7 @@ export default React.memo(function TaskCard({
 
         {/* Recurrence indicator */}
         {task.recurrence && (
-          <span className="text-[var(--accent)]" title="Recurring">
+          <span className="text-[var(--accent)]" title={t('common.recurring')}>
             <Repeat className="h-3 w-3" />
           </span>
         )}

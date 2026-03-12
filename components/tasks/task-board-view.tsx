@@ -208,7 +208,7 @@ export default function TaskBoardView({
                   hover:bg-[var(--bg-hover)]
                   transition-colors duration-150
                 "
-                title={t('common.collapse') || 'Collapse'}
+                title={t('common.collapse')}
               >
                 <ChevronDown className="h-3.5 w-3.5" />
               </button>
@@ -234,7 +234,7 @@ export default function TaskBoardView({
                 {group.tasks.length === 0 ? (
                   <div className="px-3 py-8 text-center">
                     <p className="text-[13px] text-[var(--text-muted)]">
-                      {t('tasks.noTasks') || 'No tasks'}
+                      {t('tasks.noTasksInColumn')}
                     </p>
                   </div>
                 ) : (

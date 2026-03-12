@@ -201,7 +201,7 @@ export default function TaskSidebar({
             }`}
           >
             <User className="h-4 w-4" />
-            <span>Solo mis tareas</span>
+            <span>{t('tasks.meMode')}</span>
             <div
               className={`ml-auto relative w-8 h-[18px] rounded-full transition-colors duration-200 ${
                 meMode ? 'bg-[var(--accent)]' : 'bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]'
@@ -324,7 +324,7 @@ export default function TaskSidebar({
                           })
                         }
                         className="input-dark h-8 text-[12px] w-full pl-7"
-                        placeholder="Desde"
+                        placeholder={t('filter.from')}
                       />
                     </div>
                     <div className="flex-1 relative">
@@ -342,7 +342,7 @@ export default function TaskSidebar({
                           })
                         }
                         className="input-dark h-8 text-[12px] w-full pl-7"
-                        placeholder="Hasta"
+                        placeholder={t('filter.to')}
                       />
                     </div>
                   </div>
@@ -351,11 +351,11 @@ export default function TaskSidebar({
                 {/* Boolean filters */}
                 <div className="px-5 py-4">
                   <p className="text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)] font-semibold mb-3">
-                    Filtros adicionales
+                    {t('filter.additionalFilters')}
                   </p>
                   <div className="grid grid-cols-1 gap-0.5">
                     <BooleanToggle
-                      label="Sin fecha"
+                      label={t('filter.noDate')}
                       active={!!filters.noDate}
                       onToggle={() =>
                         onFiltersChange({
@@ -365,7 +365,7 @@ export default function TaskSidebar({
                       }
                     />
                     <BooleanToggle
-                      label="Sin asignado"
+                      label={t('filter.noAssignee')}
                       active={!!filters.noAssignee}
                       onToggle={() =>
                         onFiltersChange({
@@ -375,7 +375,7 @@ export default function TaskSidebar({
                       }
                     />
                     <BooleanToggle
-                      label="Bloqueadas"
+                      label={t('filter.blocked')}
                       active={!!filters.isBlocked}
                       onToggle={() =>
                         onFiltersChange({
@@ -385,7 +385,7 @@ export default function TaskSidebar({
                       }
                     />
                     <BooleanToggle
-                      label="Con adjuntos"
+                      label={t('filter.hasAttachments')}
                       active={!!filters.hasAttachments}
                       onToggle={() =>
                         onFiltersChange({
@@ -395,7 +395,7 @@ export default function TaskSidebar({
                       }
                     />
                     <BooleanToggle
-                      label="Con dependencias"
+                      label={t('filter.hasDependencies')}
                       active={!!filters.hasDependencies}
                       onToggle={() =>
                         onFiltersChange({
@@ -475,7 +475,7 @@ export default function TaskSidebar({
         {/* ===== Density ===== */}
         <div className="px-5 py-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)] mb-3">
-            Densidad
+            {t('filter.density')}
           </p>
           <div className="flex gap-1.5">
             {DENSITIES.map((d) => {

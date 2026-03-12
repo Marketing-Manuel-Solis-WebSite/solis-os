@@ -5,13 +5,19 @@ import { WidgetShell } from '../widget-shell';
 import { CalendarClock, Clock } from 'lucide-react';
 import type { WidgetProps } from '@/lib/dashboard-types';
 
-function UpcomingDeadlinesInner({ tasks, teams }: WidgetProps) {
-  const { t } = useI18n();
+function UpcomingDeadlinesInner({ tasks, teams, user, canSeeAllTeams }: WidgetProps) {
+  const { t, lang } = useI18n();
 
   const upcoming = useMemo(() => {
     const now = new Date();
     const weekLater = new Date(now.getTime() + 7 * 86400000);
-    return tasks
+
+    // SECURITY: Non-admin users see only their own deadlines
+    const scopedTasks = canSeeAllTeams
+      ? tasks
+      : tasks.filter(tk => tk.assignees?.includes(user?.uid) || tk.createdBy === user?.uid);
+
+    return scopedTasks
       .filter(tk => {
         if (!tk.dueDate || tk.status === 'done' || tk.status === 'completed') return false;
         const due = tk.dueDate?.toDate ? tk.dueDate.toDate() : new Date(tk.dueDate);
@@ -23,7 +29,7 @@ function UpcomingDeadlinesInner({ tasks, teams }: WidgetProps) {
         return da.getTime() - db.getTime();
       })
       .slice(0, 8);
-  }, [tasks]);
+  }, [tasks, canSeeAllTeams, user?.uid]);
 
   return (
     <WidgetShell
@@ -64,7 +70,7 @@ function UpcomingDeadlinesInner({ tasks, teams }: WidgetProps) {
                       </span>
                     )}
                     <span className="text-[11px] text-[var(--text-muted)]">
-                      {due.toLocaleDateString('es-MX', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      {due.toLocaleDateString(lang === 'es' ? 'es-MX' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </span>
                   </div>
                 </div>

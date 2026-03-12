@@ -95,7 +95,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
       transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
       role="alert"
       aria-live="assertive"
-      className="pointer-events-auto w-[380px] rounded-xl shadow-lg bg-[var(--bg-elevated)] overflow-hidden"
+      className="pointer-events-auto w-full sm:w-[380px] rounded-xl shadow-lg bg-[var(--bg-elevated)] overflow-hidden"
     >
       <div className="flex items-start gap-3 p-4">
         {/* Accent line */}
@@ -224,7 +224,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
   const { t } = useI18n();
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none" aria-label={t('notif.notifications')}>
+    <div className="fixed top-4 right-4 left-4 sm:left-auto z-[100] flex flex-col gap-2 pointer-events-none" aria-label={t('notif.notifications')}>
       <AnimatePresence mode="popLayout">
         {toasts.map(toast => (
           <ToastItem key={toast.id} toast={toast} onDismiss={onDismiss} />

@@ -27,12 +27,13 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
   const [mode, setMode] = useState<'quick' | 'full'>('quick');
   const [d, setD] = useState({
     title: '', description: '', status: 'todo', priority: 'medium', type: 'task',
-    assignees: [] as string[], tags: '', dueDate: '', startDate: '', timeEstimate: '',
+    assignees: [] as string[], tags: [] as string[], dueDate: '', startDate: '', timeEstimate: '',
     points: '', subtasks: [] as any[], visibility: 'team',
     teamId: activeTeamId === '__all__' ? '' : activeTeamId,
     customFields: {} as Record<string, any>,
     recurrence: undefined as RecurrenceConfig | undefined,
   });
+  const [tagInput, setTagInput] = useState('');
   const [newSub, setNewSub] = useState('');
   const [showFields, setShowFields] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['legal']));
@@ -52,14 +53,41 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
     set('customFields', u);
   };
 
+  const addTag = (raw: string) => {
+    const tag = raw.trim().replace(/,/g, '');
+    if (tag && !d.tags.includes(tag)) {
+      set('tags', [...d.tags, tag]);
+    }
+    setTagInput('');
+  };
+
+  const removeTag = (tag: string) => {
+    set('tags', d.tags.filter((t: string) => t !== tag));
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTag(tagInput);
+    }
+    if (e.key === 'Backspace' && !tagInput && d.tags.length > 0) {
+      set('tags', d.tags.slice(0, -1));
+    }
+  };
+
   const submit = () => {
     if (!d.title.trim()) return;
+    // Flush any pending tag input
+    if (tagInput.trim()) {
+      d.tags = [...d.tags, tagInput.trim()];
+      setTagInput('');
+    }
     // Validate & sanitize custom fields before creating
     const { sanitized: cleanCustomFields } = validateCustomFieldValues(d.customFields, activeFields);
     const out: any = {
       ...d,
       customFields: cleanCustomFields,
-      tags: d.tags.split(',').map((t: string) => t.trim()).filter(Boolean),
+      tags: d.tags,
       points: d.points ? Number(d.points) : null,
       timeEstimate: d.timeEstimate ? Number(d.timeEstimate) : null,
     };
@@ -257,6 +285,34 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
           </div>
         </div>
 
+        {/* Tags (quick mode) */}
+        <div>
+          <label className="block text-[11px] uppercase tracking-wider text-[var(--text-muted)] mb-1 font-semibold">
+            {t('taskCreate.tags')}
+          </label>
+          <div className="flex flex-wrap items-center gap-1.5 min-h-[40px] px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-transparent focus-within:border-[var(--accent)]/30 transition">
+            {d.tags.map((tag: string) => (
+              <span
+                key={tag}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[var(--accent-subtle)] text-[var(--accent)] text-[12px] font-medium"
+              >
+                {tag}
+                <button onClick={() => removeTag(tag)} className="hover:text-[var(--error)] transition">
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </span>
+            ))}
+            <input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={handleTagKeyDown}
+              onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
+              placeholder={d.tags.length === 0 ? t('taskCreate.tagsPlaceholder') : ''}
+              className="flex-1 min-w-[60px] h-6 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none"
+            />
+          </div>
+        </div>
+
         {/* Footer */}
         <div className="flex items-center justify-between pt-4">
           <button
@@ -264,7 +320,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
             className="text-[13px] text-[var(--accent)] hover:text-[var(--accent-hover)] font-medium transition flex items-center gap-1"
           >
             <Plus className="h-3.5 w-3.5" />
-            Mas opciones
+            {t('tasks.moreOptions')}
           </button>
           <div className="flex gap-2">
             <button
@@ -278,7 +334,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
               disabled={!d.title.trim()}
               className="h-10 px-6 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-semibold transition text-sm disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Crear
+              {t('common.create')}
             </button>
           </div>
         </div>
@@ -312,7 +368,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
 
       <div className="px-7 pb-7">
         {/* ──────── Section 1: Identidad ──────── */}
-        {sectionSep('Identidad')}
+        {sectionSep(t('taskCreate.sectionIdentity'))}
 
         <div className="space-y-3">
           {/* Title */}
@@ -363,7 +419,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
         </div>
 
         {/* ──────── Section 2: Organizacion ──────── */}
-        {sectionSep('Organizacion')}
+        {sectionSep(t('taskCreate.sectionOrganization'))}
 
         <div className="space-y-3">
           {/* Status + Priority */}
@@ -452,7 +508,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
         </div>
 
         {/* ──────── Section 3: Tiempo y Fechas ──────── */}
-        {sectionSep('Tiempo y Fechas')}
+        {sectionSep(t('taskCreate.sectionDates'))}
 
         <div className="space-y-3">
           {/* Dates */}
@@ -521,7 +577,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
         </div>
 
         {/* ──────── Section 4: Responsables ──────── */}
-        {sectionSep('Responsables')}
+        {sectionSep(t('taskCreate.sectionAssignees'))}
 
         <div>
           <div className="flex gap-2 flex-wrap">
@@ -546,19 +602,37 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
         </div>
 
         {/* ──────── Section 5: Etiquetas ──────── */}
-        {sectionSep('Etiquetas')}
+        {sectionSep(t('taskCreate.sectionTags'))}
 
         <div>
-          <input
-            value={d.tags}
-            onChange={(e) => set('tags', e.target.value)}
-            placeholder={t('taskCreate.tagsPlaceholder')}
-            className="input-dark h-10 text-[14px] rounded-xl w-full"
-          />
+          <div className="flex flex-wrap items-center gap-1.5 min-h-[40px] px-3 py-2 rounded-xl bg-[var(--bg-elevated)] border border-transparent focus-within:border-[var(--accent)]/30 focus-within:ring-1 focus-within:ring-[var(--accent)]/20 transition">
+            {d.tags.map((tag: string) => (
+              <span
+                key={tag}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--accent-subtle)] text-[var(--accent)] text-[13px] font-medium"
+              >
+                {tag}
+                <button
+                  onClick={() => removeTag(tag)}
+                  className="hover:text-[var(--error)] transition ml-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+            <input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={handleTagKeyDown}
+              onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
+              placeholder={d.tags.length === 0 ? t('taskCreate.tagsPlaceholder') : ''}
+              className="flex-1 min-w-[80px] h-7 bg-transparent text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none"
+            />
+          </div>
         </div>
 
         {/* ──────── Section 6: Subtareas ──────── */}
-        {sectionSep('Subtareas')}
+        {sectionSep(t('taskCreate.sectionSubtasks'))}
 
         <div className="space-y-1.5">
           {d.subtasks.map((s: any, i: number) => (
@@ -597,7 +671,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
             onClick={() => setShowFields(!showFields)}
             className="absolute left-4 top-1/2 -translate-y-1/2 px-2 bg-[var(--bg-base)] text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)] font-semibold flex items-center gap-1.5 hover:text-[var(--text-secondary)] transition"
           >
-            Campos Personalizados
+            {t('taskCreate.sectionCustom')}
             <ChevronDown
               className={`h-3 w-3 transition-transform duration-200 ${showFields ? 'rotate-180' : ''}`}
             />
@@ -698,7 +772,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
           disabled={!d.title.trim()}
           className="h-11 px-6 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          Crear Tarea
+          {t('common.createTask')}
         </button>
       </div>
     </motion.div>

@@ -16,6 +16,7 @@ import {
   LayoutDashboard, CheckSquare, FileText, MessageSquare, Zap, BarChart3,
   Users, Shield, LogOut, Menu, Bot, ChevronLeft, Sun, Moon, ChevronDown,
   Settings, Loader2, CalendarDays, MoreHorizontal, Target, Clock, PenTool, FileInput, Plug, Search,
+  Layers,
 } from 'lucide-react';
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -262,13 +263,15 @@ function SearchTrigger() {
 // SHELL
 // ============================================
 function Shell({ children }: { children: React.ReactNode }) {
-  const { user, me, loading, isAdmin, canSeeAllTeams } = useAuth();
+  const { user, me, loading, isAdmin, canSeeAllTeams, teams } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
   const path = usePathname();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 768 : true);
   const isMoreRoute = MORE_NAV.some(n => path.startsWith(n.href));
   const [moreOpen, setMoreOpen] = useState(isMoreRoute);
+  const isSpacesRoute = path.startsWith('/app/spaces');
+  const [spacesOpen, setSpacesOpen] = useState(isSpacesRoute);
   const morePopRef = useRef<HTMLDivElement>(null);
   const [morePopover, setMorePopover] = useState(false);
 
@@ -284,15 +287,36 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
   if (!user || !me) return null;
 
+  // Spaces: only teams the user belongs to (or all for admin)
+  const sidebarTeams = teams.filter(team => {
+    if (team.status === 'archived') return false;
+    if (canSeeAllTeams) return true;
+    return me.teamId === team.id || me.teamIds?.includes(team.id);
+  });
+
   const isActive = (h: string) => h === '/app' ? path === '/app' : path.startsWith(h);
+  const navTo = (href: string) => { router.push(href); if (window.innerWidth < 768) setOpen(false); };
 
   return (
     <div className="min-h-screen flex bg-[var(--bg-base)]">
+      {/* ===== MOBILE BACKDROP ===== */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-30 bg-black/40 md:hidden"
+            onClick={() => setOpen(false)}
+          />
+        )}
+      </AnimatePresence>
       {/* ===== SIDEBAR ===== */}
       <motion.aside
         animate={{ width: open ? 240 : 60 }}
         transition={{ duration: 0.25, ease: EASE }}
-        className="fixed top-0 left-0 h-full z-40 flex flex-col bg-[var(--sidebar-bg)]"
+        className={`fixed top-0 left-0 h-full z-40 flex flex-col bg-[var(--sidebar-bg)] max-md:!w-[240px] max-md:transition-transform max-md:duration-300 ${!open ? 'max-md:-translate-x-full' : 'max-md:translate-x-0'}`}
       >
         {/* Logo */}
         <div className="h-14 flex items-center px-3 gap-2.5">
@@ -319,7 +343,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             return (
               <button
                 key={n.href}
-                onClick={() => router.push(n.href)}
+                onClick={() => navTo(n.href)}
                 className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-200 relative ${
                   active
                     ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
@@ -344,6 +368,79 @@ function Shell({ children }: { children: React.ReactNode }) {
               </button>
             );
           })}
+
+          {/* Spaces section */}
+          {sidebarTeams.length > 0 && (
+            open ? (
+              <>
+                <div className="pt-3 pb-1 px-2.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--sidebar-text)] opacity-60">{t('nav.spaces')}</p>
+                </div>
+                <button
+                  onClick={() => { navTo('/app/spaces'); }}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-200 relative ${
+                    path === '/app/spaces'
+                      ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
+                      : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
+                  }`}
+                >
+                  {path === '/app/spaces' && (
+                    <motion.div layoutId="nav-indicator-spaces" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+                  )}
+                  <Layers className="h-5 w-5 shrink-0" strokeWidth={1.75} />
+                  <span>{t('spaces.allSpaces')}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 ml-auto transition-transform duration-200 ${spacesOpen ? 'rotate-180' : ''}`} onClick={(e) => { e.stopPropagation(); setSpacesOpen(!spacesOpen); }} />
+                </button>
+                <AnimatePresence>
+                  {spacesOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: EASE }}
+                      className="overflow-hidden"
+                    >
+                      <div className="pl-3 space-y-0.5">
+                        {sidebarTeams.map(st => {
+                          const spaceHref = `/app/spaces/${st.id}`;
+                          const spaceActive = path === spaceHref;
+                          return (
+                            <button
+                              key={st.id}
+                              onClick={() => navTo(spaceHref)}
+                              className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200 relative ${
+                                spaceActive
+                                  ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
+                                  : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
+                              }`}
+                            >
+                              {spaceActive && (
+                                <motion.div layoutId={`nav-indicator-space-${st.id}`} className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-r-full" style={{ backgroundColor: st.color || 'var(--accent)' }} transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+                              )}
+                              <span className="text-sm shrink-0">{st.icon || '📁'}</span>
+                              <span className="truncate">{st.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            ) : (
+              <button
+                onClick={() => navTo('/app/spaces')}
+                className={`w-full flex items-center justify-center py-2 rounded-lg text-sm transition-all duration-200 ${
+                  isSpacesRoute
+                    ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)]'
+                    : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
+                }`}
+                title={t('nav.spaces')}
+              >
+                <Layers className="h-5 w-5" strokeWidth={1.75} />
+              </button>
+            )
+          )}
 
           {/* More section */}
           {open ? (
@@ -375,7 +472,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                         return (
                           <button
                             key={n.href}
-                            onClick={() => router.push(n.href)}
+                            onClick={() => navTo(n.href)}
                             className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-200 relative ${
                               active
                                 ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
@@ -425,7 +522,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                       return (
                         <button
                           key={n.href}
-                          onClick={() => { router.push(n.href); setMorePopover(false); }}
+                          onClick={() => { navTo(n.href); setMorePopover(false); }}
                           className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-all duration-200 ${
                             active ? 'text-[var(--accent)] font-semibold bg-[var(--accent-subtle)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                           }`}
@@ -453,7 +550,7 @@ function Shell({ children }: { children: React.ReactNode }) {
               </AnimatePresence>
               {!open && <div className="pt-2 mt-2"><div className="h-px bg-[var(--sidebar-divider)] mx-2" /></div>}
               <button
-                onClick={() => router.push('/app/admin')}
+                onClick={() => navTo('/app/admin')}
                 className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-200 relative ${
                   path.startsWith('/app/admin')
                     ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
@@ -502,7 +599,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       </motion.aside>
 
       {/* ===== MAIN ===== */}
-      <motion.div animate={{ marginLeft: open ? 240 : 60 }} transition={{ duration: 0.25, ease: EASE }} className="flex-1">
+      <motion.div animate={{ marginLeft: open ? 240 : 60 }} transition={{ duration: 0.25, ease: EASE }} className="flex-1 max-md:!ml-0">
         {/* Topbar */}
         <header className="h-14 sticky top-0 z-30 flex items-center justify-between px-5 bg-[var(--bg-base)]/80 backdrop-blur-md shadow-topbar">
           <div className="flex items-center gap-3 flex-1">

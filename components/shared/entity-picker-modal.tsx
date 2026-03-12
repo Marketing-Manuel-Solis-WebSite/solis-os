@@ -21,7 +21,7 @@ const TABS: { type: EntityType; icon: any; labelEs: string; labelEn: string }[] 
 
 export default function EntityPickerModal({ excludeId, onSelect, onClose }: Props) {
   const { t, lang } = useI18n();
-  const { can } = useAuth();
+  const { can, canSeeAllTeams, activeTeamId, me } = useAuth();
   const [tab, setTab] = useState<EntityType>('task');
   const [query, setQuery] = useState('');
   const [relationType, setRelationType] = useState<RelationType>('related_to');
@@ -31,16 +31,17 @@ export default function EntityPickerModal({ excludeId, onSelect, onClose }: Prop
   const loadItems = useCallback(async () => {
     setLoading(true);
     try {
+      const teamScope = canSeeAllTeams ? undefined : (activeTeamId !== '__all__' ? activeTeamId : me?.teamId);
       let data: any[] = [];
       switch (tab) {
         case 'task':
-          data = can('task', 'read') ? (await getTasks()).items as any[] : [];
+          data = can('task', 'read') ? (await getTasks(teamScope)).items as any[] : [];
           break;
         case 'doc':
-          data = can('doc', 'read') ? (await getDocuments()).items as any[] : [];
+          data = can('doc', 'read') ? (await getDocuments(teamScope)).items as any[] : [];
           break;
         case 'goal':
-          data = can('goal', 'read') ? (await getGoals()).items as any[] : [];
+          data = can('goal', 'read') ? (await getGoals(teamScope)).items as any[] : [];
           break;
       }
       setItems(data.filter(d => d.id !== excludeId));

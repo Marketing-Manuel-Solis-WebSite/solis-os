@@ -38,6 +38,18 @@ service cloud.firestore {
       return request.resource.data.orgId == orgId;
     }
 
+    // Team-level access: admin/director bypass, or document has no teamId, or user is a member of the document's team.
+    // Used for tasks, docs, goals to enforce team isolation within the org.
+    function canAccessTeamData(orgId) {
+      let member = get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data;
+      return member.role in ['owner', 'admin']
+        || ('hierarchyLevel' in member && member.hierarchyLevel in ['director', 'owner'])
+        || !('teamId' in resource.data)
+        || resource.data.teamId == null
+        || member.teamId == resource.data.teamId
+        || ('teamIds' in member && resource.data.teamId in member.teamIds);
+    }
+
     // ======== ORGANIZATIONS ========
 
     match /orgs/{orgId} {
@@ -211,7 +223,7 @@ service cloud.firestore {
     // ======== TASKS ========
 
     match /tasks/{taskId} {
-      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
       allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
@@ -234,7 +246,7 @@ service cloud.firestore {
     // ======== DOCS ========
 
     match /docs/{docId} {
-      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
       allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
@@ -302,7 +314,7 @@ service cloud.firestore {
     // ======== GOALS ========
 
     match /goals/{goalId} {
-      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
       allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow delete: if isSignedIn() && isManager(resource.data.orgId);

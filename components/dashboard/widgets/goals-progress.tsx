@@ -13,15 +13,23 @@ const STATUS_COLORS: Record<string, string> = {
   completed: '#3B82F6',
 };
 
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_LABELS_ES: Record<string, string> = {
   on_track: 'En camino',
   at_risk: 'En riesgo',
   behind: 'Atrasada',
   completed: 'Completada',
 };
 
+const STATUS_LABELS_EN: Record<string, string> = {
+  on_track: 'On track',
+  at_risk: 'At risk',
+  behind: 'Behind',
+  completed: 'Completed',
+};
+
 function GoalsProgressInner({ goals, user, me }: WidgetProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const STATUS_LABELS = lang === 'es' ? STATUS_LABELS_ES : STATUS_LABELS_EN;
 
   const myGoals = useMemo(() => {
     return goals

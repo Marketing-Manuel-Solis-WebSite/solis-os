@@ -1,7 +1,7 @@
 'use client';
 import { useMemo } from 'react';
 import { useI18n } from '@/lib/i18n';
-import { WIDGET_CATALOG } from '@/lib/dashboard-types';
+import { WIDGET_CATALOG, ADMIN_ONLY_TYPES } from '@/lib/dashboard-types';
 import type { WidgetLayout } from '@/lib/dashboard-types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Hash, PieChart, CheckSquare, Activity, Target, TrendingUp, Calendar, Flag, BarChart3, Inbox, Sparkles, PackageOpen } from 'lucide-react';
@@ -15,19 +15,22 @@ interface WidgetPickerProps {
   onClose: () => void;
   onAdd: (type: string) => void;
   existingWidgets: WidgetLayout[];
+  isAdmin?: boolean;
 }
 
-export default function WidgetPicker({ open, onClose, onAdd, existingWidgets }: WidgetPickerProps) {
+export default function WidgetPicker({ open, onClose, onAdd, existingWidgets, isAdmin }: WidgetPickerProps) {
   const { t } = useI18n();
 
-  // Filter out widget types already in the dashboard (stat-card allowed multiple)
+  // SECURITY: Filter out admin-only widgets for non-admin users + already-added widgets
   const available = useMemo(() => {
     const existingTypes = new Set(existingWidgets.map(w => w.type));
     return WIDGET_CATALOG.filter(wt => {
+      // Admin-only widget gating
+      if (!isAdmin && ADMIN_ONLY_TYPES.has(wt.type)) return false;
       if (wt.type === 'stat-card') return true;
       return !existingTypes.has(wt.type);
     });
-  }, [existingWidgets]);
+  }, [existingWidgets, isAdmin]);
 
   return (
     <AnimatePresence>

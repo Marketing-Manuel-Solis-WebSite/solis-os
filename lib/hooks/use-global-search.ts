@@ -24,7 +24,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const MAX_PER_GROUP = 5;
 
 export function useGlobalSearch() {
-  const { allMembers, can, canSeeResource, canSeeAllTeams } = useAuth();
+  const { allMembers, can, canSeeResource, canSeeAllTeams, activeTeamId, me } = useAuth();
   const [results, setResults] = useState<SearchResult[]>([]);
   const [actions, setActions] = useState<QuickAction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,12 +36,13 @@ export function useGlobalSearch() {
       return cacheRef.current;
     }
 
+    const teamScope = canSeeAllTeams ? undefined : (activeTeamId !== '__all__' ? activeTeamId : me?.teamId);
     const empty = { items: [] as any[], hasMore: false };
     const [tasksR, docsR, channelsR, goalsR, formsR] = await Promise.all([
-      can('task', 'read') ? getTasks() : Promise.resolve(empty),
-      can('doc', 'read') ? getDocuments() : Promise.resolve(empty),
+      can('task', 'read') ? getTasks(teamScope) : Promise.resolve(empty),
+      can('doc', 'read') ? getDocuments(teamScope) : Promise.resolve(empty),
       can('channel', 'read') ? getChannels() : Promise.resolve(empty),
-      can('goal', 'read') ? getGoals() : Promise.resolve(empty),
+      can('goal', 'read') ? getGoals(teamScope) : Promise.resolve(empty),
       can('form', 'read') ? getForms() : Promise.resolve(empty),
     ]);
 

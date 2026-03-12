@@ -14,11 +14,17 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 const PRIORITIES = ['urgent', 'high', 'medium', 'low'] as const;
 
-function PriorityBreakdownInner({ tasks }: WidgetProps) {
-  const { t } = useI18n();
+function PriorityBreakdownInner({ tasks, user, canSeeAllTeams }: WidgetProps) {
+  const { t, lang } = useI18n();
+
+  // SECURITY: Non-admin users see only their own task priorities
+  const scopedTasks = useMemo(() => {
+    if (canSeeAllTeams) return tasks;
+    return tasks.filter(tk => tk.assignees?.includes(user?.uid) || tk.createdBy === user?.uid);
+  }, [tasks, canSeeAllTeams, user?.uid]);
 
   const data = useMemo(() => {
-    const openTasks = tasks.filter(tk => tk.status !== 'done' && tk.status !== 'completed');
+    const openTasks = scopedTasks.filter(tk => tk.status !== 'done' && tk.status !== 'completed');
     const total = openTasks.length;
     return PRIORITIES.map(p => ({
       name: t(`priority.${p}`),
@@ -26,10 +32,11 @@ function PriorityBreakdownInner({ tasks }: WidgetProps) {
       color: PRIORITY_COLORS[p],
       pct: total > 0 ? Math.round((openTasks.filter(tk => (tk.priority || 'medium') === p).length / total) * 100) : 0,
     }));
-  }, [tasks, t]);
+  }, [scopedTasks, t]);
 
   const hasData = data.some(d => d.value > 0);
   const total = data.reduce((s, d) => s + d.value, 0);
+  const totalLabel = lang === 'es' ? 'Total abiertas' : 'Total open';
 
   return (
     <WidgetShell title={t('dashboard.openByPriority')} icon={<Flag className="h-4 w-4" />}>
@@ -68,7 +75,7 @@ function PriorityBreakdownInner({ tasks }: WidgetProps) {
 
           {/* Total */}
           <div className="pt-3 mt-auto border-t border-[var(--border-subtle)]/50 flex items-center justify-between">
-            <span className="text-[12px] text-[var(--text-muted)]">Total abiertas</span>
+            <span className="text-[12px] text-[var(--text-muted)]">{totalLabel}</span>
             <span className="text-[13px] font-bold text-[var(--text-primary)]">{total}</span>
           </div>
         </div>

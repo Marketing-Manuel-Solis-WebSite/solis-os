@@ -37,12 +37,18 @@ const STATUS_KEYS: Record<string, string> = {
   blocked: 'status.blocked',
 };
 
-function TasksByStatusInner({ tasks }: WidgetProps) {
+function TasksByStatusInner({ tasks, user, canSeeAllTeams }: WidgetProps) {
   const { t } = useI18n();
+
+  // SECURITY: Non-admin users see only their own tasks distribution
+  const scopedTasks = useMemo(() => {
+    if (canSeeAllTeams) return tasks;
+    return tasks.filter(tk => tk.assignees?.includes(user?.uid) || tk.createdBy === user?.uid);
+  }, [tasks, canSeeAllTeams, user?.uid]);
 
   const data = useMemo(() => {
     const counts: Record<string, number> = {};
-    tasks.forEach(task => {
+    scopedTasks.forEach(task => {
       const s = task.status === 'completed' ? 'done' : (task.status || 'todo');
       counts[s] = (counts[s] || 0) + 1;
     });
@@ -53,9 +59,9 @@ function TasksByStatusInner({ tasks }: WidgetProps) {
         color: STATUS_COLORS[status] || '#64748B',
       }))
       .sort((a, b) => b.value - a.value);
-  }, [tasks, t]);
+  }, [scopedTasks, t]);
 
-  const total = tasks.length;
+  const total = scopedTasks.length;
 
   return (
     <WidgetShell title={t('dashboard.widget.tasksByStatus')} icon={<PieIcon className="h-4 w-4" />}>

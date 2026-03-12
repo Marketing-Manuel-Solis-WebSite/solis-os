@@ -8,6 +8,7 @@ import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from '@d
 import { CSS } from '@dnd-kit/utilities';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { WidgetLayout, WidgetProps } from '@/lib/dashboard-types';
+import { ADMIN_ONLY_TYPES } from '@/lib/dashboard-types';
 import { StatCardWidget } from './widgets/stat-card';
 import { TasksByStatusWidget } from './widgets/tasks-by-status';
 import { MyTasksWidget } from './widgets/my-tasks';
@@ -19,7 +20,7 @@ import { PriorityBreakdownWidget } from './widgets/priority-breakdown';
 import { TeamPerformanceWidget } from './widgets/team-performance';
 import { InboxWidget } from './widgets/inbox-widget';
 import { AIInsightsWidget } from './widgets/ai-insights';
-import { Trash2, GripVertical } from 'lucide-react';
+import { Trash2, GripVertical, LayoutGrid } from 'lucide-react';
 
 const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
   'stat-card': StatCardWidget,
@@ -45,6 +46,7 @@ interface WidgetGridProps {
   widgets: WidgetLayout[];
   sharedProps: Omit<WidgetProps, 'config'>;
   editing?: boolean;
+  isAdmin?: boolean;
   onReorder?: (widgets: WidgetLayout[]) => void;
   onRemove?: (widgetId: string) => void;
 }
@@ -96,7 +98,7 @@ function WidgetItem({ widget, editing, onRemove, sharedProps, cols }: {
         ease: 'easeInOut',
       } : { duration: 0.15 }}
     >
-      {/* Editing controls — inline, no box, just buttons */}
+      {/* Editing controls */}
       <AnimatePresence>
         {editing && (
           <motion.div
@@ -141,7 +143,7 @@ function WidgetItem({ widget, editing, onRemove, sharedProps, cols }: {
   );
 }
 
-export default function WidgetGrid({ widgets, sharedProps, editing, onReorder, onRemove }: WidgetGridProps) {
+export default function WidgetGrid({ widgets, sharedProps, editing, isAdmin, onReorder, onRemove }: WidgetGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
@@ -163,28 +165,35 @@ export default function WidgetGrid({ widgets, sharedProps, editing, onReorder, o
     return () => ro.disconnect();
   }, []);
 
-  const widgetIds = useMemo(() => widgets.map(w => w.widgetId), [widgets]);
+  // SECURITY: Strip admin-only widgets for non-admin users at runtime.
+  // This is the enforcement layer — even if a user somehow persisted an admin widget
+  // in their dashboard config, it will be filtered out here.
+  const filteredWidgets = useMemo(() => {
+    if (isAdmin) return widgets;
+    return widgets.filter(w => !ADMIN_ONLY_TYPES.has(w.type));
+  }, [widgets, isAdmin]);
+
+  const widgetIds = useMemo(() => filteredWidgets.map(w => w.widgetId), [filteredWidgets]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id || !onReorder) return;
 
-    const oldIndex = widgets.findIndex(w => w.widgetId === active.id);
-    const newIndex = widgets.findIndex(w => w.widgetId === over.id);
+    const oldIndex = filteredWidgets.findIndex(w => w.widgetId === active.id);
+    const newIndex = filteredWidgets.findIndex(w => w.widgetId === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    onReorder(arrayMove(widgets, oldIndex, newIndex));
-  }, [widgets, onReorder]);
+    onReorder(arrayMove(filteredWidgets, oldIndex, newIndex));
+  }, [filteredWidgets, onReorder]);
 
-  if (widgets.length === 0) {
+  if (filteredWidgets.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="flex flex-col items-center justify-center py-24 text-center">
         <div className="w-16 h-16 rounded-2xl bg-[var(--bg-tertiary)] flex items-center justify-center mb-4">
-          <svg className="h-8 w-8 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-          </svg>
+          <LayoutGrid className="h-8 w-8 text-[var(--text-muted)] opacity-40" />
         </div>
-        <p className="text-[var(--text-muted)] text-sm">No hay widgets. Personaliza tu dashboard para añadir.</p>
+        <p className="text-[14px] text-[var(--text-muted)] font-medium mb-1">No hay widgets</p>
+        <p className="text-[13px] text-[var(--text-muted)] opacity-70">Personaliza tu dashboard para añadir widgets.</p>
       </div>
     );
   }
@@ -202,7 +211,7 @@ export default function WidgetGrid({ widgets, sharedProps, editing, onReorder, o
             padding: 0,
           }}
         >
-          {widgets.map((widget, i) => (
+          {filteredWidgets.map((widget) => (
             <WidgetItem
               key={widget.widgetId}
               widget={widget}

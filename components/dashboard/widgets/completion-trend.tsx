@@ -22,27 +22,34 @@ function CustomChartTooltip({ active, payload, label }: any) {
   );
 }
 
-function CompletionTrendInner({ config, tasks }: WidgetProps) {
-  const { t } = useI18n();
+function CompletionTrendInner({ config, tasks, user, canSeeAllTeams }: WidgetProps) {
+  const { t, lang } = useI18n();
   const dateRange = config.dateRange || '30d';
+
+  // SECURITY: Non-admin users see only their own task trends
+  const scopedTasks = useMemo(() => {
+    if (canSeeAllTeams) return tasks;
+    return tasks.filter(tk => tk.assignees?.includes(user?.uid) || tk.createdBy === user?.uid);
+  }, [tasks, canSeeAllTeams, user?.uid]);
 
   const chartData = useMemo(() => {
     const days = dateRange === '7d' ? 7 : dateRange === '90d' ? 90 : 30;
     const now = new Date();
+    const locale = lang === 'es' ? 'es-MX' : 'en-US';
     const data: { date: string; created: number; completed: number }[] = [];
 
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
-      const label = d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' });
+      const label = d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 
-      const created = tasks.filter(tk => {
+      const created = scopedTasks.filter(tk => {
         const c = tk.createdAt?.seconds ? new Date(tk.createdAt.seconds * 1000) : null;
         return c && c.toISOString().split('T')[0] === dateStr;
       }).length;
 
-      const completed = tasks.filter(tk => {
+      const completed = scopedTasks.filter(tk => {
         if (tk.status !== 'done' && tk.status !== 'completed') return false;
         const u = tk.updatedAt?.seconds ? new Date(tk.updatedAt.seconds * 1000) : null;
         return u && u.toISOString().split('T')[0] === dateStr;
@@ -52,7 +59,7 @@ function CompletionTrendInner({ config, tasks }: WidgetProps) {
     }
 
     return data;
-  }, [tasks, dateRange]);
+  }, [scopedTasks, dateRange, lang]);
 
   const hasData = chartData.some(d => d.created > 0 || d.completed > 0);
 
@@ -62,7 +69,7 @@ function CompletionTrendInner({ config, tasks }: WidgetProps) {
       icon={<TrendingUp className="h-4 w-4" />}
       headerRight={
         <span className="text-[11px] text-[var(--text-muted)] font-medium">
-          {dateRange === '7d' ? '7 dias' : dateRange === '90d' ? '90 dias' : '30 dias'}
+          {dateRange === '7d' ? '7d' : dateRange === '90d' ? '90d' : '30d'}
         </span>
       }
     >

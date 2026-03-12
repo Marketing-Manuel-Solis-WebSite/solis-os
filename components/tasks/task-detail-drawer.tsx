@@ -274,7 +274,7 @@ export default function TaskDetailDrawer({
   const content = (
     <div className="flex flex-col h-full overflow-hidden min-w-0 max-w-full">
       {/* ---- Header bar ---- */}
-      <div className="flex items-center justify-between px-6 py-4 shrink-0 border-b border-[var(--border)]/30">
+      <div className="flex items-center justify-between px-6 py-4 shrink-0 border-b border-[var(--border)]/40 bg-[var(--bg-tertiary)]/30">
         <div className="flex items-center gap-2 min-w-0">
           <tp.Icon className="h-4 w-4 shrink-0" style={{ color: tp.color }} />
           <span className="text-sm font-semibold text-[var(--text-muted)] uppercase">
@@ -1301,14 +1301,28 @@ export default function TaskDetailDrawer({
 
   return (
     <motion.div
-      initial={{ x: '100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: '100%' }}
-      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-      style={{ width: '540px', maxWidth: '85vw' }}
-      className="fixed top-0 right-0 z-40 h-full bg-[var(--bg-base)] border-l border-[var(--border-subtle)] shadow-2xl flex flex-col overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-40"
     >
-      {content}
+      {/* Backdrop overlay */}
+      <div
+        className="absolute inset-0 bg-black/20"
+        onClick={onClose}
+      />
+      {/* Floating drawer */}
+      <motion.div
+        initial={{ x: '100%', opacity: 0.8 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: '100%', opacity: 0.8 }}
+        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+        style={{ width: '540px', maxWidth: 'calc(85vw - 24px)' }}
+        className="fixed top-3 right-3 bottom-3 z-50 bg-[var(--bg-base)] rounded-2xl border border-[var(--border)] shadow-2xl flex flex-col overflow-hidden"
+      >
+        {content}
+      </motion.div>
     </motion.div>
   );
 }

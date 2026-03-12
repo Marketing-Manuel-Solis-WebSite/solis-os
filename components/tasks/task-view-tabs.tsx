@@ -1,12 +1,11 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { useI18n } from '@/lib/i18n';
-import { motion } from 'framer-motion';
 import {
   Inbox, User, Sun, CalendarClock, AlertTriangle, Eye, Bookmark, Plus,
-  MoreHorizontal, Pin, Copy, Share2, Pencil, Trash2, X,
+  MoreHorizontal, Pin, Copy, Share2, Pencil, Trash2, X, UserCheck,
 } from 'lucide-react';
-import { BUILT_IN_PRESETS, SavedView } from './constants';
+import { BUILT_IN_PRESETS, type ViewPreset, SavedView } from './constants';
 
 interface Props {
   activePreset: string;
@@ -19,11 +18,13 @@ interface Props {
   onDuplicateView?: (sv: SavedView) => void;
   onTogglePin?: (id: string) => void;
   onRenameView?: (id: string, name: string) => void;
+  allPresets?: ViewPreset[];
 }
 
 const PRESET_ICONS: Record<string, any> = {
   all: Inbox,
   my_tasks: User,
+  created_by_me: UserCheck,
   today: Sun,
   upcoming: CalendarClock,
   overdue: AlertTriangle,
@@ -33,6 +34,7 @@ const PRESET_ICONS: Record<string, any> = {
 export default function TaskViewTabs({
   activePreset, savedViews, pinnedPresets, onPresetChange,
   onSaveView, onLoadView, onDeleteView, onDuplicateView, onTogglePin, onRenameView,
+  allPresets,
 }: Props) {
   const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -47,7 +49,8 @@ export default function TaskViewTabs({
     return () => document.removeEventListener('mousedown', handler);
   }, [menuOpen]);
 
-  const visiblePresets = BUILT_IN_PRESETS.filter(p => pinnedPresets.includes(p.id));
+  const presetSource = allPresets || BUILT_IN_PRESETS;
+  const visiblePresets = presetSource.filter(p => pinnedPresets.includes(p.id));
 
   return (
     <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin pb-0.5">
@@ -68,10 +71,8 @@ export default function TaskViewTabs({
             <Icon className="h-4 w-4" strokeWidth={active ? 2 : 1.75} />
             {t(`preset.${preset.id}`)}
             {active && (
-              <motion.div
-                layoutId="preset-indicator"
+              <div
                 className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-[var(--accent)]"
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
               />
             )}
           </button>
@@ -99,10 +100,8 @@ export default function TaskViewTabs({
               <Bookmark className="h-4 w-4" strokeWidth={1.75} />
               {sv.name}
               {active && (
-                <motion.div
-                  layoutId="preset-indicator-saved"
+                <div
                   className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-[var(--accent)]"
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                 />
               )}
             </button>

@@ -5,7 +5,7 @@ import { WidgetShell } from '../widget-shell';
 import { Activity, Zap } from 'lucide-react';
 import type { WidgetProps } from '@/lib/dashboard-types';
 
-function ActivityFeedInner({ config, logs, members, activeTeamId }: WidgetProps) {
+function ActivityFeedInner({ config, logs, members, activeTeamId, canSeeAllTeams }: WidgetProps) {
   const { t } = useI18n();
   const limit = config.limit || 10;
 

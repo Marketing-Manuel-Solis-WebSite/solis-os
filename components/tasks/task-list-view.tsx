@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown, ChevronRight, ChevronUp, Calendar,
   CheckSquare, Trash2, GripVertical, Paperclip, Repeat,
+  CheckCircle2, Plus,
 } from 'lucide-react';
 import {
   STATUSES, PRIORITIES, TASK_TYPES, ALL_COLUMNS,
@@ -52,8 +53,8 @@ const DENSITY_HEIGHT: Record<Density, number> = {
 /* HELPERS                                       */
 /* ============================================= */
 
-function formatDate(d: Date): string {
-  return d.toLocaleDateString('es-MX', { month: 'short', day: 'numeric' });
+function formatDate(d: Date, locale = 'es-MX'): string {
+  return d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
 function formatMinutes(m: number): string {
@@ -264,7 +265,10 @@ function SubtaskExpandedList({
   canUpdate: boolean;
   onUpdate: (id: string, field: string, value: any, old?: any) => void;
 }) {
-  if (!task.subtasks?.length) return null;
+  const { t } = useI18n();
+  const [adding, setAdding] = useState(false);
+  const [newSubTitle, setNewSubTitle] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const toggleSubtask = (subId: string, currentDone: boolean) => {
     const updated = task.subtasks.map((s) =>
@@ -273,13 +277,30 @@ function SubtaskExpandedList({
     onUpdate(task.id, 'subtasks', updated, task.subtasks);
   };
 
+  const addSubtask = () => {
+    if (!newSubTitle.trim()) return;
+    const updated = [
+      ...(task.subtasks || []),
+      { id: Date.now().toString(), title: newSubTitle.trim(), done: false },
+    ];
+    onUpdate(task.id, 'subtasks', updated, task.subtasks);
+    setNewSubTitle('');
+    // Keep input open for rapid entry
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  useEffect(() => {
+    if (adding) inputRef.current?.focus();
+  }, [adding]);
+
+  if (!task.subtasks?.length && !canUpdate) return null;
+
   return (
-    <div className="ml-10 mt-1 space-y-0.5">
-      {task.subtasks.map((sub) => (
+    <div className="ml-10 mt-1 space-y-0.5" onClick={(e) => e.stopPropagation()}>
+      {(task.subtasks || []).map((sub) => (
         <div
           key={sub.id}
           className="flex items-center gap-2 py-0.5 text-[13px]"
-          onClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={() => canUpdate && toggleSubtask(sub.id, sub.done)}
@@ -296,6 +317,42 @@ function SubtaskExpandedList({
           </span>
         </div>
       ))}
+
+      {/* Inline add subtask */}
+      {canUpdate && (
+        adding ? (
+          <div className="flex items-center gap-2 py-0.5">
+            <input
+              ref={inputRef}
+              value={newSubTitle}
+              onChange={(e) => setNewSubTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); addSubtask(); }
+                if (e.key === 'Escape') { setAdding(false); setNewSubTitle(''); }
+              }}
+              onBlur={() => {
+                if (!newSubTitle.trim()) { setAdding(false); setNewSubTitle(''); }
+              }}
+              placeholder={t('taskCreate.addSubtask')}
+              className="flex-1 h-6 text-[13px] bg-transparent text-[var(--text-secondary)] placeholder:text-[var(--text-muted)] outline-none border-b border-[var(--border-subtle)] focus:border-[var(--accent)] transition"
+            />
+            <button
+              onClick={addSubtask}
+              className="text-[var(--accent)] hover:text-[var(--accent-hover)] transition p-0.5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1.5 py-0.5 text-[12px] text-[var(--text-muted)] hover:text-[var(--accent)] transition"
+          >
+            <Plus className="h-3 w-3" />
+            {t('taskCreate.addSubtask')}
+          </button>
+        )
+      )}
     </div>
   );
 }
@@ -396,7 +453,7 @@ const TaskRow = React.memo(function TaskRow({
                 </div>
               );
 
-            /* ----- STATUS ----- */
+            /* ----- STATUS (ClickUp-style toggle) ----- */
             case 'status':
               return (
                 <div key={col.id} className={`${widthCls} flex justify-center`}>
@@ -407,10 +464,27 @@ const TaskRow = React.memo(function TaskRow({
                         onUpdate(task.id, 'status', isDone ? 'todo' : 'done', task.status);
                       }
                     }}
-                    className="hover:scale-110 transition"
-                    title={t(`status.${statusCfg.id}`)}
+                    className="group/status relative w-6 h-6 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
+                    title={isDone ? t('status.todo') : t('status.done')}
                   >
-                    <statusCfg.Icon className="h-[18px] w-[18px]" style={{ color: statusCfg.color }} />
+                    {/* Default icon */}
+                    <statusCfg.Icon
+                      className="h-[18px] w-[18px] transition-opacity duration-150 group-hover/status:opacity-0"
+                      style={{ color: statusCfg.color }}
+                    />
+                    {/* Hover: green check (or undo circle for done) */}
+                    {canUpdate && (
+                      isDone ? (
+                        <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/status:opacity-100 transition-opacity duration-150">
+                          <span className="w-[18px] h-[18px] rounded-full border-2 border-[var(--text-muted)]" />
+                        </span>
+                      ) : (
+                        <CheckCircle2
+                          className="absolute h-[18px] w-[18px] opacity-0 group-hover/status:opacity-100 transition-opacity duration-150"
+                          style={{ color: '#22C55E' }}
+                        />
+                      )
+                    )}
                   </button>
                 </div>
               );
@@ -445,7 +519,7 @@ const TaskRow = React.memo(function TaskRow({
                       <Paperclip className="h-3 w-3 shrink-0 text-[var(--text-muted)] opacity-60" />
                     )}
                     {task.recurrence && (
-                      <span title="Recurring">
+                      <span title={t('common.recurring')}>
                         <Repeat className="h-3 w-3 shrink-0 text-[var(--accent)] opacity-70" />
                       </span>
                     )}
@@ -609,8 +683,8 @@ const TaskRow = React.memo(function TaskRow({
         )}
       </motion.div>
 
-      {/* Expanded subtasks below the row */}
-      {subtaskDisplay === 'expanded' && task.subtasks?.length > 0 && (
+      {/* Expanded subtasks below the row (always show in expanded mode for inline add) */}
+      {subtaskDisplay === 'expanded' && (
         <SubtaskExpandedList task={task} canUpdate={canUpdate} onUpdate={onUpdate} />
       )}
     </>
