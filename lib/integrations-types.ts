@@ -64,6 +64,8 @@ export const ALL_EVENTS: { value: WebhookEvent; labelKey: string; group: string 
 // ============================================
 // RECORDS (Firestore documents)
 // ============================================
+export type ConnectorDepth = 'full' | 'basic' | 'read_only' | 'stub';
+
 export interface IntegrationDef {
   provider: IntegrationProvider;
   name: string;
@@ -75,6 +77,7 @@ export interface IntegrationDef {
   webhookSupported: boolean;
   apiKeySupported: boolean;
   comingSoon?: boolean;
+  depth: ConnectorDepth;
 }
 
 export interface IntegrationRecord {

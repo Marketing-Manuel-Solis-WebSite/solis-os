@@ -1,3 +1,11 @@
+/** Reject javascript:, data:, vbscript: and other dangerous protocols */
+function isSafeUrl(url: string): boolean {
+  const lower = url.toLowerCase().trim();
+  if (/^(javascript|data|vbscript|file):/i.test(lower)) return false;
+  // Allow http(s), mailto, relative, anchor, tel
+  return /^(https?:\/\/|mailto:|tel:|\/|#|\.)/.test(lower) || !/^[a-z]+:/i.test(lower);
+}
+
 export function renderMarkdown(md: string): string {
   if (!md) return '';
   let html = md;
@@ -56,14 +64,23 @@ export function renderMarkdown(md: string): string {
   html = html.replace(/^\d+\.\s+(.+)$/gm, '<li class="doc-oli">$1</li>');
   html = html.replace(/((?:<li class="doc-oli">.*<\/li>\n?)+)/g, '<ol class="doc-ol">$1</ol>');
 
-  // Images (MUST come before links)
+  // Images (MUST come before links) — validate src to prevent javascript: injection
   html = html.replace(
     /!\[([^\]]*)\]\(([^)]+)\)/g,
-    '<figure class="doc-figure"><img src="$2" alt="$1" class="doc-img" loading="lazy" /><figcaption class="doc-figcaption">$1</figcaption></figure>'
+    (_m: string, alt: string, src: string) =>
+      isSafeUrl(src)
+        ? `<figure class="doc-figure"><img src="${src}" alt="${alt}" class="doc-img" loading="lazy" /><figcaption class="doc-figcaption">${alt}</figcaption></figure>`
+        : `<span class="doc-p">[image: ${alt}]</span>`
   );
 
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="doc-link" target="_blank" rel="noopener">$1</a>');
+  // Links — validate href to prevent javascript: injection
+  html = html.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    (_m: string, text: string, href: string) =>
+      isSafeUrl(href)
+        ? `<a href="${href}" class="doc-link" target="_blank" rel="noopener noreferrer">${text}</a>`
+        : `<span>${text}</span>`
+  );
 
   // Paragraphs (lines that aren't already wrapped)
   html = html.replace(/^(?!<[a-z]|$)(.+)$/gm, '<p class="doc-p">$1</p>');

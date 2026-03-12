@@ -11,15 +11,19 @@ interface ValidationResult {
 
 type TFn = (key: string, params?: Record<string, string | number>) => string;
 
-/** Strip HTML/script tags for XSS prevention */
+/** Strip HTML/script tags and dangerous protocols for XSS prevention */
 export function sanitizeValue(value: any): any {
   if (typeof value !== 'string') return value;
   return value
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
     .replace(/<\/?\w[^>]*>/g, '')
-    .replace(/on\w+\s*=\s*"[^"]*"/gi, '')
-    .replace(/on\w+\s*=\s*'[^']*'/gi, '')
+    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/on\w+\s*=\s*[^\s>]*/gi, '')
+    // Block dangerous protocols including unicode-escaped variants
+    .replace(/j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:/gi, '')
     .replace(/javascript\s*:/gi, '')
+    .replace(/vbscript\s*:/gi, '')
+    .replace(/data\s*:\s*text\/html/gi, '')
     .trim();
 }
 

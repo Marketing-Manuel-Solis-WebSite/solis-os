@@ -220,24 +220,38 @@ GUIDELINES:
 - Professional tone — suitable for the managing partner`,
 };
 
+// Max input sizes to prevent abuse
+const MAX_QUESTION_LENGTH = 10_000;
+const MAX_HISTORY_MESSAGES = 10;
+const MAX_HISTORY_CONTENT = 500;
+
 export async function POST(request: NextRequest) {
+  const start = Date.now();
+  let authedUser: any = null;
+
   try {
     const body = await request.json();
-    const { question, mode = 'chat', history = [] } = body;
+    let { question, mode = 'chat', history = [], feature = 'chat' } = body;
 
-    if (!question) {
+    if (!question || typeof question !== 'string' || !question.trim()) {
       return NextResponse.json({ error: 'Question required' }, { status: 400 });
     }
 
     // Auth check — require valid Firebase ID token
-    const authedUser = await authenticateRequest(request);
+    authedUser = await authenticateRequest(request);
     if (!authedUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const key = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    // Input validation — truncate oversized inputs
+    const truncated = question.length > MAX_QUESTION_LENGTH;
+    if (truncated) {
+      question = question.slice(0, MAX_QUESTION_LENGTH);
+    }
+
+    const key = process.env.GEMINI_API_KEY;
     if (!key) {
-      return NextResponse.json({ error: 'Gemini API key not configured. Add GEMINI_API_KEY to your .env file.' }, { status: 500 });
+      return NextResponse.json({ error: 'AI service not configured' }, { status: 503 });
     }
 
     const genAI = new GoogleGenerativeAI(key);
@@ -257,15 +271,16 @@ export async function POST(request: NextRequest) {
     const systemPrompt = MODE_PROMPTS[mode] || MODE_PROMPTS.chat;
     let fullPrompt = systemPrompt + '\n\n';
 
-    // Conversation history for context
-    const recentHistory = (history || []).slice(-10);
+    // Conversation history for context — bounded
+    const recentHistory = (history || []).slice(-MAX_HISTORY_MESSAGES);
     if (recentHistory.length > 0) {
       fullPrompt += '--- CONVERSATION HISTORY ---\n';
       for (const msg of recentHistory) {
+        const content = typeof msg.content === 'string' ? msg.content.slice(0, MAX_HISTORY_CONTENT) : '';
         if (msg.role === 'user') {
-          fullPrompt += `USER: ${msg.content}\n`;
+          fullPrompt += `USER: ${content}\n`;
         } else {
-          fullPrompt += `ASSISTANT: ${msg.content?.slice(0, 500)}...\n`;
+          fullPrompt += `ASSISTANT: ${content}...\n`;
         }
       }
       fullPrompt += '--- END HISTORY ---\n\n';
@@ -282,23 +297,56 @@ export async function POST(request: NextRequest) {
     const result = await model.generateContent(fullPrompt);
     const response = result.response;
     const text = response.text();
+    const durationMs = Date.now() - start;
+
+    // Estimate tokens (rough: ~4 chars per token for English/Spanish)
+    const estimatedInputTokens = Math.ceil(fullPrompt.length / 4);
+    const estimatedOutputTokens = Math.ceil(text.length / 4);
 
     return NextResponse.json({
       answer: text,
       mode,
-      tokens: text.length,
+      tokens: estimatedInputTokens + estimatedOutputTokens,
+      truncated,
+      durationMs,
+      usage: {
+        inputChars: fullPrompt.length,
+        outputChars: text.length,
+        estimatedInputTokens,
+        estimatedOutputTokens,
+      },
     });
   } catch (error: any) {
-    console.error('AI API error:', error);
+    const durationMs = Date.now() - start;
+    console.error('AI API error:', error?.message || error);
+
+    // Classify error for user-friendly message
     const is429 = error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('quota');
     if (is429) {
       return NextResponse.json(
-        { error: 'Rate limit exceeded. Please wait a minute and try again.' },
+        { error: 'Rate limit exceeded. Please wait a minute and try again.', code: 'RATE_LIMIT' },
         { status: 429 }
       );
     }
+
+    const isTimeout = error?.name === 'AbortError' || error?.message?.includes('timeout');
+    if (isTimeout) {
+      return NextResponse.json(
+        { error: 'AI request timed out. Try a simpler question or shorter context.', code: 'TIMEOUT' },
+        { status: 504 }
+      );
+    }
+
+    const isAuth = error?.status === 401 || error?.status === 403 || error?.message?.includes('API key');
+    if (isAuth) {
+      return NextResponse.json(
+        { error: 'AI service authentication failed. Contact admin.', code: 'AUTH_FAILED' },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
-      { error: error.message || 'AI processing failed. Verify your Gemini API key in .env' },
+      { error: 'AI processing failed. Try again or use a shorter prompt.', code: 'INTERNAL', durationMs },
       { status: 500 }
     );
   }

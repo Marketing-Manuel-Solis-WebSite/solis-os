@@ -42,3 +42,65 @@ export async function listNotionDatabases(): Promise<{ id: string; title: string
     id: d.id, title: d.title?.[0]?.plain_text || 'Untitled',
   }));
 }
+
+export async function createNotionPage(
+  databaseId: string,
+  properties: Record<string, any>,
+  content?: string,
+): Promise<{ id: string; url: string } | null> {
+  const token = await getNotionToken();
+  if (!token) return null;
+
+  const body: any = {
+    parent: { database_id: databaseId },
+    properties,
+  };
+
+  if (content) {
+    body.children = [
+      {
+        object: 'block',
+        type: 'paragraph',
+        paragraph: {
+          rich_text: [{ type: 'text', text: { content } }],
+        },
+      },
+    ];
+  }
+
+  const res = await fetch('https://api.notion.com/v1/pages', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) return null;
+  const data = await res.json();
+  return { id: data.id, url: data.url || '' };
+}
+
+export async function queryNotionDatabase(
+  databaseId: string,
+  filter?: any,
+  pageSize = 25,
+): Promise<{ id: string; properties: Record<string, any>; url: string }[]> {
+  const token = await getNotionToken();
+  if (!token) return [];
+
+  const body: any = { page_size: pageSize };
+  if (filter) body.filter = filter;
+
+  const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.results || []).map((r: any) => ({
+    id: r.id,
+    properties: r.properties || {},
+    url: r.url || '',
+  }));
+}

@@ -195,8 +195,19 @@ export default function PlannerPage() {
                   members={members}
                   selectedTask={selectedTask}
                   onSelect={setSelectedTask}
-                  onDateRangeChange={(taskId, startDate, endDate) => {
-                    updateTask(taskId, { startDate, dueDate: endDate }).then(load);
+                  onDateRangeChange={async (taskId, startDate, endDate) => {
+                    if (!can('task', 'update')) return;
+                    const task = tasks.find(t => t.id === taskId) || {};
+                    await updateTask(taskId, { startDate, dueDate: endDate });
+                    await afterTaskUpdated({
+                      taskId,
+                      task,
+                      field: 'dueDate',
+                      from: (task as any).dueDate,
+                      to: endDate,
+                      actor: { actorId: user!.uid, actorName: me!.displayName },
+                    });
+                    load();
                   }}
                 />
               )}

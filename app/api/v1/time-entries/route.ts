@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError, parsePagination } from '../middleware';
 import { createTimeEntry, countByOrg, queryTimeEntriesPaginated } from '@/lib/db-admin';
+import { afterTimeEntryCreatedAdmin } from '@/lib/timeentry-side-effects-admin';
 import { TimeEntryCreateSchema, formatZodError } from '@/lib/validation';
 
 export async function GET(req: NextRequest) {
@@ -39,9 +40,13 @@ export async function POST(req: NextRequest) {
     }
     const data = parsed.data;
 
-    const docRef = await createTimeEntry({
-      ...data,
-      createdBy: `api:${auth.context!.keyRecord.prefix}`,
+    const entryData = { ...data, createdBy: `api:${auth.context!.keyRecord.prefix}` };
+    const docRef = await createTimeEntry(entryData);
+
+    await afterTimeEntryCreatedAdmin({
+      entryId: docRef.id,
+      entry: entryData,
+      actor: { actorId: entryData.createdBy, actorName: 'API' },
     });
 
     return apiResponse({ id: docRef.id, ...data });

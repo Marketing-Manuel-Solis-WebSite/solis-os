@@ -122,6 +122,34 @@ export interface GoalUpdatedEvent {
 }
 
 // ============================================================
+// TIME ENTRY EVENTS
+// ============================================================
+
+export interface TimeEntryCreatedEvent {
+  type: 'time_entry.created';
+  entryId: string;
+  entry: Record<string, any>;
+  actor: ActorContext;
+}
+
+export interface TimeEntryUpdatedEvent {
+  type: 'time_entry.updated';
+  entryId: string;
+  entry: Record<string, any>;
+  field: string;
+  from: any;
+  to: any;
+  actor: ActorContext;
+}
+
+export interface TimeEntryDeletedEvent {
+  type: 'time_entry.deleted';
+  entryId: string;
+  entry: Record<string, any>;
+  actor: ActorContext;
+}
+
+// ============================================================
 // DOC EVENTS
 // ============================================================
 
@@ -193,6 +221,9 @@ export type DomainEvent =
   | TaskBulkDeletedEvent
   | GoalCreatedEvent
   | GoalUpdatedEvent
+  | TimeEntryCreatedEvent
+  | TimeEntryUpdatedEvent
+  | TimeEntryDeletedEvent
   | DocCreatedEvent
   | DocUpdatedEvent
   | DocDeletedEvent
@@ -245,6 +276,18 @@ export type DomainEvent =
 //   [critical]  logAction — audit log
 //   Note: cascade (targets, relations) handled by deleteGoal() in db.ts
 //   Note: goal.completed is NOT a separate event; tracked via status='completed'
+//
+// TIME_ENTRY.CREATED
+//   [critical]  logAction — audit log
+//   [important] syncTaskTimeSpent — update task.timeSpent aggregate
+//
+// TIME_ENTRY.UPDATED
+//   [critical]  logAction — audit log
+//   [important] syncTaskTimeSpent — recalc task.timeSpent
+//
+// TIME_ENTRY.DELETED
+//   [critical]  logAction — audit log
+//   [important] syncTaskTimeSpent — recalc task.timeSpent
 //
 // DOC.CREATED
 //   [critical]  logAction — audit log

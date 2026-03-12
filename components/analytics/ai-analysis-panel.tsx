@@ -1,7 +1,9 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { auth } from '@/lib/firebase';
-import type { PlatformData } from '@/app/app/analytics/page';
+import { useAuth } from '@/lib/auth';
+import type { AnalyticsSnapshot } from '@/app/app/analytics/page';
+import { checkAIUsage, incrementAIUsage, logAIAction } from '@/lib/ai-usage';
 import {
   Brain, Send, Loader2, Copy, Check, Sparkles, TrendingUp, Target, Globe,
   FileText, Users, BarChart3, Shield, Lightbulb, Zap, ArrowRight, ChevronDown,
@@ -9,9 +11,10 @@ import {
 } from 'lucide-react';
 
 interface Props {
-  data: PlatformData;
+  data: AnalyticsSnapshot;
   userId: string;
   userName: string;
+  userRole: string;
 }
 
 interface Analysis {
@@ -26,7 +29,8 @@ interface Analysis {
 const ANALYSIS_CATEGORIES = [
   {
     id: 'performance',
-    label: '📊 Performance',
+    label: 'Performance',
+    emoji: '\ud83d\udcca',
     color: '#3B82F6',
     analyses: [
       { id: 'overall', icon: TrendingUp, label: 'Overall Performance Report', prompt: 'Generate a comprehensive performance analysis of the entire organization. Cover task completion rates, productivity metrics, department comparisons, and identify strengths and weaknesses. Include specific recommendations for improvement.' },
@@ -36,7 +40,8 @@ const ANALYSIS_CATEGORIES = [
   },
   {
     id: 'team',
-    label: '👥 Team',
+    label: 'Team',
+    emoji: '\ud83d\udc65',
     color: '#3B82F6',
     analyses: [
       { id: 'workload', icon: Users, label: 'Workload Distribution', prompt: 'Analyze the workload distribution across all team members and departments. Who is overloaded? Who has capacity? Recommend optimal task redistribution.' },
@@ -46,17 +51,19 @@ const ANALYSIS_CATEGORIES = [
   },
   {
     id: 'market',
-    label: '🌐 Market',
+    label: 'Market',
+    emoji: '\ud83c\udf10',
     color: '#A855F7',
     analyses: [
       { id: 'competitive', icon: Globe, label: 'Competitive Analysis', prompt: 'Provide a comprehensive competitive analysis for an immigration law firm like ours. What are the top competitors doing differently? What market trends should we be aware of? What strategies can help us gain market share?' },
-      { id: 'marketing', icon: Target, label: 'Marketing Strategy', prompt: 'Based on our team structure (Marketing, Openers, Closers, Dirección departments), analyze our marketing funnel and recommend improvements. Cover digital marketing, social media, lead generation, and conversion optimization for an immigration law firm.' },
+      { id: 'marketing', icon: Target, label: 'Marketing Strategy', prompt: 'Based on our team structure (Marketing, Openers, Closers, Direccion departments), analyze our marketing funnel and recommend improvements. Cover digital marketing, social media, lead generation, and conversion optimization for an immigration law firm.' },
       { id: 'growth', icon: TrendingUp, label: 'Growth Opportunities', prompt: 'Identify growth opportunities for our immigration law firm. Consider new service areas, geographic expansion, technology adoption, partnership opportunities, and client acquisition strategies.' },
     ],
   },
   {
     id: 'operations',
-    label: '⚙️ Operations',
+    label: 'Operations',
+    emoji: '\u2699\ufe0f',
     color: '#22C55E',
     analyses: [
       { id: 'processes', icon: RefreshCw, label: 'Process Improvement', prompt: 'Analyze our operational processes based on task and document data. Identify areas for automation, standardization, and efficiency gains. Recommend specific process improvements for each department.' },
@@ -66,7 +73,8 @@ const ANALYSIS_CATEGORIES = [
   },
   {
     id: 'documents',
-    label: '📄 Documents',
+    label: 'Documents',
+    emoji: '\ud83d\udcc4',
     color: '#F59E0B',
     analyses: [
       { id: 'doc-review', icon: FileText, label: 'Document Portfolio Review', prompt: 'Review the entire document portfolio. What types of documents do we have? Are there gaps in our documentation? Which departments produce the most content? Recommend documents that should be created or improved.' },
@@ -76,86 +84,42 @@ const ANALYSIS_CATEGORIES = [
   },
 ];
 
-export default function AIAnalysisPanel({ data, userId, userName }: Props) {
+export default function AIAnalysisPanel({ data, userId, userName, userRole }: Props) {
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentQ, setCurrentQ] = useState('');
   const [customQ, setCustomQ] = useState('');
   const [selectedDept, setSelectedDept] = useState('all');
-  const [selectedDoc, setSelectedDoc] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedCategory, setExpandedCategory] = useState<string | null>('performance');
+  const [usageError, setUsageError] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [analyses.length]);
 
-  // Build platform context for AI
+  // Build platform context from pre-computed snapshot (NOT raw arrays)
   const buildContext = () => {
-    const tasks = data.tasks;
-    const docs = data.docs;
-    const members = data.members;
-    const teams = data.teams;
-
-    const completedTasks = tasks.filter((t: any) => t.status === 'done' || t.status === 'completed').length;
-    const overdue = tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done' && t.status !== 'completed').length;
-
-    // Build department summaries
-    const deptSummaries = teams.map((t: any) => {
-      const dTasks = tasks.filter((tk: any) => tk.teamId === t.id);
-      const dDocs = docs.filter((d: any) => d.teamId === t.id);
-      const dMembers = members.filter((m: any) => m.teamId === t.id);
-      const dCompleted = dTasks.filter((tk: any) => tk.status === 'done' || tk.status === 'completed').length;
-      return `- ${t.name} (${t.icon}): ${dMembers.length} members, ${dTasks.length} tasks (${dCompleted} completed, ${dTasks.length > 0 ? Math.round((dCompleted / dTasks.length) * 100) : 0}% rate), ${dDocs.length} documents`;
+    const deptSummaries = data.departments.map(dept => {
+      const dm = data.deptMetrics[dept.id] || { tasks: 0, completed: 0, rate: 0, docs: 0, members: 0, words: 0 };
+      return `- ${dept.name} (${dept.icon}): ${dm.members} members, ${dm.tasks} tasks (${dm.completed} completed, ${dm.rate}% rate), ${dm.docs} documents (${dm.words.toLocaleString()} words)`;
     }).join('\n');
 
-    // Task status breakdown
-    const statusBreak: Record<string, number> = {};
-    tasks.forEach((t: any) => { statusBreak[t.status || 'unknown'] = (statusBreak[t.status || 'unknown'] || 0) + 1; });
-    const statusStr = Object.entries(statusBreak).map(([s, c]) => `${s}: ${c}`).join(', ');
+    const statusStr = Object.entries(data.tasksByStatus).map(([s, c]) => `${s}: ${c}`).join(', ');
+    const prioStr = Object.entries(data.tasksByPriority).map(([p, c]) => `${p}: ${c}`).join(', ');
+    const roleStr = Object.entries(data.membersByRole).map(([r, c]) => `${r}: ${c}`).join(', ');
+    const docList = data.topDocuments.map(d => `"${d.title}" (${d.wordCount} words, ${d.visibility}, ${d.teamName})`).join('\n  ');
 
-    // Priority breakdown
-    const prioBreak: Record<string, number> = {};
-    tasks.forEach((t: any) => { prioBreak[t.priority || 'medium'] = (prioBreak[t.priority || 'medium'] || 0) + 1; });
-    const prioStr = Object.entries(prioBreak).map(([p, c]) => `${p}: ${c}`).join(', ');
-
-    // Member roles
-    const roleBreak: Record<string, number> = {};
-    members.forEach((m: any) => { roleBreak[m.role || 'member'] = (roleBreak[m.role || 'member'] || 0) + 1; });
-    const roleStr = Object.entries(roleBreak).map(([r, c]) => `${r}: ${c}`).join(', ');
-
-    // Document titles
-    const docList = docs.slice(0, 20).map((d: any) => `"${d.title}" (${d.wordCount || 0} words, ${d.visibility}, ${teams.find((t: any) => t.id === d.teamId)?.name || 'unassigned'})`).join('\n  ');
-
-    // Selected department context
     let deptContext = '';
     if (selectedDept !== 'all') {
-      const team = teams.find((t: any) => t.id === selectedDept);
-      if (team) {
-        const dTasks = tasks.filter((tk: any) => tk.teamId === team.id);
-        const dDocs = docs.filter((d: any) => d.teamId === team.id);
-        const dMembers = members.filter((m: any) => m.teamId === team.id);
-        deptContext = `\n\n--- FOCUSED DEPARTMENT: ${team.name} ---
-Members: ${dMembers.map((m: any) => `${m.displayName} (${m.role}, ${m.hierarchyLevel || 'member'})`).join(', ')}
-Tasks: ${dTasks.map((t: any) => `"${t.title || 'Untitled'}" [${t.status}/${t.priority}]`).slice(0, 15).join(', ')}
-Documents: ${dDocs.map((d: any) => `"${d.title}" (${d.wordCount || 0}w)`).slice(0, 10).join(', ')}`;
-      }
-    }
-
-    // Selected document context
-    let docContext = '';
-    if (selectedDoc) {
-      const doc = docs.find((d: any) => d.id === selectedDoc);
-      if (doc) {
-        docContext = `\n\n--- FOCUSED DOCUMENT ---
-Title: ${doc.title}
-Content (first 2000 chars): ${(doc.content || '').slice(0, 2000)}
-Word Count: ${doc.wordCount || 0}
-Created by: ${doc.createdByName}
-Visibility: ${doc.visibility}
-Department: ${teams.find((t: any) => t.id === doc.teamId)?.name || 'none'}
-Tags: ${(doc.tags || []).join(', ')}`;
+      const dept = data.departments.find(d => d.id === selectedDept);
+      const dm = data.deptMetrics[selectedDept];
+      if (dept && dm) {
+        deptContext = `\n\n--- FOCUSED DEPARTMENT: ${dept.name} ---
+Tasks: ${dm.tasks} total, ${dm.completed} completed (${dm.rate}%)
+Documents: ${dm.docs} (${dm.words.toLocaleString()} words)
+Members: ${dm.members}`;
       }
     }
 
@@ -163,35 +127,52 @@ Tags: ${(doc.tags || []).join(', ')}`;
 === SOLIS CENTER — PLATFORM DATA CONTEXT ===
 Organization: Law Office of Manuel Solis (Immigration Law)
 Platform: Solis Center (Internal workspace with tasks, docs, chat, AI)
-Analysis Date: ${new Date().toLocaleDateString()}
+Analysis Date: ${new Date(data.computedAt).toLocaleDateString()}
 Analyzed by: ${userName}
 
 --- SUMMARY ---
-Total Members: ${members.length} (Roles: ${roleStr})
-Total Tasks: ${tasks.length} (Completed: ${completedTasks}, Overdue: ${overdue}, Rate: ${tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0}%)
-Total Documents: ${docs.length} (Total words: ${docs.reduce((s: number, d: any) => s + (d.wordCount || 0), 0).toLocaleString()})
-Departments: ${teams.length}
-Channels: ${data.channels.length}
-AI Conversations: ${data.aiConversations.length}
-Audit Log Events: ${data.auditLogs.length}
+Total Members: ${data.totalMembers} (Active: ${data.activeMembers}, Roles: ${roleStr})
+Total Tasks: ${data.totalTasks} (Completed: ${data.completedTasks}, Overdue: ${data.overdueTasks}, Rate: ${data.completionRate}%)
+Total Documents: ${data.totalDocs} (Total words: ${data.totalWords.toLocaleString()})
+Total Goals: ${data.totalGoals} (At risk: ${data.goalsAtRisk}, Avg progress: ${data.avgGoalProgress}%)
+Departments: ${data.departments.length}
+Channels: ${data.totalChannels}
+AI Conversations: ${data.aiConversationsTotal}
+Actions (7d): ${data.actionsLast7d} | Actions (30d): ${data.actionsLast30d}
+Hours logged (7d): ${data.totalHoursLast7d}h | Hours (30d): ${data.totalHoursLast30d}h
+Billable hours (30d): ${data.billableHoursLast30d}h | Non-billable: ${data.nonBillableHoursLast30d}h
 
 --- TASK BREAKDOWN ---
 By Status: ${statusStr}
 By Priority: ${prioStr}
+Tasks created (7d): ${data.createdLast7d} | Completed (7d): ${data.completedLast7d}
+Tasks created (30d): ${data.createdLast30d} | Completed (30d): ${data.completedLast30d}
 
 --- DEPARTMENT DETAILS ---
 ${deptSummaries}
 
---- DOCUMENTS (top 20) ---
+--- TOP DOCUMENTS ---
   ${docList || 'No documents yet'}
-${deptContext}${docContext}
+${deptContext}
 === END CONTEXT ===
 `;
   };
 
   const runAnalysis = async (question: string, type: string = 'custom') => {
+    setUsageError('');
+
+    // Check AI usage before sending
+    try {
+      const usage = await checkAIUsage(userId, userRole, 'research');
+      if (!usage.allowed) {
+        setUsageError(`Limite diario alcanzado (${usage.used}/${usage.limit} unidades). Intenta manana.`);
+        return;
+      }
+    } catch {}
+
     setLoading(true);
     setCurrentQ(question);
+    const start = Date.now();
 
     try {
       const context = buildContext();
@@ -204,24 +185,52 @@ ${deptContext}${docContext}
         body: JSON.stringify({
           question: fullPrompt,
           mode: 'research',
+          feature: 'analytics',
         }),
       });
 
       const result = await res.json();
-      const answer = result.answer || result.error || 'No response from AI.';
+      const durationMs = Date.now() - start;
 
-      setAnalyses(prev => [...prev, {
-        id: `a-${Date.now()}`,
-        type,
-        question,
-        answer,
-        timestamp: new Date(),
-      }]);
+      if (!res.ok) {
+        // Surface classified error from API
+        const code = result.code || '';
+        let errorMsg = result.error || 'AI processing failed';
+        if (code === 'RATE_LIMIT') errorMsg = 'Limite de API excedido. Espera un minuto e intenta de nuevo.';
+        else if (code === 'TIMEOUT') errorMsg = 'La consulta tardo demasiado. Intenta con una pregunta mas corta.';
+        else if (code === 'AUTH_FAILED') errorMsg = 'Error de autenticacion con el servicio AI. Contacta al admin.';
+
+        setAnalyses(prev => [...prev, {
+          id: `a-${Date.now()}`, type: 'error', question,
+          answer: `Error: ${errorMsg}`, timestamp: new Date(),
+        }]);
+
+        logAIAction({
+          userId, userName, feature: 'analytics', mode: 'research',
+          questionLength: question.length, contextLength: fullPrompt.length,
+          responseLength: 0, truncated: false, durationMs,
+          success: false, error: errorMsg, estimatedTokens: 0,
+        }).catch(() => {});
+      } else {
+        const answer = result.answer || 'No response from AI.';
+
+        setAnalyses(prev => [...prev, {
+          id: `a-${Date.now()}`, type, question, answer, timestamp: new Date(),
+        }]);
+
+        // Increment usage + log
+        const tokens = result.usage?.estimatedInputTokens + result.usage?.estimatedOutputTokens || 0;
+        incrementAIUsage(userId, 'research', tokens).catch(() => {});
+        logAIAction({
+          userId, userName, feature: 'analytics', mode: 'research',
+          questionLength: question.length, contextLength: fullPrompt.length,
+          responseLength: answer.length, truncated: result.truncated || false,
+          durationMs, success: true, estimatedTokens: tokens,
+        }).catch(() => {});
+      }
     } catch (err: any) {
       setAnalyses(prev => [...prev, {
-        id: `a-${Date.now()}`,
-        type: 'error',
-        question,
+        id: `a-${Date.now()}`, type: 'error', question,
         answer: `Error: ${err.message || 'Failed to connect to AI'}`,
         timestamp: new Date(),
       }]);
@@ -243,9 +252,15 @@ ${deptContext}${docContext}
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  // URL validation — reject javascript:/data:/vbscript: protocols
+  const isSafeUrl = (url: string): boolean => {
+    const lower = url.toLowerCase().trim();
+    if (/^(javascript|data|vbscript|file):/i.test(lower)) return false;
+    return /^(https?:\/\/|mailto:|tel:|\/|#|\.)/.test(lower) || !/^[a-z]+:/i.test(lower);
+  };
+
   // Markdown renderer (simplified) — HTML is escaped first to prevent XSS
   const renderMd = (text: string): string => {
-    // Escape HTML entities BEFORE any markdown transformation
     let safe = text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -260,8 +275,10 @@ ${deptContext}${docContext}
       .replace(/^# (.+)$/gm, '<h1 class="ai-h1">$1</h1>')
       .replace(/\*\*(.+?)\*\*/g, '<strong class="ai-bold">$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/^> (.+)$/gm, '<blockquote class="ai-blockquote">$1</blockquote>')
+      .replace(/^&gt; (.+)$/gm, '<blockquote class="ai-blockquote">$1</blockquote>')
       .replace(/^---$/gm, '<hr class="ai-hr" />')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m: string, txt: string, href: string) =>
+        isSafeUrl(href) ? `<a href="${href}" target="_blank" rel="noopener noreferrer">${txt}</a>` : `<span>${txt}</span>`)
       .replace(/^\|(.+)\|$/gm, (match) => {
         const cells = match.split('|').filter(Boolean).map(c => c.trim());
         if (cells.every(c => /^[-:]+$/.test(c))) return '';
@@ -277,6 +294,14 @@ ${deptContext}${docContext}
 
   return (
     <div className="space-y-6">
+      {/* Usage warning */}
+      {usageError && (
+        <div className="px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
+          <span className="text-[13px] text-amber-300">{usageError}</span>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap anim-slide" style={{ animationDelay: '80ms' }}>
         <div className="flex items-center gap-2">
@@ -285,14 +310,10 @@ ${deptContext}${docContext}
         </div>
         <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)} className="select-dark h-8 text-sm">
           <option value="all">All Departments</option>
-          {data.teams.map((t: any) => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
+          {data.departments.map(d => <option key={d.id} value={d.id}>{d.icon} {d.name}</option>)}
         </select>
-        <select value={selectedDoc} onChange={e => setSelectedDoc(e.target.value)} className="select-dark h-8 text-sm max-w-xs">
-          <option value="">All Documents</option>
-          {data.docs.map((d: any) => <option key={d.id} value={d.id}>📄 {d.title || 'Untitled'}</option>)}
-        </select>
-        {(selectedDept !== 'all' || selectedDoc) && (
-          <button onClick={() => { setSelectedDept('all'); setSelectedDoc(''); }} className="text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)]">Clear filters</button>
+        {selectedDept !== 'all' && (
+          <button onClick={() => setSelectedDept('all')} className="text-[12px] text-[var(--text-muted)] hover:text-[var(--text-secondary)]">Clear filter</button>
         )}
       </div>
 
@@ -302,13 +323,13 @@ ${deptContext}${docContext}
           <div key={cat.id} className="rounded-xl shadow-card bg-[var(--bg-elevated)] overflow-hidden">
             <button onClick={() => setExpandedCategory(expandedCategory === cat.id ? null : cat.id)}
               className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-white/[0.01] transition">
-              <span className="text-lg">{cat.label.split(' ')[0]}</span>
-              <span className="text-sm font-semibold" style={{ color: cat.color }}>{cat.label.split(' ').slice(1).join(' ')}</span>
+              <span className="text-lg">{cat.emoji}</span>
+              <span className="text-sm font-semibold" style={{ color: cat.color }}>{cat.label}</span>
               <span className="text-[12px] text-[var(--text-muted)] ml-2">{cat.analyses.length} analyses</span>
               <ChevronDown className={`h-4 w-4 text-[var(--text-muted)] ml-auto transition-transform ${expandedCategory === cat.id ? 'rotate-180' : ''}`} />
             </button>
             {expandedCategory === cat.id && (
-              <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-3 gap-2  pt-3">
+              <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-3 gap-2 pt-3">
                 {cat.analyses.map(a => (
                   <button key={a.id} onClick={() => runAnalysis(a.prompt, a.id)} disabled={loading}
                     className="flex items-start gap-3 p-4 rounded-xl bg-[var(--bg-base)] hover:bg-[var(--bg-hover)] text-left transition-all duration-200 group disabled:opacity-50">
@@ -330,7 +351,7 @@ ${deptContext}${docContext}
         <div className="flex items-center gap-2 mb-3">
           <Sparkles className="h-4 w-4 text-purple-400" />
           <span className="text-sm font-bold text-purple-400">Custom Analysis</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">AI has full platform context</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">Server-computed context</span>
         </div>
         <div className="flex gap-2">
           <textarea value={customQ} onChange={e => setCustomQ(e.target.value)} placeholder="Ask anything about your organization, team, market, operations, documents..."
@@ -344,7 +365,7 @@ ${deptContext}${docContext}
         </div>
         <div className="flex gap-2 mt-2 flex-wrap">
           {[
-            '¿Cómo podemos mejorar la productividad del equipo?',
+            'Como podemos mejorar la productividad del equipo?',
             'What are our biggest risks right now?',
             'Analiza nuestra estrategia de marketing vs competidores',
             'Recommend process automations',
@@ -363,9 +384,8 @@ ${deptContext}${docContext}
             <BarChart3 className="h-4 w-4 text-[var(--accent)]" />
             Analysis Results ({analyses.length})
           </h3>
-          {analyses.map((a, i) => (
+          {analyses.map((a) => (
             <div key={a.id} className="rounded-xl shadow-card bg-[var(--bg-base)] overflow-hidden anim-fade">
-              {/* Question header */}
               <div className="px-5 py-3 bg-[#0A0E16] flex items-center gap-3">
                 <Brain className="h-4 w-4 text-purple-400 shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -378,7 +398,6 @@ ${deptContext}${docContext}
                   {copiedId === a.id ? 'Copied!' : 'Copy'}
                 </button>
               </div>
-              {/* Answer */}
               <div className="p-5 ai-content" dangerouslySetInnerHTML={{ __html: renderMd(a.answer) }} />
             </div>
           ))}

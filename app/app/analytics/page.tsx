@@ -1,97 +1,55 @@
 'use client';
 import { useAuth } from '@/lib/auth';
+import { auth } from '@/lib/firebase';
 import { useEffect, useState, useCallback } from 'react';
-import { getTasks, getDocuments, getMembers, getAuditLogs, getTeams, getChannels } from '@/lib/db';
-import { getAIConversations } from '@/lib/ai-db';
 import { useToast } from '@/components/notifications/toast-provider';
 import StatsDashboard from '@/components/analytics/stats-dashboard';
 import AIAnalysisPanel from '@/components/analytics/ai-analysis-panel';
 import {
-  BarChart3, TrendingUp, Brain, ChevronRight, Sparkles, RefreshCw,
+  BarChart3, Brain, RefreshCw,
   Users, FileText, CheckSquare, MessageSquare, Activity, Zap, AlertTriangle
 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
+import type { AnalyticsSnapshot } from '@/lib/analytics-snapshot';
 
-export interface PlatformData {
-  tasks: any[];
-  docs: any[];
-  members: any[];
-  teams: any[];
-  channels: any[];
-  auditLogs: any[];
-  aiConversations: any[];
-  loadedAt: Date;
-}
+export type { AnalyticsSnapshot };
 
 export default function AnalyticsPage() {
-  const { user, me, isAdmin, teams, can, canSeeAllTeams } = useAuth();
+  const { user, me } = useAuth();
   const toast = useToast();
   const { t } = useI18n();
-  const [data, setData] = useState<PlatformData | null>(null);
+  const [data, setData] = useState<AnalyticsSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'dashboard' | 'ai'>('dashboard');
   const [refreshing, setRefreshing] = useState(false);
-  const [truncatedCollections, setTruncatedCollections] = useState<string[]>([]);
 
-  const loadAll = useCallback(async () => {
+  const loadSnapshot = useCallback(async () => {
     if (!user) return;
     try {
-      const [tasksRes, docsRes, members, teamsList, channelsRes, auditLogsRes, aiConvos] = await Promise.all([
-        getTasks('__all__').catch(() => ({ items: [], hasMore: false })),
-        getDocuments('__all__').catch(() => ({ items: [], hasMore: false })),
-        getMembers().catch(() => []),
-        getTeams().catch(() => []),
-        getChannels('__all__').catch(() => ({ items: [], hasMore: false })),
-        getAuditLogs().catch(() => ({ items: [], hasMore: false })),
-        getAIConversations(user.uid).catch(() => []),
-      ]);
-      const truncated: string[] = [];
-      if (tasksRes.hasMore) truncated.push(t('analytics.tasks'));
-      if (docsRes.hasMore) truncated.push(t('analytics.documents'));
-      if (channelsRes.hasMore) truncated.push(t('analytics.channels'));
-      if (auditLogsRes.hasMore) truncated.push(t('analytics.activity'));
-      setTruncatedCollections(truncated);
-      setData({
-        tasks: tasksRes.items as any[],
-        docs: docsRes.items as any[],
-        members: members as any[],
-        teams: teamsList as any[],
-        channels: channelsRes.items as any[],
-        auditLogs: auditLogsRes.items as any[],
-        aiConversations: aiConvos as any[],
-        loadedAt: new Date(),
+      const idToken = await auth.currentUser?.getIdToken();
+      const res = await fetch('/api/analytics/snapshot', {
+        headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : {},
       });
+      if (!res.ok) throw new Error('Failed to load analytics');
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setData(json.data);
     } catch (err) {
       toast.error(t('analytics.loadError'), t('analytics.loadErrorMsg'));
     }
     setLoading(false);
   }, [user]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => { loadSnapshot(); }, [loadSnapshot]);
 
   const refresh = async () => {
     setRefreshing(true);
-    await loadAll();
+    await loadSnapshot();
     setRefreshing(false);
   };
 
-  // Quick stats
-  const stats = data ? {
-    totalTasks: data.tasks.length,
-    completedTasks: data.tasks.filter((t: any) => t.status === 'done' || t.status === 'completed').length,
-    overdueTasks: data.tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'done' && t.status !== 'completed').length,
-    totalDocs: data.docs.length,
-    totalMembers: data.members.length,
-    activeMembers: data.members.filter((m: any) => m.active !== false).length,
-    totalChannels: data.channels.length,
-    totalMessages: data.auditLogs.length,
-    aiConversations: data.aiConversations.length,
-    departments: data.teams.length,
-  } : null;
-
   return (
     <div className="flex h-[calc(100vh-64px)]">
-      {/* Main content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-6 max-w-7xl mx-auto">
           {/* Header */}
@@ -102,7 +60,7 @@ export default function AnalyticsPage() {
                 <span className="text-[12px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--accent)] font-semibold">{t('analytics.aiPowered')}</span>
               </h1>
               <p className="text-base text-[var(--text-muted)] mt-1">
-                {data ? t('analytics.lastUpdated', { time: data.loadedAt.toLocaleTimeString() }) : t('analytics.loadingData')}
+                {data ? t('analytics.lastUpdated', { time: new Date(data.computedAt).toLocaleTimeString() }) : t('analytics.loadingData')}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -123,16 +81,16 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          {/* Quick stats bar */}
-          {stats && (
+          {/* Quick stats bar — from server-computed snapshot */}
+          {data && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6 anim-slide" style={{ animationDelay: '40ms' }}>
               {[
-                { label: t('analytics.tasks'), value: stats.totalTasks, sub: t('analytics.tasksDone', { n: stats.completedTasks }), icon: CheckSquare, color: '#22C55E' },
-                { label: t('analytics.documents'), value: stats.totalDocs, sub: t('analytics.total'), icon: FileText, color: '#3B82F6' },
-                { label: t('analytics.members'), value: stats.activeMembers, sub: t('analytics.ofTotal', { n: stats.totalMembers }), icon: Users, color: 'var(--accent)' },
-                { label: t('analytics.channels'), value: stats.totalChannels, sub: t('analytics.active'), icon: MessageSquare, color: '#8B5CF6' },
-                { label: t('analytics.activity'), value: stats.totalMessages, sub: t('analytics.events'), icon: Activity, color: '#F59E0B' },
-                { label: t('analytics.aiChats'), value: stats.aiConversations, sub: t('analytics.conversations'), icon: Zap, color: '#EC4899' },
+                { label: t('analytics.tasks'), value: data.totalTasks, sub: t('analytics.tasksDone', { n: data.completedTasks }), icon: CheckSquare, color: '#22C55E' },
+                { label: t('analytics.documents'), value: data.totalDocs, sub: t('analytics.total'), icon: FileText, color: '#3B82F6' },
+                { label: t('analytics.members'), value: data.activeMembers, sub: t('analytics.ofTotal', { n: data.totalMembers }), icon: Users, color: 'var(--accent)' },
+                { label: t('analytics.channels'), value: data.totalChannels, sub: t('analytics.active'), icon: MessageSquare, color: '#8B5CF6' },
+                { label: t('analytics.activity'), value: data.actionsLast30d, sub: t('analytics.events'), icon: Activity, color: '#F59E0B' },
+                { label: t('analytics.aiChats'), value: data.aiConversationsTotal, sub: t('analytics.conversations'), icon: Zap, color: '#EC4899' },
               ].map((s, i) => (
                 <div key={s.label} className="p-4 rounded-xl bg-[var(--bg-secondary)] shadow-card anim-slide" style={{ animationDelay: `${(i + 2) * 40}ms` }}>
                   <div className="flex items-center justify-between mb-2">
@@ -146,16 +104,6 @@ export default function AnalyticsPage() {
             </div>
           )}
 
-          {/* Truncation warning */}
-          {truncatedCollections.length > 0 && !loading && (
-            <div className="mb-4 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0" />
-              <span className="text-[13px] text-amber-300">
-                {t('analytics.dataTruncated', { collections: truncatedCollections.join(', ') })}
-              </span>
-            </div>
-          )}
-
           {loading ? (
             <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="h-48 skeleton rounded-lg" />)}</div>
           ) : !data ? (
@@ -163,7 +111,7 @@ export default function AnalyticsPage() {
           ) : (
             <>
               {view === 'dashboard' && <StatsDashboard data={data} />}
-              {view === 'ai' && <AIAnalysisPanel data={data} userId={user?.uid || ''} userName={me?.displayName || ''} />}
+              {view === 'ai' && <AIAnalysisPanel data={data} userId={user?.uid || ''} userName={me?.displayName || ''} userRole={me?.role || 'member'} />}
             </>
           )}
         </div>

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError } from '../../middleware';
 import { getTimeEntry, updateTimeEntry, deleteTimeEntry } from '@/lib/db-admin';
+import { afterTimeEntryUpdatedAdmin, afterTimeEntryDeletedAdmin } from '@/lib/timeentry-side-effects-admin';
 import { TimeEntryUpdateSchema, formatZodError } from '@/lib/validation';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -35,6 +36,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const data = parsed.data;
     await updateTimeEntry(id, data);
 
+    // Dispatch side effects — use first changed field as representative
+    const changedField = Object.keys(data)[0] || 'hours';
+    await afterTimeEntryUpdatedAdmin({
+      entryId: id,
+      entry: { ...(entry as any), ...data },
+      field: changedField,
+      from: (entry as any)?.[changedField],
+      to: (data as any)[changedField],
+      actor: { actorId: auth.context!.keyRecord.prefix, actorName: 'API' },
+    });
+
     return apiResponse({ id, ...data });
   } catch {
     return apiError('Internal error', 500);
@@ -51,6 +63,12 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!entry) return apiError('Time entry not found', 404);
 
     await deleteTimeEntry(id);
+
+    await afterTimeEntryDeletedAdmin({
+      entryId: id,
+      entry: entry as any,
+      actor: { actorId: auth.context!.keyRecord.prefix, actorName: 'API' },
+    });
 
     return apiResponse({ deleted: true, id });
   } catch {

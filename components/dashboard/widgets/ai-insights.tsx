@@ -2,8 +2,9 @@
 import { memo, useState, useCallback, useEffect } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { WidgetShell } from '../widget-shell';
-import { Sparkles, RefreshCw, Brain } from 'lucide-react';
+import { Sparkles, RefreshCw, Brain, AlertTriangle } from 'lucide-react';
 import { generateDashboardInsights, type DashboardMetrics } from '@/lib/dashboard-ai';
+import { checkAIUsage, incrementAIUsage, logAIAction } from '@/lib/ai-usage';
 import type { WidgetProps } from '@/lib/dashboard-types';
 
 function AIInsightsInner({ tasks, goals, teams, user, me, activeTeamId }: WidgetProps) {
@@ -14,9 +15,22 @@ function AIInsightsInner({ tasks, goals, teams, user, me, activeTeamId }: Widget
   const [hasLoaded, setHasLoaded] = useState(false);
 
   const fetchInsights = useCallback(async () => {
-    if (!me) return;
+    if (!me || !user) return;
+
+    // Check AI usage limits before calling
+    try {
+      const usage = await checkAIUsage(user.uid, me.role || 'member', 'chat');
+      if (!usage.allowed) {
+        setError(`Limite diario alcanzado (${usage.used}/${usage.limit}).`);
+        setHasLoaded(true);
+        return;
+      }
+    } catch {}
+
     setLoading(true);
     setError('');
+    const start = Date.now();
+
     try {
       const completedTasks = tasks.filter(tk => tk.status === 'done' || tk.status === 'completed').length;
       const overdueTasks = tasks.filter(tk => {
@@ -39,14 +53,39 @@ function AIInsightsInner({ tasks, goals, teams, user, me, activeTeamId }: Widget
       };
 
       const result = await generateDashboardInsights(metrics);
+      const durationMs = Date.now() - start;
       setText(result.trim());
       setHasLoaded(true);
-    } catch {
-      setError('No se pudo conectar con el asistente. Intenta de nuevo.');
+
+      // Track usage + log
+      const estimatedTokens = Math.ceil(result.length / 4);
+      incrementAIUsage(user.uid, 'chat', estimatedTokens).catch(() => {});
+      logAIAction({
+        userId: user.uid, userName: me.displayName || '', feature: 'dashboard', mode: 'chat',
+        questionLength: 200, contextLength: 0, responseLength: result.length,
+        truncated: false, durationMs, success: true, estimatedTokens,
+      }).catch(() => {});
+    } catch (err: any) {
+      const durationMs = Date.now() - start;
+      // Surface classified errors
+      if (err.message === 'RATE_LIMIT') {
+        setError('Limite de API excedido. Espera un minuto.');
+      } else if (err.message === 'TIMEOUT') {
+        setError('La consulta tardo demasiado. Intenta de nuevo.');
+      } else {
+        setError('No se pudo conectar con el asistente. Intenta de nuevo.');
+      }
+
+      logAIAction({
+        userId: user.uid, userName: me.displayName || '', feature: 'dashboard', mode: 'chat',
+        questionLength: 200, contextLength: 0, responseLength: 0,
+        truncated: false, durationMs, success: false, error: err.message,
+        estimatedTokens: 0,
+      }).catch(() => {});
     } finally {
       setLoading(false);
     }
-  }, [tasks, goals, teams, me]);
+  }, [tasks, goals, teams, me, user]);
 
   useEffect(() => {
     if (!hasLoaded && tasks.length > 0 && me) {
@@ -73,7 +112,7 @@ function AIInsightsInner({ tasks, goals, teams, user, me, activeTeamId }: Widget
       {error ? (
         <div className="flex flex-col items-center justify-center h-full gap-3 py-6">
           <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
-            <Sparkles className="h-5 w-5 text-red-400" />
+            <AlertTriangle className="h-5 w-5 text-amber-400" />
           </div>
           <p className="text-[13px] text-[var(--text-muted)] text-center max-w-[200px]">{error}</p>
           <button

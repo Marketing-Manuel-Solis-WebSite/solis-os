@@ -5,6 +5,7 @@ import { Clock, Plus, ChevronLeft, ChevronRight, Play, Loader2 } from 'lucide-re
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { getTimeEntriesByDateRange, createTimeEntry, deleteTimeEntry, getTasks } from '@/lib/db';
+import { afterTimeEntryCreated, afterTimeEntryDeleted } from '@/lib/timeentry-side-effects';
 import TimesheetTable from '@/components/timesheets/timesheet-table';
 import TimeEntryModal from '@/components/timesheets/time-entry-modal';
 import { TimerFloating, useTimer } from '@/components/timesheets/timer-widget';
@@ -46,18 +47,32 @@ export default function TimesheetsPage() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleSave = async (data: any) => {
-    await createTimeEntry({
+    const entryData = {
       ...data,
       userId: user?.uid || '',
       userName: me?.displayName || '',
       teamId: me?.teamId || '',
       createdBy: user?.uid || '',
+    };
+    const ref = await createTimeEntry(entryData);
+    await afterTimeEntryCreated({
+      entryId: ref.id,
+      entry: entryData,
+      actor: { actorId: user?.uid || '', actorName: me?.displayName || '' },
     });
     loadData();
   };
 
   const handleDelete = async (id: string) => {
+    const entry = entries.find(e => e.id === id);
     await deleteTimeEntry(id);
+    if (entry) {
+      await afterTimeEntryDeleted({
+        entryId: id,
+        entry,
+        actor: { actorId: user?.uid || '', actorName: me?.displayName || '' },
+      });
+    }
     loadData();
   };
 
@@ -66,19 +81,28 @@ export default function TimesheetsPage() {
     setShowModal(true);
   };
 
+  const [timerStartMode, setTimerStartMode] = useState(false);
+
   const handleTimerStart = () => {
-    // Open modal to select task, then start
+    setTimerStartMode(true);
     setShowModal(true);
   };
 
+  const handleTimerTaskSelected = (data: any) => {
+    timer.start(data.taskId, data.taskTitle);
+    setTimerStartMode(false);
+  };
+
   const handleTimerStop = async () => {
+    const taskId = timer.taskId;
+    const taskTitle = timer.taskTitle;
     const elapsed = timer.stop();
     const hours = Math.floor(elapsed / 3600);
     const minutes = Math.floor((elapsed % 3600) / 60);
     if (hours > 0 || minutes > 0) {
-      await createTimeEntry({
-        taskId: '', // Will need to be from timer context
-        taskTitle: timer.taskTitle,
+      const entryData = {
+        taskId,
+        taskTitle,
         date: new Date().toISOString().split('T')[0],
         hours,
         minutes,
@@ -88,6 +112,12 @@ export default function TimesheetsPage() {
         userName: me?.displayName || '',
         teamId: me?.teamId || '',
         createdBy: user?.uid || '',
+      };
+      const ref = await createTimeEntry(entryData);
+      await afterTimeEntryCreated({
+        entryId: ref.id,
+        entry: entryData,
+        actor: { actorId: user?.uid || '', actorName: me?.displayName || '' },
       });
       loadData();
     }
@@ -205,10 +235,11 @@ export default function TimesheetsPage() {
       {/* Entry modal */}
       <TimeEntryModal
         open={showModal}
-        onClose={() => setShowModal(false)}
-        onSave={handleSave}
+        onClose={() => { setShowModal(false); setTimerStartMode(false); }}
+        onSave={timerStartMode ? handleTimerTaskSelected : handleSave}
         tasks={tasks}
         defaultDate={modalDate || undefined}
+        timerMode={timerStartMode}
       />
 
       {/* Timer widget */}

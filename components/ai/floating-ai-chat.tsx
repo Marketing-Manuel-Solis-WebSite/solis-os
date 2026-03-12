@@ -5,6 +5,7 @@ import { auth } from '@/lib/firebase';
 import { useI18n } from '@/lib/i18n';
 import { usePathname, useRouter } from 'next/navigation';
 import { getTasks, getGoals } from '@/lib/db';
+import { checkAIUsage, incrementAIUsage, logAIAction } from '@/lib/ai-usage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X, ArrowUp, Loader2, Maximize2 } from 'lucide-react';
 import AIMarkdown from './ai-markdown';
@@ -83,14 +84,25 @@ export default function FloatingAIChat() {
   if (isAIPage) return null;
 
   const handleSend = async () => {
-    if (!text.trim() || loading) return;
+    if (!text.trim() || loading || !user || !me) return;
     const question = text.trim();
     setText('');
+
+    // Check AI usage limits
+    try {
+      const usage = await checkAIUsage(user.uid, me.role || 'member', 'chat');
+      if (!usage.allowed) {
+        const limitMsg: MiniMessage = { id: `l-${Date.now()}`, role: 'assistant', content: `Limite diario alcanzado (${usage.used}/${usage.limit} unidades).` };
+        setMessages(prev => [...prev, limitMsg]);
+        return;
+      }
+    } catch {}
 
     const userMsg: MiniMessage = { id: `u-${Date.now()}`, role: 'user', content: question };
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
     setStreamingText('');
+    const start = Date.now();
 
     try {
       const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
@@ -100,12 +112,19 @@ export default function FloatingAIChat() {
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
-        body: JSON.stringify({ question, mode: 'chat', history, stream: true, userContext }),
+        body: JSON.stringify({ question, mode: 'chat', history, stream: true, userContext, feature: 'floating' }),
       });
 
+      if (res.status === 429) {
+        throw new Error('Limite de API excedido. Espera un minuto.');
+      }
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Error');
+        const code = data.code || '';
+        let errorText = data.error || 'Error';
+        if (code === 'TIMEOUT') errorText = 'Consulta demasiado larga. Intenta algo mas corto.';
+        else if (code === 'AUTH_FAILED') errorText = 'Error de autenticacion AI. Contacta al admin.';
+        throw new Error(errorText);
       }
 
       const reader = res.body.getReader();
@@ -133,12 +152,30 @@ export default function FloatingAIChat() {
       }
 
       setStreamingText('');
-      const aiMsg: MiniMessage = { id: `a-${Date.now()}`, role: 'assistant', content: fullAnswer || 'Sin respuesta.' };
+      const durationMs = Date.now() - start;
+      const answer = fullAnswer || 'Sin respuesta.';
+      const aiMsg: MiniMessage = { id: `a-${Date.now()}`, role: 'assistant', content: answer };
       setMessages(prev => [...prev, aiMsg]);
+
+      // Track usage + log
+      const estimatedTokens = Math.ceil(answer.length / 4);
+      incrementAIUsage(user.uid, 'chat', estimatedTokens).catch(() => {});
+      logAIAction({
+        userId: user.uid, userName: me.displayName || '', feature: 'floating', mode: 'chat',
+        questionLength: question.length, contextLength: 0, responseLength: answer.length,
+        truncated: false, durationMs, success: true, estimatedTokens,
+      }).catch(() => {});
     } catch (err: any) {
       setStreamingText('');
       const errMsg: MiniMessage = { id: `e-${Date.now()}`, role: 'assistant', content: `Error: ${err.message}` };
       setMessages(prev => [...prev, errMsg]);
+
+      logAIAction({
+        userId: user.uid, userName: me.displayName || '', feature: 'floating', mode: 'chat',
+        questionLength: question.length, contextLength: 0, responseLength: 0,
+        truncated: false, durationMs: Date.now() - start, success: false,
+        error: err.message, estimatedTokens: 0,
+      }).catch(() => {});
     } finally {
       setLoading(false);
     }

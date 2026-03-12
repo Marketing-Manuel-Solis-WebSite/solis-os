@@ -12,9 +12,10 @@ interface Props {
   tasks: any[];
   editEntry?: TimeEntry | null;
   defaultDate?: string;
+  timerMode?: boolean;
 }
 
-export default function TimeEntryModal({ open, onClose, onSave, tasks, editEntry, defaultDate }: Props) {
+export default function TimeEntryModal({ open, onClose, onSave, tasks, editEntry, defaultDate, timerMode }: Props) {
   const { t } = useI18n();
   const [taskId, setTaskId] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
@@ -55,7 +56,8 @@ export default function TimeEntryModal({ open, onClose, onSave, tasks, editEntry
   }).slice(0, 15);
 
   const handleSave = async () => {
-    if (!taskId || (hours === 0 && minutes === 0)) return;
+    if (!taskId) return;
+    if (!timerMode && (hours === 0 && minutes === 0)) return;
     setSaving(true);
     await onSave({ taskId, taskTitle, date, hours, minutes, notes: notes.trim(), billable });
     setSaving(false);
@@ -83,7 +85,7 @@ export default function TimeEntryModal({ open, onClose, onSave, tasks, editEntry
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)]">
             <h2 className="text-base font-semibold text-[var(--text-primary)]">
-              {editEntry ? t('timesheets.editEntry') : t('timesheets.logTime')}
+              {timerMode ? t('timesheets.selectTask') : editEntry ? t('timesheets.editEntry') : t('timesheets.logTime')}
             </h2>
             <button onClick={onClose} className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] transition">
               <X className="h-4 w-4" />
@@ -124,60 +126,64 @@ export default function TimeEntryModal({ open, onClose, onSave, tasks, editEntry
               )}
             </div>
 
-            {/* Date */}
-            <div>
-              <label className="text-[13px] font-medium text-[var(--text-secondary)] block mb-1">{t('timesheets.date')}</label>
-              <input
-                type="date"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                className="w-full h-9 px-3 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] outline-none ring-1 ring-[var(--border-subtle)] focus:ring-[var(--accent)] transition"
-              />
-            </div>
+            {!timerMode && (
+              <>
+                {/* Date */}
+                <div>
+                  <label className="text-[13px] font-medium text-[var(--text-secondary)] block mb-1">{t('timesheets.date')}</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={e => setDate(e.target.value)}
+                    className="w-full h-9 px-3 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] outline-none ring-1 ring-[var(--border-subtle)] focus:ring-[var(--accent)] transition"
+                  />
+                </div>
 
-            {/* Hours + Minutes */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[13px] font-medium text-[var(--text-secondary)] block mb-1">{t('timesheets.hours')}</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={24}
-                  value={hours}
-                  onChange={e => setHours(Math.max(0, Number(e.target.value)))}
-                  className="w-full h-9 px-3 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] outline-none ring-1 ring-[var(--border-subtle)] focus:ring-[var(--accent)] transition"
-                />
-              </div>
-              <div>
-                <label className="text-[13px] font-medium text-[var(--text-secondary)] block mb-1">{t('timesheets.minutes')}</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={59}
-                  value={minutes}
-                  onChange={e => setMinutes(Math.max(0, Math.min(59, Number(e.target.value))))}
-                  className="w-full h-9 px-3 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] outline-none ring-1 ring-[var(--border-subtle)] focus:ring-[var(--accent)] transition"
-                />
-              </div>
-            </div>
+                {/* Hours + Minutes */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[13px] font-medium text-[var(--text-secondary)] block mb-1">{t('timesheets.hours')}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={24}
+                      value={hours}
+                      onChange={e => setHours(Math.max(0, Number(e.target.value)))}
+                      className="w-full h-9 px-3 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] outline-none ring-1 ring-[var(--border-subtle)] focus:ring-[var(--accent)] transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[13px] font-medium text-[var(--text-secondary)] block mb-1">{t('timesheets.minutes')}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={59}
+                      value={minutes}
+                      onChange={e => setMinutes(Math.max(0, Math.min(59, Number(e.target.value))))}
+                      className="w-full h-9 px-3 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] outline-none ring-1 ring-[var(--border-subtle)] focus:ring-[var(--accent)] transition"
+                    />
+                  </div>
+                </div>
 
-            {/* Notes */}
-            <div>
-              <label className="text-[13px] font-medium text-[var(--text-secondary)] block mb-1">{t('timesheets.notes')}</label>
-              <textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder={t('timesheets.notesPlaceholder')}
-                rows={2}
-                className="w-full px-3 py-2 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none ring-1 ring-[var(--border-subtle)] focus:ring-[var(--accent)] transition resize-none"
-              />
-            </div>
+                {/* Notes */}
+                <div>
+                  <label className="text-[13px] font-medium text-[var(--text-secondary)] block mb-1">{t('timesheets.notes')}</label>
+                  <textarea
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    placeholder={t('timesheets.notesPlaceholder')}
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none ring-1 ring-[var(--border-subtle)] focus:ring-[var(--accent)] transition resize-none"
+                  />
+                </div>
 
-            {/* Billable */}
-            <label className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] cursor-pointer">
-              <input type="checkbox" checked={billable} onChange={e => setBillable(e.target.checked)} className="rounded" />
-              {t('timesheets.billable')}
-            </label>
+                {/* Billable */}
+                <label className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] cursor-pointer">
+                  <input type="checkbox" checked={billable} onChange={e => setBillable(e.target.checked)} className="rounded" />
+                  {t('timesheets.billable')}
+                </label>
+              </>
+            )}
           </div>
 
           {/* Footer */}
@@ -187,10 +193,10 @@ export default function TimeEntryModal({ open, onClose, onSave, tasks, editEntry
             </button>
             <button
               onClick={handleSave}
-              disabled={!taskId || (hours === 0 && minutes === 0) || saving}
+              disabled={!taskId || (!timerMode && hours === 0 && minutes === 0) || saving}
               className="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--accent)] text-white hover:opacity-90 transition disabled:opacity-50"
             >
-              {saving ? t('common.loading') : t('common.save')}
+              {saving ? t('common.loading') : timerMode ? t('timesheets.startTimer') : t('common.save')}
             </button>
           </div>
         </motion.div>

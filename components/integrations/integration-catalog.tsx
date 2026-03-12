@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Check, ExternalLink } from 'lucide-react';
+import { Search, X, Check, ExternalLink, Info } from 'lucide-react';
+import type { ConnectorDepth } from '@/lib/integrations-types';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { INTEGRATION_CATALOG, CATEGORIES } from '@/lib/integrations-catalog';
@@ -61,6 +62,18 @@ export default function IntegrationCatalog() {
     }
   };
 
+  const depthLabel = (d: ConnectorDepth) =>
+    d === 'full' ? t('integ.depth.full') || 'Full'
+    : d === 'basic' ? t('integ.depth.basic') || 'Basic'
+    : d === 'read_only' ? t('integ.depth.readOnly') || 'Read-only'
+    : t('integ.depth.stub') || 'Planned';
+
+  const depthColor = (d: ConnectorDepth) =>
+    d === 'full' ? 'text-green-500 bg-green-500/10'
+    : d === 'basic' ? 'text-blue-500 bg-blue-500/10'
+    : d === 'read_only' ? 'text-amber-500 bg-amber-500/10'
+    : 'text-[var(--text-muted)] bg-[var(--bg-tertiary)]';
+
   const renderCard = (item: IntegrationDef, i: number) => {
     const status = getStatus(item.provider);
     const Icon = item.icon;
@@ -70,7 +83,7 @@ export default function IntegrationCatalog() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2, delay: i * 0.03 }}
-        className="group relative rounded-xl bg-[var(--bg-elevated)] shadow-card hover:shadow-card-hover transition-all duration-200 overflow-hidden"
+        className={`group relative rounded-xl bg-[var(--bg-elevated)] shadow-card hover:shadow-card-hover transition-all duration-200 overflow-hidden ${item.depth === 'stub' ? 'opacity-60' : ''}`}
       >
         {/* Color strip */}
         <div className="h-1 w-full" style={{ backgroundColor: item.color }} />
@@ -84,7 +97,12 @@ export default function IntegrationCatalog() {
               <Icon className="h-5 w-5" style={{ color: item.color }} strokeWidth={1.75} />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-[var(--text-primary)]">{item.name}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">{item.name}</h3>
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${depthColor(item.depth)}`}>
+                  {depthLabel(item.depth)}
+                </span>
+              </div>
               <p className="text-xs text-[var(--text-muted)] mt-0.5 line-clamp-2">{t(item.descriptionKey)}</p>
             </div>
           </div>

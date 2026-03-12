@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { queueEvent } from '@/lib/integrations-db-admin';
+import { queueEvent, checkReplayProtection } from '@/lib/integrations-db-admin';
 
 const MAX_PAYLOAD = 1_048_576; // 1MB
 
@@ -35,19 +35,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
+    // Replay protection — reject duplicate deliveries
+    const deliveryId = req.headers.get('x-github-delivery') || '';
+    const isNew = await checkReplayProtection('github', deliveryId);
+    if (!isNew) {
+      return NextResponse.json({ ok: true, duplicate: true });
+    }
+
     const githubEvent = req.headers.get('x-github-event') || 'ping';
 
-    let internalEvent: 'task.created' | 'task.updated' | 'task.status_changed' = 'task.created';
+    // Handle ping (webhook registration test) — respond immediately
+    if (githubEvent === 'ping') {
+      return NextResponse.json({ ok: true, pong: true });
+    }
+
+    let internalEvent: 'task.created' | 'task.updated' | 'task.status_changed' = 'task.updated';
     if (githubEvent === 'issues' && payload.action === 'opened') {
       internalEvent = 'task.created';
     } else if (githubEvent === 'issues' && payload.action === 'closed') {
+      internalEvent = 'task.status_changed';
+    } else if (githubEvent === 'issues' && payload.action === 'reopened') {
       internalEvent = 'task.status_changed';
     } else if (githubEvent === 'issues') {
       internalEvent = 'task.updated';
     } else if (githubEvent === 'pull_request' && payload.action === 'opened') {
       internalEvent = 'task.created';
-    } else if (githubEvent === 'pull_request' && payload.action === 'closed') {
+    } else if (githubEvent === 'pull_request' && (payload.action === 'closed' || payload.action === 'merged')) {
       internalEvent = 'task.status_changed';
+    } else if (githubEvent === 'pull_request') {
+      internalEvent = 'task.updated';
     }
 
     await queueEvent({
@@ -62,6 +78,9 @@ export async function POST(req: NextRequest) {
         title: payload.issue?.title || payload.pull_request?.title || '',
         url: payload.issue?.html_url || payload.pull_request?.html_url || '',
         sender: payload.sender?.login || '',
+        labels: (payload.issue?.labels || payload.pull_request?.labels || []).map((l: any) => l.name),
+        merged: payload.pull_request?.merged || false,
+        number: payload.issue?.number || payload.pull_request?.number || 0,
       },
     });
 

@@ -45,3 +45,48 @@ export async function listSlackChannels(): Promise<{ id: string; name: string }[
     name: ch.name,
   }));
 }
+
+export async function sendSlackRichMessage(
+  channel: string,
+  blocks: any[],
+  text?: string,
+): Promise<{ ok: boolean; ts?: string }> {
+  const token = await getSlackToken();
+  if (!token) return { ok: false };
+
+  const res = await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ channel, blocks, text: text || '' }),
+  });
+
+  const data = await res.json();
+  return { ok: data.ok === true, ts: data.ts };
+}
+
+export async function sendSlackTaskNotification(
+  channel: string,
+  task: { title: string; status?: string; assignee?: string; url?: string },
+  action: 'created' | 'updated' | 'completed' | 'deleted',
+): Promise<boolean> {
+  const emoji = action === 'created' ? ':new:' : action === 'completed' ? ':white_check_mark:' : action === 'deleted' ? ':wastebasket:' : ':pencil2:';
+  const blocks = [
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `${emoji} *Task ${action}:* ${task.url ? `<${task.url}|${task.title}>` : task.title}`,
+      },
+    },
+    {
+      type: 'context',
+      elements: [
+        ...(task.status ? [{ type: 'mrkdwn', text: `*Status:* ${task.status}` }] : []),
+        ...(task.assignee ? [{ type: 'mrkdwn', text: `*Assignee:* ${task.assignee}` }] : []),
+      ].filter(Boolean),
+    },
+  ];
+
+  const result = await sendSlackRichMessage(channel, blocks, `Task ${action}: ${task.title}`);
+  return result.ok;
+}

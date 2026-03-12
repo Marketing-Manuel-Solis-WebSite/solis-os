@@ -13,12 +13,14 @@ const LS_KEY = 'solis-timer';
 
 interface TimerState {
   startedAt: number; // timestamp ms
+  taskId: string;
   taskTitle: string;
 }
 
 export function useTimer() {
   const [running, setRunning] = useState(false);
   const [startedAt, setStartedAt] = useState(0);
+  const [taskId, setTaskId] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
 
   useEffect(() => {
@@ -26,32 +28,38 @@ export function useTimer() {
     if (saved) {
       const state: TimerState = JSON.parse(saved);
       setStartedAt(state.startedAt);
+      setTaskId(state.taskId || '');
       setTaskTitle(state.taskTitle);
       setRunning(true);
     }
   }, []);
 
-  const start = (title: string) => {
+  const start = (id: string, title: string) => {
     const now = Date.now();
     setStartedAt(now);
+    setTaskId(id);
     setTaskTitle(title);
     setRunning(true);
-    localStorage.setItem(LS_KEY, JSON.stringify({ startedAt: now, taskTitle: title }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ startedAt: now, taskId: id, taskTitle: title }));
   };
 
   const stop = (): number => {
     const elapsed = Math.floor((Date.now() - startedAt) / 1000);
     setRunning(false);
+    setTaskId('');
+    setTaskTitle('');
     localStorage.removeItem(LS_KEY);
     return elapsed;
   };
 
   const discard = () => {
     setRunning(false);
+    setTaskId('');
+    setTaskTitle('');
     localStorage.removeItem(LS_KEY);
   };
 
-  return { running, startedAt, taskTitle, start, stop, discard };
+  return { running, startedAt, taskId, taskTitle, start, stop, discard };
 }
 
 export default function TimerWidget({ onStop, taskTitle }: Props & { startedAt: number; onDiscard: () => void }) {

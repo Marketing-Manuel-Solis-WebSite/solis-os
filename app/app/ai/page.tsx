@@ -9,6 +9,7 @@ import {
   autoTitleConversation, AIConversation, AIMessage,
 } from '@/lib/ai-db';
 import { getTasks, getGoals } from '@/lib/db';
+import { checkAIUsage, incrementAIUsage, logAIAction } from '@/lib/ai-usage';
 import AISidebar from '@/components/ai/ai-sidebar';
 import AIMessages from '@/components/ai/ai-messages';
 import AIInput from '@/components/ai/ai-input';
@@ -98,6 +99,17 @@ export default function AIPage() {
   const handleSend = async (content: string, sendMode: string = 'chat') => {
     if (!user || !me || !content.trim() || loading) return;
     const aiMode = sendMode as 'chat' | 'research' | 'deep';
+
+    // Check AI usage limits before sending
+    try {
+      const usage = await checkAIUsage(user.uid, me.role || 'member', aiMode);
+      if (!usage.allowed) {
+        const limitMsg: AIMessage = { id: `temp-limit-${Date.now()}`, role: 'assistant', content: `Limite diario alcanzado (${usage.used}/${usage.limit} unidades). Intenta manana o usa un modo mas ligero.`, mode: aiMode, tokens: 0, createdAt: { seconds: Date.now() / 1000 } };
+        setMessages(prev => [...prev, limitMsg]);
+        return;
+      }
+    } catch {}
+
     let convoId = activeConvo?.id;
 
     if (!convoId) {
@@ -118,25 +130,31 @@ export default function AIPage() {
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
     setStreamingText('');
+    const start = Date.now();
 
     try {
       const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
       const userContext = await buildUserContext();
 
-      // Use real SSE streaming
       const idToken = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
-        body: JSON.stringify({ question: content.trim(), mode: aiMode, history, stream: true, userContext }),
+        body: JSON.stringify({ question: content.trim(), mode: aiMode, history, stream: true, userContext, feature: 'chat' }),
       });
 
       if (res.status === 429) {
-        throw new Error(t('ai.rateLimitError'));
+        throw new Error('Limite de API excedido. Espera un minuto e intenta de nuevo.');
+      }
+      if (res.status === 504) {
+        throw new Error('La consulta tardo demasiado. Intenta con una pregunta mas corta.');
       }
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || t('ai.noResponse'));
+        const code = data.code || '';
+        let errorText = data.error || t('ai.noResponse');
+        if (code === 'AUTH_FAILED') errorText = 'Error de autenticacion con el servicio AI. Contacta al admin.';
+        throw new Error(errorText);
       }
 
       // Read SSE stream
@@ -171,16 +189,33 @@ export default function AIPage() {
 
       setStreamingText('');
       const answer = fullAnswer || t('ai.noResponse');
+      const durationMs = Date.now() - start;
 
       await addAIMessage(convoId, { role: 'assistant', content: answer, mode: aiMode, tokens: tokenCount });
 
       const aiMsg: AIMessage = { id: `temp-ai-${Date.now()}`, role: 'assistant', content: answer, mode: aiMode, tokens: tokenCount, createdAt: { seconds: Date.now() / 1000 } };
       setMessages(prev => [...prev, aiMsg]);
       await loadConversations();
+
+      // Track usage + log
+      incrementAIUsage(user.uid, aiMode, tokenCount).catch(() => {});
+      logAIAction({
+        userId: user.uid, userName: me.displayName || '', feature: 'chat', mode: aiMode,
+        questionLength: content.length, contextLength: 0, responseLength: answer.length,
+        truncated: false, durationMs, success: true, estimatedTokens: tokenCount,
+      }).catch(() => {});
     } catch (err: any) {
       setStreamingText('');
+      const durationMs = Date.now() - start;
       const errorMsg: AIMessage = { id: `temp-err-${Date.now()}`, role: 'assistant', content: `Error: ${err.message || 'Failed to connect to AI.'}`, mode: aiMode, tokens: 0, createdAt: { seconds: Date.now() / 1000 } };
       setMessages(prev => [...prev, errorMsg]);
+
+      logAIAction({
+        userId: user.uid, userName: me.displayName || '', feature: 'chat', mode: aiMode,
+        questionLength: content.length, contextLength: 0, responseLength: 0,
+        truncated: false, durationMs, success: false, error: err.message,
+        estimatedTokens: 0,
+      }).catch(() => {});
     } finally {
       setLoading(false);
     }

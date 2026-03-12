@@ -105,3 +105,90 @@ export async function listCalendarEvents(
     description: e.description || '',
   }));
 }
+
+export async function createCalendarEvent(
+  summary: string,
+  startDateTime: string,
+  endDateTime: string,
+  description?: string,
+  location?: string,
+): Promise<CalendarEvent | null> {
+  const token = await getGoogleCalendarToken();
+  if (!token) return null;
+
+  const res = await fetch(
+    'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        summary,
+        start: { dateTime: startDateTime },
+        end: { dateTime: endDateTime },
+        description: description || '',
+        location: location || '',
+      }),
+    },
+  );
+
+  if (!res.ok) return null;
+  const e = await res.json();
+  return {
+    id: e.id,
+    summary: e.summary || '',
+    start: e.start?.dateTime || e.start?.date || '',
+    end: e.end?.dateTime || e.end?.date || '',
+    location: e.location || '',
+    description: e.description || '',
+  };
+}
+
+export async function deleteCalendarEvent(eventId: string): Promise<boolean> {
+  const token = await getGoogleCalendarToken();
+  if (!token) return false;
+
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+    {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
+    },
+  );
+
+  return res.status === 204 || res.ok;
+}
+
+export async function updateCalendarEvent(
+  eventId: string,
+  updates: { summary?: string; start?: string; end?: string; description?: string; location?: string },
+): Promise<CalendarEvent | null> {
+  const token = await getGoogleCalendarToken();
+  if (!token) return null;
+
+  const body: any = {};
+  if (updates.summary) body.summary = updates.summary;
+  if (updates.start) body.start = { dateTime: updates.start };
+  if (updates.end) body.end = { dateTime: updates.end };
+  if (updates.description !== undefined) body.description = updates.description;
+  if (updates.location !== undefined) body.location = updates.location;
+
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+    {
+      method: 'PATCH',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  );
+
+  if (!res.ok) return null;
+  const e = await res.json();
+  return {
+    id: e.id,
+    summary: e.summary || '',
+    start: e.start?.dateTime || e.start?.date || '',
+    end: e.end?.dateTime || e.end?.date || '',
+    location: e.location || '',
+    description: e.description || '',
+  };
+}

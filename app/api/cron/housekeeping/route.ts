@@ -142,19 +142,19 @@ export async function GET(req: NextRequest) {
     const cutoff = daysAgo(7);
     let totalDeleted = 0;
 
-    // processed + processedAt older than 7 days
+    // processed events older than 7 days
     const processedSnap = await adminDb
       .collection('webhookEvents')
-      .where('status', '==', 'processed')
+      .where('processed', '==', true)
       .where('processedAt', '<', cutoff)
       .limit(500)
       .get();
     totalDeleted += await batchDelete(processedSnap.docs);
 
-    // exhausted + updatedAt older than 7 days
+    // exhausted events older than 7 days
     const exhaustedSnap = await adminDb
       .collection('webhookEvents')
-      .where('status', '==', 'exhausted')
+      .where('exhausted', '==', true)
       .where('updatedAt', '<', cutoff)
       .limit(500)
       .get();
@@ -302,7 +302,37 @@ export async function GET(req: NextRequest) {
   }
 
   // -----------------------------------------------------------------------
-  // (i) Form retention enforcement
+  // (i) Replay guard cleanup — older than 24 hours
+  // -----------------------------------------------------------------------
+  try {
+    const snap = await adminDb
+      .collection('replayGuard')
+      .where('receivedAt', '<', daysAgo(1))
+      .limit(500)
+      .get();
+    stats.replayGuard = await batchDelete(snap.docs);
+  } catch (err: any) {
+    console.error('[Housekeeping] replay guard cleanup failed:', err);
+    stats.replayGuard = `error: ${err?.message}`;
+  }
+
+  // -----------------------------------------------------------------------
+  // (j) Rate limit docs cleanup — older than 5 minutes
+  // -----------------------------------------------------------------------
+  try {
+    const snap = await adminDb
+      .collection('rateLimits')
+      .where('resetAt', '<', Date.now() - 300_000)
+      .limit(500)
+      .get();
+    stats.rateLimits = await batchDelete(snap.docs);
+  } catch (err: any) {
+    console.error('[Housekeeping] rate limits cleanup failed:', err);
+    stats.rateLimits = `error: ${err?.message}`;
+  }
+
+  // -----------------------------------------------------------------------
+  // (k) Form retention enforcement
   // -----------------------------------------------------------------------
   try {
     let totalDeleted = 0;

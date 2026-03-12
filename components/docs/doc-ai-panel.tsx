@@ -1,12 +1,15 @@
 'use client';
 import { useState } from 'react';
 import { auth } from '@/lib/firebase';
+import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
+import { checkAIUsage, incrementAIUsage, logAIAction } from '@/lib/ai-usage';
+import { promptDocSummarize, promptDocImprove, promptExtractActions } from '@/lib/ai-prompts';
 import {
   Bot, Sparkles, Send, X, Copy, Check, ArrowRight, Loader2, Wand2,
   FileText, Lightbulb, Search, Scale, PenLine, Languages, Zap,
   BookOpen, Scissors, Maximize2, FileSignature, ListChecks,
-  PenTool, GraduationCap, ArrowDownToLine, Plus,
+  PenTool, GraduationCap, ArrowDownToLine, Plus, AlertTriangle,
 } from 'lucide-react';
 
 interface DocAIPanelProps {
@@ -73,11 +76,13 @@ const APPLICABLE_KEYWORDS = ['improve', 'translate', 'rewrite', 'draft', 'create
 
 export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPanelProps) {
   const { t } = useI18n();
+  const { user, me } = useAuth();
   const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string; isApplicable?: boolean }[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('analyze');
+  const [usageError, setUsageError] = useState('');
 
   // Generate full doc state
   const [generatePrompt, setGeneratePrompt] = useState('');
@@ -85,14 +90,44 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
 
   const isDocEmpty = !doc.content || doc.content.trim().length < 30;
 
+  // Map specific prompts to centralized ai-prompts.ts functions
+  const resolvePrompt = (question: string, includeDoc: boolean): string => {
+    if (!includeDoc) return question;
+    const content = doc.content || '';
+    // Use centralized prompts for key operations
+    if (question === PROMPTS.find(p => p.id === 'summarize')?.prompt) {
+      return promptDocSummarize(content, doc.title || 'Untitled');
+    }
+    if (question === PROMPTS.find(p => p.id === 'improve')?.prompt) {
+      return promptDocImprove(content);
+    }
+    if (question === PROMPTS.find(p => p.id === 'action')?.prompt) {
+      return promptExtractActions(content);
+    }
+    // Fallback: inline prompt with doc context
+    const docContent = content.length > 30000
+      ? content.slice(0, 30000) + '\n\n[... document truncated for AI processing ...]'
+      : content;
+    return `Document Title: "${doc.title}"\n\nDocument Content:\n${docContent}\n\n---\n\nInstruction: ${question}`;
+  };
+
   const askAI = async (question: string, includeDoc: boolean = true) => {
+    setUsageError('');
+
+    // Check AI usage limits
+    if (user && me) {
+      try {
+        const usage = await checkAIUsage(user.uid, me.role || 'member', 'chat');
+        if (!usage.allowed) {
+          setUsageError(`Limite diario alcanzado (${usage.used}/${usage.limit} unidades).`);
+          return;
+        }
+      } catch {}
+    }
+
     setLoading(true);
-    const docContent = (doc.content || '').length > 30000
-      ? doc.content.slice(0, 30000) + '\n\n[... document truncated for AI processing ...]'
-      : doc.content || '';
-    const fullPrompt = includeDoc
-      ? `Document Title: "${doc.title}"\n\nDocument Content:\n${docContent}\n\n---\n\nInstruction: ${question}`
-      : question;
+    const fullPrompt = resolvePrompt(question, includeDoc);
+    const start = Date.now();
 
     setMessages(prev => [...prev, { role: 'user', text: question }]);
 
@@ -101,18 +136,40 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
-        body: JSON.stringify({ question: fullPrompt }),
+        body: JSON.stringify({ question: fullPrompt, feature: 'docs' }),
       });
       const data = await res.json();
-      const answer = data.answer || data.error || t('docAI.noResponse');
+      const durationMs = Date.now() - start;
 
-      const isApplicable = APPLICABLE_KEYWORDS.some(kw =>
-        question.toLowerCase().includes(kw)
-      ) || PROMPTS.some(p =>
-        (p.tab === 'improve' || p.tab === 'create') && p.prompt === question
-      );
+      if (!res.ok) {
+        const code = data.code || '';
+        let errorMsg = data.error || t('docAI.noResponse');
+        if (code === 'RATE_LIMIT') errorMsg = 'Limite de API excedido. Espera un minuto.';
+        else if (code === 'TIMEOUT') errorMsg = 'La consulta tardo demasiado. Intenta algo mas corto.';
+        setMessages(prev => [...prev, { role: 'ai', text: `Error: ${errorMsg}` }]);
+      } else {
+        const answer = data.answer || data.error || t('docAI.noResponse');
 
-      setMessages(prev => [...prev, { role: 'ai', text: answer, isApplicable }]);
+        const isApplicable = APPLICABLE_KEYWORDS.some(kw =>
+          question.toLowerCase().includes(kw)
+        ) || PROMPTS.some(p =>
+          (p.tab === 'improve' || p.tab === 'create') && p.prompt === question
+        );
+
+        setMessages(prev => [...prev, { role: 'ai', text: answer, isApplicable }]);
+
+        // Track usage
+        if (user && me) {
+          const tokens = (data.usage?.estimatedInputTokens || 0) + (data.usage?.estimatedOutputTokens || 0);
+          incrementAIUsage(user.uid, 'chat', tokens).catch(() => {});
+          logAIAction({
+            userId: user.uid, userName: me.displayName || '', feature: 'docs', mode: 'chat',
+            questionLength: question.length, contextLength: fullPrompt.length,
+            responseLength: answer.length, truncated: data.truncated || false,
+            durationMs, success: true, estimatedTokens: tokens,
+          }).catch(() => {});
+        }
+      }
     } catch {
       setMessages(prev => [...prev, { role: 'ai', text: t('docAI.errorConnecting') }]);
     }
@@ -121,7 +178,21 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
 
   const handleGenerateDoc = async () => {
     if (!generatePrompt.trim()) return;
+    setUsageError('');
+
+    // Check AI usage limits
+    if (user && me) {
+      try {
+        const usage = await checkAIUsage(user.uid, me.role || 'member', 'chat');
+        if (!usage.allowed) {
+          setUsageError(`Limite diario alcanzado (${usage.used}/${usage.limit} unidades).`);
+          return;
+        }
+      } catch {}
+    }
+
     setGenerating(true);
+    const start = Date.now();
 
     const systemPrompt = `You are a professional document writer for a law office. Create a complete, well-structured document in markdown format based on the following description. Use proper headings, sections, bullet points, and formatting. The document should be professional, thorough, and ready to use.\n\nDocument Title: "${doc.title}"\n\nDescription of what to write:\n${generatePrompt.trim()}\n\nWrite the full document content in markdown format:`;
 
@@ -130,20 +201,36 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
-        body: JSON.stringify({ question: systemPrompt }),
+        body: JSON.stringify({ question: systemPrompt, feature: 'docs' }),
       });
       const data = await res.json();
+      const durationMs = Date.now() - start;
       const answer = data.answer || '';
+
       if (answer && !data.error) {
         setMessages([
           { role: 'user', text: `Generate document: ${generatePrompt.trim()}` },
           { role: 'ai', text: answer, isApplicable: true },
         ]);
         setGeneratePrompt('');
+
+        // Track usage
+        if (user && me) {
+          const tokens = (data.usage?.estimatedInputTokens || 0) + (data.usage?.estimatedOutputTokens || 0);
+          incrementAIUsage(user.uid, 'chat', tokens).catch(() => {});
+          logAIAction({
+            userId: user.uid, userName: me.displayName || '', feature: 'docs', mode: 'chat',
+            questionLength: generatePrompt.length, contextLength: systemPrompt.length,
+            responseLength: answer.length, truncated: false,
+            durationMs, success: true, estimatedTokens: tokens,
+          }).catch(() => {});
+        }
       } else {
+        let errorMsg = data.error || t('docAI.failedGenerate');
+        if (data.code === 'RATE_LIMIT') errorMsg = 'Limite de API excedido. Espera un minuto.';
         setMessages([
           { role: 'user', text: `Generate document: ${generatePrompt.trim()}` },
-          { role: 'ai', text: data.error || t('docAI.failedGenerate') },
+          { role: 'ai', text: errorMsg },
         ]);
       }
     } catch {
@@ -198,6 +285,14 @@ export default function DocAIPanel({ doc, onClose, onApply, onInsert }: DocAIPan
         </div>
         <button onClick={onClose} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg"><X className="h-4 w-4" /></button>
       </div>
+
+      {/* Usage limit warning */}
+      {usageError && (
+        <div className="mx-3 mt-1 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center gap-2">
+          <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+          <span className="text-[12px] text-amber-300">{usageError}</span>
+        </div>
+      )}
 
       {/* Generate Full Document (when doc is empty) */}
       {isDocEmpty && messages.length === 0 && (

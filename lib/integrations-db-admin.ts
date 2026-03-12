@@ -357,4 +357,48 @@ export async function markEventRetry(id: string, attempts: number) {
   });
 }
 
+// ===== PERSISTENT RATE LIMITING (Firestore-backed) =====
+
+export async function checkRateLimitPersistent(
+  keyId: string,
+  maxRequests: number,
+  windowMs: number,
+): Promise<boolean> {
+  const ref = adminDb.doc(`rateLimits/${keyId}`);
+  try {
+    return await adminDb.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const now = Date.now();
+      const data = snap.data();
+
+      if (!data || now > data.resetAt) {
+        tx.set(ref, { count: 1, resetAt: now + windowMs, updatedAt: FieldValue.serverTimestamp() });
+        return true;
+      }
+
+      if (data.count >= maxRequests) return false;
+      tx.update(ref, { count: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() });
+      return true;
+    });
+  } catch {
+    // On Firestore failure, allow the request (fail-open for availability)
+    return true;
+  }
+}
+
+// ===== REPLAY PROTECTION =====
+
+export async function checkReplayProtection(provider: string, deliveryId: string): Promise<boolean> {
+  if (!deliveryId) return true; // no delivery ID means no replay check
+  const ref = adminDb.doc(`replayGuard/${provider}_${deliveryId}`);
+  try {
+    const snap = await ref.get();
+    if (snap.exists) return false; // replay detected
+    await ref.set({ provider, deliveryId, receivedAt: FieldValue.serverTimestamp() });
+    return true;
+  } catch {
+    return true; // fail-open
+  }
+}
+
 export { ORG };

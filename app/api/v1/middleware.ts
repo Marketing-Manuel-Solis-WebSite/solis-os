@@ -1,32 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateApiKey } from '@/lib/integrations-db-admin';
+import { validateApiKey, checkRateLimitPersistent } from '@/lib/integrations-db-admin';
 import type { ApiKeyScope } from '@/lib/integrations-types';
 
-// ============================================
-// IN-MEMORY RATE LIMITER (100 req/min per key)
-// ============================================
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT = 100;
-
-function checkRateLimit(keyId: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(keyId);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(keyId, { count: 1, resetAt: now + 60000 });
-    return true;
-  }
-  if (entry.count >= RATE_LIMIT) return false;
-  entry.count++;
-  return true;
-}
-
-// Clean stale entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitMap) {
-    if (now > entry.resetAt) rateLimitMap.delete(key);
-  }
-}, 300000);
+const RATE_WINDOW_MS = 60_000;
 
 // ============================================
 // API KEY VALIDATION
@@ -86,13 +63,14 @@ export async function validateApiRequest(
     };
   }
 
-  // Rate limit
-  if (!checkRateLimit(record.id)) {
+  // Rate limit (Firestore-backed, persistent across serverless instances)
+  const allowed = await checkRateLimitPersistent(record.id, RATE_LIMIT, RATE_WINDOW_MS);
+  if (!allowed) {
     return {
       valid: false,
       error: NextResponse.json(
         { error: 'Rate limit exceeded. Max 100 requests per minute.' },
-        { status: 429 },
+        { status: 429, headers: { 'Retry-After': '60' } },
       ),
     };
   }

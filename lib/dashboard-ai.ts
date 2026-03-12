@@ -1,5 +1,6 @@
 // Dashboard AI — calls /api/ai with dashboard metrics
 import { auth } from './firebase';
+import { promptAnalyticsInsight } from './ai-prompts';
 
 export interface DashboardMetrics {
   totalTasks: number;
@@ -14,32 +15,23 @@ export interface DashboardMetrics {
 }
 
 export async function generateDashboardInsights(metrics: DashboardMetrics): Promise<string> {
-  const question = `Eres un asistente de productividad. Analiza estas métricas y da un resumen breve y directo.
-
-DATOS:
-- Tareas totales: ${metrics.totalTasks}
-- Completadas: ${metrics.completedTasks} (${metrics.completionRate}%)
-- En progreso: ${metrics.inProgressTasks}
-- Vencidas: ${metrics.overdueTasks}
-- Metas: ${metrics.totalGoals} (${metrics.goalsAtRisk} en riesgo)
-- Equipo: ${metrics.teamName || 'General'}
-
-REGLAS:
-- Responde en texto plano, como si fueras ChatGPT respondiendo casualmente
-- Maximo 4-5 oraciones cortas
-- No uses emojis, ni markdown, ni negritas, ni asteriscos, ni bullets, ni guiones
-- No uses títulos ni encabezados
-- Sé directo, claro y actionable
-- Responde en español`;
+  // Use centralized prompt from ai-prompts.ts
+  const question = promptAnalyticsInsight(metrics);
 
   const idToken = await auth.currentUser?.getIdToken();
   const res = await fetch('/api/ai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) },
-    body: JSON.stringify({ question, mode: 'chat', history: [], stream: false }),
+    body: JSON.stringify({ question, mode: 'chat', history: [], stream: false, feature: 'dashboard' }),
   });
 
-  if (!res.ok) throw new Error('AI request failed');
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const code = data.code || '';
+    if (code === 'RATE_LIMIT') throw new Error('RATE_LIMIT');
+    if (code === 'TIMEOUT') throw new Error('TIMEOUT');
+    throw new Error(data.error || 'AI request failed');
+  }
   const data = await res.json();
   return data.answer || '';
 }

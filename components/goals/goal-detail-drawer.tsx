@@ -109,8 +109,8 @@ export default function GoalDetailDrawer({ goal, open, onClose, onUpdate, onDele
 
   const handleDeleteTarget = async (targetId: string) => {
     if (!goal) return;
+    // deleteGoalTarget already calls recalculateGoalProgress internally
     await deleteGoalTarget(goal.id, targetId);
-    await recalculateGoalProgress(goal.id);
     await loadTargets();
     onRefresh();
   };
