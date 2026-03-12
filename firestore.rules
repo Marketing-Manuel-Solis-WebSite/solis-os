@@ -203,20 +203,35 @@ service cloud.firestore {
     }
 
     // ======== FOLDERS ========
+    // Scoped by spaceId (= teamId). Team-level isolation enforced via canAccessTeamData
+    // which checks admin/director bypass, or team membership via teamId/teamIds.
+    // Note: folders store spaceId (not teamId), so canAccessTeamData reads resource.data.spaceId
+    // via the same pattern (admin bypass || member.teamId == spaceId || spaceId in member.teamIds).
+
+    function canAccessSpaceData(orgId) {
+      let member = get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data;
+      return member.role in ['owner', 'admin']
+        || ('hierarchyLevel' in member && member.hierarchyLevel in ['director', 'owner'])
+        || !('spaceId' in resource.data)
+        || resource.data.spaceId == null
+        || member.teamId == resource.data.spaceId
+        || ('teamIds' in member && resource.data.spaceId in member.teamIds);
+    }
 
     match /folders/{folderId} {
-      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
     }
 
     // ======== LISTS ========
+    // Same team-level isolation as folders via canAccessSpaceData.
 
     match /lists/{listId} {
-      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
     }
 

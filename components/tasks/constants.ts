@@ -20,6 +20,7 @@ export interface Task {
   assignees: string[];
   tags: string[];
   teamId: string;
+  listId?: string | null;
   createdBy: string;
   dueDate?: any;
   startDate?: any;

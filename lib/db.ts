@@ -340,6 +340,117 @@ async function getByTeam(col: string, teamId: string, maxResults = 500): Promise
   return { items, hasMore };
 }
 
+// ===== FOLDERS =====
+export interface FolderData {
+  id?: string;
+  orgId?: string;
+  spaceId: string;
+  name: string;
+  position: number;
+  color?: string;
+  createdBy: string;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export async function getFolders(spaceId: string): Promise<FolderData[]> {
+  const q = query(
+    collection(db, 'folders'),
+    where('orgId', '==', ORG),
+    where('spaceId', '==', spaceId),
+    orderBy('position', 'asc'),
+  );
+  const s = await getDocs(q);
+  return s.docs.map(d => ({ id: d.id, ...d.data() } as FolderData));
+}
+
+export async function createFolder(data: Omit<FolderData, 'id' | 'orgId'>) {
+  return addTo('folders', { ...data, orgId: ORG });
+}
+
+export async function updateFolder(id: string, data: Partial<FolderData>) {
+  return updateAt(`folders/${id}`, data);
+}
+
+export async function deleteFolder(id: string) {
+  // Move lists in this folder to folderless (spaceId stays, folderId cleared)
+  const q = query(collection(db, 'lists'), where('orgId', '==', ORG), where('folderId', '==', id));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.update(d.ref, { folderId: null, updatedAt: serverTimestamp() }));
+    await batch.commit();
+  }
+  return deleteAt(`folders/${id}`);
+}
+
+// ===== LISTS =====
+export interface ListData {
+  id?: string;
+  orgId?: string;
+  spaceId: string;
+  folderId: string | null;
+  name: string;
+  position: number;
+  defaultStatus?: string;
+  createdBy: string;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export async function getLists(spaceId: string): Promise<ListData[]> {
+  const q = query(
+    collection(db, 'lists'),
+    where('orgId', '==', ORG),
+    where('spaceId', '==', spaceId),
+    orderBy('position', 'asc'),
+  );
+  const s = await getDocs(q);
+  return s.docs.map(d => ({ id: d.id, ...d.data() } as ListData));
+}
+
+export async function getListsByFolder(folderId: string): Promise<ListData[]> {
+  const q = query(
+    collection(db, 'lists'),
+    where('orgId', '==', ORG),
+    where('folderId', '==', folderId),
+    orderBy('position', 'asc'),
+  );
+  const s = await getDocs(q);
+  return s.docs.map(d => ({ id: d.id, ...d.data() } as ListData));
+}
+
+export async function createList(data: Omit<ListData, 'id' | 'orgId'>) {
+  return addTo('lists', { ...data, orgId: ORG });
+}
+
+export async function updateList(id: string, data: Partial<ListData>) {
+  return updateAt(`lists/${id}`, data);
+}
+
+export async function deleteList(id: string) {
+  // Move tasks in this list to no list (clear listId)
+  const q = query(collection(db, 'tasks'), where('orgId', '==', ORG), where('listId', '==', id));
+  const snap = await getDocs(q);
+  if (!snap.empty) {
+    const CHUNK = 450;
+    for (let i = 0; i < snap.docs.length; i += CHUNK) {
+      const batch = writeBatch(db);
+      snap.docs.slice(i, i + CHUNK).forEach(d => batch.update(d.ref, { listId: null, updatedAt: serverTimestamp() }));
+      await batch.commit();
+    }
+  }
+  return deleteAt(`lists/${id}`);
+}
+
+// Ensure a space has at least one list (the default "General" list)
+export async function ensureDefaultList(spaceId: string, createdBy: string): Promise<ListData> {
+  const existing = await getLists(spaceId);
+  if (existing.length > 0) return existing[0];
+  const ref = await createList({ spaceId, folderId: null, name: 'General', position: 0, createdBy });
+  return { id: ref.id, spaceId, folderId: null, name: 'General', position: 0, createdBy };
+}
+
 // ===== TASKS =====
 export async function getTasks(teamId?: string, maxResults = 500) {
   if (teamId) return getByTeam('tasks', teamId, maxResults);
@@ -387,6 +498,7 @@ export async function createTask(data: any) {
   return addTo('tasks', {
     ...data, orgId: ORG, status: data.status || 'todo', priority: data.priority || 'medium',
     assignees: data.assignees || [], tags: data.tags || [], teamId: data.teamId || '',
+    listId: data.listId || null,
     visibility: data.visibility || 'team',
     description: data.description || '', dueDate: data.dueDate || null, startDate: data.startDate || null,
     timeEstimate: data.timeEstimate || null, timeSpent: data.timeSpent || 0,

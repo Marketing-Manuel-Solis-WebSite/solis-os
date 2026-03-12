@@ -3,13 +3,18 @@ import { useAuth, type Team, type Member } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { getTasks, getGoals, getDocuments, getAuditLogs, getUserPreferences, saveUserPreferences } from '@/lib/db';
+import {
+  getTasks, getGoals, getDocuments, getAuditLogs, getUserPreferences, saveUserPreferences,
+  getFolders, getLists, createFolder, createList, ensureDefaultList,
+  type FolderData, type ListData,
+} from '@/lib/db';
 import { ensureSpaceDashboard, saveDashboard } from '@/lib/dashboard-db';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Layers, Users, CheckSquare, Target, FileText, ArrowLeft,
   Loader2, ShieldAlert, ChevronRight, Clock, TrendingUp,
   BarChart3, Calendar, AlertTriangle, LayoutDashboard, Settings2,
+  FolderOpen, List, Plus, FolderPlus, ListPlus,
 } from 'lucide-react';
 import WidgetGrid from '@/components/dashboard/widget-grid';
 import DashboardBuilder from '@/components/dashboard/dashboard-builder';
@@ -39,6 +44,8 @@ export default function SpacePage() {
   const [goals, setGoals] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
+  const [folders, setFolders] = useState<FolderData[]>([]);
+  const [lists, setLists] = useState<ListData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const lastFetchedId = useRef<string | null>(null);
@@ -66,16 +73,20 @@ export default function SpacePage() {
   const loadSpaceData = useCallback(async () => {
     if (!user || !spaceId || !hasAccess) return;
     setLoading(true);
-    const [tasksRes, goalsRes, docsRes, logsRes] = await Promise.all([
+    const [tasksRes, goalsRes, docsRes, logsRes, foldersRes, listsRes] = await Promise.all([
       getTasks(spaceId).catch(() => ({ items: [] })),
       getGoals(spaceId).catch(() => ({ items: [] })),
       getDocuments(spaceId).catch(() => ({ items: [] })),
       canSeeAllTeams ? getAuditLogs().catch(() => ({ items: [] })) : Promise.resolve({ items: [] }),
+      getFolders(spaceId).catch(() => []),
+      getLists(spaceId).catch(() => []),
     ]);
     setTasks(tasksRes.items);
     setGoals(goalsRes.items);
     setDocs(docsRes.items);
     setLogs(logsRes.items);
+    setFolders(foldersRes as FolderData[]);
+    setLists(listsRes as ListData[]);
     setLoading(false);
   }, [user, spaceId, hasAccess, canSeeAllTeams]);
 
@@ -333,11 +344,14 @@ export default function SpacePage() {
             {activeTab === 'overview' && (
               <OverviewTab
                 team={team}
+                spaceId={spaceId}
                 spaceMembers={spaceMembers}
                 stats={stats}
                 tasks={tasks}
                 goals={goals}
                 docs={docs}
+                folders={folders}
+                lists={lists}
                 lang={lang}
                 t={t}
                 goToModule={goToModule}
@@ -388,10 +402,11 @@ export default function SpacePage() {
 // ═══════════════════════════════════════════════════════════════
 // OVERVIEW TAB
 // ═══════════════════════════════════════════════════════════════
-function OverviewTab({ team, spaceMembers, stats, tasks, goals, docs, lang, t, goToModule, onTabChange }: {
-  team?: Team; spaceMembers: Member[];
+function OverviewTab({ team, spaceId, spaceMembers, stats, tasks, goals, docs, folders, lists, lang, t, goToModule, onTabChange }: {
+  team?: Team; spaceId: string; spaceMembers: Member[];
   stats: { open: number; overdue: number; recent: any[]; completionRate: number; total: number };
   tasks: any[]; goals: any[]; docs: any[];
+  folders: FolderData[]; lists: ListData[];
   lang: string; t: (k: string) => string;
   goToModule: (path: string) => void;
   onTabChange: (tab: Tab) => void;
@@ -538,6 +553,70 @@ function OverviewTab({ team, spaceMembers, stats, tasks, goals, docs, lang, t, g
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Hierarchy: Folders & Lists */}
+      {(folders.length > 0 || lists.length > 0) && (
+        <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3.5 bg-[var(--bg-tertiary)]/30">
+            <h2 className="text-[13px] font-semibold text-[var(--text-primary)] flex items-center gap-2">
+              <Layers className="h-4 w-4 text-[var(--accent)] opacity-80" />
+              {lang === 'es' ? 'Estructura' : 'Structure'}
+            </h2>
+            <span className="text-[11px] text-[var(--text-muted)]">
+              {folders.length} {lang === 'es' ? 'carpetas' : 'folders'} · {lists.length} {lang === 'es' ? 'listas' : 'lists'}
+            </span>
+          </div>
+          <div className="h-px bg-gradient-to-r from-transparent via-[var(--border-subtle)]/60 to-transparent" />
+          <div className="p-4 space-y-2">
+            {folders.map(folder => {
+              const folderLists = lists.filter(l => l.folderId === folder.id);
+              const taskCount = tasks.filter(tk => !tk.deleted && folderLists.some(l => l.id === tk.listId)).length;
+              return (
+                <div key={folder.id} className="rounded-xl bg-[var(--bg-tertiary)]/40 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FolderOpen className="h-4 w-4" style={{ color: folder.color || team?.color || 'var(--text-muted)' }} />
+                    <span className="text-[13px] font-medium text-[var(--text-primary)]">{folder.name}</span>
+                    <span className="text-[10px] text-[var(--text-muted)] ml-auto">{folderLists.length} {lang === 'es' ? 'listas' : 'lists'} · {taskCount} {lang === 'es' ? 'tareas' : 'tasks'}</span>
+                  </div>
+                  {folderLists.length > 0 && (
+                    <div className="pl-4 space-y-1">
+                      {folderLists.map(list => {
+                        const lTaskCount = tasks.filter(tk => !tk.deleted && tk.listId === list.id).length;
+                        return (
+                          <a
+                            key={list.id}
+                            href={`/app/spaces/${spaceId}/list/${list.id}`}
+                            className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-[var(--bg-hover)] transition text-[12px] text-[var(--text-secondary)]"
+                          >
+                            <List className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                            <span className="truncate">{list.name}</span>
+                            <span className="text-[10px] text-[var(--text-muted)] ml-auto tabular-nums">{lTaskCount}</span>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {/* Folderless lists */}
+            {lists.filter(l => !l.folderId).map(list => {
+              const lTaskCount = tasks.filter(tk => !tk.deleted && tk.listId === list.id).length;
+              return (
+                <a
+                  key={list.id}
+                  href={`/app/spaces/${spaceId}/list/${list.id}`}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-[var(--bg-hover)] transition text-[13px] text-[var(--text-secondary)]"
+                >
+                  <List className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                  <span className="truncate">{list.name}</span>
+                  <span className="text-[10px] text-[var(--text-muted)] ml-auto tabular-nums">{lTaskCount}</span>
+                </a>
+              );
+            })}
           </div>
         </div>
       )}

@@ -43,13 +43,14 @@ const SPACE_PRESETS = [
 
 interface SpaceTasksPanelProps {
   spaceId: string;
+  listId?: string | null;  // If set, only show tasks for this list
   tasks: Task[];
   members: any[];
   teams: any[];
   onReload: () => void;
 }
 
-export default function SpaceTasksPanel({ spaceId, tasks, members, teams, onReload }: SpaceTasksPanelProps) {
+export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams, onReload }: SpaceTasksPanelProps) {
   const { user, me, can, canSeeAllTeams } = useAuth();
   const { t } = useI18n();
   const toast = useToast();
@@ -142,6 +143,10 @@ export default function SpaceTasksPanel({ spaceId, tasks, members, teams, onRelo
   // ─── Derived data ──────────────────────────────────────
   const presetFilteredTasks = useMemo(() => {
     let base = tasks.filter(tk => !tk.archived && !tk.deleted);
+    // Scope to list if listId is provided
+    if (listId) {
+      base = base.filter(tk => tk.listId === listId);
+    }
     if (meMode && user?.uid) {
       base = base.filter(tk => tk.assignees?.includes(user.uid));
     }
@@ -198,6 +203,7 @@ export default function SpaceTasksPanel({ spaceId, tasks, members, teams, onRelo
     const taskRef = await createTask({
       ...data,
       teamId: spaceId,
+      listId: listId || data.listId || null,
       createdBy: user!.uid,
       visibility: data.visibility || 'team',
     });

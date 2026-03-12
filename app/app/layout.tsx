@@ -18,6 +18,7 @@ import {
   Settings, Loader2, CalendarDays, MoreHorizontal, Target, Clock, PenTool, FileInput, Plug, Search,
   Layers,
 } from 'lucide-react';
+import SpaceSidebarTree from '@/components/spaces/space-sidebar-tree';
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -263,7 +264,7 @@ function SearchTrigger() {
 // SHELL
 // ============================================
 function Shell({ children }: { children: React.ReactNode }) {
-  const { user, me, loading, isAdmin, canSeeAllTeams, teams } = useAuth();
+  const { user, me, loading, isAdmin, isManager, canSeeAllTeams, teams } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
   const path = usePathname();
@@ -272,6 +273,19 @@ function Shell({ children }: { children: React.ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(isMoreRoute);
   const isSpacesRoute = path.startsWith('/app/spaces');
   const [spacesOpen, setSpacesOpen] = useState(isSpacesRoute);
+  // Track which individual space trees are expanded in sidebar
+  const [expandedSpaces, setExpandedSpaces] = useState<Set<string>>(() => {
+    // Auto-expand the space that matches the current route
+    const match = path.match(/\/app\/spaces\/([^/]+)/);
+    return match ? new Set([match[1]]) : new Set();
+  });
+  const toggleSpaceExpand = (spaceId: string) => {
+    setExpandedSpaces(prev => {
+      const next = new Set(prev);
+      if (next.has(spaceId)) next.delete(spaceId); else next.add(spaceId);
+      return next;
+    });
+  };
   const morePopRef = useRef<HTMLDivElement>(null);
   const [morePopover, setMorePopover] = useState(false);
 
@@ -403,23 +417,55 @@ function Shell({ children }: { children: React.ReactNode }) {
                       <div className="pl-3 space-y-0.5">
                         {sidebarTeams.map(st => {
                           const spaceHref = `/app/spaces/${st.id}`;
-                          const spaceActive = path === spaceHref;
+                          const spaceActive = path.startsWith(spaceHref);
+                          const spaceExpanded = expandedSpaces.has(st.id);
                           return (
-                            <button
-                              key={st.id}
-                              onClick={() => navTo(spaceHref)}
-                              className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200 relative ${
-                                spaceActive
-                                  ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
-                                  : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
-                              }`}
-                            >
-                              {spaceActive && (
-                                <motion.div layoutId={`nav-indicator-space-${st.id}`} className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-r-full" style={{ backgroundColor: st.color || 'var(--accent)' }} transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
-                              )}
-                              <span className="text-sm shrink-0">{st.icon || '📁'}</span>
-                              <span className="truncate">{st.name}</span>
-                            </button>
+                            <div key={st.id}>
+                              <div className="flex items-center">
+                                <button
+                                  onClick={() => { navTo(spaceHref); if (!spaceExpanded) toggleSpaceExpand(st.id); }}
+                                  className={`flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200 relative ${
+                                    spaceActive
+                                      ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
+                                      : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
+                                  }`}
+                                >
+                                  {spaceActive && (
+                                    <motion.div layoutId={`nav-indicator-space-${st.id}`} className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-r-full" style={{ backgroundColor: st.color || 'var(--accent)' }} transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+                                  )}
+                                  <span className="text-sm shrink-0">{st.icon || '📁'}</span>
+                                  <span className="truncate">{st.name}</span>
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); toggleSpaceExpand(st.id); }}
+                                  className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--sidebar-hover)] transition mr-1"
+                                >
+                                  <ChevronDown className={`h-3 w-3 transition-transform duration-150 ${spaceExpanded ? 'rotate-180' : ''}`} />
+                                </button>
+                              </div>
+                              <AnimatePresence>
+                                {spaceExpanded && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.15, ease: EASE }}
+                                    className="overflow-hidden"
+                                  >
+                                    <div className="pl-3">
+                                      <SpaceSidebarTree
+                                        spaceId={st.id}
+                                        spaceName={st.name}
+                                        spaceColor={st.color}
+                                        spaceIcon={st.icon}
+                                        userId={user?.uid || ''}
+                                        canManage={isManager}
+                                      />
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
                           );
                         })}
                       </div>
