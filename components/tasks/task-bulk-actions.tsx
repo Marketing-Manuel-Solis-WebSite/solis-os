@@ -3,17 +3,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, ArrowRight, Flag, UserPlus, Calendar, FolderInput, Archive } from 'lucide-react';
+import { X, Trash2, ArrowRight, Flag, UserPlus, Calendar, FolderInput, Archive, List } from 'lucide-react';
 import { STATUSES, PRIORITIES } from './constants';
 
 interface Props {
   count: number;
   members: any[];
   teams: any[];
+  lists?: { id?: string; name: string }[];
   onStatusChange: (status: string) => void;
   onPriorityChange: (priority: string) => void;
   onAssigneeAdd: (userId: string) => void;
   onTeamChange: (teamId: string) => void;
+  onListChange?: (listId: string | null) => void;
   onArchive: () => void;
   onDelete: () => void;
   onClear: () => void;
@@ -62,10 +64,12 @@ export default function TaskBulkActions({
   count,
   members,
   teams,
+  lists,
   onStatusChange,
   onPriorityChange,
   onAssigneeAdd,
   onTeamChange,
+  onListChange,
   onArchive,
   onDelete,
   onClear,
@@ -162,6 +166,28 @@ export default function TaskBulkActions({
           </div>
         )}
       </DropUp>
+
+      {/* Move to list */}
+      {lists && lists.length > 0 && onListChange && (
+        <DropUp icon={<List className="h-3.5 w-3.5" />} label={t('spaces.lists')}>
+          <button
+            onClick={() => onListChange(null)}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-lg text-[13px] hover:bg-[var(--bg-hover)] text-[var(--text-muted)] transition-colors"
+          >
+            {t('spaces.unsorted')}
+          </button>
+          {lists.map(l => (
+            <button
+              key={l.id}
+              onClick={() => onListChange(l.id || null)}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-lg text-[13px] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-colors"
+            >
+              <List className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+              <span className="truncate">{l.name}</span>
+            </button>
+          ))}
+        </DropUp>
+      )}
 
       {/* Archive */}
       <button

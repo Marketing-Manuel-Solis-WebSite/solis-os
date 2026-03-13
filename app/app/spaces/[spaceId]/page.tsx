@@ -570,54 +570,7 @@ function OverviewTab({ team, spaceId, spaceMembers, stats, tasks, goals, docs, f
             </span>
           </div>
           <div className="h-px bg-gradient-to-r from-transparent via-[var(--border-subtle)]/60 to-transparent" />
-          <div className="p-4 space-y-2">
-            {folders.map(folder => {
-              const folderLists = lists.filter(l => l.folderId === folder.id);
-              const taskCount = tasks.filter(tk => !tk.deleted && folderLists.some(l => l.id === tk.listId)).length;
-              return (
-                <div key={folder.id} className="rounded-xl bg-[var(--bg-tertiary)]/40 p-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FolderOpen className="h-4 w-4" style={{ color: folder.color || team?.color || 'var(--text-muted)' }} />
-                    <span className="text-[13px] font-medium text-[var(--text-primary)]">{folder.name}</span>
-                    <span className="text-[10px] text-[var(--text-muted)] ml-auto">{folderLists.length} {lang === 'es' ? 'listas' : 'lists'} · {taskCount} {lang === 'es' ? 'tareas' : 'tasks'}</span>
-                  </div>
-                  {folderLists.length > 0 && (
-                    <div className="pl-4 space-y-1">
-                      {folderLists.map(list => {
-                        const lTaskCount = tasks.filter(tk => !tk.deleted && tk.listId === list.id).length;
-                        return (
-                          <a
-                            key={list.id}
-                            href={`/app/spaces/${spaceId}/list/${list.id}`}
-                            className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-[var(--bg-hover)] transition text-[12px] text-[var(--text-secondary)]"
-                          >
-                            <List className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                            <span className="truncate">{list.name}</span>
-                            <span className="text-[10px] text-[var(--text-muted)] ml-auto tabular-nums">{lTaskCount}</span>
-                          </a>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {/* Folderless lists */}
-            {lists.filter(l => !l.folderId).map(list => {
-              const lTaskCount = tasks.filter(tk => !tk.deleted && tk.listId === list.id).length;
-              return (
-                <a
-                  key={list.id}
-                  href={`/app/spaces/${spaceId}/list/${list.id}`}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-[var(--bg-hover)] transition text-[13px] text-[var(--text-secondary)]"
-                >
-                  <List className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                  <span className="truncate">{list.name}</span>
-                  <span className="text-[10px] text-[var(--text-muted)] ml-auto tabular-nums">{lTaskCount}</span>
-                </a>
-              );
-            })}
-          </div>
+          <StructureView folders={folders} lists={lists} tasks={tasks} spaceId={spaceId} teamColor={team?.color} lang={lang} />
         </div>
       )}
 
@@ -797,6 +750,65 @@ function QuickStatCard({ label, value, subtitle, color, icon, pulse }: {
         <span className="text-2xl font-bold tabular-nums" style={{ color }}>{value}</span>
         {subtitle && <span className="text-[11px] text-[var(--text-muted)] font-semibold">{subtitle}</span>}
       </div>
+    </div>
+  );
+}
+
+// Pre-aggregated task counts to avoid O(n²) in-render filtering
+function StructureView({ folders, lists, tasks, spaceId, teamColor, lang }: {
+  folders: FolderData[]; lists: ListData[]; tasks: any[]; spaceId: string; teamColor?: string; lang: string;
+}) {
+  const countByList = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const tk of tasks) {
+      if (tk.deleted) continue;
+      const lid = tk.listId || '__none__';
+      map[lid] = (map[lid] || 0) + 1;
+    }
+    return map;
+  }, [tasks]);
+
+  return (
+    <div className="p-4 space-y-2">
+      {folders.map(folder => {
+        const folderLists = lists.filter(l => l.folderId === folder.id);
+        const taskCount = folderLists.reduce((sum, l) => sum + (countByList[l.id!] || 0), 0);
+        return (
+          <div key={folder.id} className="rounded-xl bg-[var(--bg-tertiary)]/40 p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <FolderOpen className="h-4 w-4" style={{ color: folder.color || teamColor || 'var(--text-muted)' }} />
+              <span className="text-[13px] font-medium text-[var(--text-primary)]">{folder.name}</span>
+              <span className="text-[10px] text-[var(--text-muted)] ml-auto">{folderLists.length} {lang === 'es' ? 'listas' : 'lists'} · {taskCount} {lang === 'es' ? 'tareas' : 'tasks'}</span>
+            </div>
+            {folderLists.length > 0 && (
+              <div className="pl-4 space-y-1">
+                {folderLists.map(list => (
+                  <a
+                    key={list.id}
+                    href={`/app/spaces/${spaceId}/list/${list.id}`}
+                    className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-[var(--bg-hover)] transition text-[12px] text-[var(--text-secondary)]"
+                  >
+                    <List className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                    <span className="truncate">{list.name}</span>
+                    <span className="text-[10px] text-[var(--text-muted)] ml-auto tabular-nums">{countByList[list.id!] || 0}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {lists.filter(l => !l.folderId).map(list => (
+        <a
+          key={list.id}
+          href={`/app/spaces/${spaceId}/list/${list.id}`}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-[var(--bg-hover)] transition text-[13px] text-[var(--text-secondary)]"
+        >
+          <List className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+          <span className="truncate">{list.name}</span>
+          <span className="text-[10px] text-[var(--text-muted)] ml-auto tabular-nums">{countByList[list.id!] || 0}</span>
+        </a>
+      ))}
     </div>
   );
 }

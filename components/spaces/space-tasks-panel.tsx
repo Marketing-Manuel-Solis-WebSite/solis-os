@@ -6,7 +6,9 @@ import { useToast } from '@/components/notifications/toast-provider';
 import {
   createTask, updateTask, softDeleteTask,
   getUserPreferences, saveUserPreferences,
-  getSettings, saveSettings,
+  getSharedSpaceViews, saveSharedSpaceViews,
+  getLists, ensureDefaultList,
+  type ListData,
 } from '@/lib/db';
 import {
   afterTaskCreated, afterTaskUpdated, afterTaskDeleted,
@@ -80,6 +82,35 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCreate, setShowCreate] = useState(false);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
+  const [sharedViews, setSharedViews] = useState<SavedView[]>([]);
+  const canManageShared = can('task', 'update') && (me?.role === 'owner' || me?.role === 'admin' || me?.role === 'manager');
+
+  // Lists for this space (used for list selector in create/detail/bulk)
+  const [spaceLists, setSpaceLists] = useState<ListData[]>([]);
+  const [defaultListId, setDefaultListId] = useState<string | null>(null);
+
+  // Load lists; only managers bootstrap the default "General" list
+  useEffect(() => {
+    if (!user?.uid || !spaceId) return;
+    getLists(spaceId).then(async (allLists) => {
+      if (allLists.length === 0 && canManageShared) {
+        // Manager in empty space — create default "General" list
+        try {
+          const defList = await ensureDefaultList(spaceId, user.uid);
+          setDefaultListId(defList.id || null);
+          const refreshed = await getLists(spaceId);
+          setSpaceLists(refreshed);
+        } catch {
+          // If creation fails (e.g., rule race), just show empty
+          setSpaceLists([]);
+        }
+      } else {
+        setSpaceLists(allLists);
+        const general = allLists.find(l => l.name === 'General');
+        setDefaultListId(general?.id || allLists[0]?.id || null);
+      }
+    }).catch(() => {});
+  }, [user?.uid, spaceId, canManageShared]);
 
   // ─── Load preferences from Firestore ──────────────────
   useEffect(() => {
@@ -105,7 +136,7 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
     }).catch(() => { prefsLoaded.current = true; });
   }, [user?.uid, spaceId]);
 
-  // ─── Load saved views ──────────────────────────────────
+  // ─── Load saved views (private + shared) ─────────────────
   useEffect(() => {
     if (!spaceId) return;
     // Load personal saved views
@@ -114,6 +145,10 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
         if (data?.views) setSavedViews(data.views);
       }).catch(() => {});
     }
+    // Load shared space views
+    getSharedSpaceViews(spaceId).then((data: any) => {
+      if (data?.views) setSharedViews(data.views);
+    }).catch(() => {});
   }, [user?.uid, spaceId]);
 
   // ─── Debounced preference persistence ──────────────────
@@ -150,7 +185,7 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
     if (meMode && user?.uid) {
       base = base.filter(tk => tk.assignees?.includes(user.uid));
     }
-    if (activePreset.startsWith('saved:')) return base;
+    if (activePreset.startsWith('saved:') || activePreset.startsWith('shared:')) return base;
     const preset = SPACE_PRESETS.find(p => p.id === activePreset);
     if (!preset || preset.id === 'all') return base;
     if (preset.filterFn && user?.uid) {
@@ -200,10 +235,12 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
   // ─── CRUD ──────────────────────────────────────────────
   const doCreate = async (data: any) => {
     if (!can('task', 'create')) return;
+    // Resolve listId: explicit prop > user selection > space default > null
+    const resolvedListId = listId || data.listId || defaultListId || null;
     const taskRef = await createTask({
       ...data,
       teamId: spaceId,
-      listId: listId || data.listId || null,
+      listId: resolvedListId,
       createdBy: user!.uid,
       visibility: data.visibility || 'team',
     });
@@ -350,10 +387,56 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
     await saveUserPreferences(user.uid, VIEWS_KEY, { views: updated });
   };
 
+  // ─── Shared view handlers ─────────────────────────────
+  const handleDeleteSharedView = async (id: string) => {
+    const updated = sharedViews.filter(sv => sv.id !== id);
+    setSharedViews(updated);
+    if (activePreset === `shared:${id}`) setActivePreset('all');
+    await saveSharedSpaceViews(spaceId, { views: updated });
+  };
+
+  const handleDuplicateSharedToPrivate = async (sv: SavedView) => {
+    if (!user?.uid) return;
+    const dup: SavedView = { ...sv, id: Date.now().toString(36), name: `${sv.name} (copy)`, shared: false, createdBy: user.uid };
+    const updated = [...savedViews, dup];
+    setSavedViews(updated);
+    await saveUserPreferences(user.uid, VIEWS_KEY, { views: updated });
+  };
+
+  const handlePromoteView = async (sv: SavedView) => {
+    // Copy to shared views
+    const sharedCopy: SavedView = { ...sv, id: Date.now().toString(36), shared: true };
+    const updatedShared = [...sharedViews, sharedCopy];
+    setSharedViews(updatedShared);
+    await saveSharedSpaceViews(spaceId, { views: updatedShared });
+    // Remove from private views
+    if (user?.uid) {
+      const updatedPrivate = savedViews.filter(v => v.id !== sv.id);
+      setSavedViews(updatedPrivate);
+      await saveUserPreferences(user.uid, VIEWS_KEY, { views: updatedPrivate });
+    }
+  };
+
+  const handleDemoteView = async (id: string) => {
+    if (!user?.uid) return;
+    const sv = sharedViews.find(v => v.id === id);
+    if (!sv) return;
+    // Copy to private views
+    const privateCopy: SavedView = { ...sv, id: Date.now().toString(36), shared: false, createdBy: user.uid };
+    const updatedPrivate = [...savedViews, privateCopy];
+    setSavedViews(updatedPrivate);
+    await saveUserPreferences(user.uid, VIEWS_KEY, { views: updatedPrivate });
+    // Remove from shared
+    const updatedShared = sharedViews.filter(v => v.id !== id);
+    setSharedViews(updatedShared);
+    if (activePreset === `shared:${id}`) setActivePreset('all');
+    await saveSharedSpaceViews(spaceId, { views: updatedShared });
+  };
+
   // ─── Preset change ─────────────────────────────────────
   const handlePresetChange = (id: string) => {
     setActivePreset(id);
-    if (!id.startsWith('saved:')) setFilters(EMPTY_FILTERS);
+    if (!id.startsWith('saved:') && !id.startsWith('shared:')) setFilters(EMPTY_FILTERS);
   };
 
   // ─── Preference-aware setters ──────────────────────────
@@ -424,6 +507,12 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
           onDeleteView={handleDeleteView}
           onDuplicateView={handleDuplicateView}
           allPresets={SPACE_PRESETS}
+          sharedViews={sharedViews}
+          onDeleteSharedView={canManageShared ? handleDeleteSharedView : undefined}
+          onDuplicateSharedView={handleDuplicateSharedToPrivate}
+          onPromoteView={canManageShared ? handlePromoteView : undefined}
+          onDemoteView={canManageShared ? handleDemoteView : undefined}
+          canManageShared={canManageShared}
         />
 
         {/* View content */}
@@ -500,10 +589,12 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
                 count={selectedIds.size}
                 members={members}
                 teams={teams}
+                lists={spaceLists}
                 onStatusChange={status => bulkUpdate('status', status)}
                 onPriorityChange={priority => bulkUpdate('priority', priority)}
                 onAssigneeAdd={bulkAssignee}
                 onTeamChange={() => {}} // Not applicable within a space
+                onListChange={listVal => bulkUpdate('listId', listVal)}
                 onArchive={bulkArchive}
                 onDelete={bulkDelete}
                 onClear={() => setSelectedIds(new Set())}
@@ -520,6 +611,7 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
             task={selectedTask}
             members={members}
             teams={teams}
+            lists={spaceLists}
             userId={user?.uid || ''}
             userName={me?.displayName || ''}
             canUpdate={can('task', 'update')}
@@ -538,6 +630,8 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
             members={members}
             teams={teams}
             activeTeamId={spaceId}
+            lists={spaceLists}
+            defaultListId={listId || defaultListId}
             onClose={() => setShowCreate(false)}
             onCreate={doCreate}
           />

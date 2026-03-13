@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError, parsePagination } from '../middleware';
-import { createTask, countByOrg, getCustomFieldDefs, queryTasksPaginated } from '@/lib/db-admin';
+import { createTask, countByOrg, getCustomFieldDefs, queryTasksPaginated, getList } from '@/lib/db-admin';
 import { TaskCreateSchema, formatZodError, validateCustomFieldValues } from '@/lib/validation';
 import { afterTaskCreatedAdmin } from '@/lib/task-side-effects-admin';
 
@@ -47,6 +47,15 @@ export async function POST(req: NextRequest) {
         return apiError(`Custom field validation failed: ${cfResult.errors.join('; ')}`, 400);
       }
       data.customFields = cfResult.sanitized;
+    }
+
+    // Cross-space listId validation: listId must belong to same team
+    if (data.listId && data.teamId) {
+      const list = await getList(data.listId);
+      if (!list) return apiError('listId does not exist', 400, 'INVALID_LIST');
+      if ((list as any).spaceId !== data.teamId) {
+        return apiError('listId does not belong to the specified team', 400, 'CROSS_SPACE_LIST');
+      }
     }
 
     const apiActor = `api:${auth.context!.keyRecord.prefix}`;

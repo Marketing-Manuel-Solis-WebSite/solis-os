@@ -3,7 +3,7 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { getTasks, getLists, updateList, type ListData } from '@/lib/db';
+import { getTasksByList, getLists, updateList, type ListData } from '@/lib/db';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Loader2, ShieldAlert, List, Pencil, MoreHorizontal,
@@ -39,7 +39,7 @@ export default function ListPage() {
     if (!user || !spaceId || !listId || !hasAccess) return;
     setLoading(true);
     const [tasksRes, listsRes] = await Promise.all([
-      getTasks(spaceId).catch(() => ({ items: [] })),
+      getTasksByList(listId).catch(() => ({ items: [] })),
       getLists(spaceId).catch(() => []),
     ]);
     setTasks(tasksRes.items);

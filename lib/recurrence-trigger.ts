@@ -73,6 +73,7 @@ export async function handleTaskCompletion(task: any): Promise<string | null> {
     assignees: task.assignees || [],
     tags: task.tags || [],
     teamId: task.teamId || '',
+    listId: task.listId || null,
     type: task.type || 'task',
     visibility: task.visibility || 'team',
     customFields: clonedCustomFields,

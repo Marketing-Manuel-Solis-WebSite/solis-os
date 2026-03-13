@@ -33,6 +33,7 @@ interface Props {
   task: any;
   members: any[];
   teams: any[];
+  lists?: { id?: string; name: string }[];
   userId: string;
   userName: string;
   canUpdate: boolean;
@@ -74,7 +75,7 @@ const FIELD_GROUP_LABELS: Record<string, string> = {
    MAIN COMPONENT
    ============================================ */
 export default function TaskDetailDrawer({
-  task, members, teams, userId, userName,
+  task, members, teams, lists, userId, userName,
   canUpdate, canDelete, onUpdate, onDelete, onClose,
 }: Props) {
   const { t, lang } = useI18n();
@@ -432,6 +433,25 @@ export default function TaskDetailDrawer({
                 ))}
               </select>
             </div>
+            {/* List selector — move task between lists */}
+            {lists && lists.length > 0 && (
+              <div>
+                <label className="block text-[12px] uppercase tracking-[0.06em] text-[var(--text-muted)] mb-1.5 font-semibold">
+                  {t('spaces.lists')}
+                </label>
+                <select
+                  value={task.listId || ''}
+                  onChange={e => canUpdate && onUpdate(task.id, 'listId', e.target.value || null, task.listId)}
+                  disabled={!canUpdate}
+                  className="select-dark w-full h-9 text-sm"
+                >
+                  <option value="">{t('spaces.unsorted')}</option>
+                  {lists.map((l: any) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="block text-[12px] uppercase tracking-[0.06em] text-[var(--text-muted)] mb-1.5 font-semibold">
                 {t('taskCreate.startDate')}

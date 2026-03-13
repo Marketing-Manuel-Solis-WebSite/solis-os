@@ -17,11 +17,13 @@ interface Props {
   members: any[];
   teams: any[];
   activeTeamId: string;
+  lists?: { id?: string; name: string }[];
+  defaultListId?: string | null;
   onClose: () => void;
   onCreate: (data: any) => void;
 }
 
-export default function TaskCreateModal({ members, teams, activeTeamId, onClose, onCreate }: Props) {
+export default function TaskCreateModal({ members, teams, activeTeamId, lists, defaultListId, onClose, onCreate }: Props) {
   const { t, lang } = useI18n();
   const { activeFields, groups, loading: fieldsLoading } = useCustomFieldDefs();
   const [mode, setMode] = useState<'quick' | 'full'>('quick');
@@ -30,6 +32,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
     assignees: [] as string[], tags: [] as string[], dueDate: '', startDate: '', timeEstimate: '',
     points: '', subtasks: [] as any[], visibility: 'team',
     teamId: activeTeamId === '__all__' ? '' : activeTeamId,
+    listId: defaultListId || '' as string,
     customFields: {} as Record<string, any>,
     recurrence: undefined as RecurrenceConfig | undefined,
   });
@@ -283,6 +286,24 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
               ))}
             </select>
           </div>
+          {/* List selector (quick mode) */}
+          {lists && lists.length > 0 && (
+            <div>
+              <label className="block text-[11px] uppercase tracking-wider text-[var(--text-muted)] mb-1 font-semibold">
+                {t('spaces.lists')}
+              </label>
+              <select
+                value={d.listId}
+                onChange={(e) => set('listId', e.target.value)}
+                className="select-dark w-full h-10 rounded-xl text-sm"
+              >
+                <option value="">{t('spaces.unsorted')}</option>
+                {lists.map((l: any) => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Tags (quick mode) */}
@@ -505,6 +526,24 @@ export default function TaskCreateModal({ members, teams, activeTeamId, onClose,
               ))}
             </select>
           </div>
+          {/* List selector (full mode) */}
+          {lists && lists.length > 0 && (
+            <div>
+              <label className="block text-[11px] uppercase tracking-[0.08em] text-[var(--text-muted)] mb-1.5 font-semibold">
+                {t('spaces.lists')}
+              </label>
+              <select
+                value={d.listId}
+                onChange={(e) => set('listId', e.target.value)}
+                className="select-dark w-full h-10 text-[14px] rounded-xl"
+              >
+                <option value="">{t('spaces.unsorted')}</option>
+                {lists.map((l: any) => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         {/* ──────── Section 3: Tiempo y Fechas ──────── */}

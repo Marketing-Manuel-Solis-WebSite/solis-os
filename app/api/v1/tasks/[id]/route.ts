@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { validateApiRequest, apiResponse, apiError } from '../../middleware';
-import { getTask, updateTask, deleteTask, getCustomFieldDefs } from '@/lib/db-admin';
+import { getTask, updateTask, deleteTask, getCustomFieldDefs, getList } from '@/lib/db-admin';
 import { TaskUpdateSchema, formatZodError, validateCustomFieldValues } from '@/lib/validation';
 import { afterTaskUpdatedAdmin, afterTaskDeletedAdmin } from '@/lib/task-side-effects-admin';
 
@@ -43,6 +43,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         return apiError(`Custom field validation failed: ${cfResult.errors.join('; ')}`, 400);
       }
       data.customFields = cfResult.sanitized;
+    }
+
+    // Cross-space listId validation: if listId is being changed, verify it belongs to task's team
+    if (data.listId !== undefined && data.listId !== null && data.listId !== (task as any).listId) {
+      const list = await getList(data.listId);
+      if (!list) return apiError('listId does not exist', 400, 'INVALID_LIST');
+      if ((list as any).spaceId !== (task as any).teamId) {
+        return apiError('listId does not belong to the task team', 400, 'CROSS_SPACE_LIST');
+      }
     }
 
     await updateTask(id, data);

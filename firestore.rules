@@ -94,6 +94,12 @@ service cloud.firestore {
         allow write: if isAdmin(orgId);
       }
 
+      // Shared space views — space members can read, manager+ in space can write
+      match /spaceSharedViews/{spaceId} {
+        allow read: if isSignedIn() && isOrgMember(orgId) && canAccessSpaceById(orgId, spaceId);
+        allow write: if isSignedIn() && isManager(orgId) && canAccessSpaceById(orgId, spaceId);
+      }
+
       // Teams
       match /teams/{teamId} {
         allow read: if isOrgMember(orgId);
@@ -218,20 +224,40 @@ service cloud.firestore {
         || ('teamIds' in member && resource.data.spaceId in member.teamIds);
     }
 
+    // Space access check by explicit spaceId parameter (for docs where spaceId is in path, not data)
+    function canAccessSpaceById(orgId, sid) {
+      let member = get(/databases/$(database)/documents/orgs/$(orgId)/members/$(request.auth.uid)).data;
+      return member.role in ['owner', 'admin']
+        || ('hierarchyLevel' in member && member.hierarchyLevel in ['director', 'owner'])
+        || member.teamId == sid
+        || ('teamIds' in member && sid in member.teamIds);
+    }
+
+    // Validate that a listId belongs to the task's teamId (cross-space integrity)
+    function listBelongsToTeam(lid, tid) {
+      return get(/databases/$(database)/documents/lists/$(lid)).data.spaceId == tid;
+    }
+
+    // Validate that a folderId belongs to a given spaceId (cross-space integrity for docs/whiteboards)
+    function folderBelongsToSpace(fid, sid) {
+      return get(/databases/$(database)/documents/folders/$(fid)).data.spaceId == sid;
+    }
+
     match /folders/{folderId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
-      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
+      allow create: if isSignedIn() && isManager(request.resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
     }
 
     // ======== LISTS ========
     // Same team-level isolation as folders via canAccessSpaceData.
+    // Create gated to manager+ (structural decision: members use structure, managers define it).
 
     match /lists/{listId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
-      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
+      allow create: if isSignedIn() && isManager(request.resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
     }
 
@@ -239,8 +265,15 @@ service cloud.firestore {
 
     match /tasks/{taskId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
-      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      // Create: listId must be null OR belong to the same team as the task
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId)
+        && (request.resource.data.listId == null
+            || listBelongsToTeam(request.resource.data.listId, request.resource.data.teamId));
+      // Update: if listId changed to non-null, it must belong to the task's team
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId)
+        && (request.resource.data.listId == null
+            || request.resource.data.listId == resource.data.listId
+            || listBelongsToTeam(request.resource.data.listId, resource.data.teamId));
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
 
       // Cross-org leak fix: verify parent task's orgId for subcollections
@@ -259,11 +292,20 @@ service cloud.firestore {
     }
 
     // ======== DOCS ========
+    // folderId must be null OR belong to same space as doc.teamId
 
     match /docs/{docId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
-      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId)
+        && (!('folderId' in request.resource.data) || request.resource.data.folderId == null
+            || folderBelongsToSpace(request.resource.data.folderId, request.resource.data.teamId));
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId)
+        && (!('folderId' in request.resource.data) || request.resource.data.folderId == null
+            || request.resource.data.folderId == resource.data.folderId
+            || folderBelongsToSpace(request.resource.data.folderId, resource.data.teamId))
+        // structural move (folderId change) requires manager+
+        && (request.resource.data.get('folderId', null) == resource.data.get('folderId', null)
+            || isManager(resource.data.orgId));
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
 
       match /revisions/{revisionId} {
@@ -343,11 +385,20 @@ service cloud.firestore {
     }
 
     // ======== WHITEBOARDS ========
+    // Team-isolated reads + folderId must be null OR belong to same space
 
     match /whiteboards/{boardId} {
-      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
-      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId)
+        && (!('folderId' in request.resource.data) || request.resource.data.folderId == null
+            || folderBelongsToSpace(request.resource.data.folderId, request.resource.data.teamId));
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId)
+        && (!('folderId' in request.resource.data) || request.resource.data.folderId == null
+            || request.resource.data.folderId == resource.data.folderId
+            || folderBelongsToSpace(request.resource.data.folderId, resource.data.teamId))
+        // structural move (folderId change) requires manager+
+        && (request.resource.data.get('folderId', null) == resource.data.get('folderId', null)
+            || isManager(resource.data.orgId));
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
 
       match /elements/{elementId} {

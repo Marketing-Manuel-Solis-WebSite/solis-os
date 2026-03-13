@@ -373,14 +373,17 @@ export async function updateFolder(id: string, data: Partial<FolderData>) {
 }
 
 export async function deleteFolder(id: string) {
-  // Move lists in this folder to folderless (spaceId stays, folderId cleared)
-  const q = query(collection(db, 'lists'), where('orgId', '==', ORG), where('folderId', '==', id));
-  const snap = await getDocs(q);
-  if (!snap.empty) {
-    const batch = writeBatch(db);
-    snap.docs.forEach(d => batch.update(d.ref, { folderId: null, updatedAt: serverTimestamp() }));
-    await batch.commit();
-  }
+  // Move lists, docs, and whiteboards in this folder to root (folderId cleared)
+  const cols = ['lists', 'docs', 'whiteboards'];
+  await Promise.all(cols.map(async (col) => {
+    const q = query(collection(db, col), where('orgId', '==', ORG), where('folderId', '==', id));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const batch = writeBatch(db);
+      snap.docs.forEach(d => batch.update(d.ref, { folderId: null, updatedAt: serverTimestamp() }));
+      await batch.commit();
+    }
+  }));
   return deleteAt(`folders/${id}`);
 }
 
@@ -455,6 +458,21 @@ export async function ensureDefaultList(spaceId: string, createdBy: string): Pro
 export async function getTasks(teamId?: string, maxResults = 500) {
   if (teamId) return getByTeam('tasks', teamId, maxResults);
   return getByOrg('tasks', maxResults);
+}
+
+export async function getTasksByList(listId: string, maxResults = 500): Promise<{ items: any[]; hasMore: boolean }> {
+  const q = query(
+    collection(db, 'tasks'),
+    where('orgId', '==', ORG),
+    where('listId', '==', listId),
+    orderBy('createdAt', 'desc'),
+    limit(maxResults + 1),
+  );
+  const s = await getDocs(q);
+  const hasMore = s.docs.length > maxResults;
+  const docs = hasMore ? s.docs.slice(0, maxResults) : s.docs;
+  const items = docs.map(d => ({ id: d.id, ...d.data() }));
+  return { items, hasMore };
 }
 
 export async function getTasksPaginated({
@@ -580,7 +598,21 @@ export async function addTaskActivity(taskId: string, data: { action: string; fi
 
 // ===== DOCS =====
 export async function getDocuments(teamId?: string, maxResults = 500) { if (teamId) return getByTeam('docs', teamId, maxResults); return getByOrg('docs', maxResults); }
-export async function createDocument(data: any) { return addTo('docs', { ...data, orgId: ORG, content: data.content || '', teamId: data.teamId || '' }); }
+export async function createDocument(data: any) { return addTo('docs', { ...data, orgId: ORG, content: data.content || '', teamId: data.teamId || '', spaceId: data.spaceId || null, folderId: data.folderId || null }); }
+
+export async function getDocsBySpace(spaceId: string, maxResults = 200): Promise<{ items: any[]; hasMore: boolean }> {
+  const q = query(
+    collection(db, 'docs'),
+    where('orgId', '==', ORG),
+    where('teamId', '==', spaceId),
+    orderBy('updatedAt', 'desc'),
+    limit(maxResults + 1),
+  );
+  const s = await getDocs(q);
+  const hasMore = s.docs.length > maxResults;
+  const docs = hasMore ? s.docs.slice(0, maxResults) : s.docs;
+  return { items: docs.map(d => ({ id: d.id, ...d.data() })), hasMore };
+}
 export async function updateDocument(id: string, data: any) { return updateAt(`docs/${id}`, data); }
 export async function deleteDocument(id: string) {
   await Promise.allSettled([
@@ -920,6 +952,14 @@ export async function logAction(data: { action: string; resource: string; detail
 export async function getSettings(key: string) { return getOne(`orgs/${ORG}/settings/${key}`); }
 export async function saveSettings(key: string, data: any) { return setAt(`orgs/${ORG}/settings/${key}`, data); }
 
+// ===== SHARED SPACE VIEWS =====
+export async function getSharedSpaceViews(spaceId: string) {
+  return getOne(`orgs/${ORG}/spaceSharedViews/${spaceId}`);
+}
+export async function saveSharedSpaceViews(spaceId: string, data: any) {
+  return setAt(`orgs/${ORG}/spaceSharedViews/${spaceId}`, data);
+}
+
 // ===== USER PREFERENCES =====
 export async function getUserPreferences(userId: string, key: string) {
   return getOne(`orgs/${ORG}/members/${userId}/preferences/${key}`);
@@ -1258,12 +1298,28 @@ export async function createWhiteboard(data: any) {
     name: data.name || '',
     description: data.description || '',
     teamId: data.teamId || '',
+    spaceId: data.spaceId || null,
+    folderId: data.folderId || null,
     createdBy: data.createdBy || '',
     createdByName: data.createdByName || '',
     members: data.members || [],
     thumbnail: '',
     visibility: data.visibility || 'team',
   });
+}
+
+export async function getWhiteboardsBySpace(spaceId: string, maxResults = 200): Promise<{ items: any[]; hasMore: boolean }> {
+  const q = query(
+    collection(db, 'whiteboards'),
+    where('orgId', '==', ORG),
+    where('teamId', '==', spaceId),
+    orderBy('updatedAt', 'desc'),
+    limit(maxResults + 1),
+  );
+  const s = await getDocs(q);
+  const hasMore = s.docs.length > maxResults;
+  const docs = hasMore ? s.docs.slice(0, maxResults) : s.docs;
+  return { items: docs.map(d => ({ id: d.id, ...d.data() })), hasMore };
 }
 
 export async function updateWhiteboard(id: string, data: any) { return updateAt(`whiteboards/${id}`, data); }

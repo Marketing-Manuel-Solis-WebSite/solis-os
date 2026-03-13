@@ -52,6 +52,13 @@ interface Props {
   onDuplicateView?: (sv: SavedView) => void;
   onImport?: () => void;
   allPresets?: any[];
+  // Shared views
+  sharedViews?: SavedView[];
+  onDeleteSharedView?: (id: string) => void;
+  onDuplicateSharedView?: (sv: SavedView) => void;
+  onPromoteView?: (sv: SavedView) => void;
+  onDemoteView?: (id: string) => void;
+  canManageShared?: boolean;
 }
 
 // =============================================
@@ -67,6 +74,7 @@ export default function TaskToolbar({
   onNewTask, onClearFilters, onToggleSidebar,
   onPresetChange, onSaveView, onLoadView, onDeleteView, onDuplicateView,
   onImport, allPresets,
+  sharedViews, onDeleteSharedView, onDuplicateSharedView, onPromoteView, onDemoteView, canManageShared,
 }: Props) {
   const { t } = useI18n();
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -328,6 +336,12 @@ export default function TaskToolbar({
         onDeleteView={onDeleteView}
         onDuplicateView={onDuplicateView}
         allPresets={allPresets}
+        sharedViews={sharedViews}
+        onDeleteSharedView={onDeleteSharedView}
+        onDuplicateSharedView={onDuplicateSharedView}
+        onPromoteView={onPromoteView}
+        onDemoteView={onDemoteView}
+        canManageShared={canManageShared}
       />
 
       {/* ============================================= */}

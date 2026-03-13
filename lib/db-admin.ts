@@ -338,12 +338,17 @@ export async function getTasks(teamId?: string) {
   return getByOrg('tasks');
 }
 
+// ===== LISTS =====
+export async function getList(id: string) { return getOne(`lists/${id}`); }
+
+// ===== TASKS =====
 export async function getTask(id: string) { return getOne(`tasks/${id}`); }
 
 export async function createTask(data: any) {
   return addTo('tasks', {
     ...data, orgId: ORG, status: data.status || 'todo', priority: data.priority || 'medium',
     assignees: data.assignees || [], tags: data.tags || [], teamId: data.teamId || '',
+    listId: data.listId || null,
     visibility: data.visibility || 'team',
     description: data.description || '', dueDate: data.dueDate || null, startDate: data.startDate || null,
     timeEstimate: data.timeEstimate || null, timeSpent: data.timeSpent || 0,
