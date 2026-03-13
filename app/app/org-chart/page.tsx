@@ -648,31 +648,65 @@ function TreeNode({ node, members, teams, canEdit, onEdit, isRoot = false, index
               <TreeNode node={node.children[0]} members={members} teams={teams}
                 canEdit={canEdit} onEdit={onEdit} index={0} />
             ) : (
-              <div className="relative flex items-start gap-8">
-                {/* Horizontal connector line */}
-                <div className="absolute top-0 h-px"
-                  style={{
-                    left: `calc(${100 / (node.children.length * 2)}%)`,
-                    right: `calc(${100 / (node.children.length * 2)}%)`,
-                    background: `linear-gradient(90deg, ${teamColor}25, ${teamColor}40, ${teamColor}40, ${teamColor}25)`,
-                  }} />
-
-                {node.children.map((child, ci) => {
-                  const childTeam = teams.find(t => t.id === child.teamId);
-                  const childColor = childTeam?.color || getLevelConfig(child.hierarchyLevel).color;
-                  return (
-                    <div key={child.id} className="flex flex-col items-center">
-                      <div className="w-px h-6" style={{ background: `linear-gradient(to bottom, ${teamColor}40, ${childColor}30)` }} />
-                      <TreeNode node={child} members={members} teams={teams}
-                        canEdit={canEdit} onEdit={onEdit} index={ci} />
-                    </div>
-                  );
-                })}
-              </div>
+              <ChildrenRows children={node.children} members={members} teams={teams}
+                canEdit={canEdit} onEdit={onEdit} teamColor={teamColor} />
             )}
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+// =======================================
+// CHILDREN ROWS — max 3 per row
+// =======================================
+const MAX_PER_ROW = 3;
+
+function ChildrenRows({ children, members, teams, canEdit, onEdit, teamColor }: {
+  children: OrgNode[]; members: OrgMember[]; teams: Team[];
+  canEdit: boolean; onEdit: (m: OrgMember) => void; teamColor: string;
+}) {
+  // Split children into chunks of MAX_PER_ROW
+  const rows: OrgNode[][] = [];
+  for (let i = 0; i < children.length; i += MAX_PER_ROW) {
+    rows.push(children.slice(i, i + MAX_PER_ROW));
+  }
+
+  return (
+    <div className="flex flex-col items-center">
+      {rows.map((row, ri) => (
+        <div key={ri} className="flex flex-col items-center">
+          {/* Vertical connector between rows (skip for first row — parent already draws it) */}
+          {ri > 0 && (
+            <div className="w-px h-6" style={{ background: `linear-gradient(to bottom, ${teamColor}40, ${teamColor}25)` }} />
+          )}
+
+          <div className="relative flex items-start gap-8">
+            {/* Horizontal connector line across the row */}
+            {row.length > 1 && (
+              <div className="absolute top-0 h-px"
+                style={{
+                  left: `calc(${100 / (row.length * 2)}%)`,
+                  right: `calc(${100 / (row.length * 2)}%)`,
+                  background: `linear-gradient(90deg, ${teamColor}25, ${teamColor}40, ${teamColor}40, ${teamColor}25)`,
+                }} />
+            )}
+
+            {row.map((child, ci) => {
+              const childTeam = teams.find(t => t.id === child.teamId);
+              const childColor = childTeam?.color || getLevelConfig(child.hierarchyLevel).color;
+              return (
+                <div key={child.id} className="flex flex-col items-center">
+                  <div className="w-px h-6" style={{ background: `linear-gradient(to bottom, ${teamColor}40, ${childColor}30)` }} />
+                  <TreeNode node={child} members={members} teams={teams}
+                    canEdit={canEdit} onEdit={onEdit} index={ri * MAX_PER_ROW + ci} />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
