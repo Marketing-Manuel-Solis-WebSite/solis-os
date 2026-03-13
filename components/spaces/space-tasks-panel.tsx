@@ -7,7 +7,7 @@ import {
   createTask, updateTask, softDeleteTask,
   getUserPreferences, saveUserPreferences,
   getSharedSpaceViews, saveSharedSpaceViews,
-  getLists, ensureDefaultList,
+  getLists, createList,
   type ListData,
 } from '@/lib/db';
 import {
@@ -96,10 +96,10 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
       if (allLists.length === 0 && canManageShared) {
         // Manager in empty space — create default "General" list
         try {
-          const defList = await ensureDefaultList(spaceId, user.uid);
+          const ref = await createList({ spaceId, folderId: null, name: 'General', position: 0, createdBy: user.uid });
+          const defList: ListData = { id: ref.id, spaceId, folderId: null, name: 'General', position: 0, createdBy: user.uid };
           setDefaultListId(defList.id || null);
-          const refreshed = await getLists(spaceId);
-          setSpaceLists(refreshed);
+          setSpaceLists([defList]);
         } catch {
           // If creation fails (e.g., rule race), just show empty
           setSpaceLists([]);

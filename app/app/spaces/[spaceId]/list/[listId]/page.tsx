@@ -134,7 +134,7 @@ export default function ListPage() {
               <List className="h-4 w-4" style={{ color: team?.color || 'var(--accent)' }} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="group flex items-center gap-2">
                 <h1 className="text-lg font-bold text-[var(--text-primary)]">{list.name}</h1>
                 <button
                   onClick={handleRename}
