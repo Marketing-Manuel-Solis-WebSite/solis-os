@@ -297,16 +297,23 @@ function ZoomPanContainer({ children }: { children: React.ReactNode }) {
 
   const MIN_SCALE = 0.2;
   const MAX_SCALE = 2;
-  const ZOOM_STEP = 0.15;
+  const BUTTON_STEP = 0.15;
 
-  const zoomIn = () => setScale(s => Math.min(MAX_SCALE, s + ZOOM_STEP));
-  const zoomOut = () => setScale(s => Math.max(MIN_SCALE, s - ZOOM_STEP));
+  const zoomIn = () => setScale(s => Math.min(MAX_SCALE, s + BUTTON_STEP));
+  const zoomOut = () => setScale(s => Math.max(MIN_SCALE, s - BUTTON_STEP));
   const resetView = () => { setScale(1); setTranslate({ x: 0, y: 0 }); };
 
+  // Normalize deltaY across devices: trackpads send small deltas frequently,
+  // scroll wheels send large deltas infrequently. Clamp so both feel the same.
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
-    setScale(s => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s + delta)));
+    // deltaMode 1 = lines (some mice), multiply to match pixel-based deltas
+    const raw = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    // Clamp between -150 and 150 so no single event jumps too much
+    const clamped = Math.max(-150, Math.min(150, raw));
+    // Scale factor: 150px of scroll = 0.15 zoom change (same as button step)
+    const zoomDelta = -(clamped / 150) * BUTTON_STEP;
+    setScale(s => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s + zoomDelta)));
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -330,6 +337,47 @@ function ZoomPanContainer({ children }: { children: React.ReactNode }) {
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
+  }, []);
+
+  // Touch support: single-finger drag + two-finger pinch-to-zoom
+  const lastTouchDist = useRef<number | null>(null);
+  const lastTouchScale = useRef(1);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      // Single finger drag
+      if ((e.target as HTMLElement).closest('button, input, select, [role="button"]')) return;
+      setIsDragging(true);
+      dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      translateStart.current = { ...translate };
+    } else if (e.touches.length === 2) {
+      // Pinch start
+      setIsDragging(false);
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastTouchDist.current = Math.hypot(dx, dy);
+      lastTouchScale.current = scale;
+    }
+  }, [translate, scale]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1 && isDragging) {
+      const dx = e.touches[0].clientX - dragStart.current.x;
+      const dy = e.touches[0].clientY - dragStart.current.y;
+      setTranslate({ x: translateStart.current.x + dx, y: translateStart.current.y + dy });
+    } else if (e.touches.length === 2 && lastTouchDist.current !== null) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const ratio = dist / lastTouchDist.current;
+      setScale(Math.min(MAX_SCALE, Math.max(MIN_SCALE, lastTouchScale.current * ratio)));
+    }
+  }, [isDragging]);
+
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false);
+    lastTouchDist.current = null;
   }, []);
 
   const zoomPercent = Math.round(scale * 100);
@@ -372,7 +420,10 @@ function ZoomPanContainer({ children }: { children: React.ReactNode }) {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-base)]"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-base)] touch-none"
         style={{
           height: 'calc(100vh - 220px)',
           cursor: isDragging ? 'grabbing' : 'grab',
