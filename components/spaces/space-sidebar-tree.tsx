@@ -862,9 +862,9 @@ function MoveToFolderDialog({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-[100]">
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-xs bg-[var(--bg-elevated)] rounded-xl shadow-modal p-5 z-50">
+      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-xs bg-[var(--bg-elevated)] rounded-xl shadow-modal p-5 z-[100]">
         <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
           {t('spaces.moveToFolder')} &ldquo;{itemName}&rdquo;
         </h3>
