@@ -4,12 +4,12 @@
  * GET  /api/admin/repair-listids?mode=dry-run  — report only
  * POST /api/admin/repair-listids               — apply fixes (set listId=null)
  *
- * Requires admin role (via authenticateRequest).
+ * Requires admin role (via requireAdmin).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
-import { authenticateRequest } from '@/lib/server-auth';
+import { requireAdmin } from '@/lib/server-auth';
 
 const ORG = 'solis-center';
 
@@ -48,8 +48,8 @@ async function findViolations() {
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await authenticateRequest(req);
-    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAdmin(req);
+    if (auth instanceof Response) return auth;
 
     const result = await findViolations();
     return NextResponse.json({
@@ -66,8 +66,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await authenticateRequest(req);
-    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireAdmin(req);
+    if (auth instanceof Response) return auth;
 
     const result = await findViolations();
     if (result.violations.length === 0) {

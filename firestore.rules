@@ -347,9 +347,15 @@ service cloud.firestore {
            isManager(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId));
         allow update: if isSignedIn() &&
           (request.auth.uid == resource.data.userId ||
+           isManager(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId)) &&
+          (get(/databases/$(database)/documents/channels/$(channelId)).data.type == 'public' ||
+           request.auth.uid in get(/databases/$(database)/documents/channels/$(channelId)).data.members ||
            isManager(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId));
         allow delete: if isSignedIn() &&
           (request.auth.uid == resource.data.userId ||
+           isManager(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId)) &&
+          (get(/databases/$(database)/documents/channels/$(channelId)).data.type == 'public' ||
+           request.auth.uid in get(/databases/$(database)/documents/channels/$(channelId)).data.members ||
            isManager(get(/databases/$(database)/documents/channels/$(channelId)).data.orgId));
       }
 
@@ -373,7 +379,7 @@ service cloud.firestore {
     match /goals/{goalId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
 
       match /targets/{targetId} {
@@ -437,7 +443,8 @@ service cloud.firestore {
     match /time-entries/{entryId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId)
+        && (request.auth.uid == resource.data.userId || isManager(resource.data.orgId));
       allow delete: if isSignedIn() && (request.auth.uid == resource.data.userId || isManager(resource.data.orgId));
     }
 
