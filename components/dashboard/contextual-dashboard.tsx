@@ -12,7 +12,12 @@ import {
 import type { DashboardConfig, WidgetLayout, WidgetProps, DashboardScopeType } from '@/lib/dashboard-types';
 import WidgetGrid from './widget-grid';
 import DashboardBuilder from './dashboard-builder';
+import DrillDownDrawer from './drill-down-drawer';
+import TasksDrillDown from './drill-down/tasks-drill-down';
 import { Loader2, LayoutGrid } from 'lucide-react';
+import LiveAnalyticsBadge from './live-analytics-badge';
+import { useLiveAnalytics } from '@/lib/hooks/use-live-analytics';
+import { useFeatureFlag } from '@/lib/feature-flags';
 
 interface ContextualDashboardProps {
   scopeType: DashboardScopeType;
@@ -34,6 +39,13 @@ export default function ContextualDashboard({
 }: ContextualDashboardProps) {
   const { user, me, teams, allMembers, canSeeAllTeams, activeTeamId } = useAuth();
   const { lang } = useI18n();
+  const autoRefreshEnabled = useFeatureFlag('auto-refresh-analytics');
+  const liveAnalytics = useLiveAnalytics({
+    teamId: scopeType === 'space' ? scopeId : activeTeamId,
+    scope: scopeType,
+    scopeId,
+    enabled: autoRefreshEnabled,
+  });
 
   const [dashboard, setDashboard] = useState<DashboardConfig | null>(null);
   const [editing, setEditing] = useState(false);
@@ -117,6 +129,12 @@ export default function ContextualDashboard({
     });
   }, []);
 
+  // Drill-down
+  const [drillDown, setDrillDown] = useState<{ type: string; data: any } | null>(null);
+  const handleDrillDown = useCallback((type: string, data: any) => {
+    setDrillDown({ type, data });
+  }, []);
+
   const sharedProps: Omit<WidgetProps, 'config'> = useMemo(() => ({
     tasks,
     goals,
@@ -127,7 +145,8 @@ export default function ContextualDashboard({
     me,
     canSeeAllTeams,
     activeTeamId: scopeType === 'space' ? scopeId : (activeTeamId || '__all__'),
-  }), [tasks, goals, logs, teams, members, user, me, canSeeAllTeams, activeTeamId, scopeId, scopeType]);
+    onDrillDown: handleDrillDown,
+  }), [tasks, goals, logs, teams, members, user, me, canSeeAllTeams, activeTeamId, scopeId, scopeType, handleDrillDown]);
 
   if (loading) {
     return (
@@ -160,7 +179,7 @@ export default function ContextualDashboard({
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-4 flex items-center gap-2">
         <DashboardBuilder
           dashboard={dashboard}
           editing={editing}
@@ -168,6 +187,14 @@ export default function ContextualDashboard({
           onEditingChange={setEditing}
           onUpdate={handleUpdateWidgets}
         />
+        {autoRefreshEnabled && (
+          <LiveAnalyticsBadge
+            lastUpdated={liveAnalytics.lastUpdated}
+            isStale={liveAnalytics.isStale}
+            onRefresh={liveAnalytics.refresh}
+            loading={liveAnalytics.loading}
+          />
+        )}
       </div>
       <WidgetGrid
         widgets={dashboard.widgets}
@@ -177,6 +204,26 @@ export default function ContextualDashboard({
         onReorder={handleReorder}
         onRemove={handleRemoveWidget}
       />
+
+      {/* Drill-down drawer */}
+      <DrillDownDrawer
+        open={!!drillDown}
+        onClose={() => setDrillDown(null)}
+        title={drillDown?.data?.teamName || drillDown?.type || 'Details'}
+      >
+        {drillDown && (
+          <TasksDrillDown
+            tasks={tasks.filter((tk: any) => {
+              if (drillDown.data?.teamId) return tk.teamId === drillDown.data.teamId;
+              if (drillDown.data?.status) return tk.status === drillDown.data.status;
+              if (drillDown.data?.priority) return tk.priority === drillDown.data.priority;
+              return true;
+            })}
+            teams={teams}
+            filter={drillDown.data}
+          />
+        )}
+      </DrillDownDrawer>
     </div>
   );
 }

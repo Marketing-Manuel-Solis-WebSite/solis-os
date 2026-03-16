@@ -2,7 +2,9 @@
 import { useState } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, CheckSquare, Plus, ChevronDown, Zap } from 'lucide-react';
+import { X, Check, CheckSquare, Plus, ChevronDown, Zap, LayoutTemplate } from 'lucide-react';
+import { useFeatureFlag } from '@/lib/feature-flags';
+import TaskTemplatePicker from '@/components/templates/task-template-picker';
 import {
   STATUSES, PRIORITIES, TASK_TYPES, VISIBILITY,
 } from './constants';
@@ -27,6 +29,8 @@ export default function TaskCreateModal({ members, teams, activeTeamId, lists, d
   const { t, lang } = useI18n();
   const { activeFields, groups, loading: fieldsLoading } = useCustomFieldDefs();
   const [mode, setMode] = useState<'quick' | 'full'>('quick');
+  const templatesFlagEnabled = useFeatureFlag('task-templates');
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [d, setD] = useState({
     title: '', description: '', status: 'todo', priority: 'medium', type: 'task',
     assignees: [] as string[], tags: [] as string[], dueDate: '', startDate: '', timeEstimate: '',
@@ -78,8 +82,19 @@ export default function TaskCreateModal({ members, teams, activeTeamId, lists, d
     }
   };
 
+  // Required fields check
+  const requiredFields = activeFields.filter(f => f.required);
+  const missingRequired = requiredFields.filter(f => {
+    const val = d.customFields[f.id];
+    if (val === undefined || val === null || val === '') return true;
+    if (Array.isArray(val) && val.length === 0) return true;
+    return false;
+  });
+  const hasRequiredMissing = missingRequired.length > 0;
+
   const submit = () => {
     if (!d.title.trim()) return;
+    if (hasRequiredMissing) return; // Block submit if required fields missing
     // Flush any pending tag input
     if (tagInput.trim()) {
       d.tags = [...d.tags, tagInput.trim()];
@@ -122,7 +137,7 @@ export default function TaskCreateModal({ members, teams, activeTeamId, lists, d
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && d.title.trim()) {
+    if (e.key === 'Enter' && d.title.trim() && !hasRequiredMissing) {
       e.preventDefault();
       submit();
     }
@@ -131,10 +146,13 @@ export default function TaskCreateModal({ members, teams, activeTeamId, lists, d
   const renderDynamicFieldInput = (fieldDef: typeof activeFields[number]) => {
     const val = d.customFields[fieldDef.id];
     const label = lang === 'es' ? fieldDef.nameEs : fieldDef.name;
+    const isMissing = fieldDef.required && (val === undefined || val === null || val === '' || (Array.isArray(val) && val.length === 0));
 
     return (
       <div key={fieldDef.id} className="flex items-center gap-2 mb-2">
-        <label className="text-sm text-[var(--text-muted)] w-36 shrink-0">{label}</label>
+        <label className={`text-sm w-36 shrink-0 ${isMissing ? 'text-red-400' : 'text-[var(--text-muted)]'}`}>
+          {label}{fieldDef.required && <span className="text-red-400 ml-0.5">*</span>}
+        </label>
         <div className="flex-1">
           <CustomFieldRenderer
             field={fieldDef}
@@ -172,13 +190,36 @@ export default function TaskCreateModal({ members, teams, activeTeamId, lists, d
           <Zap className="h-4 w-4 text-[var(--accent)]" />
           <h2 className="text-[17px] font-bold text-[var(--text-primary)]">{t('taskCreate.title')}</h2>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg hover:bg-[var(--bg-hover)] transition"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          {templatesFlagEnabled && (
+            <button
+              onClick={() => setTemplatePickerOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-[var(--accent)] hover:bg-[var(--accent)]/5 transition"
+            >
+              <LayoutTemplate className="h-3.5 w-3.5" />
+              {lang === 'es' ? 'Desde Plantilla' : 'From Template'}
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg hover:bg-[var(--bg-hover)] transition"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
+
+      {/* Template Picker */}
+      {templatesFlagEnabled && (
+        <TaskTemplatePicker
+          open={templatePickerOpen}
+          onOpenChange={setTemplatePickerOpen}
+          onApply={(taskData) => { onCreate(taskData); onClose(); }}
+          teamId={activeTeamId}
+          spaceId={activeTeamId}
+          listId={defaultListId || ''}
+        />
+      )}
 
       <div className="px-6 pb-6 space-y-3">
         {/* Title */}

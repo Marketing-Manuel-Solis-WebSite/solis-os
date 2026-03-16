@@ -19,12 +19,32 @@ import {
   LayoutDashboard, CheckSquare, FileText, MessageSquare, Zap, BarChart3,
   Users, Shield, LogOut, Menu, Bot, ChevronLeft, Sun, Moon, ChevronDown,
   Settings, Loader2, CalendarDays, MoreHorizontal, Target, Clock, PenTool, FileInput, Plug, Search,
-  Layers, Star, LayoutTemplate,
+  Layers, Star, LayoutTemplate, Share2, EyeOff, GripVertical, Eye,
 } from 'lucide-react';
 import SpaceSidebarTree from '@/components/spaces/space-sidebar-tree';
+import SpaceFeaturesPanel from '@/components/spaces/space-features-panel';
 import PwaInstallPrompt from '@/components/shared/pwa-install-prompt';
+import ShortcutsHelpModal from '@/components/shared/shortcuts-help-modal';
+import { useGlobalShortcuts } from '@/lib/hooks/use-global-shortcuts';
+import { useFeatureFlag } from '@/lib/feature-flags';
+import OnboardingWizard from '@/components/onboarding/onboarding-wizard';
+import { shouldShowOnboarding } from '@/lib/onboarding';
+import MobileNav from '@/components/mobile/mobile-nav';
+import { useIsMobile } from '@/lib/hooks/use-mobile-detect';
 import { FeatureGate } from '@/components/shared/feature-gate';
 import { getFavorites, type Favorite } from '@/lib/favorites';
+import {
+  getSidebarPreferences, saveSidebarPreferences, applySpaceOrder, reorderSpaces,
+  type SidebarPreferences, DEFAULT_SIDEBAR_PREFS,
+} from '@/lib/sidebar-preferences';
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext, verticalListSortingStrategy, useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -270,6 +290,23 @@ function SearchTrigger() {
 // ============================================
 // SHELL
 // ============================================
+// Sortable wrapper for space rows in sidebar
+function SortableSpaceRow({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    position: 'relative' as const,
+    zIndex: isDragging ? 10 : 'auto' as any,
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {children}
+    </div>
+  );
+}
+
 function Shell({ children }: { children: React.ReactNode }) {
   const { user, me, loading, isAdmin, isManager, canSeeAllTeams, teams } = useAuth();
   const { t } = useI18n();
@@ -296,6 +333,43 @@ function Shell({ children }: { children: React.ReactNode }) {
   const morePopRef = useRef<HTMLDivElement>(null);
   const [morePopover, setMorePopover] = useState(false);
 
+  // Space features panel
+  const [spaceFeaturesId, setSpaceFeaturesId] = useState<string | null>(null);
+
+  // Sidebar preferences (space order + hide)
+  const [sidebarPrefs, setSidebarPrefs] = useState<SidebarPreferences>(DEFAULT_SIDEBAR_PREFS);
+  const [showHiddenSpaces, setShowHiddenSpaces] = useState(false);
+  const sidebarPrefsSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    getSidebarPreferences(user.uid).then(setSidebarPrefs).catch(() => {});
+  }, [user?.uid]);
+
+  const persistSidebarPrefs = (next: SidebarPreferences) => {
+    setSidebarPrefs(next);
+    if (!user?.uid) return;
+    if (sidebarPrefsSaveTimer.current) clearTimeout(sidebarPrefsSaveTimer.current);
+    sidebarPrefsSaveTimer.current = setTimeout(() => {
+      saveSidebarPreferences(user.uid!, next).catch(() => {});
+    }, 600);
+  };
+
+  const hideSpace = (spaceId: string) => {
+    const next = { ...sidebarPrefs, hiddenSpaces: [...sidebarPrefs.hiddenSpaces, spaceId] };
+    persistSidebarPrefs(next);
+  };
+
+  const unhideSpace = (spaceId: string) => {
+    const next = { ...sidebarPrefs, hiddenSpaces: sidebarPrefs.hiddenSpaces.filter(id => id !== spaceId) };
+    persistSidebarPrefs(next);
+  };
+
+  // DnD sensors
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
   // Favorites
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
@@ -308,11 +382,33 @@ function Shell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { if (!loading && !user) router.push('/login'); }, [loading, user, router]);
 
+  // --- Global Shortcuts ---
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
+  const shortcutsEnabled = useFeatureFlag('global-shortcuts');
+  useGlobalShortcuts({
+    onNavigate: router.push,
+    onNewTask: () => { /* TODO: open task create modal */ },
+    onShowHelp: () => setShortcutsHelpOpen(true),
+    enabled: shortcutsEnabled && !loading,
+  });
+
+  // --- Onboarding ---
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const onboardingEnabled = useFeatureFlag('onboarding-wizard');
+  useEffect(() => {
+    if (!user?.uid || !onboardingEnabled) return;
+    shouldShowOnboarding(user.uid).then(show => setShowOnboarding(show)).catch(() => {});
+  }, [user?.uid, onboardingEnabled]);
+
+  // --- Mobile ---
+  const isMobile = useIsMobile();
+
   // Prefetch all main nav routes for instant navigation
   useEffect(() => {
     [...NAV, ...MORE_NAV].forEach(n => router.prefetch(n.href));
     router.prefetch('/app/admin');
     router.prefetch('/app/spaces');
+    router.prefetch('/app/shared');
   }, [router]);
 
   if (loading) return (
@@ -326,11 +422,13 @@ function Shell({ children }: { children: React.ReactNode }) {
   if (!user || !me) return null;
 
   // Spaces: only teams the user belongs to (or all for admin)
-  const sidebarTeams = teams.filter(team => {
+  const sidebarTeamsRaw = teams.filter(team => {
     if (team.status === 'archived') return false;
     if (canSeeAllTeams) return true;
     return me.teamId === team.id || me.teamIds?.includes(team.id);
   });
+  const sidebarTeams = applySpaceOrder(sidebarTeamsRaw, sidebarPrefs);
+  const hiddenTeams = sidebarTeamsRaw.filter(t => sidebarPrefs.hiddenSpaces.includes(t.id));
 
   const isActive = (h: string) => h === '/app' ? path === '/app' : path.startsWith(h);
   const navTo = (href: string) => { router.push(href); if (window.innerWidth < 768) setOpen(false); };
@@ -479,6 +577,36 @@ function Shell({ children }: { children: React.ReactNode }) {
             )}
           </FeatureGate>
 
+          {/* Shared with me */}
+          {open ? (
+            <button
+              onClick={() => navTo('/app/shared')}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-200 relative ${
+                path === '/app/shared'
+                  ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
+                  : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
+              }`}
+            >
+              {path === '/app/shared' && (
+                <motion.div layoutId="nav-indicator-shared" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+              )}
+              <Share2 className="h-5 w-5 shrink-0" strokeWidth={1.75} />
+              <span className="truncate">{t('shared.title')}</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => navTo('/app/shared')}
+              className={`w-full flex items-center justify-center py-2 rounded-lg text-sm transition-all duration-200 ${
+                path === '/app/shared'
+                  ? 'text-[var(--sidebar-text-active)]'
+                  : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
+              }`}
+              title={t('shared.title')}
+            >
+              <Share2 className="h-5 w-5" strokeWidth={1.75} />
+            </button>
+          )}
+
           {/* Spaces section */}
           {sidebarTeams.length > 0 && (
             open ? (
@@ -510,61 +638,135 @@ function Shell({ children }: { children: React.ReactNode }) {
                       transition={{ duration: 0.2, ease: EASE }}
                       className="overflow-hidden"
                     >
-                      <div className="pl-3 space-y-0.5">
-                        {sidebarTeams.map(st => {
-                          const spaceHref = `/app/spaces/${st.id}`;
-                          const spaceActive = path.startsWith(spaceHref);
-                          const spaceExpanded = expandedSpaces.has(st.id);
-                          return (
-                            <div key={st.id}>
-                              <div className="flex items-center">
-                                <button
-                                  onClick={() => { navTo(spaceHref); if (!spaceExpanded) toggleSpaceExpand(st.id); }}
-                                  className={`flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200 relative ${
-                                    spaceActive
-                                      ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
-                                      : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
-                                  }`}
-                                >
-                                  {spaceActive && (
-                                    <motion.div layoutId={`nav-indicator-space-${st.id}`} className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-r-full" style={{ backgroundColor: st.color || 'var(--accent)' }} transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
-                                  )}
-                                  <span className="text-sm shrink-0">{st.icon || '📁'}</span>
-                                  <span className="truncate">{st.name}</span>
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); toggleSpaceExpand(st.id); }}
-                                  className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--sidebar-hover)] transition mr-1"
-                                >
-                                  <ChevronDown className={`h-3 w-3 transition-transform duration-150 ${spaceExpanded ? 'rotate-180' : ''}`} />
-                                </button>
-                              </div>
-                              <AnimatePresence>
-                                {spaceExpanded && (
-                                  <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    transition={{ duration: 0.15, ease: EASE }}
-                                    className="overflow-hidden"
-                                  >
-                                    <div className="pl-3">
-                                      <SpaceSidebarTree
-                                        spaceId={st.id}
-                                        spaceName={st.name}
-                                        spaceColor={st.color}
-                                        spaceIcon={st.icon}
-                                        userId={user?.uid || ''}
-                                        canManage={isManager}
-                                      />
+                      <DndContext
+                        sensors={dndSensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={(event: DragEndEvent) => {
+                          const { active, over } = event;
+                          if (!over || active.id === over.id) return;
+                          const ids = sidebarTeams.map(s => s.id);
+                          const oldIndex = ids.indexOf(active.id as string);
+                          const newIndex = ids.indexOf(over.id as string);
+                          if (oldIndex === -1 || newIndex === -1) return;
+                          const newOrder = reorderSpaces(sidebarPrefs.spaceOrder, sidebarTeamsRaw.map(s => s.id), oldIndex, newIndex);
+                          persistSidebarPrefs({ ...sidebarPrefs, spaceOrder: newOrder });
+                        }}
+                      >
+                        <SortableContext items={sidebarTeams.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                          <div className="pl-3 space-y-0.5">
+                            {sidebarTeams.map(st => {
+                              const spaceHref = `/app/spaces/${st.id}`;
+                              const spaceActive = path.startsWith(spaceHref);
+                              const spaceExpanded = expandedSpaces.has(st.id);
+                              return (
+                                <SortableSpaceRow key={st.id} id={st.id}>
+                                  <div className="flex items-center group">
+                                    <div className="opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-0.5 text-[var(--text-muted)]">
+                                      <GripVertical className="h-3 w-3" />
                                     </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </div>
-                          );
-                        })}
-                      </div>
+                                    <button
+                                      onClick={() => { navTo(spaceHref); if (!spaceExpanded) toggleSpaceExpand(st.id); }}
+                                      className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all duration-200 relative ${
+                                        spaceActive
+                                          ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
+                                          : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
+                                      }`}
+                                    >
+                                      {spaceActive && (
+                                        <motion.div layoutId={`nav-indicator-space-${st.id}`} className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-3 rounded-r-full" style={{ backgroundColor: st.color || 'var(--accent)' }} transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+                                      )}
+                                      <span className="text-sm shrink-0">{st.icon || '📁'}</span>
+                                      <span className="truncate">{st.name}</span>
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); hideSpace(st.id); }}
+                                      className="p-0.5 rounded text-[var(--text-muted)] hover:text-amber-400 hover:bg-[var(--sidebar-hover)] transition opacity-0 group-hover:opacity-100"
+                                      title={t('spaces.hide') || 'Hide'}
+                                    >
+                                      <EyeOff className="h-3 w-3" />
+                                    </button>
+                                    {isManager && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setSpaceFeaturesId(spaceFeaturesId === st.id ? null : st.id); }}
+                                        className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--sidebar-hover)] transition opacity-0 group-hover:opacity-100"
+                                        title={t('common.settings')}
+                                      >
+                                        <Settings className="h-3 w-3" />
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); toggleSpaceExpand(st.id); }}
+                                      className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--sidebar-hover)] transition mr-1"
+                                    >
+                                      <ChevronDown className={`h-3 w-3 transition-transform duration-150 ${spaceExpanded ? 'rotate-180' : ''}`} />
+                                    </button>
+                                  </div>
+                                  <AnimatePresence>
+                                    {spaceExpanded && (
+                                      <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.15, ease: EASE }}
+                                        className="overflow-hidden"
+                                      >
+                                        <div className="pl-3">
+                                          <SpaceSidebarTree
+                                            spaceId={st.id}
+                                            spaceName={st.name}
+                                            spaceColor={st.color}
+                                            spaceIcon={st.icon}
+                                            userId={user?.uid || ''}
+                                            canManage={isManager}
+                                          />
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </SortableSpaceRow>
+                              );
+                            })}
+                          </div>
+                        </SortableContext>
+                      </DndContext>
+
+                      {/* Hidden spaces reveal */}
+                      {hiddenTeams.length > 0 && (
+                        <div className="pl-3 mt-1">
+                          <button
+                            onClick={() => setShowHiddenSpaces(!showHiddenSpaces)}
+                            className="w-full flex items-center gap-2 px-2.5 py-1 rounded-lg text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--sidebar-hover)] transition"
+                          >
+                            <EyeOff className="h-3 w-3" />
+                            {hiddenTeams.length} {t('spaces.hidden') || 'hidden'}
+                            <ChevronDown className={`h-3 w-3 ml-auto transition-transform ${showHiddenSpaces ? 'rotate-180' : ''}`} />
+                          </button>
+                          <AnimatePresence>
+                            {showHiddenSpaces && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-hidden"
+                              >
+                                {hiddenTeams.map(ht => (
+                                  <div key={ht.id} className="flex items-center gap-2 px-2.5 py-1 group">
+                                    <span className="text-sm shrink-0 opacity-50">{ht.icon || '📁'}</span>
+                                    <span className="text-[12px] text-[var(--text-muted)] truncate flex-1">{ht.name}</span>
+                                    <button
+                                      onClick={() => unhideSpace(ht.id)}
+                                      className="p-0.5 rounded text-[var(--text-muted)] hover:text-emerald-400 hover:bg-[var(--sidebar-hover)] transition opacity-0 group-hover:opacity-100"
+                                      title={t('spaces.unhide') || 'Show'}
+                                    >
+                                      <Eye className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -779,6 +981,44 @@ function Shell({ children }: { children: React.ReactNode }) {
           </AnimatePresence>
         </main>
       </motion.div>
+
+      {/* Space Features Panel (slide-over) */}
+      <AnimatePresence>
+        {spaceFeaturesId && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSpaceFeaturesId(null)}
+              className="fixed inset-0 bg-black/40 z-50"
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ duration: 0.25, ease: EASE }}
+              className="fixed right-0 top-0 h-full w-[480px] max-w-[90vw] bg-[var(--bg-base)] shadow-2xl z-50 overflow-y-auto border-l border-[var(--border)]"
+            >
+              <SpaceFeaturesPanel
+                spaceId={spaceFeaturesId}
+                onClose={() => setSpaceFeaturesId(null)}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Global Shortcuts Help */}
+      <ShortcutsHelpModal open={shortcutsHelpOpen} onOpenChange={setShortcutsHelpOpen} />
+
+      {/* Onboarding Wizard */}
+      {user?.uid && showOnboarding && (
+        <OnboardingWizard userId={user.uid} open={showOnboarding} onClose={() => setShowOnboarding(false)} />
+      )}
+
+      {/* Mobile Bottom Nav */}
+      {isMobile && <MobileNav />}
     </div>
   );
 }

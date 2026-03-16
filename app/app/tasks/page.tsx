@@ -16,14 +16,19 @@ import { useToast } from '@/components/notifications/toast-provider';
 
 import TaskSidebar from '@/components/tasks/task-sidebar';
 import TaskToolbar from '@/components/tasks/task-toolbar';
-import TaskListView from '@/components/tasks/task-list-view';
-import TaskBoardView from '@/components/tasks/task-board-view';
-import TaskCalendarView from '@/components/tasks/task-calendar-view';
 import TaskDetailDrawer from '@/components/tasks/task-detail-drawer';
 import TaskCreateModal from '@/components/tasks/task-create-modal';
 import ImportWizard from '@/components/tasks/import-wizard';
 import TaskBulkActions from '@/components/tasks/task-bulk-actions';
 import TaskEmptyState from '@/components/tasks/task-empty-state';
+import ArtifactViewRenderer from '@/components/views/artifact-view-renderer';
+import AddViewMenu from '@/components/views/add-view-menu';
+
+// View registry — registers all 7 built-in views (list, board, calendar, table, gantt, timeline, workload)
+import '@/lib/views/register-views';
+import { getView } from '@/lib/views';
+import { getViewsForScope, createView as createFirestoreView, pinView, setDefaultView, shareViewByLink } from '@/lib/views/view-db';
+import type { ViewDefinition } from '@/types';
 
 import {
   Task, ViewType, FilterState, EMPTY_FILTERS, SavedView, TaskGroup,
@@ -79,6 +84,10 @@ export default function TasksPage() {
   const [showImport, setShowImport] = useState(false);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
 
+  // Firestore first-class views + artifact views
+  const [firestoreViews, setFirestoreViews] = useState<ViewDefinition[]>([]);
+  const [activeArtifactView, setActiveArtifactView] = useState<{ type: string; id: string } | null>(null);
+
   // ─── Load preferences from Firestore ───────────────────
   useEffect(() => {
     if (!user?.uid) return;
@@ -116,6 +125,38 @@ export default function TasksPage() {
     prefsSaveTimer.current = setTimeout(() => {
       saveUserPreferences(user.uid!, PREFS_KEY, next).catch((err) => console.error('[Tasks] save preferences failed:', err));
     }, 800);
+  }, [user?.uid]);
+
+  // ─── Load Firestore views (global scope) ──────────────
+  useEffect(() => {
+    if (!user?.uid) return;
+    getViewsForScope('global', '__all__', user.uid)
+      .then(setFirestoreViews)
+      .catch(() => setFirestoreViews([]));
+  }, [user?.uid]);
+
+  // ─── Firestore view handlers ────────────────────────────
+  const handlePinView = useCallback(async (viewId: string, pinned: boolean) => {
+    await pinView(viewId, pinned);
+    setFirestoreViews(vs => vs.map(v => v.id === viewId ? { ...v, isPinned: pinned } as any : v));
+  }, []);
+
+  const handleSetDefaultView = useCallback(async (viewId: string, isDefault: boolean) => {
+    await setDefaultView(viewId, isDefault);
+    setFirestoreViews(vs => vs.map(v => v.id === viewId ? { ...v, isDefault } as any : v));
+  }, []);
+
+  const handleShareViewLink = useCallback(async (viewId: string) => {
+    const token = await shareViewByLink(viewId);
+    setFirestoreViews(vs => vs.map(v => v.id === viewId ? { ...v, shareToken: token } as any : v));
+    toast.success(t('common.linkCopied'), '');
+    return token;
+  }, [toast, t]);
+
+  const handleAddArtifactView = useCallback(async (viewType: string) => {
+    if (!user?.uid) return;
+    // For artifact views, set a temporary in-memory artifact view
+    setActiveArtifactView({ type: viewType, id: '' });
   }, [user?.uid]);
 
   // ─── Load data ─────────────────────────────────────────
@@ -358,6 +399,69 @@ export default function TasksPage() {
     load();
   };
 
+  // ─── New Bulk Actions (Phase 1) ─────────────────────
+  const bulkTagAdd = async (tag: string) => {
+    if (!can('task', 'update')) return;
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map(id => {
+      const task = tasks.find(tk => tk.id === id);
+      if (!task) return Promise.resolve();
+      const currentTags = task.tags || [];
+      if (currentTags.includes(tag)) return Promise.resolve();
+      return updateTask(id, { tags: [...currentTags, tag] });
+    }));
+    setSelectedIds(new Set());
+    load();
+  };
+
+  const bulkTagRemove = async (tag: string) => {
+    if (!can('task', 'update')) return;
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map(id => {
+      const task = tasks.find(tk => tk.id === id);
+      if (!task) return Promise.resolve();
+      return updateTask(id, { tags: (task.tags || []).filter((t: string) => t !== tag) });
+    }));
+    setSelectedIds(new Set());
+    load();
+  };
+
+  const bulkDueDateSet = async (date: Date) => {
+    if (!can('task', 'update')) return;
+    const { Timestamp } = await import('firebase/firestore');
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map(id => updateTask(id, { dueDate: Timestamp.fromDate(date) })));
+    setSelectedIds(new Set());
+    load();
+  };
+
+  const bulkDuplicate = async () => {
+    if (!can('task', 'create')) return;
+    const ids = Array.from(selectedIds);
+    for (const id of ids) {
+      const task = tasks.find(tk => tk.id === id);
+      if (!task) continue;
+      await createTask({
+        title: `${task.title} (copy)`,
+        description: task.description || '',
+        status: task.status,
+        priority: task.priority,
+        type: task.type || 'task',
+        visibility: task.visibility || 'team',
+        assignees: task.assignees || [],
+        tags: task.tags || [],
+        teamId: task.teamId,
+        listId: task.listId || null,
+        customFields: task.customFields || {},
+        subtasks: [],
+        checklist: [],
+        createdBy: user!.uid,
+      } as any);
+    }
+    setSelectedIds(new Set());
+    load();
+  };
+
   // ─── Load more (cursor-based) ───────────────────────
   const handleLoadMore = async () => {
     if (!lastDocCursorRef.current) return;
@@ -496,6 +600,10 @@ export default function TasksPage() {
         case SHORTCUTS.viewList: handleViewChange('list'); break;
         case SHORTCUTS.viewBoard: handleViewChange('board'); break;
         case SHORTCUTS.viewCalendar: handleViewChange('calendar'); break;
+        case SHORTCUTS.viewTable: handleViewChange('table'); break;
+        case SHORTCUTS.viewGantt: handleViewChange('gantt'); break;
+        case SHORTCUTS.viewTimeline: handleViewChange('timeline'); break;
+        case SHORTCUTS.viewWorkload: handleViewChange('workload'); break;
         case SHORTCUTS.escape:
           if (selectedTask) setSelectedTask(null);
           else if (showCreate) setShowCreate(false);
@@ -573,7 +681,34 @@ export default function TasksPage() {
           onDeleteView={handleDeleteView}
           onDuplicateView={handleDuplicateView}
           onImport={can('task', 'create') ? () => setShowImport(true) : undefined}
+          firestoreViews={firestoreViews}
+          onPinView={(id: string) => handlePinView(id, true)}
+          onSetDefaultView={(id: string) => handleSetDefaultView(id, true)}
+          onShareViewLink={(id: string) => { handleShareViewLink(id); }}
         />
+
+        {/* Artifact view selector */}
+        <div className="flex items-center gap-2 px-4 pb-1">
+          <AddViewMenu
+            onSelect={(viewType) => {
+              const artifactTypes = ['dashboard', 'doc', 'form', 'whiteboard'];
+              if (artifactTypes.includes(viewType)) {
+                handleAddArtifactView(viewType);
+              } else {
+                handleViewChange(viewType);
+              }
+            }}
+            disabledTypes={[]}
+          />
+          {activeArtifactView && (
+            <button
+              onClick={() => setActiveArtifactView(null)}
+              className="text-[12px] text-[var(--text-muted)] hover:text-[var(--accent)]"
+            >
+              ← Back to tasks
+            </button>
+          )}
+        </div>
 
         {/* View content */}
         <div className="flex-1 overflow-hidden relative">
@@ -588,61 +723,65 @@ export default function TasksPage() {
               onCreateTask={() => setShowCreate(true)}
               onClearFilters={() => setFilters(EMPTY_FILTERS)}
             />
-          ) : (
+          ) : activeArtifactView ? (
+              <div className="h-full">
+                <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--border-subtle)]">
+                  <span className="text-sm text-[var(--text-muted)] capitalize">{activeArtifactView.type} view</span>
+                  <button
+                    onClick={() => setActiveArtifactView(null)}
+                    className="ml-auto text-[12px] text-[var(--accent)] hover:underline"
+                  >
+                    {t('common.back')} to tasks
+                  </button>
+                </div>
+                <ArtifactViewRenderer
+                  artifactType={activeArtifactView.type as any}
+                  artifactId={activeArtifactView.id}
+                  scopeType="global"
+                  scopeId="__all__"
+                  tasks={filteredTasks as any}
+                  goals={[]}
+                  members={members}
+                />
+              </div>
+            ) : (
             <AnimatePresence mode="wait">
-              {view === 'list' && (
-                <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
-                  <TaskListView
-                    groups={groups}
-                    members={members}
-                    teams={teams}
-                    selectedTask={selectedTask}
-                    selectedIds={selectedIds}
-                    sortBy={sortBy}
-                    sortDir={sortDir}
-                    canUpdate={can('task', 'update')}
-                    density={density}
-                    columns={columns}
-                    subtaskDisplay={subtaskDisplay}
-                    onSelect={setSelectedTask}
-                    onSelectionChange={setSelectedIds}
-                    onUpdate={doUpdate}
-                    onDelete={doDelete}
-                    onSortChange={(field) => {
-                      if (sortBy === field) handleSortDirToggle();
-                      else { handleSortByChange(field); setSortDir('asc'); persistPrefs({ lastSortDir: 'asc' }); }
-                    }}
-                    onQuickCreate={doCreate}
-                  />
-                </motion.div>
-              )}
-              {view === 'board' && (
-                <motion.div key="board" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
-                  <TaskBoardView
-                    groups={groups}
-                    members={members}
-                    teams={teams}
-                    selectedTask={selectedTask}
-                    canUpdate={can('task', 'update')}
-                    onSelect={setSelectedTask}
-                    onStatusChange={(taskId, newStatus) => doUpdate(taskId, 'status', newStatus)}
-                    onQuickCreate={doCreate}
-                  />
-                </motion.div>
-              )}
-              {view === 'calendar' && (
-                <motion.div key="calendar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
-                  <TaskCalendarView
-                    tasks={filteredTasks}
-                    members={members}
-                    selectedTask={selectedTask}
-                    calendarMode={calendarMode}
-                    onSelect={setSelectedTask}
-                    onDateChange={(taskId, newDate) => doUpdate(taskId, 'dueDate', newDate)}
-                    onModeChange={handleCalendarModeChange}
-                  />
-                </motion.div>
-              )}
+              {(() => {
+                const entry = getView(view);
+                if (!entry) return null;
+                const ViewComponent = entry.component;
+                return (
+                  <motion.div key={view} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
+                    <ViewComponent
+                      groups={groups}
+                      tasks={filteredTasks as any}
+                      members={members}
+                      teams={teams}
+                      selectedTask={selectedTask as any}
+                      canUpdate={can('task', 'update')}
+                      onSelect={setSelectedTask as any}
+                      onUpdate={doUpdate as any}
+                      onStatusChange={(taskId: string, newStatus: string) => doUpdate(taskId, 'status', newStatus)}
+                      onDelete={doDelete as any}
+                      onQuickCreate={doCreate as any}
+                      selectedIds={selectedIds}
+                      onSelectionChange={setSelectedIds}
+                      sortBy={sortBy}
+                      sortDir={sortDir}
+                      onSortChange={(field: string) => {
+                        if (sortBy === field) handleSortDirToggle();
+                        else { handleSortByChange(field); setSortDir('asc'); persistPrefs({ lastSortDir: 'asc' }); }
+                      }}
+                      density={density}
+                      columns={columns}
+                      subtaskDisplay={subtaskDisplay}
+                      calendarMode={calendarMode}
+                      onModeChange={handleCalendarModeChange}
+                      onDateChange={(taskId: string, newDate: Date) => doUpdate(taskId, 'dueDate', newDate)}
+                    />
+                  </motion.div>
+                );
+              })()}
             </AnimatePresence>
           )}
 
@@ -676,6 +815,10 @@ export default function TasksPage() {
                 onArchive={bulkArchive}
                 onDelete={bulkDelete}
                 onClear={() => setSelectedIds(new Set())}
+                onBulkTagAdd={bulkTagAdd}
+                onBulkTagRemove={bulkTagRemove}
+                onBulkDueDateSet={bulkDueDateSet}
+                onBulkDuplicate={bulkDuplicate}
               />
             )}
           </AnimatePresence>

@@ -606,6 +606,15 @@ service cloud.firestore {
       }
     }
 
+    // ======== TASK TEMPLATES ========
+
+    match /orgs/{orgId}/taskTemplates/{templateId} {
+      allow read: if isSignedIn() && isOrgMember(orgId);
+      allow create: if isSignedIn() && isManager(orgId);
+      allow update: if isSignedIn() && isManager(orgId) && resource.data.orgId == request.resource.data.orgId;
+      allow delete: if isSignedIn() && isAdmin(orgId);
+    }
+
     // ======== NOTIFICATIONS (top-level — legacy, LOCKED) ========
     // App uses orgs/{orgId}/notifications. This legacy collection is locked to prevent
     // abuse by any signed-in user. Read/update/delete for existing docs only.
