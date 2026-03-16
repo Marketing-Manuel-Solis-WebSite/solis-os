@@ -225,6 +225,26 @@ async function executeAction(
         }
         break;
       }
+      case 'apply_template': {
+        const templateId = action.config.templateId;
+        if (templateId) {
+          const { applyTaskTemplate } = await import('./task-templates');
+          const taskData = await applyTaskTemplate(templateId, {
+            teamId: ctx.task.teamId || '',
+            spaceId: ctx.task.spaceId || '',
+            listId: ctx.task.listId || '',
+            createdBy: 'automation',
+          });
+          await adminDb.collection('tasks').add({
+            ...taskData,
+            orgId: ORG,
+            parentTaskId: ctx.taskId, // Link to triggering task
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+        break;
+      }
       default:
         return { success: false, error: `Unsupported action type: ${action.type}` };
     }
