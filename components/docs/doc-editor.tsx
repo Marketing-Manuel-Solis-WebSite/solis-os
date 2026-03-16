@@ -691,7 +691,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
             onInsert={(text) => {
               if (useTiptap) {
                 // For TipTap, append to content
-                setContent(prev => prev + '\n' + text);
+                setContent((prev: string) => prev + '\n' + text);
                 setDirty(true);
               } else {
                 // For markdown, insert at cursor
@@ -705,7 +705,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
                   setDirty(true);
                 } else {
                   pushUndo(content);
-                  setContent(prev => prev + '\n' + text);
+                  setContent((prev: string) => prev + '\n' + text);
                   setDirty(true);
                 }
               }

@@ -87,7 +87,7 @@ export default function AnalyticsPage() {
                 <button onClick={async () => {
                   if (!user) return;
                   try {
-                    const isAdmin = me?.role === 'admin' || me?.role === 'director';
+                    const isAdmin = me?.role === 'admin' || me?.role === 'owner';
                     const dash = await ensureDefaultDashboard(user.uid, isAdmin);
                     setShareDashboard(dash);
                     setShowShare(true);

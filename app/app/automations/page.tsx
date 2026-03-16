@@ -490,7 +490,7 @@ export default function AutomationsPage() {
               trigger: data.trigger || 'task_created',
               triggerConfig: {},
               conditions: [],
-              actions: data.actions.map(a => ({ type: 'add_comment', config: { text: a } })),
+              actions: data.actions.map((a, i) => ({ id: `ai_${i}`, type: 'add_comment', config: { text: a } })),
               enabled: true,
               teamId: activeTeamId === '__all__' ? '' : activeTeamId,
               runCount: 0,
