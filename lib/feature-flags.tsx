@@ -105,6 +105,11 @@ const DEFAULT_FLAGS: FeatureFlags = {
   'pwa': false,
   'favorites': false,
   'multi-tenant': false,
+  // Phase 1 — ClickUp parity features
+  'view-team': false,
+  'global-shortcuts': false,
+  'auto-refresh-analytics': false,
+  'task-templates': false,
 };
 
 interface FeatureFlagContextValue {

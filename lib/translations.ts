@@ -226,6 +226,7 @@ export const translations: Record<Lang, Dict> = {
     'taskCreate.priority': 'Prioridad',
     'taskCreate.visibility': 'Visibilidad',
     'taskCreate.department': 'Departamento',
+    'taskCreate.dependencies': 'Dependencias',
     'taskCreate.assignees': 'Asignados',
     'taskCreate.startDate': 'Fecha inicio',
     'taskCreate.dueDate': 'Fecha límite',
@@ -612,6 +613,14 @@ export const translations: Record<Lang, Dict> = {
     'dashboard.widget.aiInsightsEmpty': 'Los insights se generarán automáticamente.',
     'dashboard.widget.burndownChart': 'Burndown',
     'dashboard.widget.burndownChartDesc': 'Gráfico de tareas restantes vs tiempo',
+    'dashboard.widget.portfolioSummary': 'Portafolio',
+    'dashboard.widget.portfolioSummaryDesc': 'Resumen de salud por espacio/proyecto',
+    'dashboard.widget.workloadHeatmap': 'Mapa de Carga',
+    'dashboard.widget.workloadHeatmapDesc': 'Distribucion de tareas por persona y dia',
+    'dashboard.widget.timeTrackingSummary': 'Tiempo Registrado',
+    'dashboard.widget.timeTrackingSummaryDesc': 'Resumen de horas por equipo',
+    'dashboard.widget.departmentMetrics': 'Metricas por Departamento',
+    'dashboard.widget.departmentMetricsDesc': 'KPIs por departamento con velocidad y tasa',
     'dashboard.goodMorning': 'Buenos días{name}',
     'dashboard.goodAfternoon': 'Buenas tardes{name}',
     'dashboard.goodEvening': 'Buenas noches{name}',
@@ -632,6 +641,9 @@ export const translations: Record<Lang, Dict> = {
     'spaces.openTasks': 'Tareas Abiertas',
     'spaces.noSpaces': 'No tienes acceso a ningún espacio.',
     'spaces.allSpaces': 'Todos los Espacios',
+    'spaces.hide': 'Ocultar',
+    'spaces.unhide': 'Mostrar',
+    'spaces.hidden': 'ocultos',
     'spaces.viewSpace': 'Ver Espacio',
     'spaces.quickActions': 'Acciones Rápidas',
     'spaces.viewTasks': 'Ver Tareas',
@@ -734,6 +746,10 @@ export const translations: Record<Lang, Dict> = {
     'admin.integrationsDesc': 'Webhooks',
     'admin.audit': 'Registro de Auditoría',
     'admin.auditDesc': 'Seguridad',
+    'admin.inspector': 'Inspector de Permisos',
+    'admin.inspectorDesc': '¿Quién ve qué?',
+    'admin.usage': 'Uso de la Plataforma',
+    'admin.usageDesc': 'Metricas y recursos',
 
     // Admin — Departments
     'admin.deptCreated': 'Departamento creado',
@@ -2120,6 +2136,12 @@ export const translations: Record<Lang, Dict> = {
     'pwa.install': 'Instalar',
     'pwa.dismiss': 'Ahora no',
 
+    // --- Shared with me ---
+    'shared.title': 'Compartido conmigo',
+    'shared.description': 'Items compartidos contigo desde otros espacios',
+    'shared.empty': 'Nadie ha compartido nada contigo aun.',
+    'shared.noResults': 'Sin resultados para este filtro.',
+
     // --- Favorites ---
     'favorites.title': 'Favoritos',
     'favorites.add': 'Agregar a favoritos',
@@ -2307,6 +2329,66 @@ export const translations: Record<Lang, Dict> = {
     'accessRequest.requestedBy': 'Solicitado por {name}',
     'accessRequest.requestedAccess': '{name} solicitó acceso a {resource}',
     'accessRequest.accessGranted': 'Tu solicitud de acceso a {resource} fue aprobada',
+
+    // --- Phase 1: Team View ---
+    'view.team': 'Equipo',
+    'team.capacity': 'Capacidad',
+    'team.overloaded': 'Sobrecargado',
+    'team.optimal': 'Óptimo',
+    'team.available': 'Disponible',
+    'team.weeklyCapacity': 'Capacidad Semanal',
+    'team.unassigned': 'Sin Asignar',
+    'team.taskCount': '{count} tareas',
+    'team.noTasks': 'Sin tareas asignadas',
+
+    // --- Phase 1: Activity View ---
+    'view.activity': 'Actividad',
+    'activity.filterByActor': 'Filtrar por Actor',
+    'activity.filterByAction': 'Filtrar por Acción',
+    'activity.noActivity': 'Sin actividad aún',
+    'activity.showAll': 'Mostrar Todo',
+    'activity.created': 'creó',
+    'activity.updated': 'actualizó',
+    'activity.deleted': 'eliminó',
+    'activity.automated': 'automatizó',
+    'activity.commented': 'comentó en',
+    'activity.today': 'Hoy',
+    'activity.yesterday': 'Ayer',
+    'activity.last24h': 'Últimas 24 horas',
+    'activity.last7d': 'Últimos 7 días',
+    'activity.last30d': 'Últimos 30 días',
+    'activity.events': 'eventos',
+
+    // --- Phase 1: Shortcuts ---
+    'shortcuts.title': 'Atajos de Teclado',
+    'shortcuts.navigation': 'Navegación',
+    'shortcuts.goToDashboard': 'Ir al Dashboard',
+    'shortcuts.goToTasks': 'Ir a Tareas',
+    'shortcuts.goToChat': 'Ir al Chat',
+    'shortcuts.goToDocs': 'Ir a Documentos',
+    'shortcuts.goToGoals': 'Ir a Objetivos',
+    'shortcuts.goToAnalytics': 'Ir a Analíticas',
+    'shortcuts.newTask': 'Nueva Tarea',
+    'shortcuts.showShortcuts': 'Mostrar Atajos',
+
+    // --- Phase 1: Bulk Actions ---
+    'bulkAction.addTag': 'Agregar Etiqueta',
+    'bulkAction.removeTag': 'Quitar Etiqueta',
+    'bulkAction.setDueDate': 'Establecer Fecha Límite',
+    'bulkAction.duplicate': 'Duplicar',
+    'bulkAction.tagPlaceholder': 'Nombre de etiqueta...',
+
+    // --- Phase 1: Analytics ---
+    'analytics.refreshing': 'Actualizando...',
+    'analytics.staleWarning': 'Los datos pueden estar desactualizados',
+    'analytics.justNow': 'Ahora',
+
+    // --- Phase 1: Task Templates ---
+    'templates.taskTemplate': 'Plantilla de Tarea',
+    'templates.applyTemplate': 'Aplicar Plantilla',
+    'templates.dueDateOffset': 'Fecha Límite Relativa (días)',
+    'templates.applied': 'Plantilla aplicada exitosamente',
+    'templates.noTaskTemplates': 'Aún no hay plantillas de tareas',
   },
 
   // ============================================================
@@ -2518,6 +2600,7 @@ export const translations: Record<Lang, Dict> = {
     'taskCreate.priority': 'Priority',
     'taskCreate.visibility': 'Visibility',
     'taskCreate.department': 'Department',
+    'taskCreate.dependencies': 'Dependencies',
     'taskCreate.assignees': 'Assignees',
     'taskCreate.startDate': 'Start date',
     'taskCreate.dueDate': 'Due date',
@@ -2904,6 +2987,14 @@ export const translations: Record<Lang, Dict> = {
     'dashboard.widget.aiInsightsEmpty': 'Insights will be generated automatically.',
     'dashboard.widget.burndownChart': 'Burndown Chart',
     'dashboard.widget.burndownChartDesc': 'Remaining tasks vs time chart',
+    'dashboard.widget.portfolioSummary': 'Portfolio',
+    'dashboard.widget.portfolioSummaryDesc': 'Health summary per space/project',
+    'dashboard.widget.workloadHeatmap': 'Workload Heatmap',
+    'dashboard.widget.workloadHeatmapDesc': 'Task distribution by person and day',
+    'dashboard.widget.timeTrackingSummary': 'Time Tracked',
+    'dashboard.widget.timeTrackingSummaryDesc': 'Hours summary by team',
+    'dashboard.widget.departmentMetrics': 'Department Metrics',
+    'dashboard.widget.departmentMetricsDesc': 'KPIs per department with velocity and rates',
     'dashboard.goodMorning': 'Good morning{name}',
     'dashboard.goodAfternoon': 'Good afternoon{name}',
     'dashboard.goodEvening': 'Good evening{name}',
@@ -2924,6 +3015,9 @@ export const translations: Record<Lang, Dict> = {
     'spaces.openTasks': 'Open Tasks',
     'spaces.noSpaces': 'You don\'t have access to any workspaces.',
     'spaces.allSpaces': 'All Workspaces',
+    'spaces.hide': 'Hide',
+    'spaces.unhide': 'Show',
+    'spaces.hidden': 'hidden',
     'spaces.viewSpace': 'View Space',
     'spaces.quickActions': 'Quick Actions',
     'spaces.viewTasks': 'View Tasks',
@@ -3026,6 +3120,10 @@ export const translations: Record<Lang, Dict> = {
     'admin.integrationsDesc': 'Webhooks',
     'admin.audit': 'Audit Logs',
     'admin.auditDesc': 'Security',
+    'admin.inspector': 'Permission Inspector',
+    'admin.inspectorDesc': 'Who sees what?',
+    'admin.usage': 'Platform Usage',
+    'admin.usageDesc': 'Metrics & resources',
 
     // Admin — Departments
     'admin.deptCreated': 'Department created',
@@ -4412,6 +4510,12 @@ export const translations: Record<Lang, Dict> = {
     'pwa.install': 'Install',
     'pwa.dismiss': 'Not now',
 
+    // --- Shared with me ---
+    'shared.title': 'Shared with me',
+    'shared.description': 'Items shared with you from other spaces',
+    'shared.empty': 'No one has shared anything with you yet.',
+    'shared.noResults': 'No results for this filter.',
+
     // --- Favorites ---
     'favorites.title': 'Favorites',
     'favorites.add': 'Add to favorites',
@@ -4599,5 +4703,65 @@ export const translations: Record<Lang, Dict> = {
     'accessRequest.requestedBy': 'Requested by {name}',
     'accessRequest.requestedAccess': '{name} requested access to {resource}',
     'accessRequest.accessGranted': 'Your access request to {resource} was approved',
+
+    // --- Phase 1: Team View ---
+    'view.team': 'Team',
+    'team.capacity': 'Capacity',
+    'team.overloaded': 'Overloaded',
+    'team.optimal': 'Optimal',
+    'team.available': 'Available',
+    'team.weeklyCapacity': 'Weekly Capacity',
+    'team.unassigned': 'Unassigned',
+    'team.taskCount': '{count} tasks',
+    'team.noTasks': 'No tasks assigned',
+
+    // --- Phase 1: Activity View ---
+    'view.activity': 'Activity',
+    'activity.filterByActor': 'Filter by Actor',
+    'activity.filterByAction': 'Filter by Action',
+    'activity.noActivity': 'No activity yet',
+    'activity.showAll': 'Show All',
+    'activity.created': 'created',
+    'activity.updated': 'updated',
+    'activity.deleted': 'deleted',
+    'activity.automated': 'automated',
+    'activity.commented': 'commented on',
+    'activity.today': 'Today',
+    'activity.yesterday': 'Yesterday',
+    'activity.last24h': 'Last 24 hours',
+    'activity.last7d': 'Last 7 days',
+    'activity.last30d': 'Last 30 days',
+    'activity.events': 'events',
+
+    // --- Phase 1: Shortcuts ---
+    'shortcuts.title': 'Keyboard Shortcuts',
+    'shortcuts.navigation': 'Navigation',
+    'shortcuts.goToDashboard': 'Go to Dashboard',
+    'shortcuts.goToTasks': 'Go to Tasks',
+    'shortcuts.goToChat': 'Go to Chat',
+    'shortcuts.goToDocs': 'Go to Docs',
+    'shortcuts.goToGoals': 'Go to Goals',
+    'shortcuts.goToAnalytics': 'Go to Analytics',
+    'shortcuts.newTask': 'New Task',
+    'shortcuts.showShortcuts': 'Show Shortcuts',
+
+    // --- Phase 1: Bulk Actions ---
+    'bulkAction.addTag': 'Add Tag',
+    'bulkAction.removeTag': 'Remove Tag',
+    'bulkAction.setDueDate': 'Set Due Date',
+    'bulkAction.duplicate': 'Duplicate',
+    'bulkAction.tagPlaceholder': 'Enter tag name...',
+
+    // --- Phase 1: Analytics ---
+    'analytics.refreshing': 'Refreshing...',
+    'analytics.staleWarning': 'Data may be outdated',
+    'analytics.justNow': 'Just now',
+
+    // --- Phase 1: Task Templates ---
+    'templates.taskTemplate': 'Task Template',
+    'templates.applyTemplate': 'Apply Template',
+    'templates.dueDateOffset': 'Due Date Offset (days)',
+    'templates.applied': 'Template applied successfully',
+    'templates.noTaskTemplates': 'No task templates yet',
   },
 };

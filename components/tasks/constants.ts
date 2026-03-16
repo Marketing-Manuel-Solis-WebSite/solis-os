@@ -83,6 +83,7 @@ export const VIEWS = [
   { id: 'gantt' as ViewType, Icon: GanttChart, shortcut: '5' },
   { id: 'timeline' as ViewType, Icon: Clock, shortcut: '6' },
   { id: 'workload' as ViewType, Icon: BarChart3, shortcut: '7' },
+  { id: 'team' as ViewType, Icon: Users, shortcut: '8' },
 ] as const;
 
 export const CALENDAR_MODES = [
@@ -208,6 +209,11 @@ export const SHORTCUTS = {
   viewList: '1',
   viewBoard: '2',
   viewCalendar: '3',
+  viewTable: '4',
+  viewGantt: '5',
+  viewTimeline: '6',
+  viewWorkload: '7',
+  viewTeam: '8',
   escape: 'Escape',
   delete: 'Delete',
 } as const;
@@ -292,6 +298,7 @@ export const ALL_COLUMNS: ColumnDef[] = [
   { id: 'timeEstimate', labelKey: 'taskCreate.timeEstimate', width: 'w-20', sortable: true, hideable: true, defaultVisible: false },
   { id: 'created', labelKey: 'taskDetail.created', width: 'w-28', sortable: true, hideable: true, defaultVisible: false },
   { id: 'team', labelKey: 'taskCreate.department', width: 'w-24', sortable: false, hideable: true, defaultVisible: false },
+  { id: 'dependencies', labelKey: 'taskCreate.dependencies', width: 'w-24', sortable: false, hideable: true, defaultVisible: false },
 ];
 
 // =============================================

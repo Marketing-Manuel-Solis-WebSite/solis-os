@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, ArrowRight, Flag, UserPlus, Calendar, FolderInput, Archive, List } from 'lucide-react';
+import { X, Trash2, ArrowRight, Flag, UserPlus, Calendar, FolderInput, Archive, List, Tag, Copy } from 'lucide-react';
 import { STATUSES, PRIORITIES } from './constants';
 
 interface Props {
@@ -20,6 +20,10 @@ interface Props {
   onArchive: () => void;
   onDelete: () => void;
   onClear: () => void;
+  onBulkTagAdd?: (tag: string) => void;
+  onBulkTagRemove?: (tag: string) => void;
+  onBulkDueDateSet?: (date: Date) => void;
+  onBulkDuplicate?: () => void;
 }
 
 function DropUp({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
@@ -74,8 +78,13 @@ export default function TaskBulkActions({
   onArchive,
   onDelete,
   onClear,
+  onBulkTagAdd,
+  onBulkTagRemove,
+  onBulkDueDateSet,
+  onBulkDuplicate,
 }: Props) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const [tagInput, setTagInput] = useState('');
 
   return (
     <motion.div
@@ -188,6 +197,66 @@ export default function TaskBulkActions({
             </button>
           ))}
         </DropUp>
+      )}
+
+      {/* Tag add/remove */}
+      {(onBulkTagAdd || onBulkTagRemove) && (
+        <DropUp icon={<Tag className="h-3.5 w-3.5" />} label={lang === 'es' ? 'Etiqueta' : 'Tag'}>
+          <div className="p-2">
+            <input
+              type="text"
+              value={tagInput}
+              onChange={e => setTagInput(e.target.value)}
+              placeholder={lang === 'es' ? 'Nombre de etiqueta...' : 'Enter tag name...'}
+              className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-tertiary)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] border-0 focus:ring-1 focus:ring-[var(--accent)] outline-none mb-2"
+              onKeyDown={e => { if (e.key === 'Enter' && tagInput.trim() && onBulkTagAdd) { onBulkTagAdd(tagInput.trim()); setTagInput(''); } }}
+            />
+            <div className="flex gap-1.5">
+              {onBulkTagAdd && (
+                <button
+                  onClick={() => { if (tagInput.trim()) { onBulkTagAdd(tagInput.trim()); setTagInput(''); } }}
+                  disabled={!tagInput.trim()}
+                  className="flex-1 h-7 rounded-lg text-[11px] font-medium bg-[var(--accent)] text-[var(--accent-text)] disabled:opacity-40 transition"
+                >
+                  {lang === 'es' ? 'Agregar' : 'Add'}
+                </button>
+              )}
+              {onBulkTagRemove && (
+                <button
+                  onClick={() => { if (tagInput.trim()) { onBulkTagRemove(tagInput.trim()); setTagInput(''); } }}
+                  disabled={!tagInput.trim()}
+                  className="flex-1 h-7 rounded-lg text-[11px] font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)] disabled:opacity-40 transition"
+                >
+                  {lang === 'es' ? 'Quitar' : 'Remove'}
+                </button>
+              )}
+            </div>
+          </div>
+        </DropUp>
+      )}
+
+      {/* Due date */}
+      {onBulkDueDateSet && (
+        <DropUp icon={<Calendar className="h-3.5 w-3.5" />} label={lang === 'es' ? 'Fecha' : 'Date'}>
+          <div className="p-2">
+            <input
+              type="date"
+              className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-tertiary)] text-[12px] text-[var(--text-primary)] border-0 focus:ring-1 focus:ring-[var(--accent)] outline-none"
+              onChange={e => { if (e.target.value) onBulkDueDateSet(new Date(e.target.value)); }}
+            />
+          </div>
+        </DropUp>
+      )}
+
+      {/* Duplicate */}
+      {onBulkDuplicate && (
+        <button
+          onClick={onBulkDuplicate}
+          className="flex items-center gap-2 h-9 px-3 rounded-lg text-[13px] font-medium text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-hover)] transition-colors"
+        >
+          <Copy className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">{lang === 'es' ? 'Duplicar' : 'Duplicate'}</span>
+        </button>
       )}
 
       {/* Archive */}

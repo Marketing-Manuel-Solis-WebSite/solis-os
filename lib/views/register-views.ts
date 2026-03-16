@@ -14,6 +14,8 @@ import TaskTableView from '@/components/tasks/task-table-view';
 import TaskGanttView from '@/components/tasks/task-gantt-view';
 import TaskTimelineView from '@/components/tasks/task-timeline-view';
 import TaskWorkloadView from '@/components/tasks/task-workload-view';
+import TaskTeamView from '@/components/tasks/task-team-view';
+import TaskActivityView from '@/components/tasks/task-activity-view';
 
 // Cast: each view component uses a subset of ViewProps — safe at runtime.
 registerView({
@@ -131,6 +133,41 @@ registerView({
   iconName: 'BarChart3',
   shortcut: '7',
   component: TaskWorkloadView as unknown as ComponentType<ViewProps>,
+  capabilities: {
+    groupBy: false,
+    sort: false,
+    filter: true,
+    density: false,
+    columns: false,
+    bulkSelect: false,
+    calendarMode: false,
+  },
+});
+
+registerView({
+  id: 'team',
+  name: 'Team',
+  nameEs: 'Equipo',
+  iconName: 'Users',
+  shortcut: '8',
+  component: TaskTeamView as unknown as ComponentType<ViewProps>,
+  capabilities: {
+    groupBy: false,
+    sort: false,
+    filter: true,
+    density: false,
+    columns: false,
+    bulkSelect: false,
+    calendarMode: false,
+  },
+});
+
+registerView({
+  id: 'activity',
+  name: 'Activity',
+  nameEs: 'Actividad',
+  iconName: 'Activity',
+  component: TaskActivityView as unknown as ComponentType<ViewProps>,
   capabilities: {
     groupBy: false,
     sort: false,
