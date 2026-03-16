@@ -10,7 +10,8 @@ export type CustomFieldType =
   | 'boolean' | 'date' | 'datetime'
   | 'email' | 'phone' | 'url'
   | 'single_select' | 'multi_select'
-  | 'user' | 'rating';
+  | 'user' | 'rating'
+  | 'formula' | 'rollup' | 'relationship';
 
 export type FieldScope = 'org' | 'space' | 'list';
 
@@ -35,6 +36,12 @@ export interface CustomFieldDef {
   scope?: FieldScope;
   /** ID of the space or list this field is scoped to. Null = org-wide. */
   scopeId?: string | null;
+  /** Formula config — only for type 'formula' */
+  formulaConfig?: { expression: string; resultType: 'number' | 'text' | 'boolean' | 'date' };
+  /** Rollup config — only for type 'rollup' */
+  rollupConfig?: { sourceRelation: 'subtasks' | 'child_tasks' | 'related_tasks'; sourceField: string; aggregation: 'sum' | 'avg' | 'min' | 'max' | 'count' | 'percent_done'; resultType: 'number' | 'percentage' };
+  /** Relationship config — only for type 'relationship' */
+  relationshipConfig?: { targetTypes: ('task' | 'doc' | 'goal')[]; relationType: string; allowMultiple: boolean };
 }
 
 export interface CustomFieldGroupDef {

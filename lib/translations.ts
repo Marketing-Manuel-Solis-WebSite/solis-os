@@ -2389,6 +2389,51 @@ export const translations: Record<Lang, Dict> = {
     'templates.dueDateOffset': 'Fecha Límite Relativa (días)',
     'templates.applied': 'Plantilla aplicada exitosamente',
     'templates.noTaskTemplates': 'Aún no hay plantillas de tareas',
+
+    // --- Phase 2: Scheduled Triggers ---
+    'automation.scheduledDaily': 'Diario programado',
+    'automation.scheduledWeekly': 'Semanal programado',
+    'automation.scheduledMonthly': 'Mensual programado',
+    'automation.atTime': 'A las',
+    'automation.dayOfWeek': 'Día de la semana',
+    'automation.dayOfMonth': 'Día del mes',
+    'automation.timezone': 'Zona horaria',
+    'automation.nextRun': 'Próxima ejecución',
+
+    // --- Phase 2: Formula/Rollup Fields ---
+    'customField.formula': 'Fórmula',
+    'customField.rollup': 'Resumen',
+    'customField.relationship': 'Relación',
+    'customField.expression': 'Expresión',
+    'customField.resultType': 'Tipo de resultado',
+    'customField.aggregation': 'Agregación',
+    'customField.sourceField': 'Campo origen',
+    'customField.sourceRelation': 'Relación origen',
+    'customField.formulaHelp': 'Usa {campo} para referenciar campos',
+
+    // --- Phase 2: Chat Trigger ---
+    'automation.chatMessageReceived': 'Mensaje de chat recibido',
+    'automation.messagePattern': 'Patrón del mensaje',
+    'automation.matchType': 'Tipo de coincidencia',
+    'automation.channelFilter': 'Filtro de canal',
+
+    // --- Phase 2: Onboarding ---
+    'onboarding.welcome': 'Bienvenido',
+    'onboarding.welcomeDesc': '¡Configuremos tu espacio de trabajo!',
+    'onboarding.createSpace': 'Crear un Espacio',
+    'onboarding.inviteMembers': 'Invitar Miembros',
+    'onboarding.createFirstTask': 'Crear tu Primera Tarea',
+    'onboarding.exploreViews': 'Explorar Vistas',
+    'onboarding.skip': 'Saltar todo',
+    'onboarding.done': '¡Listo!',
+    'onboarding.iKnowWhatImDoing': 'Ya sé lo que hago',
+    'onboarding.gettingStarted': 'Primeros Pasos',
+
+    // --- Phase 2: Relationship Field ---
+    'relationship.linkEntity': 'Vincular entidad',
+    'relationship.linkedEntities': 'Entidades vinculadas',
+    'relationship.targetTypes': 'Tipos permitidos',
+    'relationship.allowMultiple': 'Permitir múltiples',
   },
 
   // ============================================================
@@ -4763,5 +4808,50 @@ export const translations: Record<Lang, Dict> = {
     'templates.dueDateOffset': 'Due Date Offset (days)',
     'templates.applied': 'Template applied successfully',
     'templates.noTaskTemplates': 'No task templates yet',
+
+    // --- Phase 2: Scheduled Triggers ---
+    'automation.scheduledDaily': 'Scheduled Daily',
+    'automation.scheduledWeekly': 'Scheduled Weekly',
+    'automation.scheduledMonthly': 'Scheduled Monthly',
+    'automation.atTime': 'At',
+    'automation.dayOfWeek': 'Day of week',
+    'automation.dayOfMonth': 'Day of month',
+    'automation.timezone': 'Timezone',
+    'automation.nextRun': 'Next run',
+
+    // --- Phase 2: Formula/Rollup Fields ---
+    'customField.formula': 'Formula',
+    'customField.rollup': 'Rollup',
+    'customField.relationship': 'Relationship',
+    'customField.expression': 'Expression',
+    'customField.resultType': 'Result type',
+    'customField.aggregation': 'Aggregation',
+    'customField.sourceField': 'Source field',
+    'customField.sourceRelation': 'Source relation',
+    'customField.formulaHelp': 'Use {fieldName} to reference fields',
+
+    // --- Phase 2: Chat Trigger ---
+    'automation.chatMessageReceived': 'Chat message received',
+    'automation.messagePattern': 'Message pattern',
+    'automation.matchType': 'Match type',
+    'automation.channelFilter': 'Channel filter',
+
+    // --- Phase 2: Onboarding ---
+    'onboarding.welcome': 'Welcome',
+    'onboarding.welcomeDesc': 'Let\'s set up your workspace!',
+    'onboarding.createSpace': 'Create a Space',
+    'onboarding.inviteMembers': 'Invite Members',
+    'onboarding.createFirstTask': 'Create your First Task',
+    'onboarding.exploreViews': 'Explore Views',
+    'onboarding.skip': 'Skip all',
+    'onboarding.done': 'Done!',
+    'onboarding.iKnowWhatImDoing': 'I know what I\'m doing',
+    'onboarding.gettingStarted': 'Getting Started',
+
+    // --- Phase 2: Relationship Field ---
+    'relationship.linkEntity': 'Link entity',
+    'relationship.linkedEntities': 'Linked entities',
+    'relationship.targetTypes': 'Allowed types',
+    'relationship.allowMultiple': 'Allow multiple',
   },
 };

@@ -110,6 +110,14 @@ const DEFAULT_FLAGS: FeatureFlags = {
   'global-shortcuts': false,
   'auto-refresh-analytics': false,
   'task-templates': false,
+  // Phase 2 — ClickUp parity features
+  'automation-scheduled-triggers': false,
+  'formula-rollup-fields': false,
+  'automation-chat-trigger': false,
+  'onboarding-wizard': false,
+  'artifact-views': false,
+  'relationship-field': false,
+  'automation-apply-template': false,
 };
 
 interface FeatureFlagContextValue {
