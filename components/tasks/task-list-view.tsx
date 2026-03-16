@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown, ChevronRight, ChevronUp, Calendar,
   CheckSquare, Trash2, GripVertical, Paperclip, Repeat,
-  CheckCircle2, Plus,
+  CheckCircle2, Plus, CornerDownRight,
 } from 'lucide-react';
 import {
   STATUSES, PRIORITIES, TASK_TYPES, ALL_COLUMNS,
@@ -408,6 +408,10 @@ const TaskRow = React.memo(function TaskRow({
 
   const isDone = task.status === 'done';
 
+  // Nesting depth for subtask indentation
+  const nestDepth = task.parentTaskId ? (task.subtaskDepth ?? 1) : 0;
+  const nestIndent = nestDepth * 24; // 24px per level
+
   return (
     <>
       <motion.div
@@ -424,7 +428,7 @@ const TaskRow = React.memo(function TaskRow({
             ? 'bg-[var(--accent)]/5 border-[var(--accent)]/15'
             : 'border-transparent hover:bg-[var(--bg-elevated)] hover:border-[var(--border-subtle)] hover:shadow-sm'
         }`}
-        style={{ height: `${rowHeight}px` }}
+        style={{ height: `${rowHeight}px`, paddingLeft: nestIndent > 0 ? `${20 + nestIndent}px` : undefined }}
       >
         {/* Render each visible column */}
         {visibleCols.map((col) => {
@@ -494,6 +498,12 @@ const TaskRow = React.memo(function TaskRow({
               return (
                 <div key={col.id} className={`${widthCls} min-w-0`}>
                   <div className="flex items-center gap-2">
+                    {/* Subtask nesting connector */}
+                    {nestDepth > 0 && (
+                      <CornerDownRight
+                        className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)] opacity-40"
+                      />
+                    )}
                     <typeCfg.Icon
                       className="h-3.5 w-3.5 shrink-0 opacity-50"
                       style={{ color: typeCfg.color }}
@@ -507,6 +517,12 @@ const TaskRow = React.memo(function TaskRow({
                     >
                       {task.title}
                     </p>
+                    {/* "Subtask" label for nested tasks */}
+                    {nestDepth > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-muted)] font-medium whitespace-nowrap shrink-0">
+                        subtask
+                      </span>
+                    )}
                     {taskTeam && (
                       <span
                         className="hidden xl:inline-flex text-[9px] px-1.5 py-0.5 rounded-md font-medium shrink-0"

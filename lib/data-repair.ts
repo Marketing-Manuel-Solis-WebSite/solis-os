@@ -24,10 +24,39 @@ export async function findOrphanedRelations(): Promise<RepairResult> {
   const snap = await adminDb.collection('relations').where('orgId', '==', ORG).get();
   const orphaned: string[] = [];
 
+  // Collect all unique entity IDs to batch-check
+  const entityChecks = new Map<string, Set<string>>(); // collection -> ids
   for (const d of snap.docs) {
     const data = d.data();
-    const sourceExists = await entityExists(data.sourceType, data.sourceId);
-    const targetExists = await entityExists(data.targetType, data.targetId);
+    for (const [type, id] of [[data.sourceType, data.sourceId], [data.targetType, data.targetId]]) {
+      const col = type === 'task' ? 'tasks' : type === 'doc' ? 'docs' : type === 'goal' ? 'goals' : null;
+      if (col && id) {
+        if (!entityChecks.has(col)) entityChecks.set(col, new Set());
+        entityChecks.get(col)!.add(id);
+      }
+    }
+  }
+
+  // Batch check existence (10 concurrent)
+  const existsSet = new Set<string>(); // "collection/id"
+  for (const [col, ids] of entityChecks) {
+    const idArr = Array.from(ids);
+    for (let i = 0; i < idArr.length; i += 10) {
+      const chunk = idArr.slice(i, i + 10);
+      const snaps = await Promise.all(chunk.map(id => adminDb.doc(`${col}/${id}`).get()));
+      for (const s of snaps) {
+        if (s.exists && !s.data()?.deleted) existsSet.add(`${col}/${s.id}`);
+      }
+    }
+  }
+
+  // Check each relation against pre-computed set
+  for (const d of snap.docs) {
+    const data = d.data();
+    const sourceCol = data.sourceType === 'task' ? 'tasks' : data.sourceType === 'doc' ? 'docs' : data.sourceType === 'goal' ? 'goals' : null;
+    const targetCol = data.targetType === 'task' ? 'tasks' : data.targetType === 'doc' ? 'docs' : data.targetType === 'goal' ? 'goals' : null;
+    const sourceExists = sourceCol ? existsSet.has(`${sourceCol}/${data.sourceId}`) : false;
+    const targetExists = targetCol ? existsSet.has(`${targetCol}/${data.targetId}`) : false;
     if (!sourceExists || !targetExists) {
       orphaned.push(d.id);
     }
@@ -72,15 +101,41 @@ export async function findBrokenGoalTargetLinks(): Promise<RepairResult> {
   const goalsSnap = await adminDb.collection('goals').where('orgId', '==', ORG).get();
   const broken: string[] = [];
 
+  // Phase 1: Collect all unique task IDs across all targets
+  const allTaskIds = new Set<string>();
+  const targetLinks: { goalId: string; targetId: string; linkedIds: string[] }[] = [];
+
   for (const goalDoc of goalsSnap.docs) {
     const targetsSnap = await adminDb.collection(`goals/${goalDoc.id}/targets`).get();
     for (const targetDoc of targetsSnap.docs) {
       const linkedIds: string[] = targetDoc.data().linkedTaskIds || [];
-      for (const taskId of linkedIds) {
-        const taskSnap = await adminDb.doc(`tasks/${taskId}`).get();
-        if (!taskSnap.exists || taskSnap.data()?.deleted) {
-          broken.push(`goals/${goalDoc.id}/targets/${targetDoc.id} → task/${taskId}`);
-        }
+      if (linkedIds.length > 0) {
+        targetLinks.push({ goalId: goalDoc.id, targetId: targetDoc.id, linkedIds });
+        linkedIds.forEach(id => allTaskIds.add(id));
+      }
+    }
+  }
+
+  // Phase 2: Batch check existence (10 concurrent reads)
+  const BATCH_SIZE = 10;
+  const validTaskIds = new Set<string>();
+  const ids = Array.from(allTaskIds);
+
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const chunk = ids.slice(i, i + BATCH_SIZE);
+    const snaps = await Promise.all(chunk.map(id => adminDb.doc(`tasks/${id}`).get()));
+    for (const snap of snaps) {
+      if (snap.exists && !snap.data()?.deleted) {
+        validTaskIds.add(snap.id);
+      }
+    }
+  }
+
+  // Phase 3: Find broken links using pre-computed valid set
+  for (const { goalId, targetId, linkedIds } of targetLinks) {
+    for (const taskId of linkedIds) {
+      if (!validTaskIds.has(taskId)) {
+        broken.push(`goals/${goalId}/targets/${targetId} → task/${taskId}`);
       }
     }
   }
@@ -94,28 +149,44 @@ export async function repairBrokenGoalTargetLinks(): Promise<RepairResult> {
   let fixed = 0;
   const goalIdsToRecalc = new Set<string>();
 
+  // Phase 1: Collect all task IDs and batch-check existence
+  const allTaskIds = new Set<string>();
+  const targetData: { goalId: string; targetRef: FirebaseFirestore.DocumentReference; linkedIds: string[] }[] = [];
+
   for (const goalDoc of goalsSnap.docs) {
     const targetsSnap = await adminDb.collection(`goals/${goalDoc.id}/targets`).get();
     for (const targetDoc of targetsSnap.docs) {
       const linkedIds: string[] = targetDoc.data().linkedTaskIds || [];
-      const validIds: string[] = [];
-      let hasbroken = false;
-
-      for (const taskId of linkedIds) {
-        const taskSnap = await adminDb.doc(`tasks/${taskId}`).get();
-        if (taskSnap.exists && !taskSnap.data()?.deleted) {
-          validIds.push(taskId);
-        } else {
-          hasbroken = true;
-          found++;
-        }
+      if (linkedIds.length > 0) {
+        targetData.push({ goalId: goalDoc.id, targetRef: targetDoc.ref, linkedIds });
+        linkedIds.forEach(id => allTaskIds.add(id));
       }
+    }
+  }
 
-      if (hasbroken) {
-        await targetDoc.ref.update({ linkedTaskIds: validIds, updatedAt: FieldValue.serverTimestamp() });
-        fixed++;
-        goalIdsToRecalc.add(goalDoc.id);
+  // Phase 2: Batch check existence (10 concurrent reads)
+  const BATCH_SIZE = 10;
+  const validTaskIds = new Set<string>();
+  const ids = Array.from(allTaskIds);
+
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const chunk = ids.slice(i, i + BATCH_SIZE);
+    const snaps = await Promise.all(chunk.map(id => adminDb.doc(`tasks/${id}`).get()));
+    for (const snap of snaps) {
+      if (snap.exists && !snap.data()?.deleted) {
+        validTaskIds.add(snap.id);
       }
+    }
+  }
+
+  // Phase 3: Repair using pre-computed valid set
+  for (const { goalId, targetRef, linkedIds } of targetData) {
+    const validIds = linkedIds.filter(id => validTaskIds.has(id));
+    if (validIds.length < linkedIds.length) {
+      found += linkedIds.length - validIds.length;
+      await targetRef.update({ linkedTaskIds: validIds, updatedAt: FieldValue.serverTimestamp() });
+      fixed++;
+      goalIdsToRecalc.add(goalId);
     }
   }
 

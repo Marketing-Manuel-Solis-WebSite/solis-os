@@ -8,7 +8,8 @@ import {
   Plus, Trash2, Zap, ArrowRight, Power, PowerOff, ChevronDown, ChevronRight,
   Play, Pause, Filter, Clock, CheckSquare, Bell, Mail, MessageSquare, Bot,
   Users, Tag, Calendar, AlertTriangle, Edit2, Copy, Search, X, Settings, History,
-  Archive, Globe, ListPlus, GitBranch, ClipboardList, Sparkles,
+  Archive, Globe, ListPlus, GitBranch, ClipboardList, Sparkles, ShieldOff, RotateCcw,
+  Building2, FolderOpen, List,
 } from 'lucide-react';
 import AutomationTemplatePicker from '@/components/automations/automation-template-picker';
 import AISuggestionsPanel from '@/components/automations/ai-suggestions-panel';
@@ -98,8 +99,14 @@ interface AutoRule {
   branches?: BranchBlock[];
   enabled: boolean;
   teamId: string;
+  spaceId?: string;
+  folderId?: string;
+  listId?: string;
   runCount: number;
   errorCount?: number;
+  consecutiveErrors?: number;
+  disabledAt?: any;
+  disabledReason?: string;
   lastRunAt: any;
   createdAt: any;
 }
@@ -178,6 +185,11 @@ export default function AutomationsPage() {
     setTimeout(() => {
       setEditingRule({ ...rule, id: '', name: `${rule.name} (copy)` });
     }, 100);
+  };
+
+  const handleReEnable = async (rule: AutoRule) => {
+    await updateAutomation(rule.id, { enabled: true, disabledAt: null, disabledReason: null, consecutiveErrors: 0 });
+    load();
   };
 
   const handleSave = async (data: any) => {
@@ -327,8 +339,39 @@ export default function AutomationsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className={`text-sm font-semibold ${rule.enabled !== false ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>{rule.name}</p>
-                      {rule.enabled === false && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] font-semibold">{t('automations.disabled')}</span>}
+                      {rule.enabled === false && !rule.disabledAt && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] font-semibold">{t('automations.disabled')}</span>}
+                      {rule.disabledAt && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 font-bold flex items-center gap-1">
+                          <ShieldOff className="h-3 w-3" />
+                          {t('automations.autoDisabled')}
+                        </span>
+                      )}
+                      {(rule.consecutiveErrors || 0) > 0 && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-semibold">
+                          {t('automations.consecutiveErrors', { n: rule.consecutiveErrors || 0 })}
+                        </span>
+                      )}
+                      {rule.disabledAt && canManage && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleReEnable(rule); }}
+                          className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold hover:bg-emerald-500/20 transition"
+                          title={t('automations.reEnable')}
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          {t('automations.reEnable')}
+                        </button>
+                      )}
                     </div>
+                    {/* Scope label */}
+                    {(() => {
+                      const scopeSpace = rule.spaceId ? teams.find(tm => tm.id === rule.spaceId) : null;
+                      const scopeFolder = rule.folderId ? teams.find(tm => tm.id === rule.folderId) : null;
+                      const scopeList = rule.listId ? teams.find(tm => tm.id === rule.listId) : null;
+                      if (scopeList) return <p className="text-[11px] text-[var(--text-muted)] mt-0.5 flex items-center gap-1"><List className="h-3 w-3" />{t('automations.scopeList')}: {scopeList.icon} {scopeList.name}</p>;
+                      if (scopeFolder) return <p className="text-[11px] text-[var(--text-muted)] mt-0.5 flex items-center gap-1"><FolderOpen className="h-3 w-3" />{t('automations.scopeFolder')}: {scopeFolder.icon} {scopeFolder.name}</p>;
+                      if (scopeSpace) return <p className="text-[11px] text-[var(--text-muted)] mt-0.5 flex items-center gap-1"><Building2 className="h-3 w-3" />{t('automations.scopeSpace')}: {scopeSpace.icon} {scopeSpace.name}</p>;
+                      return null;
+                    })()}
                     {rule.description && <p className="text-[13px] text-[var(--text-muted)] mt-0.5 truncate">{rule.description}</p>}
 
                     {/* Flow visualization */}
@@ -522,6 +565,12 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
   const [teamId, setTeamId] = useState(initialData?.teamId || (activeTeamId === '__all__' ? '' : activeTeamId));
   const [step, setStep] = useState(0); // 0=trigger, 1=conditions, 2=actions, 3=review
 
+  // Scope state
+  const [scopeType, setScopeType] = useState<'org' | 'space' | 'folder' | 'list'>(
+    initialData?.listId ? 'list' : initialData?.folderId ? 'folder' : initialData?.spaceId ? 'space' : 'org'
+  );
+  const [scopeId, setScopeId] = useState(initialData?.listId || initialData?.folderId || initialData?.spaceId || '');
+
   const addCondition = () => {
     setConditions([...conditions, { id: Date.now().toString(), field: 'status', operator: 'equals', value: '' }]);
   };
@@ -559,6 +608,9 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
       actions,
       ...(branches.length > 0 ? { branches } : {}),
       teamId,
+      spaceId: scopeType === 'space' ? scopeId : '',
+      folderId: scopeType === 'folder' ? scopeId : '',
+      listId: scopeType === 'list' ? scopeId : '',
       enabled: true,
       runCount: 0,
     });
@@ -631,6 +683,48 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
                     </button>
                   );
                 })}
+              </div>
+
+              {/* Scope selector */}
+              <div className="mt-5">
+                <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-2 font-semibold">{t('automations.scope')}</label>
+                <div className="flex gap-2 mb-3">
+                  {([
+                    { id: 'org', label: t('automations.scopeOrg'), icon: Globe },
+                    { id: 'space', label: t('automations.scopeSpace'), icon: Building2 },
+                    { id: 'folder', label: t('automations.scopeFolder'), icon: FolderOpen },
+                    { id: 'list', label: t('automations.scopeList'), icon: List },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => { setScopeType(opt.id); if (opt.id === 'org') setScopeId(''); }}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                        scopeType === opt.id
+                          ? 'bg-[var(--accent-subtle)] text-[var(--accent)] shadow-card'
+                          : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                      }`}
+                    >
+                      <opt.icon className="h-3.5 w-3.5" />
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {scopeType !== 'org' && (
+                  <select
+                    value={scopeId}
+                    onChange={e => setScopeId(e.target.value)}
+                    className="select-dark w-full text-sm"
+                  >
+                    <option value="">
+                      {scopeType === 'space' ? (lang === 'es' ? 'Seleccionar espacio...' : 'Select space...') :
+                       scopeType === 'folder' ? (lang === 'es' ? 'Seleccionar carpeta...' : 'Select folder...') :
+                       (lang === 'es' ? 'Seleccionar lista...' : 'Select list...')}
+                    </option>
+                    {teams.map(tm => (
+                      <option key={tm.id} value={tm.id}>{tm.icon} {tm.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
           )}
@@ -966,6 +1060,23 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
                 <div>
                   <p className="text-lg font-bold text-[var(--text-primary)]">{name || 'Unnamed Rule'}</p>
                   {description && <p className="text-sm text-[var(--text-muted)] mt-1">{description}</p>}
+                  {scopeType !== 'org' && scopeId && (() => {
+                    const scopeEntity = teams.find(tm => tm.id === scopeId);
+                    const ScopeIcon = scopeType === 'space' ? Building2 : scopeType === 'folder' ? FolderOpen : List;
+                    const scopeLabel = scopeType === 'space' ? t('automations.scopeSpace') : scopeType === 'folder' ? t('automations.scopeFolder') : t('automations.scopeList');
+                    return (
+                      <p className="text-[12px] text-[var(--text-muted)] mt-1.5 flex items-center gap-1">
+                        <ScopeIcon className="h-3.5 w-3.5" />
+                        {t('automations.scope')}: {scopeLabel} — {scopeEntity ? `${scopeEntity.icon} ${scopeEntity.name}` : scopeId}
+                      </p>
+                    );
+                  })()}
+                  {scopeType === 'org' && (
+                    <p className="text-[12px] text-[var(--text-muted)] mt-1.5 flex items-center gap-1">
+                      <Globe className="h-3.5 w-3.5" />
+                      {t('automations.scope')}: {t('automations.scopeOrg')}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap">

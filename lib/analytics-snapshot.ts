@@ -1,9 +1,14 @@
 // ================================================================
 // Analytics Snapshot computation — shared by API route and cron
 // ================================================================
+// Scalability: Uses streamBatches() to process collections in chunks
+// of 1,000 docs. Uses .count().get() for pure-count collections.
+// Never loads more than 1,000 docs into memory at once.
+// ================================================================
 
 import { adminDb } from '@/lib/firebase-admin';
 import { ORG_ID as ORG } from '@/lib/org';
+import { streamBatches, countQuery } from '@/lib/firestore-batch-stream';
 
 
 
@@ -60,135 +65,185 @@ function daysAgoISO(days: number): string {
   return daysAgoDate(days).toISOString().split('T')[0];
 }
 
+// ---- Task accumulator ----
+interface TaskAcc {
+  total: number;
+  completedTasks: number;
+  tasksByStatus: Record<string, number>;
+  tasksByPriority: Record<string, number>;
+  overdueTasks: number;
+  completedLast7d: number;
+  createdLast7d: number;
+  completedLast30d: number;
+  createdLast30d: number;
+  deptTasks: Record<string, number>;
+  deptCompleted: Record<string, number>;
+}
+
+// ---- Goal accumulator ----
+interface GoalAcc {
+  total: number;
+  goalsByStatus: Record<string, number>;
+  goalsAtRisk: number;
+  totalProgress: number;
+}
+
+// ---- Time entry accumulator ----
+interface TimeAcc {
+  totalHoursLast7d: number;
+  totalHoursLast30d: number;
+  billableHoursLast30d: number;
+  nonBillableHoursLast30d: number;
+}
+
+// ---- Doc accumulator ----
+interface DocAcc {
+  total: number;
+  totalWords: number;
+  docsByVisibility: Record<string, number>;
+  topDocs: { id: string; title: string; wordCount: number; teamId: string; visibility: string }[];
+  deptDocs: Record<string, number>;
+  deptWords: Record<string, number>;
+}
+
+function extractDate(ts: any): Date | null {
+  if (!ts) return null;
+  if (ts.toDate) return ts.toDate();
+  if (ts.seconds) return new Date(ts.seconds * 1000);
+  return null;
+}
+
 export async function computeSnapshot(): Promise<AnalyticsSnapshot> {
   const now = new Date();
   const d7 = daysAgoDate(7);
   const d30 = daysAgoDate(30);
   const d7iso = daysAgoISO(7);
   const d30iso = daysAgoISO(30);
+  const todayStr = now.toISOString().split('T')[0];
 
-  // ---- TEAMS ----
+  // ---- TEAMS (small collection, always fits in memory) ----
   const teamsSnap = await adminDb.collection(`orgs/${ORG}/teams`).get();
   const teams = teamsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
   const teamMap = new Map(teams.map(t => [t.id, t]));
 
-  // ---- TASKS ----
-  const tasksSnap = await adminDb.collection('tasks')
+  // ---- TASKS (streamed in batches) ----
+  const tasksQuery = adminDb.collection('tasks')
     .where('orgId', '==', ORG)
-    .where('deleted', '!=', true)
-    .get();
+    .where('deleted', '!=', true);
 
-  const tasks = tasksSnap.docs.map(d => d.data());
-  const tasksByStatus: Record<string, number> = {};
-  const tasksByPriority: Record<string, number> = {};
-  let overdueTasks = 0;
-  let completedTasks = 0;
-  let completedLast7d = 0, createdLast7d = 0;
-  let completedLast30d = 0, createdLast30d = 0;
+  const taskAcc = await streamBatches<TaskAcc>(
+    tasksQuery,
+    {
+      total: 0, completedTasks: 0,
+      tasksByStatus: {}, tasksByPriority: {},
+      overdueTasks: 0,
+      completedLast7d: 0, createdLast7d: 0,
+      completedLast30d: 0, createdLast30d: 0,
+      deptTasks: {}, deptCompleted: {},
+    },
+    (acc, t) => {
+      acc.total++;
+      const status = t.status || 'unknown';
+      acc.tasksByStatus[status] = (acc.tasksByStatus[status] || 0) + 1;
 
-  const deptTasks: Record<string, number> = {};
-  const deptCompleted: Record<string, number> = {};
+      const priority = t.priority || 'medium';
+      acc.tasksByPriority[priority] = (acc.tasksByPriority[priority] || 0) + 1;
 
-  for (const t of tasks) {
-    const status = t.status || 'unknown';
-    tasksByStatus[status] = (tasksByStatus[status] || 0) + 1;
+      const isDone = status === 'done' || status === 'completed';
+      if (isDone) acc.completedTasks++;
 
-    const priority = t.priority || 'medium';
-    tasksByPriority[priority] = (tasksByPriority[priority] || 0) + 1;
+      if (!isDone && t.dueDate && t.dueDate < todayStr) {
+        acc.overdueTasks++;
+      }
 
-    const isDone = status === 'done' || status === 'completed';
-    if (isDone) completedTasks++;
+      const tid = t.teamId || '__unassigned';
+      acc.deptTasks[tid] = (acc.deptTasks[tid] || 0) + 1;
+      if (isDone) acc.deptCompleted[tid] = (acc.deptCompleted[tid] || 0) + 1;
 
-    if (!isDone && t.dueDate && t.dueDate < now.toISOString().split('T')[0]) {
-      overdueTasks++;
-    }
+      const createdAt = extractDate(t.createdAt);
+      const completedAt = extractDate(t.completedAt);
 
-    const tid = t.teamId || '__unassigned';
-    deptTasks[tid] = (deptTasks[tid] || 0) + 1;
-    if (isDone) deptCompleted[tid] = (deptCompleted[tid] || 0) + 1;
+      if (createdAt && createdAt >= d7) acc.createdLast7d++;
+      if (createdAt && createdAt >= d30) acc.createdLast30d++;
+      if (isDone && completedAt && completedAt >= d7) acc.completedLast7d++;
+      if (isDone && completedAt && completedAt >= d30) acc.completedLast30d++;
 
-    const createdAt = t.createdAt?.toDate?.() || (t.createdAt?.seconds ? new Date(t.createdAt.seconds * 1000) : null);
-    const completedAt = t.completedAt?.toDate?.() || (t.completedAt?.seconds ? new Date(t.completedAt.seconds * 1000) : null);
+      return acc;
+    },
+  );
 
-    if (createdAt && createdAt >= d7) createdLast7d++;
-    if (createdAt && createdAt >= d30) createdLast30d++;
-    if (isDone && completedAt && completedAt >= d7) completedLast7d++;
-    if (isDone && completedAt && completedAt >= d30) completedLast30d++;
-  }
+  const completionRate = taskAcc.total > 0 ? Math.round((taskAcc.completedTasks / taskAcc.total) * 100) : 0;
 
-  const completionRate = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+  // ---- GOALS (streamed in batches) ----
+  const goalsQuery = adminDb.collection('goals').where('orgId', '==', ORG);
 
-  // ---- GOALS ----
-  const goalsSnap = await adminDb.collection('goals')
+  const goalAcc = await streamBatches<GoalAcc>(
+    goalsQuery,
+    { total: 0, goalsByStatus: {}, goalsAtRisk: 0, totalProgress: 0 },
+    (acc, g) => {
+      acc.total++;
+      const status = g.status || 'active';
+      acc.goalsByStatus[status] = (acc.goalsByStatus[status] || 0) + 1;
+      if (status === 'at_risk' || status === 'behind') acc.goalsAtRisk++;
+      acc.totalProgress += g.progress || 0;
+      return acc;
+    },
+  );
+
+  // ---- TIME ENTRIES (streamed, filtered by date at query level) ----
+  const teQuery = adminDb.collection('time-entries')
     .where('orgId', '==', ORG)
-    .get();
+    .where('date', '>=', d30iso);
 
-  const goals = goalsSnap.docs.map(d => d.data());
-  const goalsByStatus: Record<string, number> = {};
-  let goalsAtRisk = 0;
-  let totalProgress = 0;
+  const timeAcc = await streamBatches<TimeAcc>(
+    teQuery,
+    { totalHoursLast7d: 0, totalHoursLast30d: 0, billableHoursLast30d: 0, nonBillableHoursLast30d: 0 },
+    (acc, te) => {
+      const mins = (te.hours || 0) * 60 + (te.minutes || 0);
+      const date = te.date || '';
+      if (date >= d7iso) acc.totalHoursLast7d += mins;
+      acc.totalHoursLast30d += mins;
+      if (te.billable) acc.billableHoursLast30d += mins;
+      else acc.nonBillableHoursLast30d += mins;
+      return acc;
+    },
+  );
 
-  for (const g of goals) {
-    const status = g.status || 'active';
-    goalsByStatus[status] = (goalsByStatus[status] || 0) + 1;
-    if (status === 'at_risk' || status === 'behind') goalsAtRisk++;
-    totalProgress += g.progress || 0;
-  }
+  // ---- DOCS (streamed in batches) ----
+  const docsQuery = adminDb.collection('documents').where('orgId', '==', ORG);
 
-  // ---- TIME ENTRIES ----
-  const teSnap = await adminDb.collection('time-entries')
-    .where('orgId', '==', ORG)
-    .get();
+  const docAcc = await streamBatches<DocAcc>(
+    docsQuery,
+    { total: 0, totalWords: 0, docsByVisibility: {}, topDocs: [], deptDocs: {}, deptWords: {} },
+    (acc, d, docId) => {
+      acc.total++;
+      acc.totalWords += d.wordCount || 0;
 
-  const timeEntries = teSnap.docs.map(d => d.data());
-  let totalHoursLast7d = 0, totalHoursLast30d = 0;
-  let billableHoursLast30d = 0, nonBillableHoursLast30d = 0;
+      const vis = d.visibility || 'team';
+      acc.docsByVisibility[vis] = (acc.docsByVisibility[vis] || 0) + 1;
 
-  for (const te of timeEntries) {
-    const mins = (te.hours || 0) * 60 + (te.minutes || 0);
-    const date = te.date || '';
-    if (date >= d7iso) totalHoursLast7d += mins;
-    if (date >= d30iso) {
-      totalHoursLast30d += mins;
-      if (te.billable) billableHoursLast30d += mins;
-      else nonBillableHoursLast30d += mins;
-    }
-  }
+      const tid = d.teamId || '__unassigned';
+      acc.deptDocs[tid] = (acc.deptDocs[tid] || 0) + 1;
+      acc.deptWords[tid] = (acc.deptWords[tid] || 0) + (d.wordCount || 0);
 
-  // ---- DOCS ----
-  const docsSnap = await adminDb.collection('documents')
-    .where('orgId', '==', ORG)
-    .get();
+      // Maintain top 10 docs by word count (insertion sort on small array)
+      const wc = d.wordCount || 0;
+      if (acc.topDocs.length < 10 || wc > (acc.topDocs[acc.topDocs.length - 1]?.wordCount || 0)) {
+        acc.topDocs.push({ id: docId, title: d.title || 'Untitled', wordCount: wc, teamId: d.teamId || '', visibility: vis });
+        acc.topDocs.sort((a, b) => b.wordCount - a.wordCount);
+        if (acc.topDocs.length > 10) acc.topDocs.pop();
+      }
 
-  const docs = docsSnap.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-  const totalWords = docs.reduce((s: number, d: any) => s + (d.wordCount || 0), 0);
+      return acc;
+    },
+  );
 
-  const docsByVisibility: Record<string, number> = {};
-  docs.forEach(d => {
-    const vis = d.visibility || 'team';
-    docsByVisibility[vis] = (docsByVisibility[vis] || 0) + 1;
-  });
+  const topDocuments = docAcc.topDocs.map(d => ({
+    ...d,
+    teamName: teamMap.get(d.teamId)?.name || 'Unassigned',
+  }));
 
-  const topDocuments = [...docs]
-    .sort((a, b) => (b.wordCount || 0) - (a.wordCount || 0))
-    .slice(0, 10)
-    .map(d => ({
-      id: d.id,
-      title: d.title || 'Untitled',
-      wordCount: d.wordCount || 0,
-      teamName: teamMap.get(d.teamId)?.name || 'Unassigned',
-      visibility: d.visibility || 'team',
-    }));
-
-  const deptDocs: Record<string, number> = {};
-  const deptWords: Record<string, number> = {};
-  docs.forEach(d => {
-    const tid = d.teamId || '__unassigned';
-    deptDocs[tid] = (deptDocs[tid] || 0) + 1;
-    deptWords[tid] = (deptWords[tid] || 0) + (d.wordCount || 0);
-  });
-
-  // ---- MEMBERS ----
+  // ---- MEMBERS (small collection, always fits) ----
   const membersSnap = await adminDb.collection(`orgs/${ORG}/members`).get();
   const membersData = membersSnap.docs.map(d => d.data());
   const activeMembers = membersData.filter(d => d.active !== false).length;
@@ -209,19 +264,19 @@ export async function computeSnapshot(): Promise<AnalyticsSnapshot> {
   const departments = teams.map(t => ({ id: t.id, name: t.name || t.id, icon: t.icon || '', color: t.color || '#6B7280' }));
   const deptMetrics: Record<string, { tasks: number; completed: number; rate: number; docs: number; members: number; words: number }> = {};
   for (const t of teams) {
-    const tTotal = deptTasks[t.id] || 0;
-    const tDone = deptCompleted[t.id] || 0;
+    const tTotal = taskAcc.deptTasks[t.id] || 0;
+    const tDone = taskAcc.deptCompleted[t.id] || 0;
     deptMetrics[t.id] = {
       tasks: tTotal,
       completed: tDone,
       rate: tTotal > 0 ? Math.round((tDone / tTotal) * 100) : 0,
-      docs: deptDocs[t.id] || 0,
+      docs: docAcc.deptDocs[t.id] || 0,
       members: deptMembers[t.id] || 0,
-      words: deptWords[t.id] || 0,
+      words: docAcc.deptWords[t.id] || 0,
     };
   }
 
-  // ---- ACTIVITY (eventLogs) ----
+  // ---- ACTIVITY (eventLogs — already capped at 500, OK to load) ----
   let actionsLast7d = 0, actionsLast30d = 0;
   const activityByDay: Record<string, number> = {};
   const activityByAction: Record<string, number> = {};
@@ -265,77 +320,90 @@ export async function computeSnapshot(): Promise<AnalyticsSnapshot> {
     }
   } catch { /* eventLogs may not have index */ }
 
-  // ---- AI CONVERSATIONS ----
+  // ---- AI CONVERSATIONS (count only — no docs loaded) ----
   let aiConversationsTotal = 0;
   try {
-    const aiSnap = await adminDb.collection(`orgs/${ORG}/ai-conversations`).get();
-    aiConversationsTotal = aiSnap.size;
+    aiConversationsTotal = await countQuery(
+      adminDb.collection(`orgs/${ORG}/ai-conversations`)
+    );
   } catch {}
 
-  // ---- CHANNELS (count only) ----
+  // ---- CHANNELS (count only — no docs loaded) ----
   let totalChannels = 0;
   try {
-    const chSnap = await adminDb.collection('channels')
-      .where('orgId', '==', ORG)
-      .get();
-    totalChannels = chSnap.size;
+    totalChannels = await countQuery(
+      adminDb.collection('channels').where('orgId', '==', ORG)
+    );
   } catch {}
 
-  // ---- WEBHOOK STATS ----
+  // ---- WEBHOOK STATS (count queries) ----
   let webhookEventsProcessed = 0, webhookEventsFailed = 0;
   try {
-    const whSnap = await adminDb.collection('webhookEvents')
-      .where('orgId', '==', ORG)
-      .where('processed', '==', true)
-      .get();
-    for (const d of whSnap.docs) {
-      if (d.data().exhausted) webhookEventsFailed++;
-      else webhookEventsProcessed++;
-    }
+    const [processedCount, exhaustedCount] = await Promise.all([
+      countQuery(
+        adminDb.collection('webhookEvents')
+          .where('orgId', '==', ORG)
+          .where('processed', '==', true)
+          .where('exhausted', '!=', true)
+      ),
+      countQuery(
+        adminDb.collection('webhookEvents')
+          .where('orgId', '==', ORG)
+          .where('exhausted', '==', true)
+      ),
+    ]);
+    webhookEventsProcessed = processedCount;
+    webhookEventsFailed = exhaustedCount;
   } catch {}
 
-  // ---- AUTOMATIONS ----
+  // ---- AUTOMATIONS (collectionGroup for logs — avoids N+1) ----
   let automationRunsLast7d = 0, automationFailuresLast7d = 0;
   try {
+    // Get automation IDs for this org first (small set)
     const autoSnap = await adminDb.collection('automations')
       .where('orgId', '==', ORG)
+      .select()  // only IDs, no field data
       .get();
-    for (const autoDoc of autoSnap.docs) {
-      try {
-        const logsSnap = await adminDb.collection(`automations/${autoDoc.id}/logs`)
-          .where('createdAt', '>=', d7)
-          .limit(500)
-          .get();
-        for (const l of logsSnap.docs) {
-          automationRunsLast7d++;
-          if (l.data().status === 'error') automationFailuresLast7d++;
-        }
-      } catch {}
+    const autoIds = new Set(autoSnap.docs.map(d => d.id));
+
+    if (autoIds.size > 0) {
+      // Single collectionGroup query across all automation logs
+      const logsSnap = await adminDb.collectionGroup('logs')
+        .where('createdAt', '>=', d7)
+        .limit(5000)
+        .get();
+
+      for (const l of logsSnap.docs) {
+        const parentId = l.ref.parent.parent?.id;
+        if (!parentId || !autoIds.has(parentId)) continue;
+        automationRunsLast7d++;
+        if (l.data().status === 'error') automationFailuresLast7d++;
+      }
     }
   } catch {}
 
   return {
-    totalTasks: tasks.length,
-    completedTasks,
+    totalTasks: taskAcc.total,
+    completedTasks: taskAcc.completedTasks,
     completionRate,
-    tasksByStatus,
-    tasksByPriority,
-    overdueTasks,
-    completedLast7d,
-    createdLast7d,
-    completedLast30d,
-    createdLast30d,
-    totalGoals: goals.length,
-    goalsByStatus,
-    goalsAtRisk,
-    avgGoalProgress: goals.length > 0 ? Math.round(totalProgress / goals.length) : 0,
-    totalHoursLast7d: Math.round(totalHoursLast7d / 60 * 10) / 10,
-    totalHoursLast30d: Math.round(totalHoursLast30d / 60 * 10) / 10,
-    billableHoursLast30d: Math.round(billableHoursLast30d / 60 * 10) / 10,
-    nonBillableHoursLast30d: Math.round(nonBillableHoursLast30d / 60 * 10) / 10,
-    totalDocs: docs.length,
-    totalWords,
-    docsByVisibility,
+    tasksByStatus: taskAcc.tasksByStatus,
+    tasksByPriority: taskAcc.tasksByPriority,
+    overdueTasks: taskAcc.overdueTasks,
+    completedLast7d: taskAcc.completedLast7d,
+    createdLast7d: taskAcc.createdLast7d,
+    completedLast30d: taskAcc.completedLast30d,
+    createdLast30d: taskAcc.createdLast30d,
+    totalGoals: goalAcc.total,
+    goalsByStatus: goalAcc.goalsByStatus,
+    goalsAtRisk: goalAcc.goalsAtRisk,
+    avgGoalProgress: goalAcc.total > 0 ? Math.round(goalAcc.totalProgress / goalAcc.total) : 0,
+    totalHoursLast7d: Math.round(timeAcc.totalHoursLast7d / 60 * 10) / 10,
+    totalHoursLast30d: Math.round(timeAcc.totalHoursLast30d / 60 * 10) / 10,
+    billableHoursLast30d: Math.round(timeAcc.billableHoursLast30d / 60 * 10) / 10,
+    nonBillableHoursLast30d: Math.round(timeAcc.nonBillableHoursLast30d / 60 * 10) / 10,
+    totalDocs: docAcc.total,
+    totalWords: docAcc.totalWords,
+    docsByVisibility: docAcc.docsByVisibility,
     topDocuments,
     totalMembers: membersSnap.size,
     activeMembers,

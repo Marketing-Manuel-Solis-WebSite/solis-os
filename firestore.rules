@@ -240,6 +240,43 @@ service cloud.firestore {
           allow update, delete: if false;
         }
       }
+
+      // Views — first-class saved views (filters, sorts, groupings)
+      // Read: org member + view is not private OR user is the creator
+      // Create: full members for private views; manager+ for required/default visibility
+      // Update: creator OR manager+
+      // Delete: creator OR admin+
+      match /views/{viewId} {
+        allow read: if isSignedIn() && isOrgMember(orgId)
+          && (resource.data.visibility != 'private'
+              || resource.data.createdBy == request.auth.uid);
+        allow create: if isSignedIn() && isOrgMember(orgId)
+          && (
+            // Private views: any full member (not guest/readonly)
+            (request.resource.data.visibility == 'private' && isFullMember(orgId))
+            // Required/default views: manager+ only
+            || (request.resource.data.visibility in ['required', 'default'] && isManager(orgId))
+            // All other visibilities (e.g. 'shared'): full member
+            || (!(request.resource.data.visibility in ['private', 'required', 'default']) && isFullMember(orgId))
+          );
+        allow update: if isSignedIn() && isOrgMember(orgId)
+          && (resource.data.createdBy == request.auth.uid || isManager(orgId));
+        allow delete: if isSignedIn() && isOrgMember(orgId)
+          && (resource.data.createdBy == request.auth.uid || isAdmin(orgId));
+      }
+
+      // Access Requests — users request access to restricted resources
+      // Create: any org member can submit a request
+      // Read: requester can see their own requests; manager+ can see all
+      // Update: manager+ only (approve/deny)
+      // Delete: admin only
+      match /accessRequests/{requestId} {
+        allow create: if isSignedIn() && isOrgMember(orgId);
+        allow read: if isSignedIn() && isOrgMember(orgId)
+          && (resource.data.requesterId == request.auth.uid || isManager(orgId));
+        allow update: if isSignedIn() && isManager(orgId);
+        allow delete: if isSignedIn() && isAdmin(orgId);
+      }
     }
 
     // ======== USER PROFILES (UNUSED — app uses orgs/{orgId}/members) ========

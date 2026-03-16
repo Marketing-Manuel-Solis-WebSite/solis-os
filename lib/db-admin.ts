@@ -7,6 +7,11 @@
 import { adminDb } from './firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { ORG_ID as ORG } from '@/lib/org';
+import { TTLCache } from '@/lib/cache';
+
+// Server-side caches for frequently-read, rarely-changed data
+const membersCache = new TTLCache<any[]>(5 * 60 * 1000);  // 5 min
+const teamsCache = new TTLCache<any[]>(10 * 60 * 1000);    // 10 min
 
 
 
@@ -175,17 +180,29 @@ export async function getCustomFieldDefs(): Promise<any[]> {
 
 // ===== MEMBERS =====
 export async function getMembers() {
+  const cached = membersCache.get(ORG);
+  if (cached) return cached;
   const snap = await adminDb.collection(`orgs/${ORG}/members`).get();
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const result = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  membersCache.set(ORG, result);
+  return result;
 }
+
+export function invalidateMembersCache() { membersCache.invalidate(ORG); }
 
 export async function getMember(uid: string) { return getOne(`orgs/${ORG}/members/${uid}`); }
 
 // ===== TEAMS / DEPARTMENTS =====
 export async function getTeams() {
+  const cached = teamsCache.get(ORG);
+  if (cached) return cached;
   const snap = await adminDb.collection(`orgs/${ORG}/teams`).get();
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const result = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  teamsCache.set(ORG, result);
+  return result;
 }
+
+export function invalidateTeamsCache() { teamsCache.invalidate(ORG); }
 
 export async function getTeam(id: string) { return getOne(`orgs/${ORG}/teams/${id}`); }
 
@@ -346,6 +363,7 @@ export async function getList(id: string) { return getOne(`lists/${id}`); }
 export async function getTask(id: string) { return getOne(`tasks/${id}`); }
 
 export async function createTask(data: any) {
+  const title = data.title || '';
   return addTo('tasks', {
     ...data, orgId: ORG, status: data.status || 'todo', priority: data.priority || 'medium',
     assignees: data.assignees || [], tags: data.tags || [], teamId: data.teamId || '',
@@ -357,10 +375,14 @@ export async function createTask(data: any) {
     customFields: data.customFields || {}, type: data.type || 'task', points: data.points || null,
     dependencies: data.dependencies || [], watchers: data.watchers || [], archived: false,
     createdBy: data.createdBy || '',
+    titleLower: title.toLowerCase(),
   });
 }
 
-export async function updateTask(id: string, data: any) { return updateAt(`tasks/${id}`, data); }
+export async function updateTask(id: string, data: any) {
+  const patch = data.title !== undefined ? { ...data, titleLower: data.title.toLowerCase() } : data;
+  return updateAt(`tasks/${id}`, patch);
+}
 export async function deleteTask(id: string) {
   // Critical: detach from goal targets (affects goal progress integrity)
   // Must succeed before parent delete — throws on failure
@@ -405,10 +427,14 @@ export async function createGoal(data: any) {
     visibility: data.visibility || 'team',
     createdBy: data.createdBy || '',
     createdByName: data.createdByName || '',
+    titleLower: (data.name || '').toLowerCase(),
   });
 }
 
-export async function updateGoal(id: string, data: any) { return updateAt(`goals/${id}`, data); }
+export async function updateGoal(id: string, data: any) {
+  const patch = data.name !== undefined ? { ...data, titleLower: data.name.toLowerCase() } : data;
+  return updateAt(`goals/${id}`, patch);
+}
 export async function deleteGoal(id: string) {
   const cascadeOps = [
     { name: 'targets', fn: () => deleteSubcollectionDocsAdmin(`goals/${id}`, 'targets') },
@@ -637,13 +663,27 @@ export async function queryTasksPaginated(opts: {
   status?: string | null;
   teamId?: string | null;
   assignee?: string | null;
+  priority?: string | null;
+  dueBefore?: string | null;
+  dueAfter?: string | null;
+  deleted?: boolean;
 }): Promise<PaginatedResult> {
   let q: FirebaseFirestore.Query = adminDb.collection('tasks')
     .where('orgId', '==', ORG);
 
+  // Filter deleted at query level (default: exclude deleted)
+  if (opts.deleted === true) {
+    q = q.where('deleted', '==', true);
+  } else {
+    q = q.where('deleted', '!=', true);
+  }
+
   if (opts.status) q = q.where('status', '==', opts.status);
   if (opts.teamId) q = q.where('teamId', '==', opts.teamId);
   if (opts.assignee) q = q.where('assignees', 'array-contains', opts.assignee);
+  if (opts.priority) q = q.where('priority', '==', opts.priority);
+  if (opts.dueBefore) q = q.where('dueDate', '<=', opts.dueBefore);
+  if (opts.dueAfter) q = q.where('dueDate', '>=', opts.dueAfter);
 
   q = q.orderBy('createdAt', 'desc');
 
@@ -655,13 +695,10 @@ export async function queryTasksPaginated(opts: {
     }
   }
 
-  // Fetch extra to filter deleted + detect hasMore
-  const fetchLimit = opts.limit + 20;
-  const snap = await q.limit(fetchLimit).get();
+  const snap = await q.limit(opts.limit + 1).get();
 
-  const filtered = snap.docs.filter(d => !d.data().deleted);
-  const hasMore = filtered.length > opts.limit;
-  const resultDocs = filtered.slice(0, opts.limit);
+  const hasMore = snap.docs.length > opts.limit;
+  const resultDocs = hasMore ? snap.docs.slice(0, opts.limit) : snap.docs;
   const items = resultDocs.map(d => ({ id: d.id, ...d.data() }));
 
   const lastDoc = resultDocs[resultDocs.length - 1];

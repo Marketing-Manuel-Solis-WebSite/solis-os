@@ -13,6 +13,13 @@ import {
   type ListData,
 } from '@/lib/db';
 import {
+  getViewsForScope, createView as createFirestoreView,
+  updateView as updateFirestoreView,
+  pinView, setDefaultView, shareViewByLink,
+} from '@/lib/views/view-db';
+import { getCurrentOrgId } from '@/lib/org';
+import type { ViewDefinition } from '@/types';
+import {
   afterTaskCreated, afterTaskUpdated, afterTaskDeleted,
   afterTaskBulkUpdated, afterTaskBulkDeleted,
 } from '@/lib/task-side-effects';
@@ -29,6 +36,9 @@ import TaskEmptyState from '@/components/tasks/task-empty-state';
 // View registry — dynamic view rendering
 import '@/lib/views/register-views';
 import { getView } from '@/lib/views';
+
+import ArtifactViewRenderer from '@/components/views/artifact-view-renderer';
+import AddViewMenu from '@/components/views/add-view-menu';
 
 import {
   Task, ViewType, FilterState, EMPTY_FILTERS, SavedView, TaskGroup,
@@ -82,11 +92,13 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
 
   // Active preset & selection
   const [activePreset, setActivePreset] = useState('all');
+  const [activeArtifactViewId, setActiveArtifactViewId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showCreate, setShowCreate] = useState(false);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [sharedViews, setSharedViews] = useState<SavedView[]>([]);
+  const [firestoreViews, setFirestoreViews] = useState<ViewDefinition[]>([]);
   const canManageShared = can('task', 'update') && (me?.role === 'owner' || me?.role === 'admin' || me?.role === 'manager');
 
   // Feature flag: granular permissions (per-list ACL)
@@ -159,6 +171,21 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
     getSharedSpaceViews(spaceId).then((data: any) => {
       if (data?.views) setSharedViews(data.views);
     }).catch(() => {});
+  }, [user?.uid, spaceId]);
+
+  // ─── Load Firestore views (first-class view system) ────
+  useEffect(() => {
+    if (!user?.uid || !spaceId) return;
+    getViewsForScope('space', spaceId, user.uid)
+      .then(setFirestoreViews)
+      .catch(() => {});
+  }, [user?.uid, spaceId]);
+
+  const reloadFirestoreViews = useCallback(() => {
+    if (!user?.uid || !spaceId) return;
+    getViewsForScope('space', spaceId, user.uid)
+      .then(setFirestoreViews)
+      .catch(() => {});
   }, [user?.uid, spaceId]);
 
   // ─── Debounced preference persistence ──────────────────
@@ -368,6 +395,27 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
     const updated = [...savedViews, sv];
     setSavedViews(updated);
     await saveUserPreferences(user.uid, VIEWS_KEY, { views: updated });
+
+    // Also persist to Firestore first-class views
+    try {
+      await createFirestoreView({
+        orgId: getCurrentOrgId(),
+        scopeType: 'space',
+        scopeId: spaceId,
+        name: name.trim(),
+        viewType: view,
+        visibility: 'private',
+        isDefault: false,
+        isPinned: false,
+        position: savedViews.length,
+        config: { filters: filters as any, sortBy, sortDir, groupBy, density, columns, subtaskDisplay, calendarMode },
+        sharedWith: [],
+        createdBy: user.uid,
+      });
+      reloadFirestoreViews();
+    } catch (err) {
+      console.error('[SpaceTasks] createView failed:', err);
+    }
   };
 
   const handleLoadView = (sv: SavedView) => {
@@ -425,6 +473,16 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
       setSavedViews(updatedPrivate);
       await saveUserPreferences(user.uid, VIEWS_KEY, { views: updatedPrivate });
     }
+    // Update Firestore view visibility: private -> public
+    const fsView = firestoreViews.find(v => v.name === sv.name && v.createdBy === sv.createdBy);
+    if (fsView) {
+      try {
+        await updateFirestoreView(fsView.id, { visibility: 'public' });
+        reloadFirestoreViews();
+      } catch (err) {
+        console.error('[SpaceTasks] promote view failed:', err);
+      }
+    }
   };
 
   const handleDemoteView = async (id: string) => {
@@ -441,11 +499,60 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
     setSharedViews(updatedShared);
     if (activePreset === `shared:${id}`) setActivePreset('all');
     await saveSharedSpaceViews(spaceId, { views: updatedShared });
+    // Update Firestore view visibility: public -> private
+    const fsView = firestoreViews.find(v => v.name === sv.name && v.visibility === 'public');
+    if (fsView) {
+      try {
+        await updateFirestoreView(fsView.id, { visibility: 'private' });
+        reloadFirestoreViews();
+      } catch (err) {
+        console.error('[SpaceTasks] demote view failed:', err);
+      }
+    }
+  };
+
+  // ─── Firestore view actions ────────────────────────────
+  const handlePinView = async (viewId: string) => {
+    const fsView = firestoreViews.find(v => v.id === viewId);
+    if (!fsView) return;
+    try {
+      await pinView(viewId, !fsView.isPinned);
+      reloadFirestoreViews();
+    } catch (err) {
+      console.error('[SpaceTasks] pin view failed:', err);
+    }
+  };
+
+  const handleSetDefaultView = async (viewId: string) => {
+    try {
+      // Unset previous default
+      const currentDefault = firestoreViews.find(v => v.isDefault);
+      if (currentDefault) {
+        await setDefaultView(currentDefault.id, false);
+      }
+      await setDefaultView(viewId, true);
+      reloadFirestoreViews();
+    } catch (err) {
+      console.error('[SpaceTasks] set default view failed:', err);
+    }
+  };
+
+  const handleShareViewLink = async (viewId: string) => {
+    try {
+      const token = await shareViewByLink(viewId);
+      const url = `${window.location.origin}/shared-view/${token}`;
+      await navigator.clipboard.writeText(url);
+      toast.success(t('views.linkCopied'));
+      reloadFirestoreViews();
+    } catch (err) {
+      console.error('[SpaceTasks] share view link failed:', err);
+    }
   };
 
   // ─── Preset change ─────────────────────────────────────
   const handlePresetChange = (id: string) => {
     setActivePreset(id);
+    setActiveArtifactViewId(null); // Clear artifact view when switching to a task preset
     if (!id.startsWith('saved:') && !id.startsWith('shared:')) setFilters(EMPTY_FILTERS);
   };
 
@@ -460,6 +567,46 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
   const handleCalendarModeChange = (m: CalendarMode) => { setCalendarMode(m); persistPrefs({ calendarMode: m }); };
 
   const canCreate = can('task', 'create');
+
+  // ─── Active artifact view (from Firestore views with artifactType) ──
+  const activeArtifactView = useMemo(() => {
+    if (!activeArtifactViewId) return null;
+    return firestoreViews.find(v => v.id === activeArtifactViewId && v.artifactType) || null;
+  }, [activeArtifactViewId, firestoreViews]);
+
+  // ─── AddViewMenu handler ─────────────────────────
+  const handleAddView = useCallback(async (viewType: string) => {
+    const artifactTypes = ['dashboard', 'doc', 'form', 'whiteboard'];
+    if (artifactTypes.includes(viewType)) {
+      // Create artifact view in Firestore
+      if (!user?.uid) return;
+      try {
+        const newViewId = await createFirestoreView({
+          orgId: getCurrentOrgId(),
+          scopeType: 'space',
+          scopeId: spaceId,
+          name: viewType.charAt(0).toUpperCase() + viewType.slice(1),
+          viewType: 'artifact',
+          artifactType: viewType as any,
+          visibility: 'private',
+          isDefault: false,
+          isPinned: false,
+          position: firestoreViews.length,
+          config: {},
+          sharedWith: [],
+          createdBy: user.uid,
+        });
+        reloadFirestoreViews();
+        setActiveArtifactViewId(newViewId);
+      } catch (err) {
+        console.error('[SpaceTasks] create artifact view failed:', err);
+      }
+    } else {
+      // Task view type — switch to it
+      handleViewChange(viewType as ViewType);
+      setActiveArtifactViewId(null);
+    }
+  }, [user?.uid, spaceId, firestoreViews.length, reloadFirestoreViews, handleViewChange]);
 
   // ─── List access management ───────────────────────
   const handleSaveListAccess = async (visibility: 'inherited' | 'private', memberIds: string[]) => {
@@ -542,7 +689,30 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
           onPromoteView={canManageShared ? handlePromoteView : undefined}
           onDemoteView={canManageShared ? handleDemoteView : undefined}
           canManageShared={canManageShared}
+          firestoreViews={firestoreViews}
+          onPinView={handlePinView}
+          onSetDefaultView={canManageShared ? handleSetDefaultView : undefined}
+          onShareViewLink={handleShareViewLink}
         />
+
+        {/* Add View menu + artifact view tabs */}
+        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[var(--border-subtle)]/40">
+          {/* Artifact view tabs from Firestore views */}
+          {firestoreViews.filter(v => v.artifactType).map(v => (
+            <button
+              key={v.id}
+              onClick={() => setActiveArtifactViewId(activeArtifactViewId === v.id ? null : v.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap transition-all duration-200 ${
+                activeArtifactViewId === v.id
+                  ? 'text-[var(--accent)] bg-[var(--accent-subtle)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+              }`}
+            >
+              {v.name}
+            </button>
+          ))}
+          <AddViewMenu onSelect={handleAddView} />
+        </div>
 
         {/* Private list indicator */}
         {granularPermsEnabled && currentList && isPrivateList(currentList) && (
@@ -557,7 +727,19 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
 
         {/* View content */}
         <div className="flex-1 overflow-hidden relative">
-          {emptyStateType ? (
+          {activeArtifactView ? (
+            <motion.div key={`artifact-${activeArtifactView.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full overflow-auto">
+              <ArtifactViewRenderer
+                artifactType={activeArtifactView.artifactType!}
+                artifactId={activeArtifactView.artifactId}
+                scopeType="space"
+                scopeId={spaceId}
+                tasks={tasks}
+                goals={[]}
+                members={members}
+              />
+            </motion.div>
+          ) : emptyStateType ? (
             <TaskEmptyState
               type={emptyStateType}
               canCreate={canCreate}

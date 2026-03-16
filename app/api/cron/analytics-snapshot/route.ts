@@ -1,9 +1,9 @@
 // ================================================================
 // Cron: Daily Analytics Snapshot — precompute and persist metrics
 // ================================================================
-// Runs daily at 06:00 UTC. Computes org-wide metrics snapshot
-// and saves it to orgs/{org}/analyticsSnapshots/{date}.
-// This enables time series without full scans.
+// Runs daily at 06:00 UTC. Tries incremental first (reads yesterday's
+// snapshot + counts deltas). Falls back to full recompute if no
+// previous snapshot or delta > 20%.
 // ================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -27,16 +27,20 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { computeSnapshot } = await import('@/lib/analytics-snapshot');
-    const snapshot = await computeSnapshot();
+    // Try incremental first, then fall back to full
+    const { computeSnapshotIncremental } = await import('@/lib/analytics-snapshot-incremental');
+
+    const { snapshot, incremental, deltaCount } = await computeSnapshotIncremental();
 
     const dateKey = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     await adminDb.doc(`orgs/${ORG}/analyticsSnapshots/${dateKey}`).set({
       ...snapshot,
       savedAt: FieldValue.serverTimestamp(),
+      _incremental: incremental,
+      _deltaCount: deltaCount ?? null,
     });
 
-    return NextResponse.json({ ok: true, date: dateKey, snapshot });
+    return NextResponse.json({ ok: true, date: dateKey, incremental, deltaCount, snapshot });
   } catch (err: any) {
     console.error('[Cron:AnalyticsSnapshot] error:', err);
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });

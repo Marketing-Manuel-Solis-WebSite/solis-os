@@ -4,7 +4,9 @@ import { useI18n } from '@/lib/i18n';
 import {
   Inbox, User, Sun, CalendarClock, AlertTriangle, Eye, Bookmark, Plus,
   MoreHorizontal, Pin, Copy, Share2, Pencil, Trash2, X, UserCheck, Globe,
+  Lock, Star, Link,
 } from 'lucide-react';
+import type { ViewDefinition } from '@/types';
 import { BUILT_IN_PRESETS, type ViewPreset, SavedView } from './constants';
 
 interface Props {
@@ -26,6 +28,11 @@ interface Props {
   onPromoteView?: (sv: SavedView) => void;
   onDemoteView?: (id: string) => void;
   canManageShared?: boolean;
+  // Firestore first-class views
+  firestoreViews?: ViewDefinition[];
+  onPinView?: (viewId: string) => void;
+  onSetDefaultView?: (viewId: string) => void;
+  onShareViewLink?: (viewId: string) => void;
 }
 
 const PRESET_ICONS: Record<string, any> = {
@@ -44,6 +51,7 @@ export default function TaskViewTabs({
   allPresets,
   sharedViews, onDeleteSharedView, onDuplicateSharedView, onPromoteView, onDemoteView,
   canManageShared,
+  firestoreViews, onPinView, onSetDefaultView, onShareViewLink,
 }: Props) {
   const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -61,6 +69,10 @@ export default function TaskViewTabs({
   const presetSource = allPresets || BUILT_IN_PRESETS;
   const visiblePresets = presetSource.filter(p => pinnedPresets.includes(p.id));
   const hasShared = sharedViews && sharedViews.length > 0;
+
+  // Helper: find matching Firestore ViewDefinition for a SavedView
+  const findFsView = (sv: SavedView): ViewDefinition | undefined =>
+    firestoreViews?.find(v => v.name === sv.name && v.createdBy === sv.createdBy);
 
   return (
     <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin pb-0.5">
@@ -97,6 +109,7 @@ export default function TaskViewTabs({
       {/* My Views (private) */}
       {savedViews.map(sv => {
         const active = activePreset === `saved:${sv.id}`;
+        const fsView = findFsView(sv);
         return (
           <div key={sv.id} className="relative group">
             <button
@@ -109,6 +122,11 @@ export default function TaskViewTabs({
             >
               <Bookmark className="h-4 w-4" strokeWidth={1.75} />
               {sv.name}
+              {/* Visual indicators */}
+              {fsView?.isPinned && <Pin className="h-3 w-3 text-[var(--text-muted)]" />}
+              {fsView?.isDefault && <Star className="h-3 w-3 text-amber-500" />}
+              {fsView?.visibility === 'required' && <Lock className="h-3 w-3 text-[var(--text-muted)]" />}
+              {fsView?.shareToken && <Link className="h-3 w-3 text-[var(--text-muted)]" />}
               {active && (
                 <div
                   className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-[var(--accent)]"
@@ -141,6 +159,30 @@ export default function TaskViewTabs({
                     className="w-full flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
                   >
                     <Copy className="h-3.5 w-3.5" /> {t('common.duplicate')}
+                  </button>
+                )}
+                {onSetDefaultView && fsView && (
+                  <button
+                    onClick={() => { onSetDefaultView(fsView.id); setMenuOpen(null); }}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+                  >
+                    <Star className="h-3.5 w-3.5" /> {fsView.isDefault ? t('views.unsetDefault') : t('views.makeDefault')}
+                  </button>
+                )}
+                {onPinView && fsView && (
+                  <button
+                    onClick={() => { onPinView(fsView.id); setMenuOpen(null); }}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+                  >
+                    <Pin className="h-3.5 w-3.5" /> {fsView.isPinned ? t('views.unpin') : t('views.pin')}
+                  </button>
+                )}
+                {onShareViewLink && fsView && (
+                  <button
+                    onClick={() => { onShareViewLink(fsView.id); setMenuOpen(null); }}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+                  >
+                    <Link className="h-3.5 w-3.5" /> {t('views.shareLink')}
                   </button>
                 )}
                 {onPromoteView && canManageShared && (
@@ -177,6 +219,7 @@ export default function TaskViewTabs({
       {sharedViews?.map(sv => {
         const key = `shared:${sv.id}`;
         const active = activePreset === key;
+        const fsView = findFsView(sv);
         return (
           <div key={key} className="relative group">
             <button
@@ -189,6 +232,11 @@ export default function TaskViewTabs({
             >
               <Globe className="h-4 w-4" strokeWidth={1.75} />
               {sv.name}
+              {/* Visual indicators */}
+              {fsView?.isPinned && <Pin className="h-3 w-3 text-[var(--text-muted)]" />}
+              {fsView?.isDefault && <Star className="h-3 w-3 text-amber-500" />}
+              {fsView?.visibility === 'required' && <Lock className="h-3 w-3 text-[var(--text-muted)]" />}
+              {fsView?.shareToken && <Link className="h-3 w-3 text-[var(--text-muted)]" />}
               {active && (
                 <div className="absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-[var(--accent)]" />
               )}
@@ -203,6 +251,30 @@ export default function TaskViewTabs({
 
             {menuOpen === key && (
               <div ref={menuRef} className="absolute top-full left-0 mt-1 w-48 rounded-xl bg-[var(--bg-elevated)] shadow-lg z-50 p-1.5 anim-slide">
+                {onSetDefaultView && canManageShared && fsView && (
+                  <button
+                    onClick={() => { onSetDefaultView(fsView.id); setMenuOpen(null); }}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+                  >
+                    <Star className="h-3.5 w-3.5" /> {fsView.isDefault ? t('views.unsetDefault') : t('views.makeDefault')}
+                  </button>
+                )}
+                {onPinView && canManageShared && fsView && (
+                  <button
+                    onClick={() => { onPinView(fsView.id); setMenuOpen(null); }}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+                  >
+                    <Pin className="h-3.5 w-3.5" /> {fsView.isPinned ? t('views.unpin') : t('views.pin')}
+                  </button>
+                )}
+                {onShareViewLink && fsView && (
+                  <button
+                    onClick={() => { onShareViewLink(fsView.id); setMenuOpen(null); }}
+                    className="w-full flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+                  >
+                    <Link className="h-3.5 w-3.5" /> {t('views.shareLink')}
+                  </button>
+                )}
                 {onDuplicateSharedView && (
                   <button
                     onClick={() => { onDuplicateSharedView(sv); setMenuOpen(null); }}

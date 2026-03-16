@@ -483,7 +483,9 @@ export interface Notification {
 export type NotificationType =
   | 'task_assigned' | 'task_mentioned' | 'task_due_soon'
   | 'task_completed' | 'task_comment' | 'doc_mentioned'
-  | 'channel_mention' | 'automation_result' | 'system';
+  | 'channel_mention' | 'automation_result' | 'system'
+  | 'access_requested' | 'access_granted' | 'access_denied'
+  | 'automation_disabled';
 
 export interface EntityRef {
   type: ResourceType;
@@ -615,4 +617,71 @@ export interface EmailTemplate extends BaseEntity {
   signature?: string;
   disclaimer?: string;
   active: boolean;
+}
+
+// --- Views (First-Class) ---
+export type ViewVisibility = 'private' | 'public' | 'protected' | 'required';
+export type ViewScopeType = 'space' | 'folder' | 'list' | 'global';
+export type ArtifactType = 'dashboard' | 'doc' | 'form' | 'whiteboard';
+
+export interface ViewConfig {
+  filters: Record<string, unknown>;
+  sortBy: string;
+  sortDir: 'asc' | 'desc';
+  groupBy: string;
+  density: 'compact' | 'comfortable' | 'spacious';
+  columns: string[];
+  subtaskDisplay: 'hidden' | 'count' | 'progress' | 'expanded';
+  calendarMode?: 'month' | 'week' | 'day';
+  ganttZoom?: 'day' | 'week' | 'month';
+  workloadPeriod?: 'week' | 'month';
+}
+
+export interface ViewDefinition extends BaseEntity {
+  orgId: string;
+  scopeType: ViewScopeType;
+  scopeId: string;
+  name: string;
+  viewType: string;
+  artifactType?: ArtifactType;
+  artifactId?: string;
+  visibility: ViewVisibility;
+  isDefault: boolean;
+  isPinned: boolean;
+  position: number;
+  config: Partial<ViewConfig>;
+  sharedWith: string[];
+  shareToken?: string;
+}
+
+// --- Access Requests ---
+export type AccessRequestStatus = 'pending' | 'approved' | 'denied';
+
+export interface AccessRequest extends BaseEntity {
+  orgId: string;
+  resourceType: ResourceType;
+  resourceId: string;
+  resourceName: string;
+  requesterId: string;
+  requesterName: string;
+  reason?: string;
+  status: AccessRequestStatus;
+  respondedBy?: string;
+  respondedAt?: FirestoreTimestamp;
+}
+
+// --- Inheritance ---
+export type InheritanceMode = 'inherit' | 'extend' | 'override';
+
+export interface InheritanceConfig {
+  statusMode: InheritanceMode;
+  customFieldMode: InheritanceMode;
+  automationMode: InheritanceMode;
+}
+
+// --- Subtask Progress ---
+export interface SubtaskProgress {
+  total: number;
+  done: number;
+  pct: number;
 }

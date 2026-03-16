@@ -1,11 +1,13 @@
 // ================================================================
 // Analytics — SLA & Response Time Metrics
 // ================================================================
-// Computes SLA compliance, response times, and cycle times
-// for tasks across the organization.
+// Scalability: Pushes teamId/date filters to Firestore queries.
+// Uses streamBatches() for memory-safe iteration.
+// ================================================================
 
 import { adminDb } from '@/lib/firebase-admin';
 import { ORG_ID as ORG } from '@/lib/org';
+import { streamBatches } from '@/lib/firestore-batch-stream';
 
 
 
@@ -81,10 +83,24 @@ function median(values: number[]): number {
     : Math.round(((sorted[mid - 1] + sorted[mid]) / 2) * 10) / 10;
 }
 
+// ---- SLA accumulator ----
+interface SLAAcc {
+  totalEvaluated: number;
+  responseTimeMet: number;
+  responseTimeBreached: number;
+  resolutionTimeMet: number;
+  resolutionTimeBreached: number;
+  cycleTimes: number[];
+  responseTimes: number[];
+  byPriority: Record<string, { total: number; resolutionMet: number; resolutionBreached: number; cycleTimes: number[] }>;
+  currentlyBreaching: { id: string; title: string; priority: string; hoursOverdue: number }[];
+}
+
 // ---- Main Computation ----
 
 /**
  * Compute SLA metrics for a given date range.
+ * Pushes teamId and date filters to Firestore queries.
  */
 export async function computeSLAMetrics(
   options: {
@@ -97,96 +113,99 @@ export async function computeSLAMetrics(
   const sla = options.slaConfig || DEFAULT_SLA;
   const now = new Date();
 
-  const snap = await adminDb.collection('tasks')
+  // Build query with server-side filters
+  let q: FirebaseFirestore.Query = adminDb.collection('tasks')
     .where('orgId', '==', ORG)
-    .where('deleted', '!=', true)
-    .get();
+    .where('deleted', '!=', true);
 
-  const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(t => {
-    if (options.teamId && t.teamId !== options.teamId) return false;
-    const created = extractDate(t.createdAt);
-    if (!created) return false;
-    if (options.startDate && created < new Date(options.startDate)) return false;
-    if (options.endDate && created > new Date(options.endDate + 'T23:59:59')) return false;
-    return true;
-  });
+  if (options.teamId) q = q.where('teamId', '==', options.teamId);
+  if (options.startDate) q = q.where('createdAt', '>=', new Date(options.startDate));
+  if (options.endDate) q = q.where('createdAt', '<=', new Date(options.endDate + 'T23:59:59'));
 
-  let responseTimeMet = 0;
-  let responseTimeBreached = 0;
-  let resolutionTimeMet = 0;
-  let resolutionTimeBreached = 0;
-  const cycleTimes: number[] = [];
-  const responseTimes: number[] = [];
-  const byPriority: Record<string, { total: number; resolutionMet: number; resolutionBreached: number; cycleTimes: number[] }> = {};
-  const currentlyBreaching: SLAMetrics['currentlyBreaching'] = [];
+  const acc = await streamBatches<SLAAcc>(
+    q,
+    {
+      totalEvaluated: 0,
+      responseTimeMet: 0,
+      responseTimeBreached: 0,
+      resolutionTimeMet: 0,
+      resolutionTimeBreached: 0,
+      cycleTimes: [],
+      responseTimes: [],
+      byPriority: {},
+      currentlyBreaching: [],
+    },
+    (acc, t, docId) => {
+      const created = extractDate(t.createdAt);
+      if (!created) return acc;
 
-  for (const t of tasks) {
-    const created = extractDate(t.createdAt)!;
-    const priority = t.priority || 'medium';
-    const isDone = t.status === 'done' || t.status === 'completed';
-    const completed = isDone ? (extractDate(t.completedAt) || extractDate(t.updatedAt)) : null;
+      acc.totalEvaluated++;
+      const priority = t.priority || 'medium';
+      const isDone = t.status === 'done' || t.status === 'completed';
+      const completed = isDone ? (extractDate(t.completedAt) || extractDate(t.updatedAt)) : null;
 
-    // Initialize priority bucket
-    if (!byPriority[priority]) {
-      byPriority[priority] = { total: 0, resolutionMet: 0, resolutionBreached: 0, cycleTimes: [] };
-    }
-    byPriority[priority].total++;
-
-    // Response time: creation → first assignment
-    const hasAssignee = t.assignees?.length > 0;
-    if (hasAssignee) {
-      // Use assignedAt if available, else estimate via updatedAt
-      const assignedAt = extractDate(t.assignedAt) || extractDate(t.updatedAt) || created;
-      const responseHours = hoursBetween(created, assignedAt);
-      responseTimes.push(responseHours);
-
-      if (responseHours <= sla.responseTimeHours) {
-        responseTimeMet++;
-      } else {
-        responseTimeBreached++;
+      // Initialize priority bucket
+      if (!acc.byPriority[priority]) {
+        acc.byPriority[priority] = { total: 0, resolutionMet: 0, resolutionBreached: 0, cycleTimes: [] };
       }
-    }
+      acc.byPriority[priority].total++;
 
-    // Resolution time
-    const maxResolutionHours = sla.resolutionTimeHours[priority] || sla.resolutionTimeHours['medium'] || 72;
+      // Response time: creation → first assignment
+      const hasAssignee = t.assignees?.length > 0;
+      if (hasAssignee) {
+        const assignedAt = extractDate(t.assignedAt) || extractDate(t.updatedAt) || created;
+        const responseHours = hoursBetween(created, assignedAt);
+        acc.responseTimes.push(responseHours);
 
-    if (completed) {
-      const cycleHours = hoursBetween(created, completed);
-      cycleTimes.push(cycleHours);
-      byPriority[priority].cycleTimes.push(cycleHours);
-
-      if (cycleHours <= maxResolutionHours) {
-        resolutionTimeMet++;
-        byPriority[priority].resolutionMet++;
-      } else {
-        resolutionTimeBreached++;
-        byPriority[priority].resolutionBreached++;
-      }
-    } else {
-      // Check if currently breaching
-      const elapsedHours = hoursBetween(created, now);
-      if (elapsedHours > maxResolutionHours) {
-        resolutionTimeBreached++;
-        byPriority[priority].resolutionBreached++;
-        if (currentlyBreaching.length < 20) {
-          currentlyBreaching.push({
-            id: t.id,
-            title: t.title || 'Untitled',
-            priority,
-            hoursOverdue: Math.round((elapsedHours - maxResolutionHours) * 10) / 10,
-          });
+        if (responseHours <= sla.responseTimeHours) {
+          acc.responseTimeMet++;
+        } else {
+          acc.responseTimeBreached++;
         }
       }
-    }
-  }
 
-  const totalEvaluated = tasks.length;
-  const totalWithResponse = responseTimeMet + responseTimeBreached;
-  const totalWithResolution = resolutionTimeMet + resolutionTimeBreached;
+      // Resolution time
+      const maxResolutionHours = sla.resolutionTimeHours[priority] || sla.resolutionTimeHours['medium'] || 72;
+
+      if (completed) {
+        const cycleHours = hoursBetween(created, completed);
+        acc.cycleTimes.push(cycleHours);
+        acc.byPriority[priority].cycleTimes.push(cycleHours);
+
+        if (cycleHours <= maxResolutionHours) {
+          acc.resolutionTimeMet++;
+          acc.byPriority[priority].resolutionMet++;
+        } else {
+          acc.resolutionTimeBreached++;
+          acc.byPriority[priority].resolutionBreached++;
+        }
+      } else {
+        // Check if currently breaching
+        const elapsedHours = hoursBetween(created, now);
+        if (elapsedHours > maxResolutionHours) {
+          acc.resolutionTimeBreached++;
+          acc.byPriority[priority].resolutionBreached++;
+          if (acc.currentlyBreaching.length < 20) {
+            acc.currentlyBreaching.push({
+              id: docId,
+              title: t.title || 'Untitled',
+              priority,
+              hoursOverdue: Math.round((elapsedHours - maxResolutionHours) * 10) / 10,
+            });
+          }
+        }
+      }
+
+      return acc;
+    },
+  );
+
+  const totalWithResponse = acc.responseTimeMet + acc.responseTimeBreached;
+  const totalWithResolution = acc.resolutionTimeMet + acc.resolutionTimeBreached;
 
   // Build priority summary
   const byPrioritySummary: SLAMetrics['byPriority'] = {};
-  for (const [p, data] of Object.entries(byPriority)) {
+  for (const [p, data] of Object.entries(acc.byPriority)) {
     byPrioritySummary[p] = {
       total: data.total,
       resolutionMet: data.resolutionMet,
@@ -198,27 +217,27 @@ export async function computeSLAMetrics(
   }
 
   // Sort breaching by hours overdue (worst first)
-  currentlyBreaching.sort((a, b) => b.hoursOverdue - a.hoursOverdue);
+  acc.currentlyBreaching.sort((a, b) => b.hoursOverdue - a.hoursOverdue);
 
   return {
-    totalEvaluated,
-    responseTimeMet,
-    responseTimeBreached,
-    responseTimeRate: totalWithResponse > 0 ? Math.round((responseTimeMet / totalWithResponse) * 100) : 100,
-    resolutionTimeMet,
-    resolutionTimeBreached,
-    resolutionTimeRate: totalWithResolution > 0 ? Math.round((resolutionTimeMet / totalWithResolution) * 100) : 100,
-    overallComplianceRate: totalEvaluated > 0
-      ? Math.round(((responseTimeMet + resolutionTimeMet) / (totalWithResponse + totalWithResolution || 1)) * 100)
+    totalEvaluated: acc.totalEvaluated,
+    responseTimeMet: acc.responseTimeMet,
+    responseTimeBreached: acc.responseTimeBreached,
+    responseTimeRate: totalWithResponse > 0 ? Math.round((acc.responseTimeMet / totalWithResponse) * 100) : 100,
+    resolutionTimeMet: acc.resolutionTimeMet,
+    resolutionTimeBreached: acc.resolutionTimeBreached,
+    resolutionTimeRate: totalWithResolution > 0 ? Math.round((acc.resolutionTimeMet / totalWithResolution) * 100) : 100,
+    overallComplianceRate: acc.totalEvaluated > 0
+      ? Math.round(((acc.responseTimeMet + acc.resolutionTimeMet) / (totalWithResponse + totalWithResolution || 1)) * 100)
       : 100,
-    avgCycleTimeHours: cycleTimes.length > 0
-      ? Math.round(cycleTimes.reduce((s, v) => s + v, 0) / cycleTimes.length * 10) / 10
+    avgCycleTimeHours: acc.cycleTimes.length > 0
+      ? Math.round(acc.cycleTimes.reduce((s, v) => s + v, 0) / acc.cycleTimes.length * 10) / 10
       : 0,
-    medianCycleTimeHours: median(cycleTimes),
-    avgResponseTimeHours: responseTimes.length > 0
-      ? Math.round(responseTimes.reduce((s, v) => s + v, 0) / responseTimes.length * 10) / 10
+    medianCycleTimeHours: median(acc.cycleTimes),
+    avgResponseTimeHours: acc.responseTimes.length > 0
+      ? Math.round(acc.responseTimes.reduce((s, v) => s + v, 0) / acc.responseTimes.length * 10) / 10
       : 0,
     byPriority: byPrioritySummary,
-    currentlyBreaching,
+    currentlyBreaching: acc.currentlyBreaching,
   };
 }

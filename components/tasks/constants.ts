@@ -50,6 +50,12 @@ export interface Task {
   checklist: any[];
   attachments: any[];
   dependencies: string[];
+  /** Parent task ID for nested subtasks (task-level nesting, not inline subtasks) */
+  parentTaskId?: string | null;
+  /** IDs of child tasks (task-level nesting) */
+  subtaskIds?: string[];
+  /** Nesting depth — 0 = root, 1 = child, 2 = grandchild, etc. */
+  subtaskDepth?: number;
   customFields: Record<string, any>;
   watchers: string[];
   archived: boolean;
@@ -479,11 +485,24 @@ export function groupTasks(tasks: Task[], groupBy: string, members: any[], t: (k
     return { key: p.id, label: t(`priority.${p.id}`), tasks: tk, color: p.color, count: tk.length };
   });
   if (groupBy === 'assignee') {
+    // Single-pass: build Map<memberId, Task[]> in O(tasks) instead of O(members × tasks)
+    const assigneeMap = new Map<string, Task[]>();
+    const unassigned: Task[] = [];
+    for (const task of tasks) {
+      if (!task.assignees?.length) {
+        unassigned.push(task);
+      } else {
+        for (const aid of task.assignees) {
+          const list = assigneeMap.get(aid);
+          if (list) list.push(task);
+          else assigneeMap.set(aid, [task]);
+        }
+      }
+    }
     const grouped: TaskGroup[] = members.map(m => {
-      const tk = tasks.filter(x => x.assignees?.includes(m.id));
+      const tk = assigneeMap.get(m.id) || [];
       return { key: m.id, label: m.displayName || m.email, tasks: tk, color: '#3B82F6', count: tk.length };
     });
-    const unassigned = tasks.filter(x => !x.assignees?.length);
     if (unassigned.length > 0) grouped.push({ key: '__none__', label: t('tasks.unassigned'), tasks: unassigned, color: '#64748B', count: unassigned.length });
     return grouped;
   }

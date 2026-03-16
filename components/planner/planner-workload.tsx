@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { ChevronLeft, ChevronRight, Users, Clock, AlertTriangle } from 'lucide-react';
 import { Task, PRIORITIES, STATUSES } from '@/components/tasks/constants';
 import { useI18n } from '@/lib/i18n';
+import { DEFAULT_CAPACITY } from '@/lib/workload-utils';
 
 interface Props {
   tasks: Task[];
@@ -13,7 +14,6 @@ interface Props {
 }
 
 type Period = 'week' | 'month';
-const CAPACITY_HOURS_PER_DAY = 8;
 
 function getMonday(d: Date): Date {
   const date = new Date(d);
@@ -68,9 +68,7 @@ export default function PlannerWorkload({ tasks, members, selectedTask, onSelect
     : ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
   const { start: periodStart, end: periodEnd } = getPeriodRange(currentDate, period);
-  const capacityHours = period === 'week'
-    ? CAPACITY_HOURS_PER_DAY * 5   // 40h
-    : CAPACITY_HOURS_PER_DAY * 22;  // ~176h
+  const periodMultiplier = period === 'week' ? 1 : 4.33;
 
   // Navigation
   const prev = () => {
@@ -86,6 +84,8 @@ export default function PlannerWorkload({ tasks, members, selectedTask, onSelect
   // Aggregate workload per member
   const workloadData: MemberWorkload[] = useMemo(() => {
     return members.map(member => {
+      const weeklyCapacity = member.capacityHoursPerWeek ?? DEFAULT_CAPACITY;
+      const cap = Math.round(weeklyCapacity * periodMultiplier);
       const memberTasks = tasks.filter(t => {
         if (!t.assignees?.includes(member.id)) return false;
         if (t.status === 'done') return false;
@@ -98,7 +98,7 @@ export default function PlannerWorkload({ tasks, members, selectedTask, onSelect
 
       const totalMinutes = memberTasks.reduce((sum, t) => sum + (t.timeEstimate || 0), 0);
       const totalHours = totalMinutes / 60;
-      const percentage = capacityHours > 0 ? (totalHours / capacityHours) * 100 : 0;
+      const percentage = cap > 0 ? (totalHours / cap) * 100 : 0;
       const tasksWithoutEstimate = memberTasks.filter(t => !t.timeEstimate).length;
 
       const status: 'underload' | 'optimal' | 'overload' =
@@ -106,13 +106,13 @@ export default function PlannerWorkload({ tasks, members, selectedTask, onSelect
         percentage > 70 ? 'optimal' :
         'underload';
 
-      return { member, tasks: memberTasks, totalHours, capacityHours, percentage, status, tasksWithoutEstimate };
+      return { member, tasks: memberTasks, totalHours, capacityHours: cap, percentage, status, tasksWithoutEstimate };
     }).sort((a, b) => b.percentage - a.percentage);
-  }, [tasks, members, periodStart, periodEnd, capacityHours]);
+  }, [tasks, members, periodStart, periodEnd, periodMultiplier]);
 
   // Summary stats
   const totalAssigned = workloadData.reduce((s, w) => s + w.totalHours, 0);
-  const totalCapacity = workloadData.length * capacityHours;
+  const totalCapacity = workloadData.reduce((s, w) => s + w.capacityHours, 0);
   const overloadCount = workloadData.filter(w => w.status === 'overload').length;
 
   return (

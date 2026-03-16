@@ -42,6 +42,9 @@ export type WidgetType =
   | 'department-metrics'
   | 'burndown-chart';
 
+export type DashboardScopeType = 'space' | 'folder' | 'list' | 'global';
+export type DashboardVisibility = 'private' | 'shared';
+
 export interface DashboardConfig {
   id: string;
   userId: string;
@@ -49,6 +52,10 @@ export interface DashboardConfig {
   isDefault: boolean;
   widgets: WidgetLayout[];
   spaceId?: string;       // If set, this dashboard belongs to a specific space
+  folderId?: string;      // If set, this dashboard belongs to a specific folder
+  listId?: string;        // If set, this dashboard belongs to a specific list
+  scopeType?: DashboardScopeType; // Contextual scope type
+  visibility?: DashboardVisibility; // Private or shared dashboard
   isShared?: boolean;      // Whether the dashboard is publicly shared
   publicToken?: string;    // UUID token for public access
   shareMode?: 'view' | 'interact'; // view = static snapshot, interact = live filters
@@ -132,6 +139,26 @@ export const SPACE_DEFAULT_WIDGETS: WidgetLayout[] = [
   { widgetId: 'sw8', type: 'goals-progress', x: 0, y: 0, w: 2, h: 2, config: {} },
   { widgetId: 'sw9', type: 'upcoming-deadlines', x: 0, y: 0, w: 2, h: 2, config: {} },
   { widgetId: 'sw10', type: 'my-tasks', x: 0, y: 0, w: 2, h: 2, config: { limit: 8 } },
+];
+
+// Overview dashboard for folders — high-level overview with activity
+export const OVERVIEW_DEFAULT_WIDGETS: WidgetLayout[] = [
+  { widgetId: 'ow1', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'totalTasks' } },
+  { widgetId: 'ow2', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'inProgress' } },
+  { widgetId: 'ow3', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'completed' } },
+  { widgetId: 'ow4', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'overdue' } },
+  { widgetId: 'ow5', type: 'activity-feed', x: 0, y: 0, w: 2, h: 2, config: { limit: 10 } },
+  { widgetId: 'ow6', type: 'goals-progress', x: 0, y: 0, w: 2, h: 2, config: {} },
+];
+
+// List-level dashboard — focused on task execution & deadlines
+export const LIST_DEFAULT_WIDGETS: WidgetLayout[] = [
+  { widgetId: 'lw1', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'totalTasks' } },
+  { widgetId: 'lw2', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'inProgress' } },
+  { widgetId: 'lw3', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'completed' } },
+  { widgetId: 'lw4', type: 'stat-card', x: 0, y: 0, w: 1, h: 1, config: { metric: 'overdue' } },
+  { widgetId: 'lw5', type: 'tasks-by-status', x: 0, y: 0, w: 2, h: 2, config: {} },
+  { widgetId: 'lw6', type: 'upcoming-deadlines', x: 0, y: 0, w: 2, h: 2, config: {} },
 ];
 
 // Widget type catalog

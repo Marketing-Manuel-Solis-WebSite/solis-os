@@ -19,7 +19,7 @@ import {
   LayoutDashboard, CheckSquare, FileText, MessageSquare, Zap, BarChart3,
   Users, Shield, LogOut, Menu, Bot, ChevronLeft, Sun, Moon, ChevronDown,
   Settings, Loader2, CalendarDays, MoreHorizontal, Target, Clock, PenTool, FileInput, Plug, Search,
-  Layers, Star,
+  Layers, Star, LayoutTemplate,
 } from 'lucide-react';
 import SpaceSidebarTree from '@/components/spaces/space-sidebar-tree';
 import PwaInstallPrompt from '@/components/shared/pwa-install-prompt';
@@ -48,6 +48,7 @@ const MORE_NAV = [
   { key: 'nav.timesheets', icon: Clock, href: '/app/timesheets' },
   { key: 'nav.whiteboards', icon: PenTool, href: '/app/whiteboards' },
   { key: 'nav.forms', icon: FileInput, href: '/app/forms' },
+  { key: 'nav.templates', icon: LayoutTemplate, href: '/app/templates' },
   { key: 'nav.integrations', icon: Plug, href: '/app/integrations' },
 ];
 

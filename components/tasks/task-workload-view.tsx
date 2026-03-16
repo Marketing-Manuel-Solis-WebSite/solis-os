@@ -10,6 +10,7 @@ import React, { useState, useMemo } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { Task, TaskGroup, PRIORITIES, STATUSES } from './constants';
 import { Users, Clock, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { DEFAULT_CAPACITY } from '@/lib/workload-utils';
 
 // ─── Types ──────────────────────────────────────────────
 interface Props {
@@ -36,7 +37,7 @@ interface MemberWorkload {
   byStatus: Record<string, number>;
 }
 
-const CAPACITY_HOURS_WEEK = 40;
+// Per-member capacity from member doc; falls back to DEFAULT_CAPACITY (40h)
 
 // ─── Component ──────────────────────────────────────────
 export default function TaskWorkloadView({
@@ -54,11 +55,12 @@ export default function TaskWorkloadView({
   // Aggregate workload per member
   const workloadData: MemberWorkload[] = useMemo(() => {
     const data = members.map(member => {
+      const cap = member.capacityHoursPerWeek ?? DEFAULT_CAPACITY;
       const memberTasks = activeTasks.filter(t => t.assignees?.includes(member.id));
 
       const totalMinutes = memberTasks.reduce((sum, t) => sum + (t.timeEstimate || 0), 0);
       const totalHours = totalMinutes / 60;
-      const percentage = CAPACITY_HOURS_WEEK > 0 ? (totalHours / CAPACITY_HOURS_WEEK) * 100 : 0;
+      const percentage = cap > 0 ? (totalHours / cap) * 100 : 0;
       const tasksWithoutEstimate = memberTasks.filter(t => !t.timeEstimate).length;
 
       const status: 'underload' | 'optimal' | 'overload' =
@@ -76,7 +78,7 @@ export default function TaskWorkloadView({
 
       return {
         member, tasks: memberTasks, totalHours,
-        capacityHours: CAPACITY_HOURS_WEEK, percentage, status,
+        capacityHours: cap, percentage, status,
         tasksWithoutEstimate, byPriority, byStatus,
       };
     });
@@ -94,7 +96,7 @@ export default function TaskWorkloadView({
 
   // Summary stats
   const totalAssigned = workloadData.reduce((s, w) => s + w.totalHours, 0);
-  const totalCapacity = workloadData.length * CAPACITY_HOURS_WEEK;
+  const totalCapacity = workloadData.reduce((s, w) => s + w.capacityHours, 0);
   const overloadCount = workloadData.filter(w => w.status === 'overload').length;
 
   const statusBarColor = (status: string) =>
@@ -197,7 +199,7 @@ export default function TaskWorkloadView({
                         status === 'optimal' ? 'text-[var(--success)]' :
                         'text-[var(--text-muted)]'
                       }`}>
-                        {totalHours.toFixed(1)}h / {CAPACITY_HOURS_WEEK}h
+                        {totalHours.toFixed(1)}h / {member.capacityHoursPerWeek ?? DEFAULT_CAPACITY}h
                       </span>
                     </div>
                   </div>

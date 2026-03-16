@@ -4,7 +4,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { DashboardConfig, WidgetLayout } from './dashboard-types';
-import { DEFAULT_WIDGETS, ADMIN_DEFAULT_WIDGETS, SPACE_DEFAULT_WIDGETS } from './dashboard-types';
+import { DEFAULT_WIDGETS, ADMIN_DEFAULT_WIDGETS, SPACE_DEFAULT_WIDGETS, OVERVIEW_DEFAULT_WIDGETS, LIST_DEFAULT_WIDGETS } from './dashboard-types';
 import { getCurrentOrgId, ORG_ID as ORG } from '@/lib/org';
 
 // Multi-tenant ready: resolve org at call-time, not import-time
@@ -26,8 +26,8 @@ export async function getDashboard(id: string): Promise<DashboardConfig | null> 
 
 export async function getDefaultDashboard(userId: string): Promise<DashboardConfig | null> {
   const dashboards = await getDashboards(userId);
-  // Exclude space-scoped dashboards from the main default lookup
-  const mainDashboards = dashboards.filter(d => !d.spaceId);
+  // Exclude scoped dashboards (space/folder/list) from the main default lookup
+  const mainDashboards = dashboards.filter(d => !d.spaceId && !d.folderId && !d.listId);
   const defaultOne = mainDashboards.find(d => d.isDefault);
   if (defaultOne) return defaultOne;
   if (mainDashboards.length > 0) return mainDashboards[0];
@@ -148,6 +148,7 @@ export async function ensureSpaceDashboard(userId: string, spaceId: string): Pro
     title: `Space Dashboard`,
     isDefault: false,
     spaceId,
+    scopeType: 'space',
     widgets,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -158,6 +159,73 @@ export async function ensureSpaceDashboard(userId: string, spaceId: string): Pro
     title: 'Space Dashboard',
     isDefault: false,
     spaceId,
+    scopeType: 'space',
+    widgets,
+  };
+}
+
+// ===== List-scoped dashboards =====
+
+export async function getListDashboard(userId: string, listId: string): Promise<DashboardConfig | null> {
+  const dashboards = await getDashboards(userId);
+  return dashboards.find(d => d.listId === listId) || null;
+}
+
+export async function ensureListDashboard(userId: string, listId: string): Promise<DashboardConfig> {
+  const existing = await getListDashboard(userId, listId);
+  if (existing) return existing;
+
+  const widgets = LIST_DEFAULT_WIDGETS;
+  const ref = await addDoc(collection(db, DASHBOARDS_PATH), {
+    userId,
+    title: 'List Dashboard',
+    isDefault: false,
+    listId,
+    scopeType: 'list',
+    widgets,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return {
+    id: ref.id,
+    userId,
+    title: 'List Dashboard',
+    isDefault: false,
+    listId,
+    scopeType: 'list',
+    widgets,
+  };
+}
+
+// ===== Folder-scoped dashboards =====
+
+export async function getFolderDashboard(userId: string, folderId: string): Promise<DashboardConfig | null> {
+  const dashboards = await getDashboards(userId);
+  return dashboards.find(d => d.folderId === folderId) || null;
+}
+
+export async function ensureFolderDashboard(userId: string, folderId: string): Promise<DashboardConfig> {
+  const existing = await getFolderDashboard(userId, folderId);
+  if (existing) return existing;
+
+  const widgets = OVERVIEW_DEFAULT_WIDGETS;
+  const ref = await addDoc(collection(db, DASHBOARDS_PATH), {
+    userId,
+    title: 'Folder Dashboard',
+    isDefault: false,
+    folderId,
+    scopeType: 'folder',
+    widgets,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return {
+    id: ref.id,
+    userId,
+    title: 'Folder Dashboard',
+    isDefault: false,
+    folderId,
+    scopeType: 'folder',
     widgets,
   };
 }

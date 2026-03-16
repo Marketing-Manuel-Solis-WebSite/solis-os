@@ -481,21 +481,30 @@ export async function getTasksByList(listId: string, maxResults = 500): Promise<
 export async function getTasksPaginated({
   teamId,
   pageSize = 50,
-  lastDoc,
+  lastDoc: lastDocSnap,
   status,
+  priority,
+  dueBefore,
+  dueAfter,
   sortBy = 'createdAt',
 }: {
   teamId?: string;
   pageSize?: number;
   lastDoc?: QueryDocumentSnapshot | null;
   status?: string;
+  priority?: string;
+  dueBefore?: string;
+  dueAfter?: string;
   sortBy?: string;
 }): Promise<{ items: any[]; lastDoc: QueryDocumentSnapshot | null; hasMore: boolean }> {
   const constraints: any[] = [where('orgId', '==', ORG)];
   if (teamId && teamId !== '__all__') constraints.push(where('teamId', '==', teamId));
   if (status) constraints.push(where('status', '==', status));
+  if (priority) constraints.push(where('priority', '==', priority));
+  if (dueBefore) constraints.push(where('dueDate', '<=', dueBefore));
+  if (dueAfter) constraints.push(where('dueDate', '>=', dueAfter));
   constraints.push(orderBy(sortBy, 'desc'));
-  if (lastDoc) constraints.push(startAfter(lastDoc));
+  if (lastDocSnap) constraints.push(startAfter(lastDocSnap));
   constraints.push(limit(pageSize + 1));
 
   const q = query(collection(db, 'tasks'), ...constraints);
@@ -516,6 +525,7 @@ export async function createTask(data: any) {
       throw new Error(`Custom field validation failed: ${Object.values(errors).join(', ')}`);
     }
   }
+  const title = data.title || '';
   return addTo('tasks', {
     ...data, orgId: ORG, status: data.status || 'todo', priority: data.priority || 'medium',
     assignees: data.assignees || [], tags: data.tags || [], teamId: data.teamId || '',
@@ -527,6 +537,7 @@ export async function createTask(data: any) {
     customFields: data.customFields || {}, type: data.type || 'task', points: data.points || null,
     dependencies: data.dependencies || [], watchers: data.watchers || [], archived: false,
     createdBy: data.createdBy || '',
+    titleLower: title.toLowerCase(),
   });
 }
 export async function updateTask(id: string, data: any) {
@@ -538,7 +549,9 @@ export async function updateTask(id: string, data: any) {
       throw new Error(`Custom field validation failed: ${Object.values(errors).join(', ')}`);
     }
   }
-  return updateAt(`tasks/${id}`, data);
+  // Keep titleLower in sync for server-side search
+  const patch = data.title !== undefined ? { ...data, titleLower: data.title.toLowerCase() } : data;
+  return updateAt(`tasks/${id}`, patch);
 }
 export async function deleteTask(id: string) {
   // Critical: detach from goal targets (affects goal progress integrity)
@@ -633,7 +646,7 @@ export async function getDocuments(teamId?: string, maxResults = 500, parentDocI
   if (teamId) return getByTeam('docs', teamId, maxResults);
   return getByOrg('docs', maxResults);
 }
-export async function createDocument(data: any) { return addTo('docs', { ...data, orgId: ORG, content: data.content || '', teamId: data.teamId || '', spaceId: data.spaceId || null, folderId: data.folderId || null, parentDocId: data.parentDocId ?? null }); }
+export async function createDocument(data: any) { return addTo('docs', { ...data, orgId: ORG, content: data.content || '', teamId: data.teamId || '', spaceId: data.spaceId || null, folderId: data.folderId || null, parentDocId: data.parentDocId ?? null, titleLower: (data.title || '').toLowerCase() }); }
 
 export async function getDocsBySpace(spaceId: string, maxResults = 200): Promise<{ items: any[]; hasMore: boolean }> {
   const q = query(
@@ -648,7 +661,10 @@ export async function getDocsBySpace(spaceId: string, maxResults = 200): Promise
   const docs = hasMore ? s.docs.slice(0, maxResults) : s.docs;
   return { items: docs.map(d => ({ id: d.id, ...d.data() })), hasMore };
 }
-export async function updateDocument(id: string, data: any) { return updateAt(`docs/${id}`, data); }
+export async function updateDocument(id: string, data: any) {
+  const patch = data.title !== undefined ? { ...data, titleLower: data.title.toLowerCase() } : data;
+  return updateAt(`docs/${id}`, patch);
+}
 export async function deleteDocument(id: string) {
   await Promise.allSettled([
     deleteSubcollectionDocs(`docs/${id}`, 'revisions'),
@@ -1137,10 +1153,14 @@ export async function createGoal(data: any) {
     createdBy: data.createdBy || '',
     createdByName: data.createdByName || '',
     parentGoalId: data.parentGoalId || null,
+    titleLower: (data.name || '').toLowerCase(),
   });
 }
 
-export async function updateGoal(id: string, data: any) { return updateAt(`goals/${id}`, data); }
+export async function updateGoal(id: string, data: any) {
+  const patch = data.name !== undefined ? { ...data, titleLower: data.name.toLowerCase() } : data;
+  return updateAt(`goals/${id}`, patch);
+}
 export async function deleteGoal(id: string) {
   await Promise.allSettled([
     deleteSubcollectionDocs(`goals/${id}`, 'targets'),

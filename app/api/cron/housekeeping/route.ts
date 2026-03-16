@@ -214,29 +214,35 @@ export async function GET(req: NextRequest) {
 
   // -----------------------------------------------------------------------
   // (f) Automation logs cleanup — keep latest 500 per automation
+  // Process in parallel batches of 5 automations for efficiency
   // -----------------------------------------------------------------------
   try {
     let totalDeleted = 0;
     const autoSnap = await adminDb
       .collection('automations')
       .where('orgId', '==', ORG)
+      .select()  // only IDs, no field data
       .limit(200)
       .get();
 
-    for (const autoDoc of autoSnap.docs) {
-      try {
+    // Process 5 automations concurrently
+    const CONCURRENCY = 5;
+    for (let i = 0; i < autoSnap.docs.length; i += CONCURRENCY) {
+      const chunk = autoSnap.docs.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(chunk.map(async (autoDoc) => {
         const logsSnap = await adminDb
           .collection(`automations/${autoDoc.id}/logs`)
           .orderBy('createdAt', 'desc')
           .offset(500)
           .limit(500)
           .get();
-
         if (!logsSnap.empty) {
-          totalDeleted += await batchDelete(logsSnap.docs);
+          return batchDelete(logsSnap.docs);
         }
-      } catch (innerErr: any) {
-        console.error(`[Housekeeping] automation logs cleanup failed for ${autoDoc.id}:`, innerErr);
+        return 0;
+      }));
+      for (const r of results) {
+        if (r.status === 'fulfilled') totalDeleted += r.value;
       }
     }
     stats.automationLogs = totalDeleted;
@@ -333,7 +339,7 @@ export async function GET(req: NextRequest) {
   }
 
   // -----------------------------------------------------------------------
-  // (k) Form retention enforcement
+  // (k) Form retention enforcement — process forms concurrently
   // -----------------------------------------------------------------------
   try {
     let totalDeleted = 0;
@@ -343,24 +349,29 @@ export async function GET(req: NextRequest) {
       .limit(200)
       .get();
 
-    for (const formDoc of formsSnap.docs) {
-      try {
-        const data = formDoc.data();
-        const retentionDays = data.retentionDays;
-        if (!retentionDays || retentionDays <= 0) continue;
+    // Filter to forms with retention policy, then process concurrently
+    const formsWithRetention = formsSnap.docs.filter(d => {
+      const days = d.data().retentionDays;
+      return days && days > 0;
+    });
 
-        const cutoff = daysAgo(retentionDays);
+    const CONCURRENCY = 5;
+    for (let i = 0; i < formsWithRetention.length; i += CONCURRENCY) {
+      const chunk = formsWithRetention.slice(i, i + CONCURRENCY);
+      const results = await Promise.allSettled(chunk.map(async (formDoc) => {
+        const cutoff = daysAgo(formDoc.data().retentionDays);
         const subsSnap = await adminDb
           .collection(`forms/${formDoc.id}/submissions`)
           .where('createdAt', '<', cutoff)
           .limit(500)
           .get();
-
         if (!subsSnap.empty) {
-          totalDeleted += await batchDelete(subsSnap.docs);
+          return batchDelete(subsSnap.docs);
         }
-      } catch (innerErr: any) {
-        console.error(`[Housekeeping] form retention failed for ${formDoc.id}:`, innerErr);
+        return 0;
+      }));
+      for (const r of results) {
+        if (r.status === 'fulfilled') totalDeleted += r.value;
       }
     }
     stats.formRetention = totalDeleted;

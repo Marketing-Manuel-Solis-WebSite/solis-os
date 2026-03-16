@@ -59,6 +59,11 @@ interface Props {
   onPromoteView?: (sv: SavedView) => void;
   onDemoteView?: (id: string) => void;
   canManageShared?: boolean;
+  // Firestore first-class views
+  firestoreViews?: any[];
+  onPinView?: (viewId: string) => void;
+  onSetDefaultView?: (viewId: string) => void;
+  onShareViewLink?: (viewId: string) => void;
 }
 
 // =============================================
@@ -75,6 +80,7 @@ export default function TaskToolbar({
   onPresetChange, onSaveView, onLoadView, onDeleteView, onDuplicateView,
   onImport, allPresets,
   sharedViews, onDeleteSharedView, onDuplicateSharedView, onPromoteView, onDemoteView, canManageShared,
+  firestoreViews, onPinView, onSetDefaultView, onShareViewLink,
 }: Props) {
   const { t } = useI18n();
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -342,6 +348,10 @@ export default function TaskToolbar({
         onPromoteView={onPromoteView}
         onDemoteView={onDemoteView}
         canManageShared={canManageShared}
+        firestoreViews={firestoreViews}
+        onPinView={onPinView}
+        onSetDefaultView={onSetDefaultView}
+        onShareViewLink={onShareViewLink}
       />
 
       {/* ============================================= */}

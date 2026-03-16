@@ -2,12 +2,19 @@
 
 // ============================================================
 // Task Gantt View — Timeline chart with task bars, dependencies,
-// zoom levels (day/week/month), today indicator, and drag-resize.
+// zoom levels (day/week/month), today indicator, drag-resize,
+// drag-to-move, critical path, milestones, constraint violations.
 // ============================================================
 
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { Task, TaskGroup, PRIORITY_ORDER, getStatusConfig } from './constants';
+import {
+  computeCriticalPath,
+  buildDependencyMap,
+  validateDependencyConstraints,
+  type GanttTask,
+} from '@/lib/gantt-utils';
 
 // ─── Types ──────────────────────────────────────────────
 interface Props {
@@ -29,11 +36,24 @@ interface TimelineTask extends Task {
   _end: Date;
 }
 
+// ─── Drag types ─────────────────────────────────────────
+type DragMode = 'move' | 'resize-left' | 'resize-right';
+interface DragState {
+  taskId: string;
+  mode: DragMode;
+  startX: number;
+  origLeft: number;
+  origWidth: number;
+  origStart: Date;
+  origEnd: Date;
+}
+
 // ─── Constants ──────────────────────────────────────────
 const COL_WIDTHS: Record<Zoom, number> = { day: 40, week: 100, month: 160 };
 const ROW_HEIGHT = 36;
 const MS_PER_DAY = 86400000;
 const LABEL_WIDTH = 260;
+const HANDLE_WIDTH = 6;
 
 // ─── Date helpers ───────────────────────────────────────
 function daysBetween(a: Date, b: Date): number {
@@ -78,6 +98,8 @@ export default function TaskGanttView({
 }: Props) {
   const { t, lang } = useI18n();
   const [zoom, setZoom] = useState<Zoom>('week');
+  const [showCriticalPath, setShowCriticalPath] = useState(false);
+  const [dragState, setDragState] = useState<DragState | null>(null);
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
   const syncingScroll = useRef(false);
@@ -133,6 +155,33 @@ export default function TaskGanttView({
     return colWidth / 30;
   }, [zoom, colWidth]);
 
+  // Dependency map: blockerId -> blockedId[]
+  const depMap = useMemo(() => {
+    return buildDependencyMap(timelineTasks as unknown as GanttTask[]);
+  }, [timelineTasks]);
+
+  // Critical path set
+  const criticalPathSet = useMemo(() => {
+    if (!showCriticalPath) return new Set<string>();
+    return computeCriticalPath(timelineTasks as unknown as GanttTask[], depMap);
+  }, [showCriticalPath, timelineTasks, depMap]);
+
+  // Constraint violations: taskId -> violation messages
+  const violationMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const task of timelineTasks) {
+      if (!task._start || !task._end) continue;
+      const violations = validateDependencyConstraints(
+        task.id, task._start, task._end,
+        timelineTasks as unknown as GanttTask[], depMap,
+      );
+      if (violations.length > 0) {
+        map.set(task.id, violations.map(v => v.message));
+      }
+    }
+    return map;
+  }, [timelineTasks, depMap]);
+
   // Bar position
   const getBarStyle = useCallback((task: TimelineTask) => {
     const daysFromStart = daysBetween(rangeStart, task._start);
@@ -177,6 +226,74 @@ export default function TaskGanttView({
     }
   };
 
+  // ─── Drag handlers (move / resize) ─────────────────────
+  const handleDragStart = useCallback((
+    e: React.MouseEvent, taskId: string, mode: DragMode, task: TimelineTask,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const bar = getBarStyle(task);
+    setDragState({
+      taskId,
+      mode,
+      startX: e.clientX,
+      origLeft: bar.left,
+      origWidth: bar.width,
+      origStart: new Date(task._start),
+      origEnd: new Date(task._end),
+    });
+  }, [getBarStyle]);
+
+  useEffect(() => {
+    if (!dragState) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // Visual feedback only — we don't move bars in real-time for simplicity,
+      // but the final position is computed on mouse-up.
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (!dragState || !canUpdate) { setDragState(null); return; }
+
+      const dx = e.clientX - dragState.startX;
+      const deltaDays = Math.round(dx / pxPerDay);
+      if (deltaDays === 0) { setDragState(null); return; }
+
+      const { taskId, mode, origStart, origEnd } = dragState;
+
+      let newStart = origStart;
+      let newEnd = origEnd;
+
+      if (mode === 'move') {
+        newStart = addDays(origStart, deltaDays);
+        newEnd = addDays(origEnd, deltaDays);
+      } else if (mode === 'resize-left') {
+        newStart = addDays(origStart, deltaDays);
+        if (newStart >= newEnd) newStart = addDays(newEnd, -1);
+      } else if (mode === 'resize-right') {
+        newEnd = addDays(origEnd, deltaDays);
+        if (newEnd <= newStart) newEnd = addDays(newStart, 1);
+      }
+
+      // Apply date updates
+      if (mode === 'move' || mode === 'resize-left') {
+        onUpdate(taskId, 'startDate', newStart);
+      }
+      if (mode === 'move' || mode === 'resize-right') {
+        onUpdate(taskId, 'dueDate', newEnd);
+      }
+
+      setDragState(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragState, pxPerDay, canUpdate, onUpdate]);
+
   // Empty state
   const noTasks = timelineTasks.length === 0;
   const tasksWithoutDates = allTasks.length - timelineTasks.length;
@@ -197,6 +314,16 @@ export default function TaskGanttView({
           <button onClick={scrollToToday}
             className="text-[12px] px-2.5 py-1 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--accent)] transition">
             {t('common.today') || 'Today'}
+          </button>
+          <button
+            onClick={() => setShowCriticalPath(v => !v)}
+            className={`text-[12px] px-2.5 py-1 rounded-lg transition ${
+              showCriticalPath
+                ? 'bg-red-500/15 text-red-400 ring-1 ring-red-500/30'
+                : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--accent)]'
+            }`}
+          >
+            {lang === 'es' ? 'Ruta Cr\u00edtica' : 'Critical Path'}
           </button>
         </div>
         <div className="flex rounded-xl bg-[var(--bg-elevated)] shadow-card overflow-hidden">
@@ -305,25 +432,113 @@ export default function TaskGanttView({
                 const isSelected = selectedTask?.id === task.id;
                 const barColor = cfg?.color || 'var(--accent)';
                 const isDone = task.status === 'done' || task.status === 'completed';
+                const isMilestone = task.type === 'milestone';
+                const isCritical = showCriticalPath && criticalPathSet.has(task.id);
+                const hasViolation = violationMap.has(task.id);
+                const violationMessages = violationMap.get(task.id);
+                const isDragging = dragState?.taskId === task.id;
 
+                // ── Milestone diamond ──
+                if (isMilestone) {
+                  const cx = left + width / 2;
+                  const cy = ROW_HEIGHT / 2;
+                  const size = 10;
+                  return (
+                    <div
+                      key={task.id}
+                      className="absolute flex items-center justify-center"
+                      style={{ top: idx * ROW_HEIGHT, height: ROW_HEIGHT, left: cx - size, width: size * 2 }}
+                    >
+                      <div
+                        onClick={() => onSelect(task)}
+                        className={`cursor-pointer transition-all hover:scale-110 ${
+                          isSelected ? 'drop-shadow-[0_0_4px_var(--accent)]' : ''
+                        } ${isCritical ? 'drop-shadow-[0_0_8px_rgba(239,68,68,0.7)]' : ''}`}
+                        title={`${task.title} (milestone)\n${task._start.toLocaleDateString()}`}
+                        style={{
+                          width: size * 2,
+                          height: size * 2,
+                          backgroundColor: barColor,
+                          transform: 'rotate(45deg)',
+                          border: hasViolation ? '2px solid #EF4444' : 'none',
+                        }}
+                      />
+                    </div>
+                  );
+                }
+
+                // ── Regular bar ──
                 return (
                   <div
                     key={task.id}
                     className="absolute flex items-center"
-                    style={{ top: idx * ROW_HEIGHT, height: ROW_HEIGHT, left, width }}
+                    style={{
+                      top: idx * ROW_HEIGHT,
+                      height: ROW_HEIGHT,
+                      left,
+                      width: Math.max(width, 20),
+                    }}
                   >
                     <div
-                      onClick={() => onSelect(task)}
-                      className={`h-6 w-full rounded-md cursor-pointer transition-all hover:brightness-110 ${
-                        isSelected ? 'ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--bg-base)]' : ''
-                      } ${isDone ? 'opacity-60' : ''}`}
-                      style={{ backgroundColor: barColor + '30', borderLeft: `3px solid ${barColor}` }}
-                      title={`${task.title}\n${task._start.toLocaleDateString()} → ${task._end.toLocaleDateString()}`}
+                      className="relative h-6 w-full group"
+                      style={{ cursor: isDragging ? 'grabbing' : 'default' }}
                     >
-                      {width > 60 && (
-                        <span className="text-[10px] font-medium text-[var(--text-primary)] truncate px-2 leading-6 block">
-                          {task.title}
-                        </span>
+                      {/* Left resize handle */}
+                      {canUpdate && (
+                        <div
+                          className="absolute left-0 top-0 bottom-0 z-20 cursor-col-resize hover:bg-white/20 rounded-l-md"
+                          style={{ width: HANDLE_WIDTH }}
+                          onMouseDown={e => handleDragStart(e, task.id, 'resize-left', task)}
+                        />
+                      )}
+
+                      {/* Bar body (draggable) */}
+                      <div
+                        onClick={() => !isDragging && onSelect(task)}
+                        onMouseDown={canUpdate ? (e => {
+                          // Only start move drag if not clicking handles
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const relX = e.clientX - rect.left;
+                          if (relX > HANDLE_WIDTH && relX < rect.width - HANDLE_WIDTH) {
+                            handleDragStart(e, task.id, 'move', task);
+                          }
+                        }) : undefined}
+                        className={`h-6 w-full rounded-md transition-all hover:brightness-110 ${
+                          isSelected ? 'ring-2 ring-[var(--accent)] ring-offset-1 ring-offset-[var(--bg-base)]' : ''
+                        } ${isDone ? 'opacity-60' : ''} ${
+                          canUpdate ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+                        }`}
+                        style={{
+                          backgroundColor: barColor + '30',
+                          borderLeft: `3px solid ${barColor}`,
+                          // Critical path glow
+                          ...(isCritical ? {
+                            boxShadow: `0 0 8px 2px rgba(239, 68, 68, 0.5), inset 0 0 0 1px rgba(239, 68, 68, 0.4)`,
+                          } : {}),
+                          // Constraint violation border
+                          ...(hasViolation ? {
+                            outline: '2px solid #EF4444',
+                            outlineOffset: '-1px',
+                          } : {}),
+                        }}
+                        title={`${task.title}\n${task._start.toLocaleDateString()} \u2192 ${task._end.toLocaleDateString()}${
+                          hasViolation ? '\n\u26a0 ' + violationMessages!.join('; ') : ''
+                        }${isCritical ? '\n\ud83d\udd34 Critical path' : ''}`}
+                      >
+                        {width > 60 && (
+                          <span className="text-[10px] font-medium text-[var(--text-primary)] truncate px-2 leading-6 block">
+                            {task.title}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Right resize handle */}
+                      {canUpdate && (
+                        <div
+                          className="absolute right-0 top-0 bottom-0 z-20 cursor-col-resize hover:bg-white/20 rounded-r-md"
+                          style={{ width: HANDLE_WIDTH }}
+                          onMouseDown={e => handleDragStart(e, task.id, 'resize-right', task)}
+                        />
                       )}
                     </div>
                   </div>
@@ -345,15 +560,17 @@ export default function TaskGanttView({
                     const x2 = taskBar.left;
                     const y2 = idx * ROW_HEIGHT + ROW_HEIGHT / 2;
                     const mx = x1 + (x2 - x1) / 2;
+                    const bothCritical = showCriticalPath
+                      && criticalPathSet.has(task.id) && criticalPathSet.has(depId);
                     return (
                       <path
                         key={`${depId}-${task.id}`}
                         d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`}
                         fill="none"
-                        stroke="var(--text-muted)"
-                        strokeWidth="1.5"
-                        strokeDasharray="4 2"
-                        opacity={0.4}
+                        stroke={bothCritical ? '#EF4444' : 'var(--text-muted)'}
+                        strokeWidth={bothCritical ? 2.5 : 1.5}
+                        strokeDasharray={bothCritical ? 'none' : '4 2'}
+                        opacity={bothCritical ? 0.8 : 0.4}
                       />
                     );
                   });

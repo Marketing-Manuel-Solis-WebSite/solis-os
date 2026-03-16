@@ -3,7 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
-import { Calendar, Paperclip, MessageSquare, GitBranch, CheckSquare, Repeat } from 'lucide-react';
+import { Calendar, Paperclip, MessageSquare, GitBranch, CheckSquare, Repeat, Network } from 'lucide-react';
 import {
   Task,
   PRIORITIES,
@@ -53,6 +53,7 @@ export default React.memo(function TaskCard({
   const attachmentCount = (task.attachments || []).length;
   const dependencyCount = (task.dependencies || []).length;
   const hasComments = !!(task as any).comments;
+  const childTaskCount = (task.subtaskIds || []).length;
 
   const isUrgentOrHigh = task.priority === 'urgent' || task.priority === 'high';
 
@@ -143,7 +144,7 @@ export default React.memo(function TaskCard({
         </p>
       )}
 
-      {/* ── Middle: Subtask progress ── */}
+      {/* ── Middle: Subtask progress (inline subtasks) ── */}
       {subtaskProgress.total > 0 && (
         <div className="mb-3 ml-6">
           <div className="flex items-center gap-1.5 mb-1">
@@ -164,6 +165,16 @@ export default React.memo(function TaskCard({
               }}
             />
           </div>
+        </div>
+      )}
+
+      {/* ── Middle: Nested child task count badge ── */}
+      {childTaskCount > 0 && (
+        <div className="mb-3 ml-6 flex items-center gap-1.5">
+          <Network className="h-3 w-3 text-[var(--text-muted)]" />
+          <span className="text-[11px] px-2 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-muted)] font-medium">
+            {childTaskCount} {childTaskCount === 1 ? 'subtask' : 'subtasks'}
+          </span>
         </div>
       )}
 

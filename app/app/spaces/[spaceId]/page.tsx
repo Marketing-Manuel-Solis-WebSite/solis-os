@@ -1,5 +1,7 @@
 'use client';
 import { useAuth, type Team, type Member } from '@/lib/auth';
+import { getInheritanceConfig, setInheritanceConfig } from '@/lib/inheritance';
+import type { InheritanceConfig, InheritanceMode } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
@@ -8,18 +10,16 @@ import {
   getFolders, getLists, createFolder, createList, ensureDefaultList,
   type FolderData, type ListData,
 } from '@/lib/db';
-import { ensureSpaceDashboard, saveDashboard } from '@/lib/dashboard-db';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Layers, Users, CheckSquare, Target, FileText, ArrowLeft,
   Loader2, ShieldAlert, ChevronRight, Clock, TrendingUp,
-  BarChart3, Calendar, AlertTriangle, LayoutDashboard, Settings2,
+  BarChart3, Calendar, AlertTriangle, LayoutDashboard, Settings2, Settings,
   FolderOpen, List, Plus, FolderPlus, ListPlus,
 } from 'lucide-react';
-import WidgetGrid from '@/components/dashboard/widget-grid';
-import DashboardBuilder from '@/components/dashboard/dashboard-builder';
+import ContextualDashboard from '@/components/dashboard/contextual-dashboard';
 import SpaceTasksPanel from '@/components/spaces/space-tasks-panel';
-import type { WidgetLayout, WidgetProps, DashboardConfig } from '@/lib/dashboard-types';
+import RequestAccessModal from '@/components/shared/request-access-modal';
 
 // ─── Constants ───────────────────────────────────────────
 const STATUS_COLORS: Record<string, string> = {
@@ -33,10 +33,10 @@ const GOAL_STATUS_COLORS: Record<string, string> = {
   on_track: '#22C55E', at_risk: '#F59E0B', behind: '#EF4444', completed: '#3B82F6',
 };
 
-type Tab = 'overview' | 'dashboard' | 'tasks' | 'docs' | 'goals';
+type Tab = 'overview' | 'dashboard' | 'tasks' | 'docs' | 'goals' | 'settings';
 
 export default function SpacePage() {
-  const { user, me, teams, allMembers, canSeeAllTeams, setActiveTeamId } = useAuth();
+  const { user, me, teams, allMembers, canSeeAllTeams, setActiveTeamId, isManager } = useAuth();
   const { t, lang } = useI18n();
   const router = useRouter();
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -51,10 +51,7 @@ export default function SpacePage() {
   const lastFetchedId = useRef<string | null>(null);
   const tabLoaded = useRef(false);
 
-  // Space dashboard
-  const [dashboard, setDashboard] = useState<DashboardConfig | null>(null);
-  const [dashEditing, setDashEditing] = useState(false);
-  const dashboardLoaded = useRef(false);
+  const [showRequestAccess, setShowRequestAccess] = useState(false);
 
   const team: Team | undefined = teams.find(t => t.id === spaceId);
 
@@ -120,44 +117,10 @@ export default function SpacePage() {
     }
   }, [user?.uid, spaceId]);
 
-  // ─── Load space dashboard ────────────────────────────────
-  useEffect(() => {
-    if (!user?.uid || !spaceId || dashboardLoaded.current) return;
-    dashboardLoaded.current = true;
-    ensureSpaceDashboard(user.uid, spaceId).then(d => setDashboard(d)).catch(err => {
-      console.error('[Space] Failed to load dashboard:', err);
-    });
-  }, [user?.uid, spaceId]);
-
   // Reset refs when spaceId changes
   useEffect(() => {
     tabLoaded.current = false;
-    dashboardLoaded.current = false;
   }, [spaceId]);
-
-  // Dashboard handlers
-  const handleDashboardUpdate = useCallback((widgets: WidgetLayout[]) => {
-    if (!dashboard) return;
-    const updated = { ...dashboard, widgets };
-    setDashboard(updated);
-    queueMicrotask(() => saveDashboard(dashboard.id, { widgets }).catch(err => console.error('[Space] save dashboard failed:', err)));
-  }, [dashboard]);
-
-  const handleDashboardRemove = useCallback((widgetId: string) => {
-    if (!dashboard) return;
-    const widgets = dashboard.widgets.filter(w => w.widgetId !== widgetId);
-    handleDashboardUpdate(widgets);
-  }, [dashboard, handleDashboardUpdate]);
-
-  const handleDashboardReorder = useCallback((widgets: WidgetLayout[]) => {
-    handleDashboardUpdate(widgets);
-  }, [handleDashboardUpdate]);
-
-  // ─── Widget props ─────────────────────────────────────────
-  const sharedProps: Omit<WidgetProps, 'config'> = useMemo(() => ({
-    tasks, goals, logs, teams, members: spaceMembers,
-    user, me, canSeeAllTeams, activeTeamId: spaceId || '',
-  }), [tasks, goals, logs, teams, spaceMembers, user, me, spaceId, canSeeAllTeams]);
 
   // ─── Stats ──────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -183,6 +146,7 @@ export default function SpacePage() {
     { key: 'tasks', labelKey: 'spaces.tabTasks', icon: <CheckSquare className="h-3.5 w-3.5" />, count: tasks.filter(t => !t.deleted).length },
     { key: 'docs', labelKey: 'spaces.tabDocs', icon: <FileText className="h-3.5 w-3.5" />, count: docs.length },
     { key: 'goals', labelKey: 'spaces.tabGoals', icon: <Target className="h-3.5 w-3.5" />, count: goals.length },
+    ...(isManager ? [{ key: 'settings' as Tab, labelKey: 'spaces.tabSettings', icon: <Settings className="h-3.5 w-3.5" /> }] : []),
   ];
 
   // Navigate to full module with space scope
@@ -216,10 +180,26 @@ export default function SpacePage() {
           </div>
           <p className="text-[15px] font-medium text-[var(--text-primary)]">{t('spaces.noAccess')}</p>
           <p className="text-[13px] text-[var(--text-muted)]">{t('spaces.noAccessDesc')}</p>
-          <button onClick={() => router.push('/app/spaces')} className="text-[13px] text-[var(--accent)] hover:underline mt-2">
-            {t('spaces.goBack')}
-          </button>
+          <div className="flex items-center gap-3 mt-2">
+            <button
+              onClick={() => setShowRequestAccess(true)}
+              className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] text-[13px] font-medium transition"
+            >
+              {lang === 'es' ? 'Solicitar acceso' : 'Request Access'}
+            </button>
+            <button onClick={() => router.push('/app/spaces')} className="text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:underline transition">
+              {t('spaces.goBack')}
+            </button>
+          </div>
         </div>
+        {showRequestAccess && (
+          <RequestAccessModal
+            resourceType="space"
+            resourceId={spaceId}
+            resourceName={team?.name || spaceId}
+            onClose={() => setShowRequestAccess(false)}
+          />
+        )}
       </div>
     );
   }
@@ -358,24 +338,14 @@ export default function SpacePage() {
                 onTabChange={handleTabChange}
               />
             )}
-            {activeTab === 'dashboard' && dashboard && (
-              <div>
-                <DashboardBuilder
-                  dashboard={dashboard}
-                  editing={dashEditing}
-                  isAdmin={canSeeAllTeams}
-                  onEditingChange={setDashEditing}
-                  onUpdate={handleDashboardUpdate}
-                />
-                <WidgetGrid
-                  widgets={dashboard.widgets}
-                  sharedProps={sharedProps}
-                  isAdmin={canSeeAllTeams}
-                  editing={dashEditing}
-                  onReorder={handleDashboardReorder}
-                  onRemove={handleDashboardRemove}
-                />
-              </div>
+            {activeTab === 'dashboard' && (
+              <ContextualDashboard
+                scopeType="space"
+                scopeId={spaceId}
+                tasks={tasks}
+                goals={goals}
+                members={spaceMembers}
+              />
             )}
             {activeTab === 'tasks' && (
               <SpaceTasksPanel
@@ -391,6 +361,9 @@ export default function SpacePage() {
             )}
             {activeTab === 'goals' && (
               <GoalsTab goals={goals} lang={lang} t={t} teamColor={team?.color} goToModule={goToModule} />
+            )}
+            {activeTab === 'settings' && isManager && (
+              <SettingsTab spaceId={spaceId} t={t} lang={lang} />
             )}
           </motion.div>
         </AnimatePresence>
@@ -701,6 +674,140 @@ function GoalsTab({ goals, lang, t, teamColor, goToModule }: {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SETTINGS TAB (Inheritance)
+// ═══════════════════════════════════════════════════════════════
+function SettingsTab({ spaceId, t, lang }: {
+  spaceId: string; t: (k: string) => string; lang: string;
+}) {
+  const [config, setConfig] = useState<InheritanceConfig>({
+    statusMode: 'inherit', customFieldMode: 'inherit', automationMode: 'inherit',
+  });
+  const [loadingConfig, setLoadingConfig] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingConfig(true);
+    getInheritanceConfig(spaceId).then(cfg => {
+      if (!cancelled) { setConfig(cfg); setLoadingConfig(false); }
+    }).catch(() => { if (!cancelled) setLoadingConfig(false); });
+    return () => { cancelled = true; };
+  }, [spaceId]);
+
+  const updateMode = useCallback((field: keyof InheritanceConfig, value: InheritanceMode) => {
+    setConfig(prev => ({ ...prev, [field]: value }));
+    setDirty(true);
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      await setInheritanceConfig(spaceId, config);
+      setDirty(false);
+    } catch (err) {
+      console.error('[Settings] Failed to save inheritance config:', err);
+    } finally {
+      setSaving(false);
+    }
+  }, [spaceId, config]);
+
+  const MODES: { key: InheritanceMode; labelKey: string; descKey: string }[] = [
+    { key: 'inherit', labelKey: 'inheritance.inherit', descKey: 'inheritance.inheritDesc' },
+    { key: 'extend', labelKey: 'inheritance.extend', descKey: 'inheritance.extendDesc' },
+    { key: 'override', labelKey: 'inheritance.override', descKey: 'inheritance.overrideDesc' },
+  ];
+
+  const SECTIONS: { field: keyof InheritanceConfig; labelKey: string }[] = [
+    { field: 'statusMode', labelKey: 'inheritance.statusMode' },
+    { field: 'customFieldMode', labelKey: 'inheritance.customFieldMode' },
+    { field: 'automationMode', labelKey: 'inheritance.automationMode' },
+  ];
+
+  if (loadingConfig) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <Loader2 className="h-5 w-5 animate-spin text-[var(--accent)]" />
+        <p className="text-[13px] text-[var(--text-muted)]">
+          {lang === 'es' ? 'Cargando ajustes...' : 'Loading settings...'}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-[13px] font-semibold text-[var(--text-primary)] flex items-center gap-2">
+            <Settings className="h-4 w-4 text-[var(--accent)] opacity-80" />
+            {t('inheritance.settings')}
+          </h2>
+          <button
+            onClick={handleSave}
+            disabled={!dirty || saving}
+            className={`text-[12px] font-semibold px-4 py-1.5 rounded-lg transition-all duration-200 ${
+              dirty
+                ? 'bg-[var(--accent)] text-white hover:opacity-90'
+                : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed'
+            }`}
+          >
+            {saving
+              ? (lang === 'es' ? 'Guardando...' : 'Saving...')
+              : (lang === 'es' ? 'Guardar' : 'Save')}
+          </button>
+        </div>
+        <p className="text-[12px] text-[var(--text-muted)]">
+          {lang === 'es'
+            ? 'Configura cómo las listas de este espacio heredan estados, campos y automatizaciones.'
+            : 'Configure how lists in this space inherit statuses, fields, and automations.'}
+        </p>
+      </div>
+
+      {/* Inheritance sections */}
+      {SECTIONS.map(section => (
+        <div key={section.field} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-5">
+          <h3 className="text-[13px] font-semibold text-[var(--text-primary)] mb-4">{t(section.labelKey)}</h3>
+          <div className="space-y-2">
+            {MODES.map(mode => {
+              const selected = config[section.field] === mode.key;
+              return (
+                <button
+                  key={mode.key}
+                  onClick={() => updateMode(section.field, mode.key)}
+                  className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-xl border transition-all duration-200 ${
+                    selected
+                      ? 'border-[var(--accent)]/40 bg-[var(--accent)]/[0.06]'
+                      : 'border-[var(--border-subtle)] bg-[var(--bg-tertiary)]/40 hover:bg-[var(--bg-hover)]'
+                  }`}
+                >
+                  <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                    selected ? 'border-[var(--accent)]' : 'border-[var(--text-muted)]/40'
+                  }`}>
+                    {selected && (
+                      <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-[13px] font-medium ${selected ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
+                      {t(mode.labelKey)}
+                    </div>
+                    <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                      {t(mode.descKey)}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

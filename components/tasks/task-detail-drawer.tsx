@@ -7,7 +7,7 @@ import {
   ChevronDown, Download, ExternalLink, FileText,
   Image as ImageIcon, Video, Music, CheckSquare,
   Maximize2, Minimize2, GitBranch, Eye, MessageSquare,
-  Clock, User, Activity, Repeat, Sparkles,
+  Clock, User, Activity, Repeat, Sparkles, Loader2, ArrowRightLeft,
 } from 'lucide-react';
 import { getTaskComments, addTaskComment, getTaskActivity, addTaskActivity } from '@/lib/db';
 import { uploadFile, isImageType, isVideoType, isAudioType, formatFileSize } from '@/lib/upload';
@@ -31,6 +31,8 @@ import AIDecomposePanel from './ai-decompose-panel';
 import AIAssigneeSuggestions from './ai-assignee-suggestions';
 import TaskGithubLinks from './task-github-links';
 import FavoriteButton from '@/components/shared/favorite-button';
+import SubtaskList from './subtask-list';
+import { getSubtasks, rollupProgress, convertLegacySubtasks } from '@/lib/subtask-ops';
 
 /* ============================================
    PROPS
@@ -114,6 +116,11 @@ export default function TaskDetailDrawer({
   const [showAIAssignee, setShowAIAssignee] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
+  // --- Real subtask state ---
+  const [realSubtasks, setRealSubtasks] = useState<any[]>([]);
+  const [realSubtasksLoading, setRealSubtasksLoading] = useState(false);
+  const [converting, setConverting] = useState(false);
+
   // --- Refs ---
   const fileRef = useRef<HTMLInputElement>(null);
   const commentRef = useRef<HTMLInputElement>(null);
@@ -146,6 +153,45 @@ export default function TaskDetailDrawer({
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // --- Load real subtasks ---
+  const hasRealSubtasks = Array.isArray(task.subtaskIds) && task.subtaskIds.length > 0;
+  const hasLegacySubtasks = Array.isArray(task.subtasks) && task.subtasks.length > 0;
+
+  const loadRealSubtasks = useCallback(async () => {
+    if (!hasRealSubtasks) { setRealSubtasks([]); return; }
+    setRealSubtasksLoading(true);
+    try {
+      const subs = await getSubtasks(task.id);
+      setRealSubtasks(subs);
+    } catch (err) {
+      console.error('[TaskDrawer] Failed to load real subtasks:', err);
+      setRealSubtasks([]);
+    } finally {
+      setRealSubtasksLoading(false);
+    }
+  }, [task.id, hasRealSubtasks]);
+
+  useEffect(() => { loadRealSubtasks(); }, [loadRealSubtasks]);
+
+  // --- Convert legacy subtasks to real subtasks ---
+  const handleConvertLegacy = async () => {
+    if (converting || !canUpdate) return;
+    setConverting(true);
+    try {
+      await convertLegacySubtasks(task.id, task.teamId, userId);
+      // Clear legacy subtasks from the task document
+      onUpdate(task.id, 'subtasks', []);
+      // Reload real subtasks
+      await loadRealSubtasks();
+      toast?.success?.('Subtasks converted successfully');
+    } catch (err) {
+      console.error('[TaskDrawer] Legacy subtask conversion failed:', err);
+      toast?.error?.('Failed to convert subtasks');
+    } finally {
+      setConverting(false);
+    }
+  };
+
   // --- Computed values ---
   const st = getStatusConfig(task.status);
   const tp = getTypeConfig(task.type || 'task');
@@ -155,6 +201,8 @@ export default function TaskDetailDrawer({
   const due = task.dueDate?.toDate?.();
   const start = task.startDate?.toDate?.();
   const { done: doneSub, total: totalSub, pct: progress } = getSubtaskProgress(task);
+  const realSubProgress = rollupProgress(realSubtasks);
+  const combinedSubtaskCount = totalSub + realSubProgress.total;
   const customFields = task.customFields || {};
   const activeFieldIds = Object.keys(customFields);
   const fieldsByGroup = getFieldsByGroup(activeFields);
@@ -644,7 +692,7 @@ export default function TaskDetailDrawer({
             <SectionHeader
               id="subtasks"
               label={t('taskCreate.subtasks')}
-              count={totalSub > 0 ? totalSub : undefined}
+              count={combinedSubtaskCount > 0 ? combinedSubtaskCount : undefined}
               collapsed={isSectionCollapsed('subtasks')}
               onToggle={() => toggleSection('subtasks')}
             />
@@ -657,48 +705,98 @@ export default function TaskDetailDrawer({
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  {totalSub > 0 && (
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[12px] text-[var(--text-muted)]">
-                          {doneSub}/{totalSub} · {progress}%
-                        </span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-[var(--accent)] transition-all duration-500"
-                          style={{ width: `${progress}%` }}
+                  {/* --- Real subtasks (first-class task documents) --- */}
+                  {hasRealSubtasks && (
+                    <>
+                      {realSubtasksLoading ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="h-4 w-4 animate-spin text-[var(--text-muted)]" />
+                        </div>
+                      ) : (
+                        <SubtaskList
+                          parentTaskId={task.id}
+                          subtasks={realSubtasks}
+                          members={members}
+                          teamId={task.teamId}
+                          listId={task.listId}
+                          userId={userId}
+                          canUpdate={canUpdate}
+                          onMutate={loadRealSubtasks}
                         />
-                      </div>
-                    </div>
+                      )}
+                    </>
                   )}
 
-                  {(task.subtasks || []).map((s: any, i: number) => (
-                    <div key={s.id} className="flex items-center gap-2 py-2.5 px-3.5 rounded-xl hover:bg-[var(--bg-elevated)] group">
-                      <button
-                        onClick={() => toggleSub(i)}
-                        disabled={!canUpdate}
-                        className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center transition shrink-0 ${
-                          s.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[var(--border)]'
-                        }`}
-                      >
-                        {s.done && <Check className="h-2.5 w-2.5" />}
-                      </button>
-                      <span className={`text-[14px] flex-1 ${s.done ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-secondary)]'}`}>
-                        {s.title}
-                      </span>
+                  {/* --- Legacy embedded subtasks (fallback for unmigrated tasks) --- */}
+                  {hasLegacySubtasks && (
+                    <div className={hasRealSubtasks ? 'mt-4 pt-4 border-t border-[var(--border-subtle)]' : ''}>
+                      {hasRealSubtasks && (
+                        <span className="text-[11px] uppercase tracking-wider text-[var(--text-muted)] font-semibold mb-2 block">
+                          Legacy subtasks
+                        </span>
+                      )}
+
+                      {totalSub > 0 && !hasRealSubtasks && (
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[12px] text-[var(--text-muted)]">
+                              {doneSub}/{totalSub} · {progress}%
+                            </span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-[var(--accent)] transition-all duration-500"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {(task.subtasks || []).map((s: any, i: number) => (
+                        <div key={s.id} className="flex items-center gap-2 py-2.5 px-3.5 rounded-xl hover:bg-[var(--bg-elevated)] group">
+                          <button
+                            onClick={() => toggleSub(i)}
+                            disabled={!canUpdate}
+                            className={`w-[18px] h-[18px] rounded-md border flex items-center justify-center transition shrink-0 ${
+                              s.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-[var(--border)]'
+                            }`}
+                          >
+                            {s.done && <Check className="h-2.5 w-2.5" />}
+                          </button>
+                          <span className={`text-[14px] flex-1 ${s.done ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-secondary)]'}`}>
+                            {s.title}
+                          </span>
+                          {canUpdate && (
+                            <button
+                              onClick={() => removeSub(i)}
+                              className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-400 transition"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                      {/* Convert legacy subtasks to real subtasks */}
                       {canUpdate && (
                         <button
-                          onClick={() => removeSub(i)}
-                          className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-400 transition"
+                          onClick={handleConvertLegacy}
+                          disabled={converting}
+                          className="flex items-center gap-2 mt-3 px-3 py-2 rounded-xl text-[12px] text-[var(--accent)] bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 transition w-full justify-center disabled:opacity-50"
                         >
-                          <X className="h-3.5 w-3.5" />
+                          {converting ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <ArrowRightLeft className="h-3.5 w-3.5" />
+                          )}
+                          {converting ? 'Converting...' : 'Convert to real subtasks'}
                         </button>
                       )}
                     </div>
-                  ))}
+                  )}
 
-                  {canUpdate && (
+                  {/* --- Add subtask input (legacy inline add, shown when no real subtasks yet) --- */}
+                  {canUpdate && !hasRealSubtasks && (
                     <div className="flex gap-2 mt-2">
                       <input
                         value={newSub}
@@ -1263,6 +1361,12 @@ export default function TaskDetailDrawer({
                           {a.from && <span className="text-[var(--text-muted)] mx-1">-&gt;</span>}
                           <span className="text-emerald-400">{a.to}</span>
                         </>
+                      )}
+                      {(a.automationId || a.automationName) && (
+                        <span className="inline-flex items-center gap-0.5 ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-400">
+                          <Sparkles className="h-2.5 w-2.5" />
+                          {a.automationName || 'Automation'}
+                        </span>
                       )}
                       <span className="text-[var(--text-muted)]/40 ml-2 text-[12px]">
                         {a.createdAt?.toDate?.()?.toLocaleString?.('es-MX') || ''}

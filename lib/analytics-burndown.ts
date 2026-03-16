@@ -1,11 +1,15 @@
 // ================================================================
 // Analytics — Burndown & Velocity computation
 // ================================================================
-// Computes sprint burndown data (ideal vs actual remaining work)
-// and rolling velocity metrics for team performance tracking.
+// Scalability: Pushes teamId/listId/date filters to Firestore.
+// Uses streamBatches() for memory-safe iteration.
+// Burndown uses pre-sorted completion dates + binary search
+// instead of O(tasks × days).
+// ================================================================
 
 import { adminDb } from '@/lib/firebase-admin';
 import { ORG_ID as ORG } from '@/lib/org';
+import { streamBatches } from '@/lib/firestore-batch-stream';
 
 
 
@@ -72,11 +76,31 @@ function extractDate(ts: any): Date | null {
   return null;
 }
 
+/**
+ * Binary search: find how many dates in a sorted array are <= target.
+ */
+function countLessOrEqual(sortedDates: string[], target: string): number {
+  let lo = 0;
+  let hi = sortedDates.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (sortedDates[mid] <= target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
 // ---- Burndown ----
+
+interface BurndownAcc {
+  totalScope: number;
+  completionDates: string[]; // sorted array of completion date strings
+}
 
 /**
  * Compute burndown chart data for a date range.
- * Uses tasks filtered by teamId (optional) within the date range.
+ * Pushes teamId/listId filters to Firestore query.
+ * Uses binary search over pre-sorted completion dates instead of O(tasks × days).
  */
 export async function computeBurndown(
   startDate: string,
@@ -87,45 +111,52 @@ export async function computeBurndown(
   const end = parseDate(endDate);
   const totalDays = daysBetween(start, end);
 
-  // Fetch tasks in scope — created before or during the sprint
-  let q = adminDb.collection('tasks')
+  // Build query with server-side filters
+  let q: FirebaseFirestore.Query = adminDb.collection('tasks')
     .where('orgId', '==', ORG)
     .where('deleted', '!=', true);
 
-  const snap = await q.get();
+  if (options.teamId) q = q.where('teamId', '==', options.teamId);
+  if (options.listId) q = q.where('listId', '==', options.listId);
 
-  // Filter in memory for flexibility (teamId, listId, date range)
-  const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(t => {
-    if (options.teamId && t.teamId !== options.teamId) return false;
-    if (options.listId && t.listId !== options.listId) return false;
-    const created = extractDate(t.createdAt);
-    if (!created || created > end) return false; // exclude tasks created after sprint end
-    return true;
-  });
+  // Stream tasks, accumulate scope count and completion dates
+  const acc = await streamBatches<BurndownAcc>(
+    q,
+    { totalScope: 0, completionDates: [] },
+    (acc, t) => {
+      const created = extractDate(t.createdAt);
+      if (!created || created > end) return acc; // exclude tasks created after sprint end
 
-  const totalScope = tasks.length;
+      acc.totalScope++;
 
-  // For each day in range, compute remaining and completed
+      const isDone = t.status === 'done' || t.status === 'completed';
+      if (isDone) {
+        const completedAt = extractDate(t.completedAt) || extractDate(t.updatedAt);
+        if (completedAt) {
+          acc.completionDates.push(toDateStr(completedAt));
+        }
+      }
+
+      return acc;
+    },
+  );
+
+  // Sort completion dates for binary search
+  acc.completionDates.sort();
+
+  const { totalScope } = acc;
+
+  // Build points using binary search — O(days × log(completions)) instead of O(days × tasks)
   const points: BurndownPoint[] = [];
   for (let i = 0; i <= totalDays; i++) {
     const day = addDays(start, i);
     const dayStr = toDateStr(day);
 
-    // Ideal: linear from totalScope to 0
     const idealRemaining = totalScope > 0
       ? Math.round(totalScope * (1 - i / totalDays) * 10) / 10
       : 0;
 
-    // Actual: count tasks NOT completed by this date
-    let completedByDay = 0;
-    for (const t of tasks) {
-      const isDone = t.status === 'done' || t.status === 'completed';
-      if (!isDone) continue;
-      const completedAt = extractDate(t.completedAt) || extractDate(t.updatedAt);
-      if (completedAt && toDateStr(completedAt) <= dayStr) {
-        completedByDay++;
-      }
-    }
+    const completedByDay = countLessOrEqual(acc.completionDates, dayStr);
 
     points.push({
       date: dayStr,
@@ -146,8 +177,15 @@ export async function computeBurndown(
 
 // ---- Velocity ----
 
+interface VelocityAcc {
+  // Map bucket index -> { created, completed }
+  bucketCounts: Map<number, { created: number; completed: number }>;
+}
+
 /**
  * Compute weekly velocity over the last N weeks.
+ * Pushes date range filter to Firestore.
+ * Single-pass bucket assignment using date comparison.
  */
 export async function computeVelocity(
   weeks: number = 8,
@@ -175,36 +213,99 @@ export async function computeVelocity(
     });
   }
 
-  // Fetch all tasks
+  // Build query with date range filter — only fetch tasks created/completed in range
   const rangeStart = parseDate(buckets[0].startDate);
-  let q = adminDb.collection('tasks')
+  let q: FirebaseFirestore.Query = adminDb.collection('tasks')
     .where('orgId', '==', ORG)
-    .where('deleted', '!=', true);
+    .where('deleted', '!=', true)
+    .where('createdAt', '>=', rangeStart);
 
-  const snap = await q.get();
-  const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() as any })).filter(t => {
-    if (options.teamId && t.teamId !== options.teamId) return false;
-    return true;
+  if (options.teamId) q = q.where('teamId', '==', options.teamId);
+
+  // Pre-compute bucket boundaries for fast lookup
+  const bucketStarts = buckets.map(b => parseDate(b.startDate).getTime());
+  const bucketEnds = buckets.map(b => {
+    const d = parseDate(b.endDate);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
   });
 
-  // Assign tasks to buckets
-  for (const t of tasks) {
-    const created = extractDate(t.createdAt);
-    const isDone = t.status === 'done' || t.status === 'completed';
-    const completed = isDone ? (extractDate(t.completedAt) || extractDate(t.updatedAt)) : null;
-
-    for (const b of buckets) {
-      const bStart = parseDate(b.startDate);
-      const bEnd = parseDate(b.endDate);
-      bEnd.setHours(23, 59, 59, 999);
-
-      if (created && created >= bStart && created <= bEnd) {
-        b.created++;
-      }
-      if (completed && completed >= bStart && completed <= bEnd) {
-        b.completed++;
-      }
+  // Find which bucket a timestamp belongs to (linear scan on small array)
+  function findBucket(ts: number): number {
+    for (let i = 0; i < buckets.length; i++) {
+      if (ts >= bucketStarts[i] && ts <= bucketEnds[i]) return i;
     }
+    return -1;
+  }
+
+  // Stream tasks and assign to buckets in single pass
+  const velocityAcc = await streamBatches<VelocityAcc>(
+    q,
+    { bucketCounts: new Map() },
+    (acc, t) => {
+      const created = extractDate(t.createdAt);
+      const isDone = t.status === 'done' || t.status === 'completed';
+      const completed = isDone ? (extractDate(t.completedAt) || extractDate(t.updatedAt)) : null;
+
+      if (created) {
+        const bi = findBucket(created.getTime());
+        if (bi >= 0) {
+          const entry = acc.bucketCounts.get(bi) || { created: 0, completed: 0 };
+          entry.created++;
+          acc.bucketCounts.set(bi, entry);
+        }
+      }
+
+      if (completed) {
+        const bi = findBucket(completed.getTime());
+        if (bi >= 0) {
+          const entry = acc.bucketCounts.get(bi) || { created: 0, completed: 0 };
+          entry.completed++;
+          acc.bucketCounts.set(bi, entry);
+        }
+      }
+
+      return acc;
+    },
+  );
+
+  // Also query tasks completed in range but created before range
+  // (they wouldn't be caught by createdAt >= rangeStart)
+  try {
+    const completedQuery = adminDb.collection('tasks')
+      .where('orgId', '==', ORG)
+      .where('deleted', '!=', true)
+      .where('completedAt', '>=', rangeStart);
+
+    await streamBatches(
+      completedQuery,
+      velocityAcc,
+      (acc, t) => {
+        const created = extractDate(t.createdAt);
+        // Skip if created in range (already counted above)
+        if (created && created >= rangeStart) return acc;
+
+        const isDone = t.status === 'done' || t.status === 'completed';
+        const completed = isDone ? (extractDate(t.completedAt) || extractDate(t.updatedAt)) : null;
+        if (completed) {
+          const bi = findBucket(completed.getTime());
+          if (bi >= 0) {
+            const entry = acc.bucketCounts.get(bi) || { created: 0, completed: 0 };
+            entry.completed++;
+            acc.bucketCounts.set(bi, entry);
+          }
+        }
+        return acc;
+      },
+    );
+  } catch {
+    // completedAt field may not exist on all tasks — gracefully ignore
+  }
+
+  // Apply accumulated counts to buckets
+  for (const [idx, counts] of velocityAcc.bucketCounts) {
+    buckets[idx].created += counts.created;
+    buckets[idx].completed += counts.completed;
   }
 
   // Compute net throughput

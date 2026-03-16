@@ -29,8 +29,10 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 60_000,
+            gcTime: 10 * 60 * 1000,  // clean up unmounted queries after 10 min
             retry: 1,
             refetchOnWindowFocus: true,
+            refetchOnReconnect: true,
           },
         },
       }),

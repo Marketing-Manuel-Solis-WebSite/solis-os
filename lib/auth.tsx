@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, getDocs, collection, limit, query, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -80,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [allMembers, setAllMembers] = useState<Member[]>([]);
   const [activeTeamId, setActiveTeamIdRaw] = useState('');
   const [permMatrix, setPermMatrix] = useState<any>(null);
+  const lastMembersFetchRef = useRef(0);
 
   // Derived state — normalize role for robust comparison
   const roleNorm = (me?.role || '').toLowerCase().trim();
@@ -295,6 +296,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
 
         // --- STEP 4: Background — load members + permissions (non-blocking) ---
+        // Throttle: skip if last fetch was <5 min ago
+        const MEMBERS_THROTTLE = 5 * 60 * 1000;
+        const shouldFetchMembers = Date.now() - lastMembersFetchRef.current > MEMBERS_THROTTLE;
+
+        if (shouldFetchMembers) {
+        lastMembersFetchRef.current = Date.now();
         getDocs(collection(db, 'orgs', ORG_ID, 'members')).then(allMembersSnap => {
           const allMems = allMembersSnap.docs.map(d => ({ id: d.id, ...d.data() } as unknown as Member));
 
@@ -311,6 +318,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
           setAllMembers(normalizedAllMems);
         }).catch((err) => console.error('[Auth] load members failed:', err));
+        } // end shouldFetchMembers throttle
 
         getDoc(doc(db, 'orgs', ORG_ID, 'settings', 'permissions')).then(permSnap => {
           if (permSnap.exists() && permSnap.data()?.matrix) {

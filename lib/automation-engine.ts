@@ -27,8 +27,14 @@ interface RuleDoc {
   branches?: BranchBlock[];
   enabled: boolean;
   teamId?: string;
+  spaceId?: string;
+  folderId?: string;
+  listId?: string;
   runCount: number;
   errorCount?: number;
+  consecutiveErrors?: number;
+  disabledAt?: any;
+  disabledReason?: string;
 }
 
 interface TriggerContext {
@@ -101,6 +107,7 @@ function allConditionsPass(conditions: RuleDoc['conditions'], task: Record<strin
 async function executeAction(
   action: RuleDoc['actions'][0],
   ctx: TriggerContext,
+  ruleRef?: { automationId: string; automationName: string },
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const taskRef = adminDb.doc(`tasks/${ctx.taskId}`);
@@ -137,7 +144,9 @@ async function executeAction(
           await adminDb.collection(`tasks/${ctx.taskId}/comments`).add({
             text,
             authorId: 'automation',
-            authorName: 'Automation',
+            authorName: ruleRef ? `Automation: ${ruleRef.automationName}` : 'Automation',
+            automationId: ruleRef?.automationId || null,
+            automationName: ruleRef?.automationName || null,
             createdAt: FieldValue.serverTimestamp(),
           });
         }
@@ -227,8 +236,24 @@ async function executeAction(
 
 // ---- Main Engine ----
 
-async function getMatchingRules(triggerType: string, teamId?: string): Promise<RuleDoc[]> {
-  let snap = await adminDb.collection('automations')
+interface ScopeContext {
+  teamId?: string;
+  spaceId?: string;
+  folderId?: string;
+  listId?: string;
+}
+
+function matchesScope(rule: RuleDoc, scope: ScopeContext): boolean {
+  // A rule with no scope fields set is org-wide — matches everything
+  if (rule.teamId && rule.teamId !== '' && rule.teamId !== scope.teamId) return false;
+  if (rule.spaceId && rule.spaceId !== '' && rule.spaceId !== scope.spaceId) return false;
+  if (rule.folderId && rule.folderId !== '' && rule.folderId !== scope.folderId) return false;
+  if (rule.listId && rule.listId !== '' && rule.listId !== scope.listId) return false;
+  return true;
+}
+
+async function getMatchingRules(triggerType: string, scope?: ScopeContext): Promise<RuleDoc[]> {
+  const snap = await adminDb.collection('automations')
     .where('orgId', '==', ORG)
     .where('enabled', '==', true)
     .where('trigger', '==', triggerType)
@@ -236,16 +261,18 @@ async function getMatchingRules(triggerType: string, teamId?: string): Promise<R
 
   const rules = snap.docs.map(d => ({ id: d.id, ...d.data() } as any as RuleDoc));
 
-  // Filter by team scope if applicable
-  if (teamId) {
-    return rules.filter(r => !r.teamId || r.teamId === '' || r.teamId === teamId);
+  if (scope) {
+    return rules.filter(r => matchesScope(r, scope));
   }
   return rules;
 }
 
+const AUTO_DISABLE_THRESHOLD = 5;
+
 async function executeRule(rule: RuleDoc, ctx: TriggerContext): Promise<void> {
   const start = Date.now();
   const logEntries: { actionType: string; status: string; error?: string }[] = [];
+  const ruleRef = { automationId: rule.id, automationName: rule.name };
 
   try {
     // Check conditions
@@ -260,7 +287,7 @@ async function executeRule(rule: RuleDoc, ctx: TriggerContext): Promise<void> {
 
     let allSuccess = true;
     for (const action of sorted) {
-      const result = await executeAction(action, ctx);
+      const result = await executeAction(action, ctx, ruleRef);
       logEntries.push({ actionType: action.type, status: result.success ? 'success' : 'failure', error: result.error });
       if (!result.success) allSuccess = false;
     }
@@ -274,12 +301,22 @@ async function executeRule(rule: RuleDoc, ctx: TriggerContext): Promise<void> {
         const branchLabel = conditionsMet ? 'branch_then' : 'branch_else';
 
         for (const action of branchActions || []) {
-          const result = await executeAction(action, ctx);
+          const result = await executeAction(action, ctx, ruleRef);
           logEntries.push({ actionType: `${branchLabel}:${action.type}`, status: result.success ? 'success' : 'failure', error: result.error });
           if (!result.success) allSuccess = false;
         }
       }
     }
+
+    // Write automation tracing to task activity
+    await adminDb.collection(`tasks/${ctx.taskId}/activity`).add({
+      type: 'automation',
+      automationId: rule.id,
+      automationName: rule.name,
+      actionsExecuted: logEntries.map(e => e.actionType),
+      status: allSuccess ? 'success' : 'partial_failure',
+      createdAt: FieldValue.serverTimestamp(),
+    }).catch(() => { /* best-effort tracing */ });
 
     // Update rule stats
     const updateData: Record<string, any> = {
@@ -287,16 +324,56 @@ async function executeRule(rule: RuleDoc, ctx: TriggerContext): Promise<void> {
       lastRunAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     };
-    if (!allSuccess) updateData.errorCount = FieldValue.increment(1);
+    if (allSuccess) {
+      // Reset consecutive errors on success
+      updateData.consecutiveErrors = 0;
+    } else {
+      updateData.errorCount = FieldValue.increment(1);
+      updateData.consecutiveErrors = FieldValue.increment(1);
+    }
     await adminDb.doc(`automations/${rule.id}`).update(updateData);
+
+    // Auto-disable if consecutive errors hit threshold
+    if (!allSuccess) {
+      const freshSnap = await adminDb.doc(`automations/${rule.id}`).get();
+      const freshData = freshSnap.data();
+      if (freshData && (freshData.consecutiveErrors || 0) >= AUTO_DISABLE_THRESHOLD) {
+        await adminDb.doc(`automations/${rule.id}`).update({
+          enabled: false,
+          disabledAt: FieldValue.serverTimestamp(),
+          disabledReason: `Auto-disabled after ${AUTO_DISABLE_THRESHOLD} consecutive errors`,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        console.warn(`[AutomationEngine] Rule ${rule.id} (${rule.name}) auto-disabled after ${AUTO_DISABLE_THRESHOLD} consecutive errors`);
+      }
+    }
 
     await writeLog(rule.id, allSuccess ? 'success' : 'failure', logEntries, Date.now() - start, ctx);
   } catch (err: any) {
     console.error(`[AutomationEngine] Rule ${rule.id} (${rule.name}) failed:`, err);
+
+    // Increment error counts
     await adminDb.doc(`automations/${rule.id}`).update({
       errorCount: FieldValue.increment(1),
+      consecutiveErrors: FieldValue.increment(1),
       updatedAt: FieldValue.serverTimestamp(),
-    }).catch(err => console.error('[AutomationEngine] Failed to update rule stats:', err?.message));
+    }).catch(e => console.error('[AutomationEngine] Failed to update rule stats:', e?.message));
+
+    // Auto-disable check after catastrophic failure
+    try {
+      const freshSnap = await adminDb.doc(`automations/${rule.id}`).get();
+      const freshData = freshSnap.data();
+      if (freshData && (freshData.consecutiveErrors || 0) >= AUTO_DISABLE_THRESHOLD) {
+        await adminDb.doc(`automations/${rule.id}`).update({
+          enabled: false,
+          disabledAt: FieldValue.serverTimestamp(),
+          disabledReason: `Auto-disabled after ${AUTO_DISABLE_THRESHOLD} consecutive errors: ${err?.message || 'Unknown error'}`,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        console.warn(`[AutomationEngine] Rule ${rule.id} (${rule.name}) auto-disabled after ${AUTO_DISABLE_THRESHOLD} consecutive errors`);
+      }
+    } catch { /* best-effort */ }
+
     await writeLog(rule.id, 'failure', logEntries, Date.now() - start, ctx, err?.message);
   }
 }
@@ -326,11 +403,20 @@ async function writeLog(
 
 // ---- Public API: trigger entry points ----
 
+function buildScope(task: Record<string, any>): ScopeContext {
+  return {
+    teamId: task.teamId,
+    spaceId: task.spaceId,
+    folderId: task.folderId,
+    listId: task.listId,
+  };
+}
+
 export async function onTaskCreated(taskId: string, task: Record<string, any>, actorId?: string): Promise<void> {
   if (_activeTaskIds.has(taskId)) return; // recursion guard
   _activeTaskIds.add(taskId);
   try {
-    const rules = await getMatchingRules('task_created', task.teamId);
+    const rules = await getMatchingRules('task_created', buildScope(task));
     const ctx: TriggerContext = { taskId, task, actorId };
     for (const rule of rules) {
       await executeRule(rule, ctx);
@@ -349,7 +435,7 @@ export async function onTaskStatusChanged(
   if (_activeTaskIds.has(taskId)) return; // recursion guard
   _activeTaskIds.add(taskId);
   try {
-    const rules = await getMatchingRules('task_status_changed', task.teamId);
+    const rules = await getMatchingRules('task_status_changed', buildScope(task));
     const ctx: TriggerContext = { taskId, task, previousData: { status: previousStatus }, actorId };
     for (const rule of rules) {
       await executeRule(rule, ctx);
@@ -367,7 +453,7 @@ export async function onTaskAssigned(
   if (_activeTaskIds.has(taskId)) return; // recursion guard
   _activeTaskIds.add(taskId);
   try {
-    const rules = await getMatchingRules('task_assigned', task.teamId);
+    const rules = await getMatchingRules('task_assigned', buildScope(task));
     const ctx: TriggerContext = { taskId, task, actorId };
     for (const rule of rules) {
       await executeRule(rule, ctx);
@@ -386,7 +472,7 @@ export async function onTaskPriorityChanged(
   if (_activeTaskIds.has(taskId)) return;
   _activeTaskIds.add(taskId);
   try {
-    const rules = await getMatchingRules('task_priority_changed', task.teamId);
+    const rules = await getMatchingRules('task_priority_changed', buildScope(task));
     const ctx: TriggerContext = { taskId, task, previousData: { priority: previousPriority }, actorId };
     for (const rule of rules) {
       await executeRule(rule, ctx);
@@ -404,7 +490,7 @@ export async function onTaskDueDateChanged(
   if (_activeTaskIds.has(taskId)) return;
   _activeTaskIds.add(taskId);
   try {
-    const rules = await getMatchingRules('task_due_date_changed', task.teamId);
+    const rules = await getMatchingRules('task_due_date_changed', buildScope(task));
     const ctx: TriggerContext = { taskId, task, actorId };
     for (const rule of rules) {
       await executeRule(rule, ctx);
@@ -423,7 +509,7 @@ export async function onTaskCustomFieldChanged(
   if (_activeTaskIds.has(taskId)) return;
   _activeTaskIds.add(taskId);
   try {
-    const rules = await getMatchingRules('task_custom_field_changed', task.teamId);
+    const rules = await getMatchingRules('task_custom_field_changed', buildScope(task));
     const ctx: TriggerContext = { taskId, task, previousData: { changedField: fieldName }, actorId };
     for (const rule of rules) {
       await executeRule(rule, ctx);

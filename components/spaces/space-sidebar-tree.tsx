@@ -5,7 +5,7 @@ import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronUp, ChevronDown as ChevronDownIcon, FolderOpen, List, Plus, MoreHorizontal,
-  Pencil, Trash2, FolderPlus, ListPlus, FolderInput, FileText, PenTool, Home,
+  Pencil, Trash2, FolderPlus, ListPlus, FolderInput, FileText, PenTool, Home, LayoutTemplate,
 } from 'lucide-react';
 import {
   getFolders, getLists, createFolder, createList, deleteFolder, deleteList,
@@ -15,6 +15,8 @@ import {
   type FolderData, type ListData,
 } from '@/lib/db';
 import { SpaceInputDialog, SpaceConfirmDialog } from './space-input-dialog';
+import TemplatePickerModal from '@/components/templates/template-picker-modal';
+import type { UnifiedTemplate } from '@/lib/template-center';
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -57,6 +59,7 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [menuTarget, setMenuTarget] = useState<{ type: 'folder' | 'list' | 'doc' | 'whiteboard'; id: string } | null>(null);
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [templatePicker, setTemplatePicker] = useState<{ folderId: string | null } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Load hierarchy + docs + whiteboards
@@ -148,6 +151,13 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
     if (folderId) setExpandedFolders(prev => new Set([...prev, folderId]));
     setDialog(null);
     router.push(`/app/spaces/${spaceId}/list/${ref.id}`);
+  };
+
+  const handleTemplateSelect = async (template: UnifiedTemplate) => {
+    const folderId = templatePicker?.folderId ?? null;
+    const name = template.data?.name || template.name;
+    await handleCreateList(name, folderId);
+    setTemplatePicker(null);
   };
 
   const handleCreateDoc = async (title: string, folderId: string | null) => {
@@ -362,6 +372,7 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
                   onMoveDown={fIdx < folders.length - 1 ? () => { reorderFolder(folder.id!, 1); setMenuTarget(null); } : undefined}
                   onNewDoc={() => { setDialog({ action: 'createDoc', folderId: folder.id! }); setMenuTarget(null); }}
                   onNewWhiteboard={() => { setDialog({ action: 'createWhiteboard', folderId: folder.id! }); setMenuTarget(null); }}
+                  onNewListFromTemplate={canManage ? () => { setTemplatePicker({ folderId: folder.id! }); setMenuTarget(null); } : undefined}
                   t={t}
                   type="folder"
                 />
@@ -536,6 +547,13 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
               >
                 <ListPlus className="h-3 w-3" />
               </button>
+              <button
+                onClick={() => setTemplatePicker({ folderId: null })}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--sidebar-hover)] transition"
+                title={t('spaces.fromTemplate')}
+              >
+                <LayoutTemplate className="h-3 w-3" />
+              </button>
             </>
           )}
           <button
@@ -703,6 +721,15 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
           t={t}
         />
       )}
+
+      {/* Template picker for creating lists from templates */}
+      <TemplatePickerModal
+        open={templatePicker !== null}
+        onClose={() => setTemplatePicker(null)}
+        onSelect={handleTemplateSelect}
+        filterType="list"
+        title={t('spaces.fromTemplate')}
+      />
     </>
   );
 }
@@ -772,12 +799,19 @@ const ContextMenu = forwardRef<HTMLDivElement, {
   onMoveDown?: () => void;
   onNewDoc?: () => void;
   onNewWhiteboard?: () => void;
+  onNewListFromTemplate?: () => void;
   t: (k: string) => string;
   type: 'folder' | 'list';
-}>(({ onRename, onDelete, onMoveToFolder, onMoveUp, onMoveDown, onNewDoc, onNewWhiteboard, t, type }, ref) => (
+}>(({ onRename, onDelete, onMoveToFolder, onMoveUp, onMoveDown, onNewDoc, onNewWhiteboard, onNewListFromTemplate, t, type }, ref) => (
   <div ref={ref} className="absolute left-full top-0 ml-1 w-44 rounded-xl bg-[var(--bg-elevated)] shadow-lg z-50 p-1 border border-[var(--border-subtle)]">
-    {(onNewDoc || onNewWhiteboard) && (
+    {(onNewDoc || onNewWhiteboard || onNewListFromTemplate) && (
       <>
+        {onNewListFromTemplate && (
+          <button onClick={onNewListFromTemplate} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
+            <LayoutTemplate className="h-3 w-3" />
+            {t('spaces.fromTemplate')}
+          </button>
+        )}
         {onNewDoc && (
           <button onClick={onNewDoc} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
             <FileText className="h-3 w-3" />
