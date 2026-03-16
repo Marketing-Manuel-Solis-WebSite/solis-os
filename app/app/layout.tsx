@@ -968,7 +968,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <UserMenu />
           </div>
         </header>
-        <main className="min-h-[calc(100vh-56px)]">
+        <main className={`min-h-[calc(100vh-56px)] ${isMobile ? 'pb-16' : ''}`}>
           <AnimatePresence mode="popLayout">
             <motion.div
               key={path}

@@ -184,6 +184,20 @@ export async function afterMessageSent(event: Omit<MessageSentEvent, 'type'> & {
     ));
   }
 
+  // Chat automation trigger (fire-and-forget, best-effort)
+  try {
+    fetch('/api/chat/automation-trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        channelId,
+        messageText: message.content || '',
+        actorId: actor.actorId,
+        actorName: actor.actorName,
+      }),
+    }).catch(() => {}); // best-effort, don't block
+  } catch {}
+
   const result = buildResult(cid, 'message.sent', effects);
   persistDispatchResult(result, { entityType: 'channel', entityId: channelId, actorId: actor.actorId });
   return result;

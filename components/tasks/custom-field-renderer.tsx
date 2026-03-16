@@ -4,6 +4,7 @@ import { type CustomFieldDef } from '@/lib/custom-fields';
 import { useI18n } from '@/lib/i18n';
 import { Star, X, Calculator, Sigma, Link2 } from 'lucide-react';
 import { evaluateFormula } from '@/lib/formula-engine';
+import RelationshipFieldPicker from './relationship-field-picker';
 
 interface Props {
   field: CustomFieldDef;
@@ -247,33 +248,31 @@ export default function CustomFieldRenderer({ field, value, onChange, readOnly =
         ...docs.map(d => ({ id: d.id, title: d.title, type: 'doc' as const })),
         ...goals.map(g => ({ id: g.id, title: g.name, type: 'goal' as const })),
       ];
-      const linked = linkedIds.map(id => allEntities.find(e => e.id === id)).filter(Boolean);
-      return (
-        <div>
-          <div className="flex flex-wrap gap-1 mb-1">
-            {linked.map(entity => entity && (
+      const linked = linkedIds.map(id => allEntities.find(e => e.id === id)).filter(Boolean) as { id: string; title: string; type: 'task' | 'doc' | 'goal' }[];
+
+      if (readOnly) {
+        return (
+          <div className="flex flex-wrap gap-1">
+            {linked.map(entity => (
               <span key={entity.id} className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-md bg-[var(--accent-subtle)] text-[var(--accent)]">
-                <Link2 className="h-2.5 w-2.5" />
-                {entity.title}
-                <button onClick={() => onChange(linkedIds.filter(id => id !== entity.id))} className="hover:text-red-400">
-                  <X className="h-2.5 w-2.5" />
-                </button>
+                <Link2 className="h-2.5 w-2.5" /> {entity.title}
               </span>
             ))}
+            {linked.length === 0 && <span className="text-sm text-[var(--text-muted)]">—</span>}
           </div>
-          {!readOnly && (
-            <select
-              value=""
-              onChange={e => { if (e.target.value && !linkedIds.includes(e.target.value)) onChange([...linkedIds, e.target.value]); }}
-              className={`${baseInputClass} cursor-pointer`}
-            >
-              <option value="">{lang === 'es' ? 'Vincular...' : 'Link...'}</option>
-              {allEntities.filter(e => !linkedIds.includes(e.id)).slice(0, 30).map(e => (
-                <option key={e.id} value={e.id}>{`[${e.type}] ${e.title}`}</option>
-              ))}
-            </select>
-          )}
-        </div>
+        );
+      }
+
+      return (
+        <RelationshipFieldPicker
+          value={linked}
+          onChange={(entities) => onChange(entities.map(e => e.id))}
+          allowedTypes={field.relationshipConfig?.targetTypes || ['task', 'doc', 'goal']}
+          allowMultiple={field.relationshipConfig?.allowMultiple ?? true}
+          tasks={tasks}
+          docs={docs}
+          goals={goals}
+        />
       );
     }
 
