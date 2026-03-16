@@ -25,6 +25,12 @@ const TRIGGERS = [
   { id: 'task_custom_field_changed', label: 'Custom Field Changed', icon: Settings, color: '#8B5CF6', desc: 'When a custom field value changes' },
   { id: 'task_due_approaching', label: 'Due Approaching', icon: Clock, color: '#64748B', desc: 'When a task due date is approaching', comingSoon: true },
   { id: 'task_overdue', label: 'Task Overdue', icon: AlertTriangle, color: '#EF4444', desc: 'When a task passes its due date', comingSoon: true },
+  // Scheduled triggers
+  { id: 'scheduled_daily', label: 'Scheduled Daily', icon: Clock, color: '#06B6D4', desc: 'Run every day at a specific time' },
+  { id: 'scheduled_weekly', label: 'Scheduled Weekly', icon: Calendar, color: '#8B5CF6', desc: 'Run every week on a specific day' },
+  { id: 'scheduled_monthly', label: 'Scheduled Monthly', icon: Calendar, color: '#F59E0B', desc: 'Run once a month on a specific date' },
+  // Chat trigger
+  { id: 'chat_message_received', label: 'Chat Message', icon: MessageSquare, color: '#EC4899', desc: 'When a chat message matches a pattern' },
 ];
 
 // === CONDITION FIELDS ===
@@ -66,6 +72,8 @@ const ACTIONS = [
   { id: 'archive_task', label: 'Archive Task', icon: Archive, color: '#64748B', desc: 'Archive the task', configFields: [] },
   { id: 'duplicate_task', label: 'Duplicate Task', icon: Copy, color: '#F59E0B', desc: 'Create a copy of the task', configFields: [] },
   { id: 'move_to_list', label: 'Move to List', icon: ArrowRight, color: '#22C55E', desc: 'Move task to a different list', configFields: [{ key: 'listId', label: 'List ID', type: 'text' }] },
+  { id: 'apply_template', label: 'Apply Template', icon: ClipboardList, color: '#06B6D4', desc: 'Create a task from a template', configFields: [{ key: 'templateId', label: 'Template ID', type: 'text' }] },
+  { id: 'create_task', label: 'Create Task', icon: Plus, color: '#22C55E', desc: 'Create a new related task', configFields: [{ key: 'taskTitle', label: 'Task Title', type: 'text' }, { key: 'status', label: 'Status', options: ['todo', 'in_progress', 'in_review', 'done'] }, { key: 'priority', label: 'Priority', options: ['urgent', 'high', 'medium', 'low'] }] },
 ];
 
 interface Condition {
@@ -684,6 +692,86 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
                   );
                 })}
               </div>
+
+              {/* Schedule config (for scheduled triggers) */}
+              {(trigger === 'scheduled_daily' || trigger === 'scheduled_weekly' || trigger === 'scheduled_monthly') && (
+                <div className="mt-4 p-4 rounded-xl bg-[var(--bg-elevated)] space-y-3">
+                  <p className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    {lang === 'es' ? 'Configuración de horario' : 'Schedule Configuration'}
+                  </p>
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="text-[11px] text-[var(--text-muted)] mb-1 block">{lang === 'es' ? 'Hora' : 'Hour'}</label>
+                      <input type="number" min={0} max={23} value={triggerConfig.atHour || '9'}
+                        onChange={e => setTriggerConfig(prev => ({ ...prev, atHour: e.target.value }))}
+                        className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] border border-[var(--border)] focus:border-[var(--accent)] outline-none" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[11px] text-[var(--text-muted)] mb-1 block">{lang === 'es' ? 'Minuto' : 'Minute'}</label>
+                      <input type="number" min={0} max={59} value={triggerConfig.atMinute || '0'}
+                        onChange={e => setTriggerConfig(prev => ({ ...prev, atMinute: e.target.value }))}
+                        className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] border border-[var(--border)] focus:border-[var(--accent)] outline-none" />
+                    </div>
+                  </div>
+                  {trigger === 'scheduled_weekly' && (
+                    <div>
+                      <label className="text-[11px] text-[var(--text-muted)] mb-1 block">{lang === 'es' ? 'Día de la semana' : 'Day of week'}</label>
+                      <select value={triggerConfig.dayOfWeek || '1'}
+                        onChange={e => setTriggerConfig(prev => ({ ...prev, dayOfWeek: e.target.value }))}
+                        className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] border border-[var(--border)] focus:border-[var(--accent)] outline-none">
+                        {[['0', lang === 'es' ? 'Domingo' : 'Sunday'], ['1', lang === 'es' ? 'Lunes' : 'Monday'], ['2', lang === 'es' ? 'Martes' : 'Tuesday'], ['3', lang === 'es' ? 'Miércoles' : 'Wednesday'], ['4', lang === 'es' ? 'Jueves' : 'Thursday'], ['5', lang === 'es' ? 'Viernes' : 'Friday'], ['6', lang === 'es' ? 'Sábado' : 'Saturday']].map(([v, l]) => (
+                          <option key={v} value={v}>{l}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {trigger === 'scheduled_monthly' && (
+                    <div>
+                      <label className="text-[11px] text-[var(--text-muted)] mb-1 block">{lang === 'es' ? 'Día del mes' : 'Day of month'}</label>
+                      <input type="number" min={1} max={31} value={triggerConfig.dayOfMonth || '1'}
+                        onChange={e => setTriggerConfig(prev => ({ ...prev, dayOfMonth: e.target.value }))}
+                        className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] border border-[var(--border)] focus:border-[var(--accent)] outline-none" />
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-[11px] text-[var(--text-muted)] mb-1 block">{lang === 'es' ? 'Zona horaria' : 'Timezone'}</label>
+                    <select value={triggerConfig.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}
+                      onChange={e => setTriggerConfig(prev => ({ ...prev, timezone: e.target.value }))}
+                      className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] border border-[var(--border)] focus:border-[var(--accent)] outline-none">
+                      {['UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Mexico_City', 'America/Bogota', 'America/Sao_Paulo', 'Europe/London', 'Europe/Madrid', 'Europe/Berlin', 'Asia/Tokyo'].map(tz => (
+                        <option key={tz} value={tz}>{tz}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Chat trigger config */}
+              {trigger === 'chat_message_received' && (
+                <div className="mt-4 p-4 rounded-xl bg-[var(--bg-elevated)] space-y-3">
+                  <p className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    {lang === 'es' ? 'Configuración de chat' : 'Chat Configuration'}
+                  </p>
+                  <div>
+                    <label className="text-[11px] text-[var(--text-muted)] mb-1 block">{lang === 'es' ? 'Tipo de coincidencia' : 'Match type'}</label>
+                    <select value={triggerConfig.matchType || 'contains'}
+                      onChange={e => setTriggerConfig(prev => ({ ...prev, matchType: e.target.value }))}
+                      className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] border border-[var(--border)] focus:border-[var(--accent)] outline-none">
+                      <option value="contains">{lang === 'es' ? 'Contiene' : 'Contains'}</option>
+                      <option value="exact">{lang === 'es' ? 'Exacto' : 'Exact'}</option>
+                      <option value="starts_with">{lang === 'es' ? 'Empieza con' : 'Starts with'}</option>
+                      <option value="regex">Regex</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-[var(--text-muted)] mb-1 block">{lang === 'es' ? 'Patrón' : 'Pattern'}</label>
+                    <input type="text" value={triggerConfig.pattern || ''}
+                      onChange={e => setTriggerConfig(prev => ({ ...prev, pattern: e.target.value }))}
+                      placeholder={lang === 'es' ? 'ej: urgente, /deploy, BUG-\\d+' : 'e.g.: urgent, /deploy, BUG-\\d+'}
+                      className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] border border-[var(--border)] focus:border-[var(--accent)] outline-none" />
+                  </div>
+                </div>
+              )}
 
               {/* Scope selector */}
               <div className="mt-5">
