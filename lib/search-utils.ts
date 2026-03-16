@@ -6,7 +6,7 @@
 import {
   CheckSquare, FileText, MessageSquare, Target, Users, FileInput,
   LayoutDashboard, CalendarDays, Zap, BarChart3, Bot, Clock, PenTool, Plug,
-  Shield, Settings, Sun, Moon, Plus,
+  Shield, Settings, Sun, Moon, Plus, Activity,
 } from 'lucide-react';
 
 // --- Types ---
@@ -118,6 +118,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
   { id: 'nav-forms', type: 'navigate', label: 'Go to Forms', labelEs: 'Ir a Formularios', icon: FileInput, href: '/app/forms', keywords: ['forms', 'formularios'] },
   { id: 'nav-integrations', type: 'navigate', label: 'Go to Integrations', labelEs: 'Ir a Integraciones', icon: Plug, href: '/app/integrations', keywords: ['integrations', 'integraciones'] },
   { id: 'nav-ai', type: 'navigate', label: 'Go to Solis AI', labelEs: 'Ir a Solis AI', icon: Bot, href: '/app/ai', keywords: ['ai', 'assistant', 'asistente', 'solis'] },
+  { id: 'nav-activity', type: 'navigate', label: 'Go to Activity', labelEs: 'Ir a Actividad', icon: Activity, href: '/app/activity', keywords: ['activity', 'actividad', 'feed', 'log', 'history'] },
   { id: 'nav-admin', type: 'navigate', label: 'Go to Admin', labelEs: 'Ir a Admin', icon: Shield, href: '/app/admin', keywords: ['admin', 'settings', 'configuracion'] },
   // Create actions
   { id: 'create-task', type: 'create', label: 'Create Task', labelEs: 'Crear Tarea', icon: Plus, action: 'create-task', keywords: ['create', 'new', 'task', 'crear', 'nueva', 'tarea'] },

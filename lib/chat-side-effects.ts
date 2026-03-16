@@ -36,6 +36,48 @@ import type {
 import { generateCorrelationId } from './event-types';
 import { persistDispatchResult } from './event-log';
 
+// ---- Mention extraction ----
+
+/**
+ * Extract @mention display names from message text.
+ * Matches @Word patterns, capturing the first word after @.
+ * Supports accented characters (e.g. @Jose, @Maria).
+ * Returns an array of single-word name strings (without the @ prefix).
+ * Use resolveMentionIds() to match these against members via startsWith.
+ */
+export function extractMentionNames(text: string): string[] {
+  const MENTION_RE = /@([A-Za-z\u00C0-\u024F]+)/g;
+  const names: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = MENTION_RE.exec(text)) !== null) {
+    names.push(match[1]);
+  }
+  return names;
+}
+
+/**
+ * Resolve mention display names to user IDs.
+ * Given a list of members and extracted names, returns matching user IDs.
+ * Case-insensitive matching on displayName.
+ */
+export function resolveMentionIds(
+  mentionNames: string[],
+  members: { id: string; displayName?: string }[],
+): string[] {
+  const ids: string[] = [];
+  for (const name of mentionNames) {
+    const lower = name.toLowerCase();
+    const member = members.find(m =>
+      m.displayName?.toLowerCase() === lower ||
+      m.displayName?.toLowerCase().startsWith(lower)
+    );
+    if (member && !ids.includes(member.id)) {
+      ids.push(member.id);
+    }
+  }
+  return ids;
+}
+
 async function runEffect(
   name: string,
   criticality: EffectCriticality,

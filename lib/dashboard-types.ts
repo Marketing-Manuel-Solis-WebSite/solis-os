@@ -39,7 +39,8 @@ export type WidgetType =
   | 'ai-insights'
   | 'workload-heatmap'
   | 'time-tracking-summary'
-  | 'department-metrics';
+  | 'department-metrics'
+  | 'burndown-chart';
 
 export interface DashboardConfig {
   id: string;
@@ -48,6 +49,9 @@ export interface DashboardConfig {
   isDefault: boolean;
   widgets: WidgetLayout[];
   spaceId?: string;       // If set, this dashboard belongs to a specific space
+  isShared?: boolean;      // Whether the dashboard is publicly shared
+  publicToken?: string;    // UUID token for public access
+  shareMode?: 'view' | 'interact'; // view = static snapshot, interact = live filters
   createdAt?: any;
   updatedAt?: any;
 }
@@ -143,4 +147,5 @@ export const WIDGET_CATALOG: WidgetTypeDefinition[] = [
   { type: 'team-performance', nameKey: 'dashboard.widget.teamPerformance', descriptionKey: 'dashboard.widget.teamPerformanceDesc', icon: 'BarChart3', defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 3 } },
   { type: 'inbox', nameKey: 'dashboard.widget.inbox', descriptionKey: 'dashboard.widget.inboxDesc', icon: 'Inbox', defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 4 } },
   { type: 'ai-insights', nameKey: 'dashboard.widget.aiInsights', descriptionKey: 'dashboard.widget.aiInsightsDesc', icon: 'Sparkles', defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 3 } },
+  { type: 'burndown-chart', nameKey: 'dashboard.widget.burndownChart', descriptionKey: 'dashboard.widget.burndownChartDesc', icon: 'TrendingDown', defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 3 } },
 ];

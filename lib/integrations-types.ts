@@ -44,7 +44,11 @@ export const ALL_SCOPES: { value: ApiKeyScope; labelKey: string; group: string }
 // ============================================
 export type WebhookEvent =
   | 'task.created' | 'task.updated' | 'task.deleted' | 'task.status_changed'
+  | 'task.priority_changed' | 'task.assigned' | 'task.due_date_changed'
   | 'goal.created' | 'goal.updated' | 'goal.progress_changed'
+  | 'doc.created' | 'doc.updated' | 'doc.deleted'
+  | 'channel.created' | 'channel.message_sent'
+  | 'automation.triggered' | 'automation.failed'
   | 'form.submitted'
   | 'member.added' | 'member.updated';
 
@@ -53,9 +57,19 @@ export const ALL_EVENTS: { value: WebhookEvent; labelKey: string; group: string 
   { value: 'task.updated', labelKey: 'integ.events.taskUpdated', group: 'Tasks' },
   { value: 'task.deleted', labelKey: 'integ.events.taskDeleted', group: 'Tasks' },
   { value: 'task.status_changed', labelKey: 'integ.events.taskStatusChanged', group: 'Tasks' },
+  { value: 'task.priority_changed', labelKey: 'integ.events.taskPriorityChanged', group: 'Tasks' },
+  { value: 'task.assigned', labelKey: 'integ.events.taskAssigned', group: 'Tasks' },
+  { value: 'task.due_date_changed', labelKey: 'integ.events.taskDueDateChanged', group: 'Tasks' },
   { value: 'goal.created', labelKey: 'integ.events.goalCreated', group: 'Goals' },
   { value: 'goal.updated', labelKey: 'integ.events.goalUpdated', group: 'Goals' },
   { value: 'goal.progress_changed', labelKey: 'integ.events.goalProgressChanged', group: 'Goals' },
+  { value: 'doc.created', labelKey: 'integ.events.docCreated', group: 'Docs' },
+  { value: 'doc.updated', labelKey: 'integ.events.docUpdated', group: 'Docs' },
+  { value: 'doc.deleted', labelKey: 'integ.events.docDeleted', group: 'Docs' },
+  { value: 'channel.created', labelKey: 'integ.events.channelCreated', group: 'Chat' },
+  { value: 'channel.message_sent', labelKey: 'integ.events.channelMessageSent', group: 'Chat' },
+  { value: 'automation.triggered', labelKey: 'integ.events.automationTriggered', group: 'Automations' },
+  { value: 'automation.failed', labelKey: 'integ.events.automationFailed', group: 'Automations' },
   { value: 'form.submitted', labelKey: 'integ.events.formSubmitted', group: 'Forms' },
   { value: 'member.added', labelKey: 'integ.events.memberAdded', group: 'Members' },
   { value: 'member.updated', labelKey: 'integ.events.memberUpdated', group: 'Members' },

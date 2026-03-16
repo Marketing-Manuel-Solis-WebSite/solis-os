@@ -609,6 +609,8 @@ export const translations: Record<Lang, Dict> = {
     'dashboard.widget.aiInsights': 'Insights IA',
     'dashboard.widget.aiInsightsDesc': 'Análisis y recomendaciones generadas por IA',
     'dashboard.widget.aiInsightsEmpty': 'Los insights se generarán automáticamente.',
+    'dashboard.widget.burndownChart': 'Burndown',
+    'dashboard.widget.burndownChartDesc': 'Gráfico de tareas restantes vs tiempo',
     'dashboard.goodMorning': 'Buenos días{name}',
     'dashboard.goodAfternoon': 'Buenas tardes{name}',
     'dashboard.goodEvening': 'Buenas noches{name}',
@@ -1514,6 +1516,31 @@ export const translations: Record<Lang, Dict> = {
     'formShare.notPublished': 'Publica el formulario para compartirlo.',
     'formShare.publishFirst': 'Publicar formulario',
 
+    // --- Dashboard Share ---
+    'dashboardShare.title': 'Compartir Dashboard',
+    'dashboardShare.share': 'Compartir',
+    'dashboardShare.publicUrl': 'URL pública',
+    'dashboardShare.copied': '¡Enlace copiado!',
+    'dashboardShare.enabled': 'Dashboard compartido exitosamente',
+    'dashboardShare.disabled': 'Se dejó de compartir el dashboard',
+    'dashboardShare.regenerated': 'Enlace regenerado',
+    'dashboardShare.error': 'Error al compartir',
+    'dashboardShare.regenerate': 'Regenerar enlace',
+    'dashboardShare.regenerateConfirm': '¿Regenerar el enlace? El enlace anterior dejará de funcionar.',
+    'dashboardShare.preview': 'Vista previa',
+    'dashboardShare.disable': 'Dejar de compartir',
+    'dashboardShare.liveNow': 'Tu dashboard está compartido',
+    'dashboardShare.notShared': 'Dashboard no compartido',
+    'dashboardShare.shareDesc': 'Genera un enlace público para compartir este dashboard con cualquier persona.',
+    'dashboardShare.enableSharing': 'Compartir dashboard',
+
+    // --- Chat Search ---
+    'chatSearch.title': 'Buscar mensajes',
+    'chatSearch.placeholder': 'Buscar en mensajes...',
+    'chatSearch.noResults': 'Sin resultados',
+    'chatSearch.results': '{count} resultado(s)',
+    'chatSearch.jumpTo': 'Ir al mensaje',
+
     // --- Submissions ---
     'submissions.title': 'Respuestas',
     'submissions.new': 'Nueva',
@@ -1981,6 +2008,142 @@ export const translations: Record<Lang, Dict> = {
     'import.skippedRows': 'Filas omitidas',
     'import.titleCol': 'Título',
     'import.priorityCol': 'Prioridad',
+
+    // --- Nested Pages ---
+    'nestedPages.newSubpage': 'Nueva subpágina',
+    'nestedPages.breadcrumbRoot': 'Documentos',
+    'nestedPages.moveToRoot': 'Mover a raíz',
+    'nestedPages.maxDepth': 'Profundidad máxima alcanzada',
+
+    // --- Inline Comments ---
+    'inlineComments.addComment': 'Agregar comentario',
+    'inlineComments.resolve': 'Resolver',
+    'inlineComments.unresolve': 'Reabrir',
+    'inlineComments.reply': 'Responder',
+    'inlineComments.replyPlaceholder': 'Escribe una respuesta...',
+    'inlineComments.sidebar': 'Comentarios',
+    'inlineComments.noComments': 'Sin comentarios en este documento.',
+    'inlineComments.resolved': 'Resuelto',
+
+    // --- Custom Roles ---
+    'customRoles.title': 'Roles Personalizados',
+    'customRoles.create': 'Crear Rol',
+    'customRoles.edit': 'Editar Rol',
+    'customRoles.name': 'Nombre del Rol',
+    'customRoles.permissions': 'Permisos',
+    'customRoles.delete': 'Eliminar Rol',
+    'customRoles.deleteConfirm': '¿Eliminar el rol "{name}"?',
+
+    // --- List ACL ---
+    'listAcl.manageAccess': 'Gestionar Acceso',
+    'listAcl.visibility': 'Visibilidad',
+    'listAcl.inherited': 'Heredada',
+    'listAcl.private': 'Privada',
+    'listAcl.members': 'Miembros',
+    'listAcl.addMember': 'Agregar Miembro',
+
+    // --- Automation Templates ---
+    'automationTemplates.title': 'Plantillas',
+    'automationTemplates.useTemplate': 'Usar Plantilla',
+    'automationTemplates.preview': 'Vista previa',
+    'automationTemplates.categories': 'Categorías',
+
+    // --- Chat Mentions ---
+    'chatMentions.noResults': 'Sin resultados',
+
+    // --- AI UI ---
+    'ai.decompose': 'Descomponer con IA',
+    'ai.decomposeDesc': 'Dividir tarea en subtareas',
+    'ai.suggestAssignees': 'Sugerir Asignados',
+    'ai.suggestAssigneesDesc': 'Balanceo de carga inteligente',
+    'ai.suggestAutomations': 'Sugerencias IA',
+    'ai.suggestAutomationsDesc': 'Detectar patrones y sugerir reglas',
+    'ai.writing.continue': 'Continuar',
+    'ai.writing.rewrite': 'Reescribir',
+    'ai.writing.expand': 'Expandir',
+    'ai.writing.condense': 'Condensar',
+    'ai.writing.translate': 'Traducir',
+    'ai.writing.proofread': 'Revisar',
+    'ai.writing.tone': 'Cambiar tono',
+    'ai.writing.insert': 'Insertar',
+    'ai.writing.replace': 'Reemplazar',
+    'ai.writing.discard': 'Descartar',
+
+    // --- OKR ---
+    'okr.objective': 'Objetivo',
+    'okr.keyResult': 'Resultado Clave',
+    'okr.goal': 'Meta',
+    'okr.addKeyResult': 'Agregar Resultado Clave',
+    'okr.progress': 'Progreso',
+    'okr.treeView': 'Vista de Árbol',
+
+    // --- PDF Export ---
+    'pdfExport.title': 'Exportar PDF',
+    'pdfExport.generate': 'Generar PDF',
+    'pdfExport.format': 'Formato',
+
+    // --- Scheduled Reports ---
+    'scheduledReports.title': 'Reportes Programados',
+    'scheduledReports.create': 'Crear Reporte',
+    'scheduledReports.frequency': 'Frecuencia',
+    'scheduledReports.daily': 'Diario',
+    'scheduledReports.weekly': 'Semanal',
+    'scheduledReports.monthly': 'Mensual',
+    'scheduledReports.recipients': 'Destinatarios',
+    'scheduledReports.lastSent': 'Último envío',
+    'scheduledReports.nextRun': 'Próximo envío',
+
+    // --- Time Approval ---
+    'timeApproval.title': 'Aprobación de Tiempo',
+    'timeApproval.pending': 'Pendiente',
+    'timeApproval.approved': 'Aprobado',
+    'timeApproval.rejected': 'Rechazado',
+    'timeApproval.approve': 'Aprobar',
+    'timeApproval.reject': 'Rechazar',
+    'timeApproval.submitForApproval': 'Enviar a Aprobación',
+    'timeApproval.billableRate': 'Tarifa por hora',
+    'timeApproval.billableAmount': 'Monto facturable',
+
+    // --- Integrations ---
+    'integrations.slackCommands': 'Comandos Slack',
+    'integrations.githubPrLinks': 'Pull Requests de GitHub',
+    'integrations.calendarEvents': 'Eventos de Calendario',
+    'integrations.zapierWebhooks': 'Webhooks Zapier',
+    'integrations.makeWebhooks': 'Webhooks Make',
+
+    // --- PWA ---
+    'pwa.installPrompt': 'Instalar Solis OS',
+    'pwa.installDesc': 'Instala la app para acceso rápido sin conexión.',
+    'pwa.install': 'Instalar',
+    'pwa.dismiss': 'Ahora no',
+
+    // --- Favorites ---
+    'favorites.title': 'Favoritos',
+    'favorites.add': 'Agregar a favoritos',
+    'favorites.remove': 'Quitar de favoritos',
+    'favorites.empty': 'Sin favoritos aún.',
+
+    // --- Multi-tenant ---
+    'multiTenant.switchOrg': 'Cambiar Organización',
+    'multiTenant.createOrg': 'Crear Organización',
+    'multiTenant.orgName': 'Nombre de Organización',
+
+    // --- Task GitHub Links ---
+    'taskLinks.title': 'Enlaces de GitHub',
+    'taskLinks.pullRequest': 'Pull Request',
+    'taskLinks.commit': 'Commit',
+    'taskLinks.ciStatus': 'Estado CI',
+    'taskLinks.noLinks': 'Sin enlaces.',
+
+    // --- Shared Dashboard ---
+    'sharedDashboard.title': 'Dashboard Compartido',
+    'sharedDashboard.share': 'Compartir',
+    'sharedDashboard.unshare': 'Dejar de compartir',
+    'sharedDashboard.copyLink': 'Copiar enlace',
+    'sharedDashboard.linkCopied': 'Enlace copiado',
+
+    // --- Performance ---
+    'perf.virtualScroll': 'Desplazamiento virtual activo',
   },
 
   // ============================================================
@@ -2575,6 +2738,8 @@ export const translations: Record<Lang, Dict> = {
     'dashboard.widget.aiInsights': 'AI Insights',
     'dashboard.widget.aiInsightsDesc': 'AI-generated analysis and recommendations',
     'dashboard.widget.aiInsightsEmpty': 'Insights will be generated automatically.',
+    'dashboard.widget.burndownChart': 'Burndown Chart',
+    'dashboard.widget.burndownChartDesc': 'Remaining tasks vs time chart',
     'dashboard.goodMorning': 'Good morning{name}',
     'dashboard.goodAfternoon': 'Good afternoon{name}',
     'dashboard.goodEvening': 'Good evening{name}',
@@ -3480,6 +3645,31 @@ export const translations: Record<Lang, Dict> = {
     'formShare.notPublished': 'Publish the form to share it.',
     'formShare.publishFirst': 'Publish form',
 
+    // --- Dashboard Share ---
+    'dashboardShare.title': 'Share Dashboard',
+    'dashboardShare.share': 'Share',
+    'dashboardShare.publicUrl': 'Public URL',
+    'dashboardShare.copied': 'Link copied!',
+    'dashboardShare.enabled': 'Dashboard shared successfully',
+    'dashboardShare.disabled': 'Dashboard is no longer shared',
+    'dashboardShare.regenerated': 'Link regenerated',
+    'dashboardShare.error': 'Failed to share',
+    'dashboardShare.regenerate': 'Regenerate link',
+    'dashboardShare.regenerateConfirm': 'Regenerate the link? The previous link will stop working.',
+    'dashboardShare.preview': 'Preview',
+    'dashboardShare.disable': 'Stop sharing',
+    'dashboardShare.liveNow': 'Your dashboard is shared',
+    'dashboardShare.notShared': 'Dashboard not shared',
+    'dashboardShare.shareDesc': 'Generate a public link to share this dashboard with anyone.',
+    'dashboardShare.enableSharing': 'Share dashboard',
+
+    // --- Chat Search ---
+    'chatSearch.title': 'Search messages',
+    'chatSearch.placeholder': 'Search messages...',
+    'chatSearch.noResults': 'No results',
+    'chatSearch.results': '{count} result(s)',
+    'chatSearch.jumpTo': 'Jump to message',
+
     // --- Submissions ---
     'submissions.title': 'Responses',
     'submissions.new': 'New',
@@ -3947,5 +4137,141 @@ export const translations: Record<Lang, Dict> = {
     'import.skippedRows': 'Skipped rows',
     'import.titleCol': 'Title',
     'import.priorityCol': 'Priority',
+
+    // --- Nested Pages ---
+    'nestedPages.newSubpage': 'New subpage',
+    'nestedPages.breadcrumbRoot': 'Documents',
+    'nestedPages.moveToRoot': 'Move to root',
+    'nestedPages.maxDepth': 'Maximum depth reached',
+
+    // --- Inline Comments ---
+    'inlineComments.addComment': 'Add comment',
+    'inlineComments.resolve': 'Resolve',
+    'inlineComments.unresolve': 'Reopen',
+    'inlineComments.reply': 'Reply',
+    'inlineComments.replyPlaceholder': 'Write a reply...',
+    'inlineComments.sidebar': 'Comments',
+    'inlineComments.noComments': 'No comments on this document.',
+    'inlineComments.resolved': 'Resolved',
+
+    // --- Custom Roles ---
+    'customRoles.title': 'Custom Roles',
+    'customRoles.create': 'Create Role',
+    'customRoles.edit': 'Edit Role',
+    'customRoles.name': 'Role Name',
+    'customRoles.permissions': 'Permissions',
+    'customRoles.delete': 'Delete Role',
+    'customRoles.deleteConfirm': 'Delete role "{name}"?',
+
+    // --- List ACL ---
+    'listAcl.manageAccess': 'Manage Access',
+    'listAcl.visibility': 'Visibility',
+    'listAcl.inherited': 'Inherited',
+    'listAcl.private': 'Private',
+    'listAcl.members': 'Members',
+    'listAcl.addMember': 'Add Member',
+
+    // --- Automation Templates ---
+    'automationTemplates.title': 'Templates',
+    'automationTemplates.useTemplate': 'Use Template',
+    'automationTemplates.preview': 'Preview',
+    'automationTemplates.categories': 'Categories',
+
+    // --- Chat Mentions ---
+    'chatMentions.noResults': 'No results',
+
+    // --- AI UI ---
+    'ai.decompose': 'Decompose with AI',
+    'ai.decomposeDesc': 'Break task into subtasks',
+    'ai.suggestAssignees': 'Suggest Assignees',
+    'ai.suggestAssigneesDesc': 'Smart workload balancing',
+    'ai.suggestAutomations': 'AI Suggestions',
+    'ai.suggestAutomationsDesc': 'Detect patterns and suggest rules',
+    'ai.writing.continue': 'Continue',
+    'ai.writing.rewrite': 'Rewrite',
+    'ai.writing.expand': 'Expand',
+    'ai.writing.condense': 'Condense',
+    'ai.writing.translate': 'Translate',
+    'ai.writing.proofread': 'Proofread',
+    'ai.writing.tone': 'Change tone',
+    'ai.writing.insert': 'Insert',
+    'ai.writing.replace': 'Replace',
+    'ai.writing.discard': 'Discard',
+
+    // --- OKR ---
+    'okr.objective': 'Objective',
+    'okr.keyResult': 'Key Result',
+    'okr.goal': 'Goal',
+    'okr.addKeyResult': 'Add Key Result',
+    'okr.progress': 'Progress',
+    'okr.treeView': 'Tree View',
+
+    // --- PDF Export ---
+    'pdfExport.title': 'Export PDF',
+    'pdfExport.generate': 'Generate PDF',
+    'pdfExport.format': 'Format',
+
+    // --- Scheduled Reports ---
+    'scheduledReports.title': 'Scheduled Reports',
+    'scheduledReports.create': 'Create Report',
+    'scheduledReports.frequency': 'Frequency',
+    'scheduledReports.daily': 'Daily',
+    'scheduledReports.weekly': 'Weekly',
+    'scheduledReports.monthly': 'Monthly',
+    'scheduledReports.recipients': 'Recipients',
+    'scheduledReports.lastSent': 'Last sent',
+    'scheduledReports.nextRun': 'Next run',
+
+    // --- Time Approval ---
+    'timeApproval.title': 'Time Approval',
+    'timeApproval.pending': 'Pending',
+    'timeApproval.approved': 'Approved',
+    'timeApproval.rejected': 'Rejected',
+    'timeApproval.approve': 'Approve',
+    'timeApproval.reject': 'Reject',
+    'timeApproval.submitForApproval': 'Submit for Approval',
+    'timeApproval.billableRate': 'Hourly rate',
+    'timeApproval.billableAmount': 'Billable amount',
+
+    // --- Integrations ---
+    'integrations.slackCommands': 'Slack Commands',
+    'integrations.githubPrLinks': 'GitHub Pull Requests',
+    'integrations.calendarEvents': 'Calendar Events',
+    'integrations.zapierWebhooks': 'Zapier Webhooks',
+    'integrations.makeWebhooks': 'Make Webhooks',
+
+    // --- PWA ---
+    'pwa.installPrompt': 'Install Solis OS',
+    'pwa.installDesc': 'Install the app for quick offline access.',
+    'pwa.install': 'Install',
+    'pwa.dismiss': 'Not now',
+
+    // --- Favorites ---
+    'favorites.title': 'Favorites',
+    'favorites.add': 'Add to favorites',
+    'favorites.remove': 'Remove from favorites',
+    'favorites.empty': 'No favorites yet.',
+
+    // --- Multi-tenant ---
+    'multiTenant.switchOrg': 'Switch Organization',
+    'multiTenant.createOrg': 'Create Organization',
+    'multiTenant.orgName': 'Organization Name',
+
+    // --- Task GitHub Links ---
+    'taskLinks.title': 'GitHub Links',
+    'taskLinks.pullRequest': 'Pull Request',
+    'taskLinks.commit': 'Commit',
+    'taskLinks.ciStatus': 'CI Status',
+    'taskLinks.noLinks': 'No links.',
+
+    // --- Shared Dashboard ---
+    'sharedDashboard.title': 'Shared Dashboard',
+    'sharedDashboard.share': 'Share',
+    'sharedDashboard.unshare': 'Unshare',
+    'sharedDashboard.copyLink': 'Copy link',
+    'sharedDashboard.linkCopied': 'Link copied',
+
+    // --- Performance ---
+    'perf.virtualScroll': 'Virtual scroll active',
   },
 };

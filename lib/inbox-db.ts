@@ -3,8 +3,11 @@ import {
   getDocs, query, where, orderBy, limit, serverTimestamp, Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { getCurrentOrgId, ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+// Multi-tenant ready: resolve org at call-time, not import-time
+function inboxPath() { return `orgs/${getCurrentOrgId()}/inbox`; }
+/** @deprecated Use inboxPath() for multi-tenant readiness */
 const INBOX_PATH = `orgs/${ORG}/inbox`;
 
 export interface InboxItem {

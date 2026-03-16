@@ -4,41 +4,89 @@ import { Command } from 'cmdk';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n';
 import { useGlobalSearch } from '@/lib/hooks/use-global-search';
+import { useFeatureFlag } from '@/lib/feature-flags';
 import {
   SearchResult, QuickAction, ENTITY_CONFIG, highlightMatch,
 } from '@/lib/search-utils';
-import { Search, ArrowRight, Loader2, Command as CommandIcon } from 'lucide-react';
+import { Search, ArrowRight, Loader2, Command as CommandIcon, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { SemanticSearchResult } from '@/lib/semantic-search';
 
 interface CommandPaletteProps {
   open: boolean;
   onClose: () => void;
 }
 
+// ─── Semantic search href mapping ──────────────────────
+function semanticResultHref(r: SemanticSearchResult): string {
+  switch (r.type) {
+    case 'task': return `/app/tasks?task=${r.id}`;
+    case 'doc': return `/app/docs?doc=${r.id}`;
+    case 'channel': return `/app/chat?channel=${r.id}`;
+    case 'goal': return `/app/goals?goal=${r.id}`;
+    default: return '/app';
+  }
+}
+
 export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const { t, lang } = useI18n();
   const router = useRouter();
   const { results, actions, loading, search } = useGlobalSearch();
+  const aiEnabled = useFeatureFlag('ai-semantic-search');
   const [query, setQuery] = useState('');
+  const [aiResults, setAiResults] = useState<SemanticSearchResult[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const aiDebounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   // Focus input when opened
   useEffect(() => {
     if (open) {
       setQuery('');
+      setAiResults([]);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
+
+  // Trigger semantic search when fuzzy results are sparse
+  const triggerAiSearch = useCallback(async (q: string) => {
+    if (!aiEnabled || !q.trim() || q.trim().length < 3) {
+      setAiResults([]);
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const res = await fetch('/api/search/semantic', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q.trim() }),
+      });
+      if (!res.ok) { setAiResults([]); return; }
+      const data = await res.json();
+      setAiResults(data.results || []);
+    } catch {
+      setAiResults([]);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [aiEnabled]);
 
   // Debounced search
   const handleChange = useCallback((value: string) => {
     setQuery(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
     debounceRef.current = setTimeout(() => {
       search(value, lang);
     }, 200);
-  }, [search, lang]);
+    // AI search fires with a longer debounce (600ms) to avoid unnecessary API calls
+    if (aiEnabled) {
+      aiDebounceRef.current = setTimeout(() => {
+        triggerAiSearch(value);
+      }, 600);
+    }
+  }, [search, lang, aiEnabled, triggerAiSearch]);
 
   // Handle selection
   const handleSelect = useCallback((value: string) => {
@@ -55,8 +103,15 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
       const [, type, id] = value.split(':');
       const result = results.find(r => r.id === id && r.type === type);
       if (result?.href) router.push(result.href);
+      return;
     }
-  }, [actions, results, router, onClose]);
+    // AI semantic results
+    if (value.startsWith('ai:')) {
+      const [, type, id] = value.split(':');
+      const aiResult = aiResults.find(r => r.id === id && r.type === type);
+      if (aiResult) router.push(semanticResultHref(aiResult));
+    }
+  }, [actions, results, aiResults, router, onClose]);
 
   // Group results by type
   const grouped = results.reduce<Record<string, SearchResult[]>>((acc, r) => {
@@ -65,7 +120,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
     return acc;
   }, {});
 
-  const hasResults = results.length > 0 || actions.length > 0;
+  const hasResults = results.length > 0 || actions.length > 0 || aiResults.length > 0;
 
   if (!open) return null;
 
@@ -95,7 +150,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
             >
               {/* Input */}
               <div className="flex items-center gap-3 px-4 h-14 border-b border-[var(--border-subtle)]">
-                {loading ? (
+                {loading || aiLoading ? (
                   <Loader2 className="h-5 w-5 text-[var(--text-muted)] animate-spin shrink-0" />
                 ) : (
                   <Search className="h-5 w-5 text-[var(--text-muted)] shrink-0" strokeWidth={1.75} />
@@ -186,6 +241,53 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
                     </Command.Group>
                   );
                 })}
+
+                {/* AI semantic results */}
+                {aiEnabled && query && aiResults.length > 0 && (
+                  <Command.Group
+                    heading={
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="h-3 w-3 text-[var(--accent)]" />
+                        {lang === 'es' ? 'Resultados IA' : 'AI Results'}
+                      </span>
+                    }
+                    className="cmdk-group"
+                  >
+                    {aiResults.map(item => {
+                      const config = ENTITY_CONFIG[item.type as keyof typeof ENTITY_CONFIG];
+                      if (!config) return null;
+                      const Icon = config.icon;
+                      return (
+                        <Command.Item
+                          key={`ai:${item.type}:${item.id}`}
+                          value={`ai:${item.type}:${item.id}`}
+                          onSelect={handleSelect}
+                          className="cmdk-item"
+                        >
+                          <Icon className="h-4 w-4 shrink-0" style={{ color: config.color }} strokeWidth={1.75} />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-[var(--text-primary)] truncate block">{item.title}</span>
+                            {item.subtitle && (
+                              <span className="text-[12px] text-[var(--text-muted)] truncate block">{item.subtitle}</span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-[var(--text-muted)] font-mono shrink-0">
+                            {Math.round(item.score * 100)}%
+                          </span>
+                          <ArrowRight className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
+                        </Command.Item>
+                      );
+                    })}
+                  </Command.Group>
+                )}
+
+                {/* AI loading indicator */}
+                {aiEnabled && query && aiLoading && !aiResults.length && (
+                  <div className="flex items-center justify-center gap-2 py-4 text-[12px] text-[var(--text-muted)]">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {lang === 'es' ? 'Buscando con IA...' : 'AI searching...'}
+                  </div>
+                )}
 
                 {/* Empty state — show navigation when no query */}
                 {!query && (

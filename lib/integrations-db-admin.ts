@@ -5,12 +5,13 @@
 
 import { adminDb } from './firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { ORG_ID as ORG } from '@/lib/org';
 import type {
   IntegrationProvider, IntegrationCategory, IntegrationStatus,
   ApiKeyScope, WebhookEvent,
 } from './integrations-types';
 
-const ORG = 'solis-center';
+
 
 // ===== GENERIC HELPERS =====
 

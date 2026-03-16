@@ -3,8 +3,25 @@ import {
   CheckSquare, Bug, Zap, Milestone, Target,
   Users, Globe, Lock,
   LayoutList, LayoutGrid, Calendar as CalendarIcon,
-  CalendarDays, CalendarRange,
+  CalendarDays, CalendarRange, Table2, GanttChart, Clock, BarChart3,
 } from 'lucide-react';
+
+// =============================================
+// SUBTASK INTERFACE (enriched — backward compatible)
+// =============================================
+export interface Subtask {
+  id: string;
+  title: string;
+  done: boolean;
+  /** Optional: assignee user ID */
+  assigneeId?: string | null;
+  /** Optional: due date (Firestore Timestamp or Date) */
+  dueDate?: any;
+  /** Optional: status — mirrors parent status system. Defaults derived from `done`. */
+  status?: string;
+  /** Optional: priority */
+  priority?: string;
+}
 
 // =============================================
 // TASK INTERFACE
@@ -29,7 +46,7 @@ export interface Task {
   timeEstimate?: number | null;
   timeSpent?: number;
   points?: number | null;
-  subtasks: { id: string; title: string; done: boolean }[];
+  subtasks: Subtask[];
   checklist: any[];
   attachments: any[];
   dependencies: string[];
@@ -47,7 +64,7 @@ export interface Task {
 // =============================================
 // VIEW TYPES
 // =============================================
-export type ViewType = 'list' | 'board' | 'calendar';
+export type ViewType = 'list' | 'board' | 'calendar' | (string & {});
 export type CalendarMode = 'month' | 'week' | 'day';
 export type Density = 'compact' | 'comfortable' | 'spacious';
 export type SubtaskDisplay = 'hidden' | 'count' | 'progress' | 'expanded';
@@ -56,6 +73,10 @@ export const VIEWS = [
   { id: 'list' as ViewType, Icon: LayoutList, shortcut: '1' },
   { id: 'board' as ViewType, Icon: LayoutGrid, shortcut: '2' },
   { id: 'calendar' as ViewType, Icon: CalendarIcon, shortcut: '3' },
+  { id: 'table' as ViewType, Icon: Table2, shortcut: '4' },
+  { id: 'gantt' as ViewType, Icon: GanttChart, shortcut: '5' },
+  { id: 'timeline' as ViewType, Icon: Clock, shortcut: '6' },
+  { id: 'workload' as ViewType, Icon: BarChart3, shortcut: '7' },
 ] as const;
 
 export const CALENDAR_MODES = [
@@ -366,7 +387,7 @@ export function isOverdue(task: Task): boolean {
 
 export function getSubtaskProgress(task: Task): { done: number; total: number; pct: number } {
   const total = (task.subtasks || []).length;
-  const done = (task.subtasks || []).filter(s => s.done).length;
+  const done = (task.subtasks || []).filter(s => s.done || s.status === 'done').length;
   return { done, total, pct: total > 0 ? Math.round(done / total * 100) : 0 };
 }
 

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo } from 'react';
+import Image from 'next/image';
 import { ChevronLeft, ChevronRight, Users, Clock, AlertTriangle } from 'lucide-react';
 import { Task, PRIORITIES, STATUSES } from '@/components/tasks/constants';
 import { useI18n } from '@/lib/i18n';
@@ -191,7 +192,7 @@ export default function PlannerWorkload({ tasks, members, selectedTask, onSelect
                   <div className="flex items-center gap-3 mb-2">
                     {/* Avatar */}
                     {member.photoURL ? (
-                      <img src={member.photoURL} alt="" className="w-8 h-8 rounded-lg object-cover" />
+                      <Image src={member.photoURL} alt="" width={32} height={32} className="w-8 h-8 rounded-lg object-cover" />
                     ) : (
                       <div className="w-8 h-8 rounded-lg bg-[var(--accent-subtle)] flex items-center justify-center text-xs font-bold text-[var(--accent)]">
                         {member.displayName?.[0]?.toUpperCase() || '?'}

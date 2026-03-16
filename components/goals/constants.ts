@@ -16,7 +16,13 @@ export interface Goal {
   createdByName: string;
   createdAt: any;
   updatedAt: any;
+  /** Parent goal ID for cascading hierarchy. Null/undefined = top-level goal. */
+  parentGoalId?: string | null;
+  /** OKR type: objective, key_result, or generic goal. */
+  goalType?: GoalType;
 }
+
+export type GoalType = 'objective' | 'key_result' | 'goal';
 
 export interface GoalTarget {
   id: string;
@@ -53,4 +59,10 @@ export const TARGET_TYPES: { value: TargetType; labelKey: string }[] = [
 export const GOAL_COLORS = [
   '#7B68EE', '#3B82F6', '#22C55E', '#F59E0B', '#EF4444',
   '#EC4899', '#8B5CF6', '#06B6D4', '#14B8A6', '#F97316',
+];
+
+export const GOAL_TYPES: { value: GoalType; labelKey: string; color: string }[] = [
+  { value: 'goal', labelKey: 'goals.typeGoal', color: '#7B68EE' },
+  { value: 'objective', labelKey: 'goals.typeObjective', color: '#3B82F6' },
+  { value: 'key_result', labelKey: 'goals.typeKeyResult', color: '#22C55E' },
 ];

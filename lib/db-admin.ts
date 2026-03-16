@@ -6,8 +6,9 @@
 
 import { adminDb } from './firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+
 
 // ===== GENERIC HELPERS =====
 

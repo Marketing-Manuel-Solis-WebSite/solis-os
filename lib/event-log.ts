@@ -7,8 +7,9 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
 import type { DispatchResult } from './event-types';
+import { getCurrentOrgId, ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+
 
 export async function persistDispatchResult(
   result: DispatchResult,

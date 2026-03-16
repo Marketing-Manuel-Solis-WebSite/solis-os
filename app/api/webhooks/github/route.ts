@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { queueEvent, checkReplayProtection } from '@/lib/integrations-db-admin';
+import { extractTaskIds } from '@/lib/task-links';
+import { addTaskLinkAdmin, updateTaskLinkStatusAdmin } from '@/lib/task-links-admin';
 
 const MAX_PAYLOAD = 1_048_576; // 1MB
 
@@ -64,6 +66,73 @@ export async function POST(req: NextRequest) {
       internalEvent = 'task.status_changed';
     } else if (githubEvent === 'pull_request') {
       internalEvent = 'task.updated';
+    }
+
+    // ---- PR Linking: extract task IDs from PR title/body and create links ----
+    if (githubEvent === 'pull_request' && payload.pull_request) {
+      const pr = payload.pull_request;
+      const prText = `${pr.title || ''} ${pr.body || ''}`;
+      const taskIds = extractTaskIds(prText);
+      const prStatus = pr.merged ? 'merged' : pr.state === 'closed' ? 'closed' : 'open';
+
+      for (const taskId of taskIds) {
+        try {
+          if (payload.action === 'opened' || payload.action === 'synchronize') {
+            await addTaskLinkAdmin({
+              taskId,
+              type: 'pr',
+              provider: 'github',
+              externalId: String(pr.id),
+              url: pr.html_url || '',
+              title: `#${pr.number} ${pr.title || ''}`,
+              status: prStatus,
+              repo: payload.repository?.full_name || '',
+              author: pr.user?.login || '',
+            });
+          } else {
+            // Update existing link status (closed, merged, reopened)
+            await updateTaskLinkStatusAdmin(String(pr.id), 'github', prStatus);
+          }
+        } catch (err: any) {
+          console.error(`[GitHub Webhook] Failed to link PR to task ${taskId}:`, err?.message);
+        }
+      }
+    }
+
+    // ---- Push events: extract task IDs from commit messages ----
+    if (githubEvent === 'push' && Array.isArray(payload.commits)) {
+      for (const commit of payload.commits) {
+        const taskIds = extractTaskIds(commit.message || '');
+        for (const taskId of taskIds) {
+          try {
+            await addTaskLinkAdmin({
+              taskId,
+              type: 'commit',
+              provider: 'github',
+              externalId: commit.id || '',
+              url: commit.url || '',
+              title: (commit.message || '').split('\n')[0].slice(0, 120),
+              status: 'active',
+              repo: payload.repository?.full_name || '',
+              author: commit.author?.name || commit.author?.username || '',
+            });
+          } catch (err: any) {
+            console.error(`[GitHub Webhook] Failed to link commit to task ${taskId}:`, err?.message);
+          }
+        }
+      }
+    }
+
+    // ---- Check run events: update linked task CI status ----
+    if (githubEvent === 'check_run' && payload.check_run) {
+      const cr = payload.check_run;
+      const headSha = cr.head_sha || '';
+      if (headSha) {
+        // Find task links for this commit and update status
+        const conclusion = cr.conclusion;
+        const ciStatus = conclusion === 'success' ? 'success' : conclusion === 'failure' ? 'failure' : 'pending';
+        await updateTaskLinkStatusAdmin(headSha, 'github', ciStatus).catch(() => {});
+      }
     }
 
     await queueEvent({

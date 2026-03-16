@@ -6,8 +6,16 @@
 import { adminDb } from './firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { notifyUsersAdmin } from './notify-admin';
+import { ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+
+
+interface BranchBlock {
+  id: string;
+  conditions: { field: string; operator: string; value: string }[];
+  thenActions: { id: string; type: string; config: Record<string, string> }[];
+  elseActions: { id: string; type: string; config: Record<string, string> }[];
+}
 
 interface RuleDoc {
   id: string;
@@ -16,6 +24,7 @@ interface RuleDoc {
   triggerConfig?: Record<string, string>;
   conditions: { id: string; field: string; operator: string; value: string }[];
   actions: { id: string; type: string; config: Record<string, string>; order?: number }[];
+  branches?: BranchBlock[];
   enabled: boolean;
   teamId?: string;
   runCount: number;
@@ -58,6 +67,14 @@ function evaluateCondition(condition: RuleDoc['conditions'][0], task: Record<str
       return Number(fieldValue) > Number(condValue);
     case 'less_than':
       return Number(fieldValue) < Number(condValue);
+    case 'greater_than_or_equal':
+      return Number(fieldValue) >= Number(condValue);
+    case 'less_than_or_equal':
+      return Number(fieldValue) <= Number(condValue);
+    case 'starts_with':
+      return String(fieldValue || '').startsWith(String(condValue));
+    case 'ends_with':
+      return String(fieldValue || '').endsWith(String(condValue));
     default:
       return false; // Unknown operator — fail-closed
   }
@@ -141,6 +158,64 @@ async function executeAction(
         }
         break;
       }
+      case 'call_webhook': {
+        const url = action.config.webhookUrl;
+        const method = (action.config.method || 'POST') as string;
+        if (url) {
+          const resp = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event: 'automation_triggered',
+              taskId: ctx.taskId,
+              task: { title: ctx.task.title, status: ctx.task.status, priority: ctx.task.priority },
+              actorId: ctx.actorId,
+              timestamp: new Date().toISOString(),
+            }),
+          });
+          if (!resp.ok) throw new Error(`Webhook returned ${resp.status}`);
+        }
+        break;
+      }
+      case 'create_subtask': {
+        const subtaskTitle = action.config.subtaskTitle;
+        if (subtaskTitle) {
+          const taskSnap = await adminDb.doc(`tasks/${ctx.taskId}`).get();
+          const currentSubtasks = taskSnap.data()?.subtasks || [];
+          await taskRef.update({
+            subtasks: [...currentSubtasks, { id: Date.now().toString(36), title: subtaskTitle, done: false }],
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
+        break;
+      }
+      case 'archive_task': {
+        await taskRef.update({ archived: true, updatedAt: FieldValue.serverTimestamp() });
+        break;
+      }
+      case 'duplicate_task': {
+        const snap = await taskRef.get();
+        if (snap.exists) {
+          const data = snap.data()!;
+          await adminDb.collection('tasks').add({
+            ...data,
+            title: `${data.title || 'Task'} (copy)`,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+            createdBy: 'automation',
+            archived: false,
+            deleted: false,
+          });
+        }
+        break;
+      }
+      case 'move_to_list': {
+        const listId = action.config.listId;
+        if (listId) {
+          await taskRef.update({ listId, updatedAt: FieldValue.serverTimestamp() });
+        }
+        break;
+      }
       default:
         return { success: false, error: `Unsupported action type: ${action.type}` };
     }
@@ -188,6 +263,22 @@ async function executeRule(rule: RuleDoc, ctx: TriggerContext): Promise<void> {
       const result = await executeAction(action, ctx);
       logEntries.push({ actionType: action.type, status: result.success ? 'success' : 'failure', error: result.error });
       if (!result.success) allSuccess = false;
+    }
+
+    // Execute branch blocks (if/then/else)
+    if (rule.branches && rule.branches.length > 0) {
+      for (const branch of rule.branches) {
+        const branchConditions = (branch.conditions || []).map(c => ({ id: '', ...c }));
+        const conditionsMet = allConditionsPass(branchConditions, ctx.task);
+        const branchActions = conditionsMet ? branch.thenActions : branch.elseActions;
+        const branchLabel = conditionsMet ? 'branch_then' : 'branch_else';
+
+        for (const action of branchActions || []) {
+          const result = await executeAction(action, ctx);
+          logEntries.push({ actionType: `${branchLabel}:${action.type}`, status: result.success ? 'success' : 'failure', error: result.error });
+          if (!result.success) allSuccess = false;
+        }
+      }
     }
 
     // Update rule stats
@@ -278,6 +369,62 @@ export async function onTaskAssigned(
   try {
     const rules = await getMatchingRules('task_assigned', task.teamId);
     const ctx: TriggerContext = { taskId, task, actorId };
+    for (const rule of rules) {
+      await executeRule(rule, ctx);
+    }
+  } finally {
+    _activeTaskIds.delete(taskId);
+  }
+}
+
+export async function onTaskPriorityChanged(
+  taskId: string,
+  task: Record<string, any>,
+  previousPriority: string,
+  actorId?: string,
+): Promise<void> {
+  if (_activeTaskIds.has(taskId)) return;
+  _activeTaskIds.add(taskId);
+  try {
+    const rules = await getMatchingRules('task_priority_changed', task.teamId);
+    const ctx: TriggerContext = { taskId, task, previousData: { priority: previousPriority }, actorId };
+    for (const rule of rules) {
+      await executeRule(rule, ctx);
+    }
+  } finally {
+    _activeTaskIds.delete(taskId);
+  }
+}
+
+export async function onTaskDueDateChanged(
+  taskId: string,
+  task: Record<string, any>,
+  actorId?: string,
+): Promise<void> {
+  if (_activeTaskIds.has(taskId)) return;
+  _activeTaskIds.add(taskId);
+  try {
+    const rules = await getMatchingRules('task_due_date_changed', task.teamId);
+    const ctx: TriggerContext = { taskId, task, actorId };
+    for (const rule of rules) {
+      await executeRule(rule, ctx);
+    }
+  } finally {
+    _activeTaskIds.delete(taskId);
+  }
+}
+
+export async function onTaskCustomFieldChanged(
+  taskId: string,
+  task: Record<string, any>,
+  fieldName: string,
+  actorId?: string,
+): Promise<void> {
+  if (_activeTaskIds.has(taskId)) return;
+  _activeTaskIds.add(taskId);
+  try {
+    const rules = await getMatchingRules('task_custom_field_changed', task.teamId);
+    const ctx: TriggerContext = { taskId, task, previousData: { changedField: fieldName }, actorId };
     for (const rule of rules) {
       await executeRule(rule, ctx);
     }

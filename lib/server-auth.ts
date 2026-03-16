@@ -3,8 +3,7 @@
 // ================================================================
 
 import { adminAuth, adminDb } from './firebase-admin';
-
-const ORG = 'solis-center';
+import { ORG_ID as ORG } from '@/lib/org';
 
 export interface VerifiedUser {
   uid: string;

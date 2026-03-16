@@ -3,8 +3,11 @@ import {
   orderBy, limit, serverTimestamp, onSnapshot, writeBatch,
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
+import { getCurrentOrgId, ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+// Multi-tenant ready: resolve org at call-time, not import-time
+function notifCol() { return `orgs/${getCurrentOrgId()}/notifications`; }
+/** @deprecated Use notifCol() for multi-tenant readiness */
 const NOTIF_COL = `orgs/${ORG}/notifications`;
 
 export interface AppNotification {

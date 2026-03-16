@@ -7,6 +7,13 @@ export default defineConfig({
     environment: 'node',
     include: ['__tests__/**/*.test.ts', 'tests/**/*.test.ts'],
     exclude: ['node_modules', '.next'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'text-summary'],
+      thresholds: {
+        lines: 40,
+      },
+    },
   },
   resolve: {
     alias: {

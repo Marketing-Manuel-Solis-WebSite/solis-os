@@ -16,7 +16,11 @@ import {
 } from './db-admin';
 import { notifyUsersAdmin } from './notify-admin';
 import { queueEvent } from './integrations-db-admin';
-import { onTaskCreated, onTaskStatusChanged, onTaskAssigned } from './automation-engine';
+import { dispatchWebhookEvent } from './outbound-webhooks';
+import {
+  onTaskCreated, onTaskStatusChanged, onTaskAssigned,
+  onTaskPriorityChanged, onTaskDueDateChanged, onTaskCustomFieldChanged,
+} from './automation-engine';
 import type {
   TaskCreatedEvent,
   TaskUpdatedEvent,
@@ -108,6 +112,17 @@ export async function afterTaskCreatedAdmin(
       entityId: event.taskId,
       entityType: 'task',
       payload: { title: event.task.title, status: event.task.status },
+    }).then(() => {}),
+  ));
+
+  // Important: outbound webhook dispatch
+  effects.push(await runEffect('dispatchWebhook', 'important', () =>
+    dispatchWebhookEvent('task.created', {
+      taskId: event.taskId,
+      title: event.task.title,
+      status: event.task.status,
+      assignees: event.task.assignees || [],
+      actor: event.actor,
     }).then(() => {}),
   ));
 
@@ -218,6 +233,19 @@ export async function afterTaskUpdatedAdmin(
     }).then(() => {}),
   ));
 
+  // Outbound webhook dispatch
+  effects.push(await runEffect('dispatchWebhook', 'important', () =>
+    dispatchWebhookEvent(eventType, {
+      taskId,
+      title: task.title,
+      field,
+      from,
+      to,
+      ...(statusChanged ? { newStatus: to, oldStatus: from } : {}),
+      actor,
+    }).then(() => {}),
+  ));
+
   // Automation engine
   const updatedTask = { ...task, [field]: to };
   if (statusChanged) {
@@ -228,6 +256,22 @@ export async function afterTaskUpdatedAdmin(
   if (field === 'assignees' && JSON.stringify(to) !== JSON.stringify(from)) {
     effects.push(await runEffect('onTaskAssigned', 'important', () =>
       onTaskAssigned(taskId, updatedTask, actor.actorId),
+    ));
+  }
+  if (field === 'priority' && to !== from) {
+    effects.push(await runEffect('onTaskPriorityChanged', 'important', () =>
+      onTaskPriorityChanged(taskId, updatedTask, String(from), actor.actorId),
+    ));
+  }
+  if (field === 'dueDate' && String(to) !== String(from)) {
+    effects.push(await runEffect('onTaskDueDateChanged', 'important', () =>
+      onTaskDueDateChanged(taskId, updatedTask, actor.actorId),
+    ));
+  }
+  if (field === 'customFields' || field.startsWith('customFields.')) {
+    const cfName = field.startsWith('customFields.') ? field.replace('customFields.', '') : field;
+    effects.push(await runEffect('onTaskCustomFieldChanged', 'important', () =>
+      onTaskCustomFieldChanged(taskId, updatedTask, cfName, actor.actorId),
     ));
   }
 
@@ -267,6 +311,15 @@ export async function afterTaskDeletedAdmin(
       entityId: event.taskId,
       entityType: 'task',
       payload: { title: event.task.title },
+    }).then(() => {}),
+  ));
+
+  // Important: outbound webhook dispatch
+  effects.push(await runEffect('dispatchWebhook', 'important', () =>
+    dispatchWebhookEvent('task.deleted', {
+      taskId: event.taskId,
+      title: event.task.title,
+      actor: event.actor,
     }).then(() => {}),
   ));
 

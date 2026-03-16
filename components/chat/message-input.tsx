@@ -40,6 +40,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
   const [uploadProgress, setUploadProgress] = useState(0);
   const [sending, setSending] = useState(false);
   const [previews, setPreviews] = useState<{ file: File; url: string; type: string }[]>([]);
+  const [mentionIndex, setMentionIndex] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -125,6 +126,29 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Mention dropdown keyboard navigation
+    if (showMentions && filteredMembers.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex(prev => (prev + 1) % filteredMembers.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex(prev => (prev - 1 + filteredMembers.length) % filteredMembers.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(filteredMembers[mentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMentions(false);
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -132,6 +156,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
     if (e.key === '@') {
       setShowMentions(true);
       setMentionQuery('');
+      setMentionIndex(0);
     }
   };
 
@@ -142,6 +167,7 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
     if (atMatch) {
       setShowMentions(true);
       setMentionQuery(atMatch[1].toLowerCase());
+      setMentionIndex(0);
     } else {
       setShowMentions(false);
     }
@@ -273,12 +299,15 @@ export default function MessageInput({ channelName, members, replyTo, editingMsg
             transition={{ duration: 0.15 }}
             className="mx-5 mb-1 rounded-xl bg-[var(--bg-elevated)] shadow-dropdown overflow-hidden"
           >
-            {filteredMembers.map(m => (
+            {filteredMembers.map((m, idx) => (
               <motion.button
                 key={m.id}
                 whileHover={{ backgroundColor: 'var(--bg-hover)' }}
                 onClick={() => insertMention(m)}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[var(--text-secondary)] transition">
+                onMouseEnter={() => setMentionIndex(idx)}
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[var(--text-secondary)] transition ${
+                  idx === mentionIndex ? 'bg-[var(--accent)]/10' : ''
+                }`}>
                 <div className="w-7 h-7 rounded-full bg-[var(--accent)]/10 flex items-center justify-center text-[12px] font-bold text-[var(--accent)]">
                   {m.displayName?.[0]?.toUpperCase()}
                 </div>

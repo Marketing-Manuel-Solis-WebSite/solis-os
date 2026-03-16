@@ -4,6 +4,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { getCurrentOrgId, ORG_ID as ORG } from '@/lib/org';
 import type {
   IntegrationProvider, IntegrationCategory, IntegrationStatus,
   ApiKeyScope, WebhookEvent,
@@ -11,7 +12,7 @@ import type {
   IncomingWebhookRecord, WebhookEventRecord, IncomingWebhookRecord as IWR,
 } from './integrations-types';
 
-const ORG = 'solis-center';
+
 
 // ============================================
 // GENERIC HELPERS (mirrors lib/db.ts)

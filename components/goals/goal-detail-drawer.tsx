@@ -4,11 +4,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Edit2, Trash2, Target, Calendar, User, ChevronDown } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
+import { useFeatureFlag } from '@/lib/feature-flags';
 import EntityRelations from '@/components/shared/entity-relations';
+import GoalCheckinSection from './goal-checkin-section';
+import { inferGoalStatusEnhanced, type StatusInference } from '@/lib/goal-status-inference';
 import { getGoalTargets, createGoalTarget, updateGoalTarget, deleteGoalTarget, recalculateGoalProgress, getTasks } from '@/lib/db';
-import { GOAL_STATUSES, TARGET_TYPES, GOAL_COLORS } from './constants';
+import { GOAL_STATUSES, TARGET_TYPES, GOAL_COLORS, GOAL_TYPES } from './constants';
 import type { Goal, GoalTarget, GoalStatus, TargetType } from './constants';
 import TargetItem from './target-item';
+import FavoriteButton from '@/components/shared/favorite-button';
 
 interface Props {
   goal: Goal | null;
@@ -17,11 +21,20 @@ interface Props {
   onUpdate: (id: string, data: any) => void;
   onDelete: (id: string) => void;
   onRefresh: () => void;
+  /** Callback to create a child goal under this goal */
+  onCreateChild?: (parentGoal: Goal) => void;
+  /** Child goals of this goal (for cascading display) */
+  childGoals?: Goal[];
 }
 
-export default function GoalDetailDrawer({ goal, open, onClose, onUpdate, onDelete, onRefresh }: Props) {
+export default function GoalDetailDrawer({ goal, open, onClose, onUpdate, onDelete, onRefresh, onCreateChild, childGoals = [] }: Props) {
   const { t } = useI18n();
   const { me, user, allMembers, teams, canSeeAllTeams, activeTeamId } = useAuth();
+  const checkinsEnabled = useFeatureFlag('goal-checkins');
+  const inferenceEnabled = useFeatureFlag('goal-status-inference');
+  const okrEnabled = useFeatureFlag('okr-hierarchy');
+  const favoritesEnabled = useFeatureFlag('favorites');
+  const [inference, setInference] = useState<StatusInference | null>(null);
   const [targets, setTargets] = useState<GoalTarget[]>([]);
   const [loadingTargets, setLoadingTargets] = useState(false);
   const [showAddTarget, setShowAddTarget] = useState(false);
@@ -46,8 +59,18 @@ export default function GoalDetailDrawer({ goal, open, onClose, onUpdate, onDele
     if (goal && open) {
       loadTargets();
       loadTasks();
+      // Run status inference
+      if (inferenceEnabled) {
+        inferGoalStatusEnhanced({
+          id: goal.id,
+          status: goal.status,
+          progress: goal.progress,
+          dueDate: goal.dueDate,
+          createdAt: goal.createdAt,
+        }).then(setInference).catch(() => setInference(null));
+      }
     }
-  }, [goal?.id, open]);
+  }, [goal?.id, open, inferenceEnabled]);
 
   const loadTargets = async () => {
     if (!goal) return;
@@ -145,9 +168,23 @@ export default function GoalDetailDrawer({ goal, open, onClose, onUpdate, onDele
           >
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)]">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ background: goal.color }} />
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-3 h-3 rounded-full shrink-0" style={{ background: goal.color }} />
                 <h2 className="text-base font-semibold text-[var(--text-primary)] truncate">{goal.name}</h2>
+                {favoritesEnabled && user?.uid && (
+                  <FavoriteButton entityType="goal" entityId={goal.id} entityTitle={goal.name} userId={user.uid} />
+                )}
+                {okrEnabled && goal.goalType && goal.goalType !== 'goal' && (() => {
+                  const gtInfo = GOAL_TYPES.find(gt => gt.value === goal.goalType);
+                  return gtInfo ? (
+                    <span
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0"
+                      style={{ background: gtInfo.color + '18', color: gtInfo.color }}
+                    >
+                      {t(gtInfo.labelKey) || goal.goalType.replace('_', ' ')}
+                    </span>
+                  ) : null;
+                })()}
               </div>
               <div className="flex items-center gap-1">
                 <button
@@ -364,6 +401,171 @@ export default function GoalDetailDrawer({ goal, open, onClose, onUpdate, onDele
                   )}
                 </AnimatePresence>
               </div>
+
+              {/* Key Results (OKR — only for objectives) */}
+              {okrEnabled && goal.goalType === 'objective' && (() => {
+                const keyResults = childGoals.filter(c => c.goalType === 'key_result');
+                const otherChildren = childGoals.filter(c => c.goalType !== 'key_result');
+                const avgProgress = keyResults.length > 0
+                  ? Math.round(keyResults.reduce((sum, kr) => sum + (kr.progress || 0), 0) / keyResults.length)
+                  : null;
+                return (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                        {t('goals.keyResults') || 'Key Results'}
+                        {avgProgress !== null && (
+                          <span className="ml-2 text-[12px] font-normal text-[var(--text-muted)]">
+                            {t('goals.rollUpProgress') || 'Roll-up'}: {avgProgress}%
+                          </span>
+                        )}
+                      </h3>
+                      {onCreateChild && (
+                        <button
+                          onClick={() => onCreateChild(goal)}
+                          className="flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline"
+                        >
+                          <Plus className="h-3 w-3" /> {t('goals.addKeyResult') || 'Add KR'}
+                        </button>
+                      )}
+                    </div>
+                    {keyResults.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {keyResults.map(kr => {
+                          const krStatus = GOAL_STATUSES.find(s => s.value === kr.status);
+                          return (
+                            <div key={kr.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-base)]">
+                              <span
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0"
+                                style={{ background: '#22C55E18', color: '#22C55E' }}
+                              >
+                                KR
+                              </span>
+                              <span className="text-[13px] text-[var(--text-primary)] truncate flex-1">{kr.name}</span>
+                              {krStatus && (
+                                <span
+                                  className="text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0"
+                                  style={{ background: krStatus.color + '18', color: krStatus.color }}
+                                >
+                                  {t(krStatus.labelKey)}
+                                </span>
+                              )}
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-16 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                                  <div className="h-full rounded-full transition-all" style={{ width: `${kr.progress}%`, background: kr.color || '#22C55E' }} />
+                                </div>
+                                <span className="text-[11px] text-[var(--text-muted)] w-7 text-right">{kr.progress}%</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-[12px] text-[var(--text-muted)]">{t('goals.noKeyResults') || 'No key results yet. Add KRs to track this objective.'}</p>
+                    )}
+
+                    {/* Show remaining non-KR children under the objective too */}
+                    {otherChildren.length > 0 && (
+                      <div className="mt-3">
+                        <h4 className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1.5">
+                          {t('goals.otherChildren') || 'Other sub-goals'}
+                        </h4>
+                        <div className="space-y-1">
+                          {otherChildren.map(child => (
+                            <div key={child.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-base)]">
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ background: child.color || '#7B68EE' }} />
+                              <span className="text-[13px] text-[var(--text-primary)] truncate flex-1">{child.name}</span>
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-16 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                                  <div className="h-full rounded-full transition-all" style={{ width: `${child.progress}%`, background: child.color || '#7B68EE' }} />
+                                </div>
+                                <span className="text-[11px] text-[var(--text-muted)] w-7 text-right">{child.progress}%</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Child Goals (cascading — shown when NOT an objective with OKR enabled) */}
+              {!(okrEnabled && goal.goalType === 'objective') && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                    {t('goals.childGoals') || 'Child Goals'}
+                  </h3>
+                  {onCreateChild && (
+                    <button
+                      onClick={() => onCreateChild(goal)}
+                      className="flex items-center gap-1 text-[12px] font-medium text-[var(--accent)] hover:underline"
+                    >
+                      <Plus className="h-3 w-3" /> {t('goals.addChild') || 'Add child'}
+                    </button>
+                  )}
+                </div>
+                {childGoals.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {childGoals.map(child => (
+                      <div key={child.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-base)]">
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: child.color || '#7B68EE' }} />
+                        <span className="text-[13px] text-[var(--text-primary)] truncate flex-1">{child.name}</span>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-16 h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${child.progress}%`, background: child.color || '#7B68EE' }} />
+                          </div>
+                          <span className="text-[11px] text-[var(--text-muted)] w-7 text-right">{child.progress}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[12px] text-[var(--text-muted)]">{t('goals.noChildGoals') || 'No child goals yet'}</p>
+                )}
+              </div>
+              )}
+
+              {/* Status Inference Suggestion */}
+              {inferenceEnabled && inference && inference.shouldNotify && inference.suggestedStatus !== goal.status && inference.confidence >= 0.5 && (
+                <div className="p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-base)]">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                      {t('goals.statusSuggestion') || 'Status Suggestion'}
+                    </span>
+                    <span className="text-[10px] text-[var(--text-muted)]">
+                      {Math.round(inference.confidence * 100)}% {t('goals.confidence') || 'confidence'}
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-[var(--text-secondary)] mb-2">{inference.reason}</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        onUpdate(goal.id, { status: inference.suggestedStatus });
+                        setInference(null);
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-[var(--accent)] text-white hover:opacity-90 transition"
+                    >
+                      {(() => {
+                        const sc = GOAL_STATUSES.find(s => s.value === inference.suggestedStatus);
+                        return `→ ${t(sc?.labelKey || '') || inference.suggestedStatus}`;
+                      })()}
+                    </button>
+                    <button
+                      onClick={() => setInference(null)}
+                      className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg-hover)] transition"
+                    >
+                      {t('common.dismiss') || 'Dismiss'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Check-ins */}
+              {checkinsEnabled && (
+                <GoalCheckinSection goal={goal} />
+              )}
 
               {/* Related Items */}
               <div>

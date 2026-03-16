@@ -44,6 +44,8 @@ interface Ctx {
   isAdmin: boolean;
   isManager: boolean;
   isDirector: boolean;
+  isGuest: boolean;
+  isReadonly: boolean;
   teams: Team[];
   allMembers: Member[];
   activeTeamId: string;
@@ -59,13 +61,13 @@ interface Ctx {
 }
 
 const AuthCtx = createContext<Ctx>({
-  user: null, me: null, loading: true, isAdmin: false, isManager: false, isDirector: false,
+  user: null, me: null, loading: true, isAdmin: false, isManager: false, isDirector: false, isGuest: false, isReadonly: false,
   teams: [], allMembers: [], activeTeamId: '', setActiveTeamId: () => {}, canSeeAllTeams: false,
   teamMembers: [], refreshTeams: async () => {}, refreshMembers: async () => {},
   can: () => false, canSeeResource: () => false, getMemberById: () => undefined, getMembersByTeam: () => [],
 });
 
-const ORG_ID = 'solis-center';
+import { ORG_ID, getCurrentOrgId } from '@/lib/org';
 
 // ============================================
 // PROVIDER
@@ -85,6 +87,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAdmin = roleNorm === 'owner' || roleNorm === 'admin';
   const isManager = isAdmin || roleNorm === 'manager';
   const isDirector = isAdmin || hierNorm === 'director' || hierNorm === 'owner';
+  const isGuest = roleNorm === 'guest';
+  const isReadonly = roleNorm === 'readonly';
   const canSeeAllTeams = isAdmin || isDirector;
 
   const teamMembers = useMemo(() => {
@@ -322,13 +326,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(() => ({
-    user, me, loading, isAdmin, isManager, isDirector,
+    user, me, loading, isAdmin, isManager, isDirector, isGuest, isReadonly,
     teams, allMembers, activeTeamId, setActiveTeamId,
     canSeeAllTeams, teamMembers,
     refreshTeams, refreshMembers,
     can, canSeeResource, getMemberById, getMembersByTeam,
   }), [
-    user, me, loading, isAdmin, isManager, isDirector,
+    user, me, loading, isAdmin, isManager, isDirector, isGuest, isReadonly,
     teams, allMembers, activeTeamId, setActiveTeamId,
     canSeeAllTeams, teamMembers,
     refreshTeams, refreshMembers,

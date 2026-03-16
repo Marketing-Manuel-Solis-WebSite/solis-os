@@ -1,22 +1,28 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Tag } from 'lucide-react';
+import { X, Plus, Tag, Info } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
-import { GOAL_STATUSES, GOAL_COLORS } from './constants';
-import type { Goal, GoalStatus } from './constants';
+import { useFeatureFlag } from '@/lib/feature-flags';
+import { GOAL_STATUSES, GOAL_COLORS, GOAL_TYPES } from './constants';
+import type { Goal, GoalStatus, GoalType } from './constants';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   onSave: (data: any) => void;
   editGoal?: Goal | null;
+  /** Pre-set parent goal (for "Create child goal" action) */
+  parentGoal?: Goal | null;
+  /** All goals for parent selector */
+  allGoals?: Goal[];
 }
 
-export default function GoalCreateModal({ open, onClose, onSave, editGoal }: Props) {
+export default function GoalCreateModal({ open, onClose, onSave, editGoal, parentGoal, allGoals = [] }: Props) {
   const { t } = useI18n();
   const { me, teams, allMembers, activeTeamId } = useAuth();
+  const okrEnabled = useFeatureFlag('okr-hierarchy');
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -30,6 +36,8 @@ export default function GoalCreateModal({ open, onClose, onSave, editGoal }: Pro
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [parentGoalId, setParentGoalId] = useState<string>('');
+  const [goalType, setGoalType] = useState<GoalType>('goal');
 
   useEffect(() => {
     if (editGoal) {
@@ -43,6 +51,8 @@ export default function GoalCreateModal({ open, onClose, onSave, editGoal }: Pro
       setTeamId(editGoal.teamId);
       setVisibility(editGoal.visibility || 'team');
       setTags(editGoal.tags || []);
+      setParentGoalId(editGoal.parentGoalId || '');
+      setGoalType(editGoal.goalType || 'goal');
     } else {
       setName('');
       setDescription('');
@@ -54,8 +64,11 @@ export default function GoalCreateModal({ open, onClose, onSave, editGoal }: Pro
       setTeamId(activeTeamId === '__all__' ? '' : activeTeamId);
       setVisibility('team');
       setTags([]);
+      setParentGoalId(parentGoal?.id || '');
+      // Default to key_result when parent is an objective
+      setGoalType(parentGoal?.goalType === 'objective' ? 'key_result' : 'goal');
     }
-  }, [editGoal, open, me, activeTeamId]);
+  }, [editGoal, open, me, activeTeamId, parentGoal]);
 
   const handleAddTag = () => {
     const v = tagInput.trim();
@@ -65,6 +78,8 @@ export default function GoalCreateModal({ open, onClose, onSave, editGoal }: Pro
 
   const handleSave = async () => {
     if (!name.trim()) return;
+    // When OKR is enabled and goalType is key_result, require a parent objective
+    if (okrEnabled && goalType === 'key_result' && !parentGoalId) return;
     setSaving(true);
     await onSave({
       name: name.trim(),
@@ -77,6 +92,8 @@ export default function GoalCreateModal({ open, onClose, onSave, editGoal }: Pro
       teamId,
       visibility,
       tags,
+      parentGoalId: parentGoalId || null,
+      ...(okrEnabled ? { goalType } : {}),
     });
     setSaving(false);
     onClose();
@@ -137,6 +154,41 @@ export default function GoalCreateModal({ open, onClose, onSave, editGoal }: Pro
               />
             </div>
 
+            {/* Goal Type (OKR) */}
+            {okrEnabled && (
+              <div>
+                <label className="text-[13px] font-medium text-[var(--text-secondary)] block mb-1">{t('goals.goalType') || 'Goal Type'}</label>
+                <div className="flex items-center gap-2">
+                  {GOAL_TYPES.map(gt => (
+                    <button
+                      key={gt.value}
+                      type="button"
+                      onClick={() => setGoalType(gt.value)}
+                      className={`flex-1 h-9 rounded-lg text-[13px] font-medium transition border ${
+                        goalType === gt.value
+                          ? 'border-[var(--accent)] bg-[var(--accent-subtle)] text-[var(--accent)]'
+                          : 'border-[var(--border-subtle)] bg-[var(--bg-base)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                      }`}
+                    >
+                      {t(gt.labelKey) || gt.value.replace('_', ' ')}
+                    </button>
+                  ))}
+                </div>
+                {goalType === 'objective' && (
+                  <p className="flex items-center gap-1 mt-1.5 text-[12px] text-[var(--accent)]">
+                    <Info className="h-3 w-3 shrink-0" />
+                    {t('goals.objectiveHint') || 'Add Key Results after creating this objective'}
+                  </p>
+                )}
+                {goalType === 'key_result' && !parentGoalId && (
+                  <p className="flex items-center gap-1 mt-1.5 text-[12px] text-[var(--error)]">
+                    <Info className="h-3 w-3 shrink-0" />
+                    {t('goals.krRequiresParent') || 'Key Results must be linked to a parent Objective'}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Row: Owner + Due Date */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -195,6 +247,34 @@ export default function GoalCreateModal({ open, onClose, onSave, editGoal }: Pro
                 </select>
               </div>
             </div>
+
+            {/* Parent Goal (cascading) */}
+            {allGoals.length > 0 && (
+              <div>
+                <label className="text-[13px] font-medium text-[var(--text-secondary)] block mb-1">
+                  {okrEnabled && goalType === 'key_result'
+                    ? (t('goals.parentObjective') || 'Parent Objective')
+                    : (t('goals.parentGoal') || 'Parent Goal')}
+                </label>
+                <select
+                  value={parentGoalId}
+                  onChange={e => setParentGoalId(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] outline-none ring-1 ring-[var(--border-subtle)] focus:ring-[var(--accent)] transition"
+                >
+                  <option value="">{t('goals.noParent') || 'None (top-level)'}</option>
+                  {allGoals
+                    .filter(g => g.id !== editGoal?.id) // can't be parent of itself
+                    .filter(g => {
+                      // When OKR is on and creating a KR, only show objectives as parents
+                      if (okrEnabled && goalType === 'key_result') return g.goalType === 'objective';
+                      return true;
+                    })
+                    .map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                </select>
+              </div>
+            )}
 
             {/* Color picker */}
             <div>

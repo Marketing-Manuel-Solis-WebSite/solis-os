@@ -139,3 +139,126 @@ export async function addGithubLabels(
 
   return res.ok;
 }
+
+// ============================================
+// PULL REQUESTS
+// ============================================
+
+export async function listPullRequests(
+  owner: string,
+  repo: string,
+  state: 'open' | 'closed' | 'all' = 'open',
+  perPage = 30,
+): Promise<{ id: number; number: number; title: string; state: string; html_url: string; merged: boolean; user: string; head: string; base: string }[]> {
+  const token = await getGithubToken();
+  if (!token) return [];
+
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/pulls?state=${state}&per_page=${perPage}&sort=updated`,
+    { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' } },
+  );
+  if (!res.ok) return [];
+
+  const data = await res.json();
+  return (data || []).map((pr: any) => ({
+    id: pr.id,
+    number: pr.number,
+    title: pr.title,
+    state: pr.state,
+    html_url: pr.html_url,
+    merged: pr.merged || false,
+    user: pr.user?.login || '',
+    head: pr.head?.ref || '',
+    base: pr.base?.ref || '',
+  }));
+}
+
+export async function getPullRequest(
+  owner: string,
+  repo: string,
+  prNumber: number,
+): Promise<{ id: number; number: number; title: string; state: string; html_url: string; merged: boolean; body: string; user: string; additions: number; deletions: number; changed_files: number } | null> {
+  const token = await getGithubToken();
+  if (!token) return null;
+
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`,
+    { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' } },
+  );
+  if (!res.ok) return null;
+
+  const pr = await res.json();
+  return {
+    id: pr.id,
+    number: pr.number,
+    title: pr.title,
+    state: pr.state,
+    html_url: pr.html_url,
+    merged: pr.merged || false,
+    body: pr.body || '',
+    user: pr.user?.login || '',
+    additions: pr.additions || 0,
+    deletions: pr.deletions || 0,
+    changed_files: pr.changed_files || 0,
+  };
+}
+
+// ============================================
+// COMMITS
+// ============================================
+
+export async function listCommits(
+  owner: string,
+  repo: string,
+  sha?: string,
+  perPage = 30,
+): Promise<{ sha: string; message: string; author: string; date: string; html_url: string }[]> {
+  const token = await getGithubToken();
+  if (!token) return [];
+
+  const params = new URLSearchParams({ per_page: String(perPage) });
+  if (sha) params.set('sha', sha);
+
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/commits?${params}`,
+    { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' } },
+  );
+  if (!res.ok) return [];
+
+  const data = await res.json();
+  return (data || []).map((c: any) => ({
+    sha: c.sha,
+    message: c.commit?.message || '',
+    author: c.commit?.author?.name || c.author?.login || '',
+    date: c.commit?.author?.date || '',
+    html_url: c.html_url,
+  }));
+}
+
+// ============================================
+// CHECK RUNS (CI STATUS)
+// ============================================
+
+export async function getCheckRuns(
+  owner: string,
+  repo: string,
+  ref: string,
+): Promise<{ id: number; name: string; status: string; conclusion: string | null; html_url: string }[]> {
+  const token = await getGithubToken();
+  if (!token) return [];
+
+  const res = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/commits/${ref}/check-runs`,
+    { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' } },
+  );
+  if (!res.ok) return [];
+
+  const data = await res.json();
+  return (data.check_runs || []).map((cr: any) => ({
+    id: cr.id,
+    name: cr.name,
+    status: cr.status,
+    conclusion: cr.conclusion,
+    html_url: cr.html_url,
+  }));
+}

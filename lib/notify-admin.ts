@@ -20,8 +20,9 @@ import {
   type NotificationEventType,
 } from './notification-matrix';
 import { sendNotificationEmail } from './send-notification-email';
+import { ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+
 
 export interface NotifyParams {
   eventType: NotificationEventType;

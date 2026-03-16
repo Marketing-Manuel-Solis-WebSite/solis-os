@@ -13,7 +13,7 @@ import {
   markChannelRead, onReadCursorsSnapshot,
   createTask,
 } from '@/lib/db';
-import { afterMessageSent } from '@/lib/chat-side-effects';
+import { afterMessageSent, extractMentionNames, resolveMentionIds } from '@/lib/chat-side-effects';
 import ChannelSidebar from '@/components/chat/channel-sidebar';
 import ChannelHeader from '@/components/chat/channel-header';
 import MessageList from '@/components/chat/message-list';
@@ -22,12 +22,17 @@ import ChannelSettings from '@/components/chat/channel-settings';
 import CreateChannelModal from '@/components/chat/create-channel-modal';
 import MemberDrawer from '@/components/chat/member-drawer';
 import PinnedDrawer from '@/components/chat/pinned-drawer';
-import { MessageSquare, WifiOff } from 'lucide-react';
+import ThreadPanel from '@/components/chat/thread-panel';
+import ChatSearchPanel from '@/components/chat/chat-search-panel';
+import BookmarksDrawer from '@/components/chat/bookmarks-drawer';
+import { useFeatureFlag } from '@/lib/feature-flags';
+import { bookmarkMessage } from '@/lib/db';
+import { MessageSquare, WifiOff, Bookmark } from 'lucide-react';
 import { useToast } from '@/components/notifications/toast-provider';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ChatPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { user, me, isAdmin, activeTeamId, teams, can, canSeeAllTeams } = useAuth();
   const toast = useToast();
   const [channels, setChannels] = useState<any[]>([]);
@@ -43,10 +48,14 @@ export default function ChatPage() {
   const [showPinned, setShowPinned] = useState(false);
   const [replyTo, setReplyTo] = useState<any>(null);
   const [editingMsg, setEditingMsg] = useState<any>(null);
+  const [threadMsg, setThreadMsg] = useState<any>(null);
   const [search, setSearch] = useState('');
   const [isOffline, setIsOffline] = useState(false);
   const [clearedChannels, setClearedChannels] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [showBookmarks, setShowBookmarks] = useState(false);
+  const bookmarksEnabled = useFeatureFlag('chat-bookmarks');
   const [typingUsers, setTypingUsers] = useState<{ id: string; name: string }[]>([]);
   const [onlineMap, setOnlineMap] = useState<Record<string, boolean>>({});
   const [readCursors, setReadCursors] = useState<Record<string, any>>({});
@@ -94,7 +103,8 @@ export default function ChatPage() {
   // Subscribe to real-time messages when channel changes
   useEffect(() => {
     if (unsubRef.current) { unsubRef.current(); unsubRef.current = null; }
-    if (!active) { setMsgs([]); setMsgsLoading(false); return; }
+    if (!active) { setMsgs([]); setMsgsLoading(false); setThreadMsg(null); return; }
+    setThreadMsg(null);
     setMsgsLoading(true);
     const unsub = onMessagesSnapshot(active.id, (newMsgs, hasMore) => {
       setMsgs(newMsgs);
@@ -186,12 +196,18 @@ export default function ChatPage() {
   // Actions
   const handleSend = async (content: string, mentions: string[]) => {
     if (!active || !content.trim()) return;
+
+    // Merge dropdown-tracked mentions with text-extracted mentions (fallback for manual @typing)
+    const textMentionNames = extractMentionNames(content.trim());
+    const textMentionIds = resolveMentionIds(textMentionNames, members);
+    const allMentionIds = Array.from(new Set([...mentions, ...textMentionIds]));
+
     await sendMessage(active.id, {
       content: content.trim(),
       userId: user!.uid,
       displayName: me!.displayName,
       photoURL: me!.photoURL || '',
-      mentions,
+      mentions: allMentionIds,
       replyTo: replyTo?.id || null,
       replyPreview: replyTo?.content?.slice(0, 60) || null,
       replyAuthor: replyTo?.displayName || null,
@@ -207,7 +223,7 @@ export default function ChatPage() {
       channelName: active.name || '',
       channelType: active.type || 'public',
       memberIds: active.members || [],
-      mentionIds: mentions,
+      mentionIds: allMentionIds,
     });
 
     loadChannels(); // refresh last message
@@ -357,6 +373,18 @@ export default function ChatPage() {
     }
   };
 
+  const handleBookmark = async (msg: any) => {
+    if (!user || !active) return;
+    try {
+      const preview = (msg.content || '').slice(0, 200);
+      const channelName = active.type === 'dm' ? getDMName(active) : active.name;
+      await bookmarkMessage(user.uid, active.id, msg.id, preview, channelName);
+      toast.success(t('chat.bookmarkAdded') || (lang === 'es' ? 'Mensaje guardado' : 'Message bookmarked'));
+    } catch {
+      toast.error(t('common.error') || 'Error');
+    }
+  };
+
   const pinnedMsgs = msgs.filter(m => m.pinned);
   const displayMsgs = active && clearedChannels.has(active.id) ? [] : msgs;
 
@@ -435,7 +463,27 @@ export default function ChatPage() {
               onAddMember={handleAddMember}
               onClearView={handleClearView}
               onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+              onSearch={() => setShowSearch(s => !s)}
+              onShowBookmarks={bookmarksEnabled ? () => setShowBookmarks(s => !s) : undefined}
             />
+            <AnimatePresence>
+              {showSearch && (
+                <ChatSearchPanel
+                  channelId={active.id}
+                  onClose={() => setShowSearch(false)}
+                  onJumpToMessage={(msgId) => {
+                    setShowSearch(false);
+                    // Scroll to message — find it and highlight
+                    const el = document.getElementById(`msg-${msgId}`);
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      el.classList.add('ring-2', 'ring-[var(--accent)]', 'rounded-lg');
+                      setTimeout(() => el.classList.remove('ring-2', 'ring-[var(--accent)]', 'rounded-lg'), 2000);
+                    }
+                  }}
+                />
+              )}
+            </AnimatePresence>
             {msgsHasMore && !msgsLoading && (
               <div className="px-5 py-2 text-center">
                 <span className="text-[12px] text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-3 py-1 rounded-full">
@@ -456,6 +504,8 @@ export default function ChatPage() {
               onPin={handlePin}
               onReaction={handleReaction}
               onCreateTask={handleCreateTask}
+              onOpenThread={(msg: any) => setThreadMsg(msg)}
+              onBookmark={bookmarksEnabled ? handleBookmark : undefined}
             />
             {/* Typing indicator */}
             <AnimatePresence>
@@ -525,12 +575,44 @@ export default function ChatPage() {
           onStartDM={handleStartDM}
         />
       )}
+      {threadMsg && active && (
+        <ThreadPanel
+          channelId={active.id}
+          parentMessage={threadMsg}
+          members={members}
+          userId={user?.uid || ''}
+          displayName={me?.displayName || ''}
+          photoURL={me?.photoURL || ''}
+          onClose={() => setThreadMsg(null)}
+          onReaction={handleReaction}
+        />
+      )}
       {showPinned && active && (
         <PinnedDrawer
           messages={pinnedMsgs}
           members={members}
           onClose={() => setShowPinned(false)}
           onUnpin={(msgId: string) => handlePin(msgId, true)}
+        />
+      )}
+      {showBookmarks && bookmarksEnabled && (
+        <BookmarksDrawer
+          onClose={() => setShowBookmarks(false)}
+          onJumpToMessage={(channelId, messageId) => {
+            setShowBookmarks(false);
+            const targetChannel = channels.find(c => c.id === channelId);
+            if (targetChannel) {
+              setActive(targetChannel);
+              setTimeout(() => {
+                const el = document.getElementById(`msg-${messageId}`);
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  el.classList.add('ring-2', 'ring-[var(--accent)]', 'rounded-lg');
+                  setTimeout(() => el.classList.remove('ring-2', 'ring-[var(--accent)]', 'rounded-lg'), 2000);
+                }
+              }, 500);
+            }
+          }}
         />
       )}
       {showSettings && active && (

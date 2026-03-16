@@ -3,8 +3,9 @@
 // ================================================================
 
 import { adminDb } from '@/lib/firebase-admin';
+import { ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+
 
 export interface AnalyticsSnapshot {
   totalTasks: number;

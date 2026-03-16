@@ -1,7 +1,8 @@
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
+import { ORG_ID } from '@/lib/org';
 
-const SETTINGS_PATH = `orgs/solis-center/settings/customFields`;
+const SETTINGS_PATH = `orgs/${ORG_ID}/settings/customFields`;
 
 // Extended field types
 export type CustomFieldType =
@@ -10,6 +11,8 @@ export type CustomFieldType =
   | 'email' | 'phone' | 'url'
   | 'single_select' | 'multi_select'
   | 'user' | 'rating';
+
+export type FieldScope = 'org' | 'space' | 'list';
 
 export interface CustomFieldDef {
   id: string;
@@ -28,6 +31,10 @@ export interface CustomFieldDef {
   isLegacy: boolean;
   createdAt?: any;
   createdBy?: string;
+  /** Scope level — 'org' (default) applies everywhere, 'space' or 'list' restricts visibility */
+  scope?: FieldScope;
+  /** ID of the space or list this field is scoped to. Null = org-wide. */
+  scopeId?: string | null;
 }
 
 export interface CustomFieldGroupDef {
@@ -47,10 +54,10 @@ export interface CustomFieldSettings {
 
 // Legacy hardcoded fields → CustomFieldDef migration
 const LEGACY_FIELDS: CustomFieldDef[] = [
-  { id: 'caseNumber', name: 'Case Number', nameEs: 'No. de Caso', type: 'text', group: 'legal', required: false, order: 0, archived: false, isLegacy: true },
-  { id: 'caseValue', name: 'Case Value', nameEs: 'Valor del Caso', type: 'currency', group: 'legal', required: false, order: 1, archived: false, isLegacy: true },
-  { id: 'filingDate', name: 'Filing Date', nameEs: 'Fecha de Presentación', type: 'date', group: 'legal', required: false, order: 2, archived: false, isLegacy: true },
-  { id: 'caseType', name: 'Case Type', nameEs: 'Tipo de Caso', type: 'single_select', group: 'legal', required: false, order: 3, archived: false, isLegacy: true,
+  { id: 'caseNumber', name: 'Case Number', nameEs: 'No. de Caso', type: 'text', group: 'legal', required: false, order: 0, archived: false, isLegacy: true, scope: 'org' },
+  { id: 'caseValue', name: 'Case Value', nameEs: 'Valor del Caso', type: 'currency', group: 'legal', required: false, order: 1, archived: false, isLegacy: true, scope: 'org' },
+  { id: 'filingDate', name: 'Filing Date', nameEs: 'Fecha de Presentación', type: 'date', group: 'legal', required: false, order: 2, archived: false, isLegacy: true, scope: 'org' },
+  { id: 'caseType', name: 'Case Type', nameEs: 'Tipo de Caso', type: 'single_select', group: 'legal', required: false, order: 3, archived: false, isLegacy: true, scope: 'org',
     options: [
       { id: 'civil', label: 'Civil', color: '#3B82F6' },
       { id: 'criminal', label: 'Criminal', color: '#EF4444' },
@@ -60,12 +67,12 @@ const LEGACY_FIELDS: CustomFieldDef[] = [
       { id: 'otro', label: 'Otro', color: '#6B7280' },
     ],
   },
-  { id: 'courtLocation', name: 'Court Location', nameEs: 'Ubicación del Juzgado', type: 'text', group: 'legal', required: false, order: 4, archived: false, isLegacy: true },
-  { id: 'retainerPaid', name: 'Retainer Paid', nameEs: 'Anticipo Pagado', type: 'boolean', group: 'legal', required: false, order: 5, archived: false, isLegacy: true },
-  { id: 'clientName', name: 'Client Name', nameEs: 'Nombre del Cliente', type: 'text', group: 'client', required: false, order: 6, archived: false, isLegacy: true },
-  { id: 'clientPhone', name: 'Client Phone', nameEs: 'Teléfono del Cliente', type: 'phone', group: 'client', required: false, order: 7, archived: false, isLegacy: true },
-  { id: 'clientEmail', name: 'Client Email', nameEs: 'Email del Cliente', type: 'email', group: 'client', required: false, order: 8, archived: false, isLegacy: true },
-  { id: 'referenceUrl', name: 'Reference URL', nameEs: 'URL de Referencia', type: 'url', group: 'reference', required: false, order: 9, archived: false, isLegacy: true },
+  { id: 'courtLocation', name: 'Court Location', nameEs: 'Ubicación del Juzgado', type: 'text', group: 'legal', required: false, order: 4, archived: false, isLegacy: true, scope: 'org' },
+  { id: 'retainerPaid', name: 'Retainer Paid', nameEs: 'Anticipo Pagado', type: 'boolean', group: 'legal', required: false, order: 5, archived: false, isLegacy: true, scope: 'org' },
+  { id: 'clientName', name: 'Client Name', nameEs: 'Nombre del Cliente', type: 'text', group: 'client', required: false, order: 6, archived: false, isLegacy: true, scope: 'org' },
+  { id: 'clientPhone', name: 'Client Phone', nameEs: 'Teléfono del Cliente', type: 'phone', group: 'client', required: false, order: 7, archived: false, isLegacy: true, scope: 'org' },
+  { id: 'clientEmail', name: 'Client Email', nameEs: 'Email del Cliente', type: 'email', group: 'client', required: false, order: 8, archived: false, isLegacy: true, scope: 'org' },
+  { id: 'referenceUrl', name: 'Reference URL', nameEs: 'URL de Referencia', type: 'url', group: 'reference', required: false, order: 9, archived: false, isLegacy: true, scope: 'org' },
 ];
 
 const LEGACY_GROUPS: CustomFieldGroupDef[] = [
@@ -190,6 +197,29 @@ export async function archiveFieldDef(
 // Get active (non-archived) fields
 export function getActiveFields(fields: CustomFieldDef[]): CustomFieldDef[] {
   return fields.filter(f => !f.archived).sort((a, b) => a.order - b.order);
+}
+
+/**
+ * Get fields visible for a given context (space and/or list).
+ * Returns org-wide fields + fields scoped to the given space/list.
+ */
+export function getFieldsForContext(
+  fields: CustomFieldDef[],
+  context: { spaceId?: string; listId?: string },
+): CustomFieldDef[] {
+  return getActiveFields(fields).filter(f => {
+    // Org-wide fields are always visible
+    if (!f.scope || f.scope === 'org') return true;
+    // Space-scoped: visible if context matches
+    if (f.scope === 'space' && f.scopeId && context.spaceId) {
+      return f.scopeId === context.spaceId;
+    }
+    // List-scoped: visible if context matches
+    if (f.scope === 'list' && f.scopeId && context.listId) {
+      return f.scopeId === context.listId;
+    }
+    return false;
+  });
 }
 
 // Get fields by group

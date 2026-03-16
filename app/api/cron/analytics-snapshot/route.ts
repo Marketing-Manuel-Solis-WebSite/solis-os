@@ -9,8 +9,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

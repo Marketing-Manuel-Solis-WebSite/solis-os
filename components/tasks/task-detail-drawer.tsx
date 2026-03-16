@@ -7,7 +7,7 @@ import {
   ChevronDown, Download, ExternalLink, FileText,
   Image as ImageIcon, Video, Music, CheckSquare,
   Maximize2, Minimize2, GitBranch, Eye, MessageSquare,
-  Clock, User, Activity, Repeat,
+  Clock, User, Activity, Repeat, Sparkles,
 } from 'lucide-react';
 import { getTaskComments, addTaskComment, getTaskActivity, addTaskActivity } from '@/lib/db';
 import { uploadFile, isImageType, isVideoType, isAudioType, formatFileSize } from '@/lib/upload';
@@ -25,6 +25,12 @@ import { getFieldsByGroup } from '@/lib/custom-fields';
 import CustomFieldRenderer from './custom-field-renderer';
 import { useToast } from '@/components/notifications/toast-provider';
 import { validateCustomFieldValues } from '@/lib/validation';
+import { useFeatureFlag } from '@/lib/feature-flags';
+import { FeatureGate } from '@/components/shared/feature-gate';
+import AIDecomposePanel from './ai-decompose-panel';
+import AIAssigneeSuggestions from './ai-assignee-suggestions';
+import TaskGithubLinks from './task-github-links';
+import FavoriteButton from '@/components/shared/favorite-button';
 
 /* ============================================
    PROPS
@@ -82,6 +88,11 @@ export default function TaskDetailDrawer({
   const toast = useToast();
   const { activeFields, groups: fieldGroups } = useCustomFieldDefs();
 
+  // --- Feature flags for AI ---
+  const aiDecomposeEnabled = useFeatureFlag('ai-decompose-ui');
+  const aiWorkloadEnabled = useFeatureFlag('ai-workload-ui');
+  const favoritesEnabled = useFeatureFlag('favorites');
+
   // --- UI state ---
   const [expanded, setExpanded] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
@@ -99,6 +110,8 @@ export default function TaskDetailDrawer({
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const [mentionIds, setMentionIds] = useState<string[]>([]);
+  const [showAIDecompose, setShowAIDecompose] = useState(false);
+  const [showAIAssignee, setShowAIAssignee] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
   // --- Refs ---
@@ -349,12 +362,17 @@ export default function TaskDetailDrawer({
               </button>
             </div>
           ) : (
-            <h2
-              className={`text-[20px] font-bold text-[var(--text-primary)] ${canUpdate ? 'cursor-pointer hover:text-[var(--accent)]' : ''} transition`}
-              onClick={() => canUpdate && setEditTitle(true)}
-            >
-              {task.title}
-            </h2>
+            <div className="flex items-center gap-1">
+              <h2
+                className={`text-[20px] font-bold text-[var(--text-primary)] ${canUpdate ? 'cursor-pointer hover:text-[var(--accent)]' : ''} transition`}
+                onClick={() => canUpdate && setEditTitle(true)}
+              >
+                {task.title}
+              </h2>
+              {favoritesEnabled && (
+                <FavoriteButton entityType="task" entityId={task.id} entityTitle={task.title} userId={userId} />
+              )}
+            </div>
           )}
 
           {/* ===== 2. STATUS & PRIORITY ROW ===== */}
@@ -585,6 +603,34 @@ export default function TaskDetailDrawer({
                         </button>
                       );
                     })}
+                    {/* AI Suggest Assignees button */}
+                    {aiWorkloadEnabled && canUpdate && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowAIAssignee(!showAIAssignee)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition"
+                          title="AI Suggest Assignees"
+                          data-testid="ai-assignee-btn"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Suggest
+                        </button>
+                        {showAIAssignee && (
+                          <AIAssigneeSuggestions
+                            taskId={task.id}
+                            taskTitle={task.title}
+                            taskDescription={task.description}
+                            onSelectAssignee={(uid) => {
+                              const current = task.assignees || [];
+                              if (!current.includes(uid)) {
+                                onUpdate(task.id, 'assignees', [...current, uid], current);
+                              }
+                            }}
+                            onClose={() => setShowAIAssignee(false)}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -667,7 +713,31 @@ export default function TaskDetailDrawer({
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </button>
+                      {aiDecomposeEnabled && (
+                        <button
+                          onClick={() => setShowAIDecompose(!showAIDecompose)}
+                          className="px-3 h-10 rounded-xl bg-[var(--accent)]/10 text-sm text-[var(--accent)] hover:bg-[var(--accent)]/20 transition flex items-center gap-1.5"
+                          title="Decompose with AI"
+                          data-testid="ai-decompose-btn"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
+                  )}
+
+                  {/* AI Decompose Panel */}
+                  {showAIDecompose && aiDecomposeEnabled && (
+                    <AIDecomposePanel
+                      taskId={task.id}
+                      taskTitle={task.title}
+                      taskDescription={task.description}
+                      onAddSubtasks={(subtasks) => {
+                        const existing = task.subtasks || [];
+                        onUpdate(task.id, 'subtasks', [...existing, ...subtasks]);
+                      }}
+                      onClose={() => setShowAIDecompose(false)}
+                    />
                   )}
                 </motion.div>
               )}
@@ -1034,6 +1104,13 @@ export default function TaskDetailDrawer({
             </div>
           ) : null}
         </div>
+
+        {/* ===== GITHUB LINKS ===== */}
+        <FeatureGate flag="github-pr-linking">
+          <div className="px-6 py-3 border-t border-[var(--border-subtle)]">
+            <TaskGithubLinks taskId={task.id} canEdit={canUpdate} />
+          </div>
+        </FeatureGate>
 
         {/* ===== RELATED ITEMS ===== */}
         <div className="px-6 py-3 border-t border-[var(--border-subtle)]">

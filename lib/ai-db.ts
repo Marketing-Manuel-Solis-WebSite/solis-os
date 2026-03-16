@@ -3,8 +3,9 @@ import {
   getDocs, getDoc, query, where, orderBy, limit, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+
 
 export type AIMode = 'chat' | 'research' | 'deep';
 

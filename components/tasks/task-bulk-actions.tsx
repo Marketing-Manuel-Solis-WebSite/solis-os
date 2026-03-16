@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, ArrowRight, Flag, UserPlus, Calendar, FolderInput, Archive, List } from 'lucide-react';
@@ -132,7 +133,7 @@ export default function TaskBulkActions({
               className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-lg text-[13px] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-colors"
             >
               {m.photoURL ? (
-                <img src={m.photoURL} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+                <Image src={m.photoURL} alt="" width={20} height={20} className="w-5 h-5 rounded-full object-cover shrink-0" />
               ) : (
                 <div className="w-5 h-5 rounded-full bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-bold flex items-center justify-center shrink-0">
                   {(m.displayName || m.email || '?')[0].toUpperCase()}

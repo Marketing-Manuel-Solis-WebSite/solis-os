@@ -11,8 +11,9 @@ import { join } from 'path';
 import { homedir } from 'os';
 
 const DRY_RUN = process.argv.includes('--dry-run');
-const PROJECT_ID = 'solis-center';
-const ORG = 'solis-center';
+import { ORG_ID } from '../lib/org';
+const PROJECT_ID = ORG_ID;
+const ORG = ORG_ID;
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
 // Read Firebase CLI credentials

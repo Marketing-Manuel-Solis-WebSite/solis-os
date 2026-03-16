@@ -124,3 +124,16 @@ export function isAdmin(role: Role): boolean {
 export function isManager(role: Role): boolean {
   return isAdmin(role) || role === 'manager';
 }
+
+export function isGuest(role: Role): boolean {
+  return role === 'guest';
+}
+
+export function isReadonly(role: Role): boolean {
+  return role === 'readonly';
+}
+
+/** Returns true if the role has at least member-level access (not guest/readonly) */
+export function isFullMember(role: Role): boolean {
+  return !isGuest(role) && !isReadonly(role);
+}

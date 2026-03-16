@@ -6,8 +6,9 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { validateCustomFieldValues, loadFieldDefs } from './custom-fields';
+import { getCurrentOrgId, ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+
 
 // ===== GENERIC HELPERS =====
 
@@ -396,6 +397,8 @@ export interface ListData {
   name: string;
   position: number;
   defaultStatus?: string;
+  visibility?: 'inherited' | 'private';
+  members?: string[];
   createdBy: string;
   createdAt?: any;
   updatedAt?: any;
@@ -578,6 +581,21 @@ export async function getTaskComments(taskId: string, maxResults = 200) {
 export async function addTaskComment(taskId: string, data: { text: string; authorId: string; authorName: string; mentions?: string[]; attachments?: any[] }) {
   return addTo(`tasks/${taskId}/comments`, { ...data, mentions: data.mentions || [], attachments: data.attachments || [] });
 }
+// ===== DOC COMMENTS =====
+export async function getDocComments(docId: string, maxResults = 200) {
+  const q = query(collection(db, `docs/${docId}/comments`), orderBy('createdAt', 'asc'), limit(maxResults + 1));
+  const s = await getDocs(q);
+  const hasMore = s.docs.length > maxResults;
+  const docs = hasMore ? s.docs.slice(0, maxResults) : s.docs;
+  return { items: docs.map(d => ({ id: d.id, ...d.data() })), hasMore };
+}
+export async function addDocComment(docId: string, data: { text: string; authorId: string; authorName: string; mentions?: string[] }) {
+  return addTo(`docs/${docId}/comments`, { ...data, mentions: data.mentions || [] });
+}
+export async function deleteDocComment(docId: string, commentId: string) {
+  return deleteAt(`docs/${docId}/comments/${commentId}`);
+}
+
 export async function getCustomFieldDefs() {
   const data = await getOne(`orgs/${ORG}/settings/customFields`);
   return (data as any)?.fields || [];
@@ -597,8 +615,25 @@ export async function addTaskActivity(taskId: string, data: { action: string; fi
 }
 
 // ===== DOCS =====
-export async function getDocuments(teamId?: string, maxResults = 500) { if (teamId) return getByTeam('docs', teamId, maxResults); return getByOrg('docs', maxResults); }
-export async function createDocument(data: any) { return addTo('docs', { ...data, orgId: ORG, content: data.content || '', teamId: data.teamId || '', spaceId: data.spaceId || null, folderId: data.folderId || null }); }
+export async function getDocuments(teamId?: string, maxResults = 500, parentDocId?: string | null) {
+  if (typeof parentDocId === 'string' || parentDocId === null) {
+    // Filter by parentDocId: null = top-level docs, string = children of that doc
+    const constraints: any[] = [where('orgId', '==', ORG)];
+    if (teamId && teamId !== '__all__') constraints.push(where('teamId', '==', teamId));
+    constraints.push(where('parentDocId', '==', parentDocId));
+    constraints.push(limit(maxResults + 1));
+    const q = query(collection(db, 'docs'), ...constraints);
+    const s = await getDocs(q);
+    const hasMore = s.docs.length > maxResults;
+    const docs = hasMore ? s.docs.slice(0, maxResults) : s.docs;
+    const items = docs.map(d => ({ id: d.id, ...d.data() }));
+    items.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    return { items, hasMore };
+  }
+  if (teamId) return getByTeam('docs', teamId, maxResults);
+  return getByOrg('docs', maxResults);
+}
+export async function createDocument(data: any) { return addTo('docs', { ...data, orgId: ORG, content: data.content || '', teamId: data.teamId || '', spaceId: data.spaceId || null, folderId: data.folderId || null, parentDocId: data.parentDocId ?? null }); }
 
 export async function getDocsBySpace(spaceId: string, maxResults = 200): Promise<{ items: any[]; hasMore: boolean }> {
   const q = query(
@@ -1101,6 +1136,7 @@ export async function createGoal(data: any) {
     visibility: data.visibility || 'team',
     createdBy: data.createdBy || '',
     createdByName: data.createdByName || '',
+    parentGoalId: data.parentGoalId || null,
   });
 }
 
@@ -1142,23 +1178,75 @@ export async function deleteGoalTarget(goalId: string, targetId: string) {
   await recalculateGoalProgress(goalId);
 }
 
-// Recalculate goal progress from targets
+// Recalculate goal progress from targets + child goals
 export async function recalculateGoalProgress(goalId: string) {
   const targets = await getGoalTargets(goalId);
-  if (targets.length === 0) {
+  const children = await getChildGoals(goalId);
+
+  // Collect progress sources: own targets + child goals
+  const sources: number[] = [];
+
+  for (const t of targets) {
+    const target = t as any;
+    const tv = Math.max(target.targetValue || 1, 1);
+    const cv = Math.min(Math.max(target.currentValue || 0, 0), tv);
+    sources.push((cv / tv) * 100);
+  }
+
+  for (const child of children) {
+    sources.push((child as any).progress ?? 0);
+  }
+
+  if (sources.length === 0) {
     await updateAt(`goals/${goalId}`, { progress: 0 });
     return 0;
   }
-  let totalProgress = 0;
+
+  const progress = Math.round(sources.reduce((a, b) => a + b, 0) / sources.length);
+  await updateAt(`goals/${goalId}`, { progress });
+
+  return progress;
+}
+
+/** Get all child goals of a parent goal. */
+export async function getChildGoals(parentGoalId: string) {
+  const q = query(
+    collection(db, `orgs/${ORG}/goals`),
+    where('parentGoalId', '==', parentGoalId),
+    orderBy('createdAt', 'asc'),
+  );
+  const s = await getDocs(q);
+  return s.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Cascade progress recalculation from a child goal up to its ancestors.
+ * Max depth = 10 to prevent infinite loops from circular references.
+ */
+export async function cascadeProgressToParent(goalId: string, _depth = 0) {
+  if (_depth >= 10) return; // safety guard
+  const goal = await getOne(`goals/${goalId}`);
+  if (!goal || !(goal as any).parentGoalId) return;
+  const parentId = (goal as any).parentGoalId;
+
+  // Recalculate the parent's progress from its targets + children
+  const targets = await getGoalTargets(parentId);
+  const children = await getChildGoals(parentId);
+  const sources: number[] = [];
   for (const t of targets) {
     const target = t as any;
-    const tv = Math.max(target.targetValue || 1, 1); // Guard: never divide by zero
+    const tv = Math.max(target.targetValue || 1, 1);
     const cv = Math.min(Math.max(target.currentValue || 0, 0), tv);
-    totalProgress += (cv / tv) * 100;
+    sources.push((cv / tv) * 100);
   }
-  const progress = Math.round(totalProgress / targets.length);
-  await updateAt(`goals/${goalId}`, { progress });
-  return progress;
+  for (const child of children) {
+    sources.push((child as any).progress ?? 0);
+  }
+  const progress = sources.length ? Math.round(sources.reduce((a, b) => a + b, 0) / sources.length) : 0;
+  await updateAt(`goals/${parentId}`, { progress });
+
+  // Continue cascading upward
+  await cascadeProgressToParent(parentId, _depth + 1);
 }
 
 // Sync goal targets when a task status changes
@@ -1509,6 +1597,204 @@ export async function updateFormMapping(formId: string, mappingId: string, data:
 
 export async function deleteFormMapping(formId: string, mappingId: string) {
   return deleteAt(`forms/${formId}/mappings/${mappingId}`);
+}
+
+// ===========================================================
+// CHAT THREADS
+// ===========================================================
+// Thread replies are stored as regular messages with a `threadId`
+// field pointing to the parent message ID. The parent message
+// tracks replyCount and lastReplyAt for UI display.
+
+export async function sendThreadReply(
+  channelId: string,
+  parentMessageId: string,
+  data: Partial<MessageData>,
+) {
+  // Create the reply message with threadId
+  const msg = await addTo(`channels/${channelId}/messages`, {
+    content: data.content || '',
+    userId: data.userId || '',
+    displayName: data.displayName || '',
+    photoURL: data.photoURL || '',
+    type: data.type || 'text',
+    threadId: parentMessageId,
+    replyTo: null,
+    replyPreview: null,
+    replyAuthor: null,
+    reactions: {},
+    pinned: false,
+    edited: false,
+    deleted: false,
+    mentions: data.mentions || [],
+    attachments: data.attachments || [],
+    readBy: [data.userId],
+  });
+
+  // Update parent message with thread metadata
+  const parentRef = doc(db, `channels/${channelId}/messages/${parentMessageId}`);
+  await runTransaction(db, async (transaction) => {
+    const parentSnap = await transaction.get(parentRef);
+    if (!parentSnap.exists()) return;
+    const parentData = parentSnap.data();
+    transaction.update(parentRef, {
+      replyCount: (parentData.replyCount || 0) + 1,
+      lastReplyAt: serverTimestamp(),
+      lastReplyBy: data.displayName || '',
+    });
+  });
+
+  // Update channel last message
+  const preview = (data.content || '').slice(0, 60);
+  await updateAt(`channels/${channelId}`, {
+    lastMessageAt: serverTimestamp(),
+    lastMessagePreview: `🧵 ${preview}`,
+    lastMessageBy: data.displayName || '',
+  });
+
+  return msg;
+}
+
+export function getThreadReplies(channelId: string, parentMessageId: string, maxResults = 100) {
+  const q = query(
+    collection(db, `channels/${channelId}/messages`),
+    where('threadId', '==', parentMessageId),
+    orderBy('createdAt', 'asc'),
+    limit(maxResults),
+  );
+  return getDocs(q).then(snap =>
+    snap.docs.map(d => ({ id: d.id, ...d.data() })),
+  );
+}
+
+export function onThreadRepliesSnapshot(
+  channelId: string,
+  parentMessageId: string,
+  callback: (replies: any[]) => void,
+  maxResults = 100,
+) {
+  const q = query(
+    collection(db, `channels/${channelId}/messages`),
+    where('threadId', '==', parentMessageId),
+    orderBy('createdAt', 'asc'),
+    limit(maxResults),
+  );
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }, () => callback([]));
+}
+
+// ===========================================================
+// CHAT UNREAD HELPERS
+// ===========================================================
+
+/**
+ * Compute which channels have unread messages.
+ * Pure function — works with data already fetched by the chat page.
+ *
+ * @param channels — array of { id, lastMessageAt } channel docs
+ * @param readCursors — Record<channelId, Timestamp> from onReadCursorsSnapshot
+ * @param currentUserId — exclude channels created solely by the current user
+ * @returns Record<channelId, boolean> — true if channel has unread messages
+ */
+export function computeUnreadChannels(
+  channels: { id: string; lastMessageAt?: any; lastMessageBy?: string }[],
+  readCursors: Record<string, any>,
+  currentUserId?: string,
+): Record<string, boolean> {
+  const result: Record<string, boolean> = {};
+  for (const ch of channels) {
+    const lastMsg = ch.lastMessageAt?.seconds || ch.lastMessageAt?.toMillis?.() || 0;
+    const cursor = readCursors[ch.id]?.seconds || readCursors[ch.id]?.toMillis?.() || 0;
+    if (!lastMsg) { result[ch.id] = false; continue; }
+    // If the last message was by the current user, it's "read"
+    if (currentUserId && ch.lastMessageBy === currentUserId) {
+      result[ch.id] = false;
+      continue;
+    }
+    result[ch.id] = lastMsg > cursor;
+  }
+  return result;
+}
+
+// ===========================================================
+// CHAT BOOKMARKS
+// ===========================================================
+
+export async function bookmarkMessage(
+  userId: string,
+  channelId: string,
+  messageId: string,
+  preview: string,
+  channelName: string,
+) {
+  return addDoc(collection(db, `orgs/${ORG}/members/${userId}/bookmarks`), {
+    channelId,
+    messageId,
+    preview: preview.slice(0, 200),
+    channelName,
+    createdAt: serverTimestamp(),
+  });
+}
+
+export async function getBookmarks(userId: string, maxResults = 100) {
+  const q = query(
+    collection(db, `orgs/${ORG}/members/${userId}/bookmarks`),
+    orderBy('createdAt', 'desc'),
+    limit(maxResults),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function removeBookmark(userId: string, bookmarkId: string) {
+  return deleteAt(`orgs/${ORG}/members/${userId}/bookmarks/${bookmarkId}`);
+}
+
+export function onBookmarksSnapshot(
+  userId: string,
+  callback: (bookmarks: any[]) => void,
+  maxResults = 100,
+) {
+  const q = query(
+    collection(db, `orgs/${ORG}/members/${userId}/bookmarks`),
+    orderBy('createdAt', 'desc'),
+    limit(maxResults),
+  );
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }, () => callback([]));
+}
+
+// ===========================================================
+// CHAT MESSAGE SEARCH
+// ===========================================================
+// Firestore has no native full-text search. This function
+// loads recent messages from a channel and filters client-side.
+// For production, consider Algolia/Typesense for server-side search.
+
+export async function searchMessagesInChannel(
+  channelId: string,
+  searchText: string,
+  maxResults = 50,
+): Promise<any[]> {
+  if (!searchText.trim()) return [];
+  const lower = searchText.toLowerCase();
+  const q = query(
+    collection(db, `channels/${channelId}/messages`),
+    where('deleted', '==', false),
+    orderBy('createdAt', 'desc'),
+    limit(500), // Scan last 500 messages
+  );
+  const snap = await getDocs(q);
+  const matches = snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .filter((m: any) =>
+      m.content?.toLowerCase().includes(lower) ||
+      m.displayName?.toLowerCase().includes(lower),
+    )
+    .slice(0, maxResults);
+  return matches;
 }
 
 export { ORG, serverTimestamp };

@@ -14,8 +14,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { notifyUserAdmin } from '@/lib/notify-admin';
+import { ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+
 
 export async function GET(req: NextRequest) {
   // Auth: verify CRON_SECRET

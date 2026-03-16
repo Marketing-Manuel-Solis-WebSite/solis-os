@@ -7,8 +7,9 @@ import {
   serverTimestamp, increment,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+
 const USAGE_COL = `orgs/${ORG}/ai-usage`;
 const LOG_COL = `orgs/${ORG}/ai-logs`;
 

@@ -9,13 +9,15 @@
 import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
+import { ORG_ID } from '../lib/org';
+
 const DRY_RUN = process.argv.includes('--dry-run');
-const ORG = 'solis-center';
+const ORG = ORG_ID;
 
 // Initialize with Application Default Credentials
 initializeApp({
   credential: applicationDefault(),
-  projectId: 'solis-center',
+  projectId: ORG_ID,
 });
 const db = getFirestore();
 

@@ -1,23 +1,41 @@
 'use client';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, lazy, Suspense } from 'react';
 import {
   Save, ArrowLeft, Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   List, ListOrdered, Heading1, Heading2, Heading3, Quote, Code,
   Minus, Link, Image, Eye, Edit2, Sparkles, Clock,
   Lock, Globe, Users, X, Download, Type, Undo2, Redo2,
   Maximize2, Minimize2, Table, CheckSquare, FileText, Upload, FileDown,
+  MessageSquareText,
 } from 'lucide-react';
 import { renderMarkdown } from '@/lib/markdown';
 import { uploadFile, isImageType, formatFileSize } from '@/lib/upload';
 import { useToast } from '@/components/notifications/toast-provider';
 import { useI18n } from '@/lib/i18n';
+import { useFeatureFlag } from '@/lib/feature-flags';
 import EntityRelations from '@/components/shared/entity-relations';
+import DocCommentSection from './doc-comment-section';
+import InlineCommentSidebar from './inline-comment-sidebar';
+import {
+  getInlineComments,
+  addInlineComment,
+  resolveInlineComment,
+  addInlineCommentReply,
+  type InlineComment,
+} from '@/lib/inline-comments';
+import DocBreadcrumbs from './doc-breadcrumbs';
+import AIWritingToolbar from './ai-writing-toolbar';
+import FavoriteButton from '@/components/shared/favorite-button';
+
+// Lazy-load TipTap editor (heavy deps: tiptap + yjs)
+const TiptapEditor = lazy(() => import('./tiptap-editor'));
 
 interface DocEditorProps {
   doc: any;
   members: any[];
   isAdmin: boolean;
   userId: string;
+  userName?: string;
   onSave: (id: string, data: any) => Promise<void>;
   onDelete: (doc: any) => void;
   onBack: () => void;
@@ -25,6 +43,10 @@ interface DocEditorProps {
   showAI: boolean;
   onToggleVersions?: () => void;
   showVersions?: boolean;
+  /** All docs in the workspace — used for breadcrumb navigation in nested pages */
+  allDocs?: any[];
+  /** Navigate to a different doc (used by breadcrumbs) */
+  onNavigateDoc?: (docId: string) => void;
 }
 
 // ========== TOOLBAR BUTTON ==========
@@ -44,10 +66,18 @@ function TSep() {
 }
 
 // ========== MAIN EDITOR ==========
-export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDelete, onBack, onToggleAI, showAI, onToggleVersions, showVersions }: DocEditorProps) {
+export default function DocEditor({ doc, members, isAdmin, userId, userName = '', onSave, onDelete, onBack, onToggleAI, showAI, onToggleVersions, showVersions, allDocs, onNavigateDoc }: DocEditorProps) {
   const toast = useToast();
   const { t } = useI18n();
+  const useTiptap = useFeatureFlag('tiptap-editor');
+  const commentsEnabled = useFeatureFlag('doc-comments');
+  const inlineCommentsEnabled = useFeatureFlag('inline-comments');
+  const nestedPagesEnabled = useFeatureFlag('nested-pages');
+  const aiWritingEnabled = useFeatureFlag('ai-writing-ui');
+  const favoritesEnabled = useFeatureFlag('favorites');
   const [content, setContent] = useState(doc.content || '');
+  const [showAIWriting, setShowAIWriting] = useState(false);
+  const [aiSelectedText, setAiSelectedText] = useState('');
   const [title, setTitle] = useState(doc.title || '');
   const [mode, setMode] = useState<'edit' | 'preview' | 'split'>('edit');
   const [saving, setSaving] = useState(false);
@@ -71,6 +101,10 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
 
   // Download menu
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+
+  // Inline comments state
+  const [inlineComments, setInlineComments] = useState<InlineComment[]>([]);
+  const [showInlineComments, setShowInlineComments] = useState(false);
 
   // Sync doc changes
   useEffect(() => {
@@ -126,6 +160,61 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
     return () => window.removeEventListener('click', close);
   }, [showDownloadMenu]);
 
+  // ========== INLINE COMMENTS ==========
+  const loadInlineComments = useCallback(async () => {
+    if (!inlineCommentsEnabled || !doc.id) return;
+    try {
+      const items = await getInlineComments(doc.id);
+      setInlineComments(items);
+    } catch {
+      setInlineComments([]);
+    }
+  }, [doc.id, inlineCommentsEnabled]);
+
+  useEffect(() => {
+    if (inlineCommentsEnabled) loadInlineComments();
+  }, [inlineCommentsEnabled, loadInlineComments]);
+
+  const handleAddInlineComment = useCallback(async (from: number, to: number, quotedText: string) => {
+    const text = prompt('Add a comment:');
+    if (!text?.trim()) return;
+    try {
+      await addInlineComment(doc.id, {
+        docId: doc.id,
+        text: text.trim(),
+        authorId: userId,
+        authorName: userName,
+        textAnchor: { from, to, quotedText },
+      });
+      setShowInlineComments(true);
+      loadInlineComments();
+    } catch {
+      toast.error('Failed to add comment');
+    }
+  }, [doc.id, userId, userName, loadInlineComments, toast]);
+
+  const handleResolveInlineComment = useCallback(async (commentId: string, resolved: boolean) => {
+    try {
+      await resolveInlineComment(doc.id, commentId, resolved);
+      loadInlineComments();
+    } catch {
+      toast.error('Failed to update comment');
+    }
+  }, [doc.id, loadInlineComments, toast]);
+
+  const handleReplyInlineComment = useCallback(async (commentId: string, text: string) => {
+    try {
+      await addInlineCommentReply(doc.id, commentId, {
+        text,
+        authorId: userId,
+        authorName: userName,
+      });
+      loadInlineComments();
+    } catch {
+      toast.error('Failed to add reply');
+    }
+  }, [doc.id, userId, userName, loadInlineComments, toast]);
+
   const pushUndo = useCallback((val: string) => {
     setUndoStack(prev => [...prev.slice(-50), val]);
     setRedoStack([]);
@@ -161,7 +250,7 @@ export default function DocEditor({ doc, members, isAdmin, userId, onSave, onDel
       await onSave(doc.id, {
         title,
         content,
-        contentHtml: renderMarkdown(content),
+        contentHtml: useTiptap ? content : renderMarkdown(content),
         visibility,
         category: category.trim(),
         tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
@@ -364,6 +453,21 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
         onChange={(e) => { handleImageUpload(e.target.files); e.target.value = ''; }}
       />
 
+      {/* Breadcrumbs for nested pages */}
+      {nestedPagesEnabled && allDocs && onNavigateDoc && doc.parentDocId && (
+        <DocBreadcrumbs
+          currentDoc={doc}
+          allDocs={allDocs}
+          onNavigate={(docId) => {
+            if (docId === '__root__') {
+              onBack();
+            } else {
+              onNavigateDoc(docId);
+            }
+          }}
+        />
+      )}
+
       {/* Top Bar */}
       <div className="flex items-center gap-3 px-4 py-2.5 bg-[var(--bg-base)] shrink-0">
         <button onClick={onBack} className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition">
@@ -373,6 +477,10 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
         <input value={title} onChange={e => { setTitle(e.target.value); setDirty(true); }}
           className="flex-1 bg-transparent text-lg font-bold text-[var(--text-primary)] border-none outline-none placeholder:text-[var(--text-muted)]"
           placeholder={t('docEditor.untitledDoc')} />
+
+        {favoritesEnabled && (
+          <FavoriteButton entityType="doc" entityId={doc.id} entityTitle={title} userId={userId} />
+        )}
 
         <div className="flex items-center gap-1.5">
           {dirty && <span className="text-[12px] text-amber-400 px-2 py-0.5 rounded-full bg-amber-500/10">{t('docEditor.unsaved')}</span>}
@@ -404,6 +512,33 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
             title="AI Assistant">
             <Sparkles className="h-4 w-4" />
           </button>
+
+          {aiWritingEnabled && useTiptap && (
+            <button
+              onClick={() => {
+                setAiSelectedText(content);
+                setShowAIWriting(!showAIWriting);
+              }}
+              className={`p-2 rounded-lg transition ${showAIWriting ? 'bg-purple-500/10 text-purple-400' : 'text-[var(--text-muted)] hover:text-purple-400 hover:bg-purple-500/10'}`}
+              title="AI Writing"
+              data-testid="ai-writing-btn"
+            >
+              <Type className="h-4 w-4" />
+            </button>
+          )}
+
+          {inlineCommentsEnabled && useTiptap && (
+            <button onClick={() => setShowInlineComments(!showInlineComments)}
+              className={`p-2 rounded-lg transition relative ${showInlineComments ? 'bg-amber-500/10 text-amber-400' : 'text-[var(--text-muted)] hover:text-amber-400 hover:bg-amber-500/10'}`}
+              title="Inline Comments">
+              <MessageSquareText className="h-4 w-4" />
+              {inlineComments.filter(c => !c.resolved).length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-500 text-[10px] text-white font-bold flex items-center justify-center">
+                  {inlineComments.filter(c => !c.resolved).length}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* Download dropdown */}
           <div className="relative">
@@ -480,8 +615,8 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-0.5 px-4 py-1.5 bg-[var(--bg-base)] flex-wrap shrink-0">
+      {/* Toolbar (hidden in TipTap mode — TipTap has its own) */}
+      {!useTiptap && <div className="flex items-center gap-0.5 px-4 py-1.5 bg-[var(--bg-base)] flex-wrap shrink-0">
         <TBtn icon={Undo2} label="Undo (Ctrl+Z)" onClick={undo} disabled={undoStack.length === 0} />
         <TBtn icon={Redo2} label="Redo (Ctrl+Shift+Z)" onClick={redo} disabled={redoStack.length === 0} />
         <TSep />
@@ -505,6 +640,31 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
         <TSep />
         <TBtn icon={Link} label="Link" onClick={() => insertFormat('[', '](url)')} />
         <TBtn icon={Image} label="Upload Image" onClick={() => fileInputRef.current?.click()} />
+        {aiWritingEnabled && (
+          <>
+            <TSep />
+            <button
+              onClick={() => {
+                const el = editorRef.current;
+                if (el) {
+                  const sel = content.slice(el.selectionStart, el.selectionEnd);
+                  setAiSelectedText(sel || content);
+                }
+                setShowAIWriting(!showAIWriting);
+              }}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[12px] font-medium transition ${
+                showAIWriting
+                  ? 'bg-[var(--accent-subtle)] text-[var(--accent)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10'
+              }`}
+              title="AI Writing Assistant"
+              data-testid="ai-writing-btn"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              AI
+            </button>
+          </>
+        )}
 
         <div className="flex-1" />
 
@@ -520,89 +680,177 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
             <Eye className="h-3 w-3" />
           </button>
         </div>
-      </div>
+      </div>}
+
+      {/* AI Writing Toolbar (floating) */}
+      {aiWritingEnabled && showAIWriting && (
+        <div className="px-4 py-2 shrink-0">
+          <AIWritingToolbar
+            selectedText={aiSelectedText || content}
+            docId={doc.id}
+            onInsert={(text) => {
+              if (useTiptap) {
+                // For TipTap, append to content
+                setContent(prev => prev + '\n' + text);
+                setDirty(true);
+              } else {
+                // For markdown, insert at cursor
+                const el = editorRef.current;
+                if (el) {
+                  const pos = el.selectionEnd;
+                  const before = content.slice(0, pos);
+                  const after = content.slice(pos);
+                  pushUndo(content);
+                  setContent(before + '\n' + text + after);
+                  setDirty(true);
+                } else {
+                  pushUndo(content);
+                  setContent(prev => prev + '\n' + text);
+                  setDirty(true);
+                }
+              }
+            }}
+            onReplace={(text) => {
+              if (!useTiptap && editorRef.current) {
+                const el = editorRef.current;
+                const start = el.selectionStart;
+                const end = el.selectionEnd;
+                if (start !== end) {
+                  const before = content.slice(0, start);
+                  const after = content.slice(end);
+                  pushUndo(content);
+                  setContent(before + text + after);
+                  setDirty(true);
+                  return;
+                }
+              }
+              // Full replace
+              pushUndo(content);
+              setContent(text);
+              setDirty(true);
+            }}
+            onClose={() => setShowAIWriting(false)}
+          />
+        </div>
+      )}
 
       {/* Editor / Preview area */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Drag-and-drop overlay */}
-        {dragOver && (
-          <div className="absolute inset-0 z-10 bg-[var(--accent)]/5 border-2 border-dashed border-[var(--accent)]/40 rounded-xl flex items-center justify-center pointer-events-none">
-            <div className="text-center">
-              <Upload className="h-8 w-8 text-[var(--accent)] mx-auto mb-2" />
-              <p className="text-sm text-[var(--accent)] font-semibold">{t('docEditor.dropImageHere')}</p>
-              <p className="text-sm text-[var(--text-muted)] mt-1">{t('docEditor.maxImageSize')}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Editor */}
-        {(mode === 'edit' || mode === 'split') && (
-          <div className={`${mode === 'split' ? 'w-1/2' : 'w-full'} flex flex-col`}
-            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={e => { e.preventDefault(); setDragOver(false); handleImageUpload(e.dataTransfer.files); }}
-          >
-            <textarea
-              ref={editorRef}
-              value={content}
-              onChange={e => handleContentChange(e.target.value)}
-              placeholder="Start writing... Use markdown for formatting.&#10;&#10;# Heading 1&#10;## Heading 2&#10;### Heading 3&#10;&#10;**bold** *italic* ~~strikethrough~~&#10;&#10;- Bullet list&#10;- [ ] Checklist&#10;&#10;> Blockquote&#10;&#10;| Table | Header |&#10;|-------|--------|&#10;| Cell  | Cell   |&#10;&#10;Drag & drop images or click the image button to upload."
-              className="flex-1 w-full bg-transparent text-gray-200 resize-none outline-none p-6 font-mono text-sm leading-relaxed placeholder:text-[var(--text-muted)]/60"
-              style={{ tabSize: 2 }}
-              spellCheck
-              onKeyDown={e => {
-                if (e.key === 'Tab') {
-                  e.preventDefault();
-                  const el = editorRef.current!;
-                  const start = el.selectionStart;
-                  const before = content.slice(0, start);
-                  const after = content.slice(start);
-                  pushUndo(content);
-                  setContent(before + '  ' + after);
-                  setDirty(true);
-                  setTimeout(() => { el.selectionStart = el.selectionEnd = start + 2; }, 0);
-                }
-                if (e.key === 'Enter') {
-                  const el = editorRef.current!;
-                  const pos = el.selectionStart;
-                  const lineStart = content.lastIndexOf('\n', pos - 1) + 1;
-                  const line = content.slice(lineStart, pos);
-                  const listMatch = line.match(/^(\s*)([-*]|\d+\.)\s/);
-                  const checkMatch = line.match(/^(\s*)- \[[ x]\]\s/);
-                  if (checkMatch) {
-                    e.preventDefault();
-                    const prefix = `\n${checkMatch[1]}- [ ] `;
-                    const before = content.slice(0, pos);
-                    const after = content.slice(pos);
-                    pushUndo(content);
-                    setContent(before + prefix + after);
-                    setDirty(true);
-                    setTimeout(() => { el.selectionStart = el.selectionEnd = pos + prefix.length; }, 0);
-                  } else if (listMatch) {
-                    e.preventDefault();
-                    const num = listMatch[2].match(/\d+/);
-                    const prefix = num ? `\n${listMatch[1]}${parseInt(num[0]) + 1}. ` : `\n${listMatch[1]}${listMatch[2]} `;
-                    const before = content.slice(0, pos);
-                    const after = content.slice(pos);
-                    pushUndo(content);
-                    setContent(before + prefix + after);
-                    setDirty(true);
-                    setTimeout(() => { el.selectionStart = el.selectionEnd = pos + prefix.length; }, 0);
-                  }
-                }
+      {useTiptap ? (
+        /* ─── TipTap WYSIWYG mode ─── */
+        <div className="flex-1 flex overflow-hidden">
+          <Suspense fallback={<div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm">Loading editor...</div>}>
+            <TiptapEditor
+              docId={doc.id}
+              initialContent={doc.contentHtml || renderMarkdown(doc.content || '')}
+              userId={userId}
+              userName={userName}
+              onUpdate={(html) => {
+                setContent(html);
+                setDirty(true);
               }}
+              onAddComment={inlineCommentsEnabled ? handleAddInlineComment : undefined}
             />
-          </div>
-        )}
+          </Suspense>
+          {inlineCommentsEnabled && showInlineComments && (
+            <InlineCommentSidebar
+              docId={doc.id}
+              comments={inlineComments}
+              onResolve={handleResolveInlineComment}
+              onReply={handleReplyInlineComment}
+              onRefresh={loadInlineComments}
+            />
+          )}
+        </div>
+      ) : (
+        /* ─── Classic markdown textarea mode ─── */
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Drag-and-drop overlay */}
+          {dragOver && (
+            <div className="absolute inset-0 z-10 bg-[var(--accent)]/5 border-2 border-dashed border-[var(--accent)]/40 rounded-xl flex items-center justify-center pointer-events-none">
+              <div className="text-center">
+                <Upload className="h-8 w-8 text-[var(--accent)] mx-auto mb-2" />
+                <p className="text-sm text-[var(--accent)] font-semibold">{t('docEditor.dropImageHere')}</p>
+                <p className="text-sm text-[var(--text-muted)] mt-1">{t('docEditor.maxImageSize')}</p>
+              </div>
+            </div>
+          )}
 
-        {/* Preview */}
-        {(mode === 'preview' || mode === 'split') && (
-          <div className={`${mode === 'split' ? 'w-1/2' : 'w-full'} overflow-y-auto`}>
-            <div className="doc-preview p-6 max-w-3xl mx-auto"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />
-          </div>
-        )}
-      </div>
+          {/* Editor */}
+          {(mode === 'edit' || mode === 'split') && (
+            <div className={`${mode === 'split' ? 'w-1/2' : 'w-full'} flex flex-col`}
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => { e.preventDefault(); setDragOver(false); handleImageUpload(e.dataTransfer.files); }}
+            >
+              <textarea
+                ref={editorRef}
+                value={content}
+                onChange={e => handleContentChange(e.target.value)}
+                placeholder="Start writing... Use markdown for formatting.&#10;&#10;# Heading 1&#10;## Heading 2&#10;### Heading 3&#10;&#10;**bold** *italic* ~~strikethrough~~&#10;&#10;- Bullet list&#10;- [ ] Checklist&#10;&#10;> Blockquote&#10;&#10;| Table | Header |&#10;|-------|--------|&#10;| Cell  | Cell   |&#10;&#10;Drag & drop images or click the image button to upload."
+                className="flex-1 w-full bg-transparent text-gray-200 resize-none outline-none p-6 font-mono text-sm leading-relaxed placeholder:text-[var(--text-muted)]/60"
+                style={{ tabSize: 2 }}
+                spellCheck
+                onKeyDown={e => {
+                  if (e.key === 'Tab') {
+                    e.preventDefault();
+                    const el = editorRef.current!;
+                    const start = el.selectionStart;
+                    const before = content.slice(0, start);
+                    const after = content.slice(start);
+                    pushUndo(content);
+                    setContent(before + '  ' + after);
+                    setDirty(true);
+                    setTimeout(() => { el.selectionStart = el.selectionEnd = start + 2; }, 0);
+                  }
+                  if (e.key === 'Enter') {
+                    const el = editorRef.current!;
+                    const pos = el.selectionStart;
+                    const lineStart = content.lastIndexOf('\n', pos - 1) + 1;
+                    const line = content.slice(lineStart, pos);
+                    const listMatch = line.match(/^(\s*)([-*]|\d+\.)\s/);
+                    const checkMatch = line.match(/^(\s*)- \[[ x]\]\s/);
+                    if (checkMatch) {
+                      e.preventDefault();
+                      const prefix = `\n${checkMatch[1]}- [ ] `;
+                      const before = content.slice(0, pos);
+                      const after = content.slice(pos);
+                      pushUndo(content);
+                      setContent(before + prefix + after);
+                      setDirty(true);
+                      setTimeout(() => { el.selectionStart = el.selectionEnd = pos + prefix.length; }, 0);
+                    } else if (listMatch) {
+                      e.preventDefault();
+                      const num = listMatch[2].match(/\d+/);
+                      const prefix = num ? `\n${listMatch[1]}${parseInt(num[0]) + 1}. ` : `\n${listMatch[1]}${listMatch[2]} `;
+                      const before = content.slice(0, pos);
+                      const after = content.slice(pos);
+                      pushUndo(content);
+                      setContent(before + prefix + after);
+                      setDirty(true);
+                      setTimeout(() => { el.selectionStart = el.selectionEnd = pos + prefix.length; }, 0);
+                    }
+                  }
+                }}
+              />
+            </div>
+          )}
+
+          {/* Preview */}
+          {(mode === 'preview' || mode === 'split') && (
+            <div className={`${mode === 'split' ? 'w-1/2' : 'w-full'} overflow-y-auto`}>
+              <div className="doc-preview p-6 max-w-3xl mx-auto"
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Comments section (feature-flagged) */}
+      {commentsEnabled && (
+        <div className="px-6 py-2 border-t border-[var(--border-subtle)] bg-[var(--bg-base)] shrink-0 max-h-[40%] overflow-y-auto">
+          <DocCommentSection docId={doc.id} />
+        </div>
+      )}
 
       {/* Status Bar */}
       <div className="flex items-center justify-between px-4 py-1.5 bg-[var(--bg-base)] text-[12px] text-[var(--text-muted)] shrink-0">

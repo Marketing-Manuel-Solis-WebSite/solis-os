@@ -1,13 +1,15 @@
 'use client';
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { Lock } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useToast } from '@/components/notifications/toast-provider';
+import { useFeatureFlag } from '@/lib/feature-flags';
 import {
   createTask, updateTask, softDeleteTask,
   getUserPreferences, saveUserPreferences,
   getSharedSpaceViews, saveSharedSpaceViews,
-  getLists, createList,
+  getLists, createList, updateList,
   type ListData,
 } from '@/lib/db';
 import {
@@ -15,16 +17,18 @@ import {
   afterTaskBulkUpdated, afterTaskBulkDeleted,
 } from '@/lib/task-side-effects';
 import { AnimatePresence, motion } from 'framer-motion';
+import ListAccessModal from '@/components/lists/list-access-modal';
 
 import TaskSidebar from '@/components/tasks/task-sidebar';
 import TaskToolbar from '@/components/tasks/task-toolbar';
-import TaskListView from '@/components/tasks/task-list-view';
-import TaskBoardView from '@/components/tasks/task-board-view';
-import TaskCalendarView from '@/components/tasks/task-calendar-view';
 import TaskDetailDrawer from '@/components/tasks/task-detail-drawer';
 import TaskCreateModal from '@/components/tasks/task-create-modal';
 import TaskBulkActions from '@/components/tasks/task-bulk-actions';
 import TaskEmptyState from '@/components/tasks/task-empty-state';
+
+// View registry — dynamic view rendering
+import '@/lib/views/register-views';
+import { getView } from '@/lib/views';
 
 import {
   Task, ViewType, FilterState, EMPTY_FILTERS, SavedView, TaskGroup,
@@ -84,6 +88,12 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [sharedViews, setSharedViews] = useState<SavedView[]>([]);
   const canManageShared = can('task', 'update') && (me?.role === 'owner' || me?.role === 'admin' || me?.role === 'manager');
+
+  // Feature flag: granular permissions (per-list ACL)
+  const granularPermsEnabled = useFeatureFlag('granular-permissions');
+
+  // List access modal state
+  const [accessModalList, setAccessModalList] = useState<ListData | null>(null);
 
   // Lists for this space (used for list selector in create/detail/bulk)
   const [spaceLists, setSpaceLists] = useState<ListData[]>([]);
@@ -451,6 +461,25 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
 
   const canCreate = can('task', 'create');
 
+  // ─── List access management ───────────────────────
+  const handleSaveListAccess = async (visibility: 'inherited' | 'private', memberIds: string[]) => {
+    if (!accessModalList?.id) return;
+    await updateList(accessModalList.id, { visibility, members: memberIds });
+    setSpaceLists(prev => prev.map(l =>
+      l.id === accessModalList.id ? { ...l, visibility, members: memberIds } : l
+    ));
+    setAccessModalList(null);
+  };
+
+  // Helper: check if a list is private (for lock icon)
+  const isPrivateList = (list: ListData) => list.visibility === 'private';
+
+  // Resolve current list from listId prop
+  const currentList = useMemo(() =>
+    spaceLists.find(l => l.id === listId) || null,
+    [spaceLists, listId]
+  );
+
   return (
     <div className="flex h-[calc(100vh-280px)] min-h-[500px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] overflow-hidden">
       {/* Sidebar */}
@@ -515,6 +544,17 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
           canManageShared={canManageShared}
         />
 
+        {/* Private list indicator */}
+        {granularPermsEnabled && currentList && isPrivateList(currentList) && (
+          <div className="flex items-center gap-1 px-3 py-1 text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 rounded">
+            <Lock className="w-3 h-3" />
+            <span>Private list</span>
+            <button onClick={() => setAccessModalList(currentList)} className="ml-2 underline hover:no-underline">
+              Manage Access
+            </button>
+          </div>
+        )}
+
         {/* View content */}
         <div className="flex-1 overflow-hidden relative">
           {emptyStateType ? (
@@ -526,59 +566,42 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
             />
           ) : (
             <AnimatePresence mode="wait">
-              {view === 'list' && (
-                <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
-                  <TaskListView
-                    groups={groups}
-                    members={members}
-                    teams={teams}
-                    selectedTask={selectedTask}
-                    selectedIds={selectedIds}
-                    sortBy={sortBy}
-                    sortDir={sortDir}
-                    canUpdate={can('task', 'update')}
-                    density={density}
-                    columns={columns}
-                    subtaskDisplay={subtaskDisplay}
-                    onSelect={setSelectedTask}
-                    onSelectionChange={setSelectedIds}
-                    onUpdate={doUpdate}
-                    onDelete={doDelete}
-                    onSortChange={field => {
-                      if (sortBy === field) handleSortDirToggle();
-                      else { handleSortByChange(field); setSortDir('asc'); persistPrefs({ lastSortDir: 'asc' }); }
-                    }}
-                    onQuickCreate={doCreate}
-                  />
-                </motion.div>
-              )}
-              {view === 'board' && (
-                <motion.div key="board" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
-                  <TaskBoardView
-                    groups={groups}
-                    members={members}
-                    teams={teams}
-                    selectedTask={selectedTask}
-                    canUpdate={can('task', 'update')}
-                    onSelect={setSelectedTask}
-                    onStatusChange={(taskId, newStatus) => doUpdate(taskId, 'status', newStatus)}
-                    onQuickCreate={doCreate}
-                  />
-                </motion.div>
-              )}
-              {view === 'calendar' && (
-                <motion.div key="calendar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
-                  <TaskCalendarView
-                    tasks={filteredTasks}
-                    members={members}
-                    selectedTask={selectedTask}
-                    calendarMode={calendarMode}
-                    onSelect={setSelectedTask}
-                    onDateChange={(taskId, newDate) => doUpdate(taskId, 'dueDate', newDate)}
-                    onModeChange={handleCalendarModeChange}
-                  />
-                </motion.div>
-              )}
+              {(() => {
+                const entry = getView(view);
+                if (!entry) return null;
+                const ViewComponent = entry.component;
+                return (
+                  <motion.div key={view} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="h-full">
+                    <ViewComponent
+                      groups={groups}
+                      tasks={filteredTasks}
+                      members={members}
+                      teams={teams}
+                      selectedTask={selectedTask}
+                      canUpdate={can('task', 'update')}
+                      onSelect={setSelectedTask}
+                      onUpdate={doUpdate}
+                      onStatusChange={(taskId, newStatus) => doUpdate(taskId, 'status', newStatus)}
+                      onDelete={doDelete}
+                      onQuickCreate={doCreate}
+                      selectedIds={selectedIds}
+                      onSelectionChange={setSelectedIds}
+                      sortBy={sortBy}
+                      sortDir={sortDir}
+                      onSortChange={field => {
+                        if (sortBy === field) handleSortDirToggle();
+                        else { handleSortByChange(field); setSortDir('asc'); persistPrefs({ lastSortDir: 'asc' }); }
+                      }}
+                      density={density}
+                      columns={columns}
+                      subtaskDisplay={subtaskDisplay}
+                      calendarMode={calendarMode}
+                      onModeChange={handleCalendarModeChange}
+                      onDateChange={(taskId, newDate) => doUpdate(taskId, 'dueDate', newDate)}
+                    />
+                  </motion.div>
+                );
+              })()}
             </AnimatePresence>
           )}
 
@@ -637,6 +660,17 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
           />
         )}
       </AnimatePresence>
+
+      {/* List access modal (granular permissions) */}
+      {granularPermsEnabled && accessModalList && (
+        <ListAccessModal
+          list={accessModalList}
+          members={members}
+          onSave={handleSaveListAccess}
+          onClose={() => setAccessModalList(null)}
+          open={!!accessModalList}
+        />
+      )}
     </div>
   );
 }

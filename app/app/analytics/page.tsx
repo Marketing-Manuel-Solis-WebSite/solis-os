@@ -5,23 +5,36 @@ import { useEffect, useState, useCallback } from 'react';
 import { useToast } from '@/components/notifications/toast-provider';
 import StatsDashboard from '@/components/analytics/stats-dashboard';
 import AIAnalysisPanel from '@/components/analytics/ai-analysis-panel';
+import ExportModal from '@/components/analytics/export-modal';
+import DashboardShareModal from '@/components/dashboard/dashboard-share-modal';
+import ScheduledReportModal from '@/components/analytics/scheduled-report-modal';
+import { useFeatureFlag } from '@/lib/feature-flags';
 import {
-  BarChart3, Brain, RefreshCw,
+  BarChart3, Brain, RefreshCw, Download, Share2, CalendarClock,
   Users, FileText, CheckSquare, MessageSquare, Activity, Zap, AlertTriangle
 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import type { AnalyticsSnapshot } from '@/lib/analytics-snapshot';
+import type { DashboardConfig } from '@/lib/dashboard-types';
+import { ensureDefaultDashboard } from '@/lib/dashboard-db';
 
 export type { AnalyticsSnapshot };
 
 export default function AnalyticsPage() {
   const { user, me } = useAuth();
   const toast = useToast();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const exportEnabled = useFeatureFlag('analytics-export');
+  const dashboardSharingEnabled = useFeatureFlag('dashboard-sharing');
+  const scheduledReportsEnabled = useFeatureFlag('scheduled-reports');
   const [data, setData] = useState<AnalyticsSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'dashboard' | 'ai'>('dashboard');
   const [refreshing, setRefreshing] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [showScheduleReport, setShowScheduleReport] = useState(false);
+  const [shareDashboard, setShareDashboard] = useState<DashboardConfig | null>(null);
 
   const loadSnapshot = useCallback(async () => {
     if (!user) return;
@@ -64,6 +77,34 @@ export default function AnalyticsPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {scheduledReportsEnabled && (
+                <button onClick={() => setShowScheduleReport(true)}
+                  className="flex items-center gap-2 px-4 h-9 rounded-md bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all duration-200">
+                  <CalendarClock className="h-3.5 w-3.5" /> {lang === 'es' ? 'Programar' : 'Schedule'}
+                </button>
+              )}
+              {dashboardSharingEnabled && (
+                <button onClick={async () => {
+                  if (!user) return;
+                  try {
+                    const isAdmin = me?.role === 'admin' || me?.role === 'director';
+                    const dash = await ensureDefaultDashboard(user.uid, isAdmin);
+                    setShareDashboard(dash);
+                    setShowShare(true);
+                  } catch {
+                    toast.error(lang === 'es' ? 'Error al cargar dashboard' : 'Failed to load dashboard');
+                  }
+                }}
+                  className="flex items-center gap-2 px-4 h-9 rounded-md bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all duration-200">
+                  <Share2 className="h-3.5 w-3.5" /> {lang === 'es' ? 'Compartir' : 'Share'}
+                </button>
+              )}
+              {exportEnabled && (
+                <button onClick={() => setShowExport(true)}
+                  className="flex items-center gap-2 px-4 h-9 rounded-md bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] hover:text-[var(--accent)] transition-all duration-200">
+                  <Download className="h-3.5 w-3.5" /> {lang === 'es' ? 'Exportar' : 'Export'}
+                </button>
+              )}
               <button onClick={refresh} disabled={refreshing}
                 className="flex items-center gap-2 px-4 h-9 rounded-md bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-secondary)] transition-all duration-200">
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} /> {t('common.refresh')}
@@ -116,6 +157,23 @@ export default function AnalyticsPage() {
           )}
         </div>
       </div>
+
+      {/* Export Modal */}
+      {exportEnabled && <ExportModal open={showExport} onClose={() => setShowExport(false)} />}
+
+      {/* Dashboard Share Modal */}
+      {dashboardSharingEnabled && showShare && shareDashboard && (
+        <DashboardShareModal
+          dashboard={shareDashboard}
+          onClose={() => setShowShare(false)}
+          onUpdate={(updated) => setShareDashboard(updated)}
+        />
+      )}
+
+      {/* Scheduled Report Modal */}
+      {scheduledReportsEnabled && (
+        <ScheduledReportModal open={showScheduleReport} onClose={() => setShowScheduleReport(false)} />
+      )}
     </div>
   );
 }

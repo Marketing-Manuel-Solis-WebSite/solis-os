@@ -5,8 +5,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/server-auth';
 import { adminDb } from '@/lib/firebase-admin';
+import { ORG_ID as ORG, getOrgIdFromRequest } from '@/lib/org';
 
-const ORG = 'solis-center';
+
 
 export async function GET(req: NextRequest) {
   try {

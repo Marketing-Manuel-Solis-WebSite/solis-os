@@ -5,8 +5,11 @@ import {
 import { db } from './firebase';
 import type { DashboardConfig, WidgetLayout } from './dashboard-types';
 import { DEFAULT_WIDGETS, ADMIN_DEFAULT_WIDGETS, SPACE_DEFAULT_WIDGETS } from './dashboard-types';
+import { getCurrentOrgId, ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+// Multi-tenant ready: resolve org at call-time, not import-time
+function dashboardsPath() { return `orgs/${getCurrentOrgId()}/dashboards`; }
+/** @deprecated Use dashboardsPath() for multi-tenant readiness */
 const DASHBOARDS_PATH = `orgs/${ORG}/dashboards`;
 
 export async function getDashboards(userId: string): Promise<DashboardConfig[]> {
@@ -80,6 +83,52 @@ export async function ensureDefaultDashboard(userId: string, isAdmin?: boolean):
     isDefault: true,
     widgets,
   };
+}
+
+// ===== Dashboard Sharing =====
+
+export async function shareDashboard(id: string): Promise<string> {
+  const token = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  await updateDoc(doc(db, DASHBOARDS_PATH, id), {
+    isShared: true,
+    publicToken: token,
+    shareMode: 'view',
+    updatedAt: serverTimestamp(),
+  });
+  return token;
+}
+
+export async function unshareDashboard(id: string): Promise<void> {
+  await updateDoc(doc(db, DASHBOARDS_PATH, id), {
+    isShared: false,
+    publicToken: null,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function regenerateDashboardToken(id: string): Promise<string> {
+  const token = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Date.now().toString(36) + Math.random().toString(36).slice(2);
+  await updateDoc(doc(db, DASHBOARDS_PATH, id), {
+    publicToken: token,
+    updatedAt: serverTimestamp(),
+  });
+  return token;
+}
+
+export async function getDashboardByToken(token: string): Promise<DashboardConfig | null> {
+  const q = query(
+    collection(db, DASHBOARDS_PATH),
+    where('publicToken', '==', token),
+    where('isShared', '==', true),
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  const d = snap.docs[0];
+  return { id: d.id, ...d.data() } as DashboardConfig;
 }
 
 // ===== Space-scoped dashboards =====

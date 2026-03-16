@@ -7,8 +7,9 @@
 import { adminDb } from './firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import type { DispatchResult } from './event-types';
+import { ORG_ID as ORG } from '@/lib/org';
 
-const ORG = 'solis-center';
+
 
 export async function persistDispatchResultAdmin(
   result: DispatchResult,

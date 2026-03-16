@@ -7,8 +7,23 @@ export const metadata: Metadata = { title: 'SOLIS CENTER', description: 'Law Off
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className="dark" suppressHydrationWarning>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#1B2A4A" />
+      </head>
       <body className="antialiased">
         <ThemeProvider><I18nProvider>{children}</I18nProvider></ThemeProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function() {});
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );

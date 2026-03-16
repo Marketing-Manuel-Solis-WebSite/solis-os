@@ -39,8 +39,8 @@ export const INTEGRATION_CATALOG: IntegrationDef[] = [
   { provider: 'intercom', name: 'Intercom', descriptionKey: 'integ.provider.intercomDesc', category: 'crm', icon: UserPlus, color: '#6AFDEF', oauthSupported: true, webhookSupported: true, apiKeySupported: false, depth: 'basic' },
 
   // ─── Automation ─────────────────────────────
-  { provider: 'zapier', name: 'Zapier', descriptionKey: 'integ.provider.zapierDesc', category: 'automation', icon: Zap, color: '#FF4A00', oauthSupported: false, webhookSupported: true, apiKeySupported: true, depth: 'stub', comingSoon: true },
-  { provider: 'make', name: 'Make (Integromat)', descriptionKey: 'integ.provider.makeDesc', category: 'automation', icon: Workflow, color: '#6D00CC', oauthSupported: false, webhookSupported: true, apiKeySupported: true, depth: 'stub', comingSoon: true },
+  { provider: 'zapier', name: 'Zapier', descriptionKey: 'integ.provider.zapierDesc', category: 'automation', icon: Zap, color: '#FF4A00', oauthSupported: false, webhookSupported: true, apiKeySupported: true, depth: 'basic' },
+  { provider: 'make', name: 'Make (Integromat)', descriptionKey: 'integ.provider.makeDesc', category: 'automation', icon: Workflow, color: '#6D00CC', oauthSupported: false, webhookSupported: true, apiKeySupported: true, depth: 'basic' },
   { provider: 'typeform', name: 'Typeform', descriptionKey: 'integ.provider.typeformDesc', category: 'automation', icon: FileSpreadsheet, color: '#262627', oauthSupported: false, webhookSupported: true, apiKeySupported: false, depth: 'basic' },
 
   // ─── Payments ───────────────────────────────

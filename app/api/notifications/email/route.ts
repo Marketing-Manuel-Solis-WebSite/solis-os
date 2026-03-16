@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { authenticateRequest } from '@/lib/server-auth';
 import { adminDb } from '@/lib/firebase-admin';
+import { ORG_ID } from '@/lib/org';
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'Solis Center <notifications@soliscenter.com>';
 
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the caller has at least manager role to send emails
-    const memberSnap = await adminDb.collection('orgs/solis-center/members').doc(authedUser.uid).get();
+    const memberSnap = await adminDb.collection(`orgs/${ORG_ID}/members`).doc(authedUser.uid).get();
     const callerRole = memberSnap.data()?.role as string | undefined;
     const ALLOWED_EMAIL_ROLES = ['owner', 'admin', 'manager'];
     if (!memberSnap.exists || !callerRole || !ALLOWED_EMAIL_ROLES.includes(callerRole)) {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
       if (typeof userId !== 'string' || !/^[a-zA-Z0-9]{1,128}$/.test(userId)) {
         return NextResponse.json({ error: 'Invalid userId' }, { status: 400 });
       }
-      const recipientSnap = await adminDb.doc(`orgs/solis-center/members/${userId}`).get();
+      const recipientSnap = await adminDb.doc(`orgs/${ORG_ID}/members/${userId}`).get();
       const recipientData = recipientSnap.data();
       if (!recipientData?.email) {
         return NextResponse.json({ error: 'Recipient email not found' }, { status: 400 });

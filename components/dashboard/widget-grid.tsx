@@ -20,6 +20,7 @@ import { PriorityBreakdownWidget } from './widgets/priority-breakdown';
 import { TeamPerformanceWidget } from './widgets/team-performance';
 import { InboxWidget } from './widgets/inbox-widget';
 import { AIInsightsWidget } from './widgets/ai-insights';
+import { BurndownChartWidget } from './widgets/burndown-chart';
 import { Trash2, GripVertical, LayoutGrid } from 'lucide-react';
 
 const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
@@ -34,6 +35,7 @@ const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
   'team-performance': TeamPerformanceWidget,
   'inbox': InboxWidget,
   'ai-insights': AIInsightsWidget,
+  'burndown-chart': BurndownChartWidget,
 };
 
 const MIN_HEIGHTS: Record<string, number> = {

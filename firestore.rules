@@ -2,6 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ======== MULTI-TENANT NOTE ========
+    // When the 'multi-tenant' feature flag is fully enabled, orgId validation
+    // should be added to all write rules to ensure request.resource.data.orgId
+    // matches the authenticated user's org membership. Currently the app is
+    // single-tenant (orgId = 'solis-center'), so orgId is implicitly trusted.
+    // See lib/org.ts for the multi-tenant runtime infrastructure.
+
     // ======== HELPER FUNCTIONS ========
 
     function isSignedIn() {
@@ -30,12 +37,27 @@ service cloud.firestore {
       return isOrgMember(orgId) && (getRole(orgId) in ['owner', 'admin', 'manager']);
     }
 
+    // Guest role — can read but has restricted write access
+    function isGuest(orgId) {
+      return isOrgMember(orgId) && getRole(orgId) == 'guest';
+    }
+
+    // Full member — not guest and not readonly
+    function isFullMember(orgId) {
+      return isOrgMember(orgId) && !(getRole(orgId) in ['guest', 'readonly']);
+    }
+
     function isSelf(userId) {
       return request.auth.uid == userId;
     }
 
     function hasOrgId(orgId) {
       return request.resource.data.orgId == orgId;
+    }
+
+    // Prevent orgId from being changed on update (cross-tenant migration attack)
+    function orgIdUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['orgId']);
     }
 
     // Team-level access: admin/director bypass, or document has no teamId, or user is a member of the document's team.
@@ -78,6 +100,20 @@ service cloud.firestore {
           allow read: if isSignedIn() && isSelf(userId);
           allow write: if isSignedIn() && isSelf(userId);
         }
+
+        // Chat bookmarks — self-only saved messages
+        match /bookmarks/{bookmarkId} {
+          allow read: if isSignedIn() && isSelf(userId);
+          allow create: if isSignedIn() && isSelf(userId);
+          allow delete: if isSignedIn() && isSelf(userId);
+        }
+
+        // User favorites — self-only
+        match /favorites/{favoriteId} {
+          allow read: if isSignedIn() && isSelf(userId);
+          allow create: if isSignedIn() && isSelf(userId);
+          allow delete: if isSignedIn() && isSelf(userId);
+        }
       }
 
       // Invitations
@@ -92,6 +128,14 @@ service cloud.firestore {
       match /settings/{settingId} {
         allow read: if isOrgMember(orgId);
         allow write: if isAdmin(orgId);
+
+        // Custom Roles — admin-only write, authenticated org members can read
+        match /customRoles/{roleId} {
+          allow read: if isOrgMember(orgId);
+          allow create: if isAdmin(orgId);
+          allow update: if isAdmin(orgId);
+          allow delete: if isAdmin(orgId);
+        }
       }
 
       // Shared space views — space members can read, manager+ in space can write
@@ -114,6 +158,22 @@ service cloud.firestore {
         allow write: if isSignedIn() && isSelf(userId);
       }
 
+      // Active Viewers — tracks who is currently viewing a resource
+      // Any org member can read (to see who else is viewing).
+      // Any org member can write (join/leave viewing).
+      match /activeViewers/{resourceKey} {
+        allow read: if isSignedIn() && isOrgMember(orgId);
+        allow write: if isSignedIn() && isOrgMember(orgId);
+      }
+
+      // Edit Locks — advisory locks for concurrent editing awareness
+      // Any org member can read (to check if a resource is locked).
+      // Any org member can write (acquire/release lock).
+      match /editLocks/{resourceId} {
+        allow read: if isSignedIn() && isOrgMember(orgId);
+        allow write: if isSignedIn() && isOrgMember(orgId);
+      }
+
       // Read cursors — tracks which messages each user has read per channel
       // Self-only: no reason for other users to read your cursors (no "seen" feature).
       match /readCursors/{userId} {
@@ -131,7 +191,7 @@ service cloud.firestore {
           && request.resource.data.userId is string
           && request.resource.data.type is string && request.resource.data.type.size() <= 50
           && request.resource.data.title is string && request.resource.data.title.size() <= 200
-          && request.resource.data.message is string && request.resource.data.message.size() <= 500;
+          && request.resource.data.message is string && request.resource.data.message.size() <= 1000;
         allow update: if isSignedIn() && isSelf(resource.data.userId); // Mark as read
         allow delete: if isSignedIn() && isSelf(resource.data.userId);
       }
@@ -157,9 +217,10 @@ service cloud.firestore {
       }
 
       // Inbox — self-only: users can only access their own inbox items
+      // Server-side (Admin SDK) bypasses rules; client can only create for self.
       match /inbox/{itemId} {
         allow read: if isSignedIn() && isOrgMember(orgId) && resource.data.userId == request.auth.uid;
-        allow create: if isSignedIn() && isOrgMember(orgId);
+        allow create: if isSignedIn() && isOrgMember(orgId) && request.resource.data.userId == request.auth.uid;
         allow update: if isSignedIn() && isOrgMember(orgId) && resource.data.userId == request.auth.uid;
         allow delete: if isSignedIn() && isOrgMember(orgId) && resource.data.userId == request.auth.uid;
       }
@@ -195,7 +256,7 @@ service cloud.firestore {
     match /workspaces/{workspaceId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow create: if isSignedIn() && isAdmin(request.resource.data.orgId);
-      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
     }
 
@@ -204,7 +265,7 @@ service cloud.firestore {
     match /spaces/{spaceId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow create: if isSignedIn() && isManager(request.resource.data.orgId);
-      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
     }
 
@@ -246,18 +307,22 @@ service cloud.firestore {
     match /folders/{folderId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
       allow create: if isSignedIn() && isManager(request.resource.data.orgId);
-      allow update: if isSignedIn() && isManager(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId) && canAccessSpaceData(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
     }
 
     // ======== LISTS ========
     // Same team-level isolation as folders via canAccessSpaceData.
     // Create gated to manager+ (structural decision: members use structure, managers define it).
+    // Per-list ACL: if visibility == 'private', only list members or manager+ can read.
 
     match /lists/{listId} {
-      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessSpaceData(resource.data.orgId)
+        && (!('visibility' in resource.data) || resource.data.visibility != 'private'
+            || request.auth.uid in resource.data.members
+            || isManager(resource.data.orgId));
       allow create: if isSignedIn() && isManager(request.resource.data.orgId);
-      allow update: if isSignedIn() && isManager(resource.data.orgId) && canAccessSpaceData(resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId) && canAccessSpaceData(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
     }
 
@@ -265,12 +330,13 @@ service cloud.firestore {
 
     match /tasks/{taskId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
-      // Create: listId must be null OR belong to the same team as the task
+      // Create: guests can create tasks; listId must be null OR belong to the same team
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId)
         && (request.resource.data.listId == null
             || listBelongsToTeam(request.resource.data.listId, request.resource.data.teamId));
-      // Update: if listId changed to non-null, it must belong to the task's team
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId)
+      // Update: full members only (guests and readonly cannot update)
+      allow update: if isSignedIn() && isFullMember(resource.data.orgId)
+        && orgIdUnchanged()
         && (request.resource.data.listId == null
             || request.resource.data.listId == resource.data.listId
             || listBelongsToTeam(request.resource.data.listId, resource.data.teamId));
@@ -296,10 +362,12 @@ service cloud.firestore {
 
     match /docs/{docId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
-      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId)
+      // Guests cannot create or update docs
+      allow create: if isSignedIn() && isFullMember(request.resource.data.orgId)
         && (!('folderId' in request.resource.data) || request.resource.data.folderId == null
             || folderBelongsToSpace(request.resource.data.folderId, request.resource.data.teamId));
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId)
+      allow update: if isSignedIn() && isFullMember(resource.data.orgId)
+        && orgIdUnchanged()
         && (!('folderId' in request.resource.data) || request.resource.data.folderId == null
             || request.resource.data.folderId == resource.data.folderId
             || folderBelongsToSpace(request.resource.data.folderId, resource.data.teamId))
@@ -312,6 +380,28 @@ service cloud.firestore {
         allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/docs/$(docId)).data.orgId);
         allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/docs/$(docId)).data.orgId);
         allow update, delete: if false; // Revisions are immutable
+      }
+
+      // Doc Comments — general comments on the document
+      match /comments/{commentId} {
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/docs/$(docId)).data.orgId);
+        allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/docs/$(docId)).data.orgId);
+        allow update: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/docs/$(docId)).data.orgId)
+          && resource.data.authorId == request.auth.uid;
+        allow delete: if isSignedIn()
+          && (resource.data.authorId == request.auth.uid || isManager(get(/databases/$(database)/documents/docs/$(docId)).data.orgId));
+      }
+
+      // Inline Comments — threaded comments anchored to text ranges
+      match /inlineComments/{commentId} {
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/docs/$(docId)).data.orgId);
+        allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/docs/$(docId)).data.orgId);
+        // Only author can edit text/textAnchor; any org member can resolve/unresolve
+        allow update: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/docs/$(docId)).data.orgId)
+          && (resource.data.authorId == request.auth.uid
+              || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['text', 'textAnchor', 'authorId']));
+        allow delete: if isSignedIn()
+          && (resource.data.authorId == request.auth.uid || isManager(get(/databases/$(database)/documents/docs/$(docId)).data.orgId));
       }
     }
 
@@ -326,7 +416,7 @@ service cloud.firestore {
          request.auth.uid in resource.data.members ||
          isManager(resource.data.orgId));
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) &&
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && orgIdUnchanged() &&
         (resource.data.type == 'public' ||
          request.auth.uid in resource.data.members ||
          isManager(resource.data.orgId));
@@ -379,13 +469,28 @@ service cloud.firestore {
     match /goals/{goalId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
 
       match /targets/{targetId} {
         allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
         allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
         allow update: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
+        allow delete: if isSignedIn() && isManager(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
+      }
+
+      match /checkins/{checkinId} {
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
+        allow create: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
+        allow update: if isSignedIn()
+          && isOrgMember(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId)
+          && (request.auth.uid == resource.data.authorId || isManager(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId));
+        allow delete: if isSignedIn() && isManager(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
+      }
+
+      match /settings/{settingId} {
+        allow read: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
+        allow create, update: if isSignedIn() && isOrgMember(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
         allow delete: if isSignedIn() && isManager(get(/databases/$(database)/documents/goals/$(goalId)).data.orgId);
       }
     }
@@ -399,6 +504,7 @@ service cloud.firestore {
         && (!('folderId' in request.resource.data) || request.resource.data.folderId == null
             || folderBelongsToSpace(request.resource.data.folderId, request.resource.data.teamId));
       allow update: if isSignedIn() && isOrgMember(resource.data.orgId)
+        && orgIdUnchanged()
         && (!('folderId' in request.resource.data) || request.resource.data.folderId == null
             || request.resource.data.folderId == resource.data.folderId
             || folderBelongsToSpace(request.resource.data.folderId, resource.data.teamId))
@@ -421,7 +527,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       // Public form access by publicToken is handled via API routes, not direct Firestore reads
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
 
       match /submissions/{subId} {
@@ -444,7 +550,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
       allow update: if isSignedIn() && isOrgMember(resource.data.orgId)
-        && (request.auth.uid == resource.data.userId || isManager(resource.data.orgId));
+        && orgIdUnchanged();
       allow delete: if isSignedIn() && (request.auth.uid == resource.data.userId || isManager(resource.data.orgId));
     }
 
@@ -453,7 +559,7 @@ service cloud.firestore {
     match /automations/{automationId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow create: if isSignedIn() && isManager(request.resource.data.orgId);
-      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
 
       match /logs/{logId} {
@@ -506,7 +612,7 @@ service cloud.firestore {
     match /templates/{templateId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow create: if isSignedIn() && isManager(request.resource.data.orgId);
-      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
     }
 
@@ -514,7 +620,9 @@ service cloud.firestore {
 
     match /emailTemplates/{templateId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
-      allow write: if isSignedIn() && isAdmin(resource.data.orgId);
+      allow create: if isSignedIn() && isAdmin(request.resource.data.orgId);
+      allow update: if isSignedIn() && isAdmin(resource.data.orgId) && orgIdUnchanged();
+      allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
     }
 
     // ======== ROLES (UNUSED — no app code references this collection) ========
@@ -534,7 +642,7 @@ service cloud.firestore {
     match /integrations/{integrationId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
     }
 
@@ -543,7 +651,7 @@ service cloud.firestore {
     match /apiKeys/{keyId} {
       allow read: if isSignedIn() && isAdmin(resource.data.orgId);
       allow create: if isSignedIn() && isAdmin(request.resource.data.orgId);
-      allow update: if isSignedIn() && isAdmin(resource.data.orgId);
+      allow update: if isSignedIn() && isAdmin(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
     }
 
@@ -552,7 +660,7 @@ service cloud.firestore {
     match /webhooks/{webhookId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow create: if isSignedIn() && isManager(request.resource.data.orgId);
-      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
 
       match /logs/{logId} {
@@ -567,7 +675,7 @@ service cloud.firestore {
     match /incomingWebhooks/{webhookId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow create: if isSignedIn() && isManager(request.resource.data.orgId);
-      allow update: if isSignedIn() && isManager(resource.data.orgId);
+      allow update: if isSignedIn() && isManager(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isAdmin(resource.data.orgId);
     }
 
@@ -584,21 +692,21 @@ service cloud.firestore {
     match /contacts/{contactId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
     }
 
     match /deals/{dealId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
     }
 
     match /cases/{caseId} {
       allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
-      allow update: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isManager(resource.data.orgId);
     }
 
@@ -615,6 +723,38 @@ service cloud.firestore {
       allow read: if isSignedIn() && isAdmin(resource.data.orgId);
       allow create: if isSignedIn() && isManager(request.resource.data.orgId);
       allow update, delete: if false;
+    }
+
+    // ======== SHARE LINKS ========
+
+    match /shareLinks/{linkId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn()
+        && isOrgMember(resource.data.orgId)
+        && orgIdUnchanged()
+        && (request.auth.uid == resource.data.createdBy || isManager(resource.data.orgId));
+      allow delete: if isSignedIn()
+        && isOrgMember(resource.data.orgId)
+        && (request.auth.uid == resource.data.createdBy || isManager(resource.data.orgId));
+    }
+
+    // ======== GOAL TEMPLATES ========
+
+    match /goalTemplates/{templateId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && orgIdUnchanged();
+      allow delete: if isSignedIn() && isManager(resource.data.orgId);
+    }
+
+    // ======== TASK LINKS (GitHub PRs, commits, branches) ========
+
+    match /taskLinks/{linkId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId);
+      allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
+      allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && orgIdUnchanged();
+      allow delete: if isSignedIn() && isOrgMember(resource.data.orgId);
     }
   }
 }

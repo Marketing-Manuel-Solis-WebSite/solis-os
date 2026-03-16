@@ -3,6 +3,7 @@ import { buildAuthUrl } from '@/lib/oauth-providers';
 import { randomBytes } from 'crypto';
 import { authenticateRequest } from '@/lib/server-auth';
 import { adminDb } from '@/lib/firebase-admin';
+import { ORG_ID } from '@/lib/org';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   try {
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
     }
 
     // Verify the user has at least manager role to connect integrations
-    const memberSnap = await adminDb.collection('orgs/solis-center/members').doc(authedUser.uid).get();
+    const memberSnap = await adminDb.collection(`orgs/${ORG_ID}/members`).doc(authedUser.uid).get();
     const callerRole = memberSnap.data()?.role as string | undefined;
     const ALLOWED_OAUTH_ROLES = ['owner', 'admin', 'manager'];
     if (!memberSnap.exists || !callerRole || !ALLOWED_OAUTH_ROLES.includes(callerRole)) {

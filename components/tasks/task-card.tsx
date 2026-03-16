@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
 import { Calendar, Paperclip, MessageSquare, GitBranch, CheckSquare, Repeat } from 'lucide-react';
 import {
@@ -256,10 +257,12 @@ export default React.memo(function TaskCard({
                 '?';
 
               return member?.photoURL ? (
-                <img
+                <Image
                   key={uid}
                   src={member.photoURL}
                   alt={member.displayName || ''}
+                  width={24}
+                  height={24}
                   className="w-6 h-6 rounded-full border-2 border-[var(--bg-elevated)] object-cover"
                 />
               ) : (

@@ -1,11 +1,12 @@
 'use client';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Reply, Pin, Trash2, Edit2, SmilePlus, Image as ImageIcon, FileText, Play, Download, ArrowRight, ChevronDown, Maximize2, Minimize2, ListTodo } from 'lucide-react';
+import { Reply, Pin, Trash2, Edit2, SmilePlus, Image as ImageIcon, FileText, Play, Download, ArrowRight, ChevronDown, Maximize2, Minimize2, ListTodo, MessageCircle, Bookmark } from 'lucide-react';
 import { formatFileSize } from '@/lib/upload';
 
-const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '🔥', '👀', '✅', '💯'];
+const QUICK_EMOJIS = ['\ud83d\udc4d', '\u2764\ufe0f', '\ud83d\ude02', '\ud83c\udf89', '\ud83d\udd25', '\ud83d\udc40', '\u2705', '\ud83d\udcaf'];
 
 interface Props {
   messages: any[];
@@ -20,6 +21,8 @@ interface Props {
   onPin: (msgId: string, isPinned: boolean) => void;
   onReaction: (msgId: string, emoji: string) => void;
   onCreateTask?: (msg: any) => void;
+  onOpenThread?: (msg: any) => void;
+  onBookmark?: (msg: any) => void;
 }
 
 // ========== SKELETON ==========
@@ -108,7 +111,7 @@ function truncateUrl(url: string, max = 55): string {
 
 function renderMessageText(text: string, members: any[]): React.ReactNode {
   // Split by URLs and @mentions
-  const TOKEN_RE = /(https?:\/\/[^\s]+)|(@[A-Za-záéíóúñüÁÉÍÓÚÑÜ]+(?:\s[A-Za-záéíóúñüÁÉÍÓÚÑÜ]+)?)/g;
+  const TOKEN_RE = /(https?:\/\/[^\s]+)|(@[A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00fc\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\u00dc]+(?:\s[A-Za-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00fc\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\u00dc]+)?)/g;
   const parts: React.ReactNode[] = [];
   let lastIdx = 0;
   let match: RegExpExecArray | null;
@@ -168,7 +171,7 @@ type GroupedItem =
   | { type: 'group'; messages: any[]; id: string };
 
 // ========== COMPONENT ==========
-export default function MessageList({ messages, members, userId, channelType, canManage, loading, onReply, onEdit, onDelete, onPin, onReaction, onCreateTask }: Props) {
+export default function MessageList({ messages, members, userId, channelType, canManage, loading, onReply, onEdit, onDelete, onPin, onReaction, onCreateTask, onOpenThread, onBookmark }: Props) {
   const { t, lang } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -208,42 +211,58 @@ export default function MessageList({ messages, members, userId, channelType, ca
   const getMember = (uid: string) => members.find(m => m.id === uid);
 
   // Build grouped items with date separators
-  const grouped: GroupedItem[] = [];
-  let currentDay: string | null = null;
-  let currentGroup: any[] = [];
+  const grouped: GroupedItem[] = useMemo(() => {
+    const result: GroupedItem[] = [];
+    let currentDay: string | null = null;
+    let currentGroup: any[] = [];
 
-  const flushGroup = () => {
-    if (currentGroup.length > 0) {
-      grouped.push({ type: 'group', messages: [...currentGroup], id: currentGroup[0].id });
-      currentGroup = [];
-    }
-  };
+    const flushGroup = () => {
+      if (currentGroup.length > 0) {
+        result.push({ type: 'group', messages: [...currentGroup], id: currentGroup[0].id });
+        currentGroup = [];
+      }
+    };
 
-  messages.forEach((msg, i) => {
-    const msgDate = msg.createdAt?.toDate?.();
-    const dayKey = msgDate ? `${msgDate.getFullYear()}-${msgDate.getMonth()}-${msgDate.getDate()}` : null;
+    messages.forEach((msg, i) => {
+      const msgDate = msg.createdAt?.toDate?.();
+      const dayKey = msgDate ? `${msgDate.getFullYear()}-${msgDate.getMonth()}-${msgDate.getDate()}` : null;
 
-    // Insert date separator if day changed
-    if (dayKey && dayKey !== currentDay) {
-      flushGroup();
-      currentDay = dayKey;
-      grouped.push({ type: 'date', label: formatDateSeparator(msgDate, t, lang), id: `date-${dayKey}` });
-    }
+      // Insert date separator if day changed
+      if (dayKey && dayKey !== currentDay) {
+        flushGroup();
+        currentDay = dayKey;
+        result.push({ type: 'date', label: formatDateSeparator(msgDate, t, lang), id: `date-${dayKey}` });
+      }
 
-    const prev = i > 0 ? messages[i - 1] : null;
-    const sameUser = prev && prev.userId === msg.userId && msg.type !== 'system' && prev.type !== 'system';
-    const within5min = prev && msg.createdAt?.seconds && prev.createdAt?.seconds && (msg.createdAt.seconds - prev.createdAt.seconds) < 300;
-    const prevDate = prev?.createdAt?.toDate?.();
-    const sameDay2 = msgDate && prevDate && isSameDay(msgDate, prevDate);
+      const prev = i > 0 ? messages[i - 1] : null;
+      const sameUser = prev && prev.userId === msg.userId && msg.type !== 'system' && prev.type !== 'system';
+      const within5min = prev && msg.createdAt?.seconds && prev.createdAt?.seconds && (msg.createdAt.seconds - prev.createdAt.seconds) < 300;
+      const prevDate = prev?.createdAt?.toDate?.();
+      const sameDay2 = msgDate && prevDate && isSameDay(msgDate, prevDate);
 
-    if (sameUser && within5min && sameDay2) {
-      currentGroup.push(msg);
-    } else {
-      flushGroup();
-      currentGroup = [msg];
-    }
+      if (sameUser && within5min && sameDay2) {
+        currentGroup.push(msg);
+      } else {
+        flushGroup();
+        currentGroup = [msg];
+      }
+    });
+    flushGroup();
+    return result;
+  }, [messages, t, lang]);
+
+  // Virtual scrolling for grouped items
+  const rowVirtualizer = useVirtualizer({
+    count: grouped.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: (index) => {
+      const item = grouped[index];
+      if (item.type === 'date') return 48;
+      // Estimate ~60px per message in group
+      return Math.max(60, item.messages.length * 50 + 40);
+    },
+    overscan: 10,
   });
-  flushGroup();
 
   // Show skeletons while loading
   if (loading && messages.length === 0) {
@@ -255,12 +274,12 @@ export default function MessageList({ messages, members, userId, channelType, ca
   }
 
   return (
-    <div ref={containerRef} onScroll={handleScroll} role="log" aria-live="polite" aria-label={t('chat.messages')} className="flex-1 overflow-y-auto px-4 py-4 space-y-0.5 scrollbar-thin relative" onClick={() => setShowEmoji(null)}>
+    <div ref={containerRef} onScroll={handleScroll} role="log" aria-live="polite" aria-label={t('chat.messages')} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-0.5 scrollbar-thin relative" onClick={() => setShowEmoji(null)}>
       {messages.length === 0 && (
         <div className="flex-1 flex items-center justify-center py-16">
           <div className="text-center">
             <div className="w-16 h-16 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">💬</span>
+              <span className="text-2xl">{'\ud83d\udcac'}</span>
             </div>
             <p className="text-base font-medium text-[var(--text-secondary)]">{t('chat.noMessages')}</p>
             <p className="text-sm text-[var(--text-muted)] mt-1">{t('chat.startConversation')}</p>
@@ -268,121 +287,169 @@ export default function MessageList({ messages, members, userId, channelType, ca
         </div>
       )}
 
-      {grouped.map((item) => {
-        // Date separator
-        if (item.type === 'date') {
-          return (
-            <div key={item.id} className="flex items-center gap-4 py-3 px-2 my-2">
-              <div className="flex-1 h-px bg-[var(--border)]" />
-              <span className="text-[13px] font-semibold text-[var(--text-muted)] tracking-wider">{item.label}</span>
-              <div className="flex-1 h-px bg-[var(--border)]" />
-            </div>
-          );
-        }
+      {messages.length > 0 && (
+        <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const item = grouped[virtualRow.index];
 
-        // Message group
-        const group = item.messages;
-        const first = group[0];
-        const isSystem = first.type === 'system';
-        const isMine = first.userId === userId;
-        const member = getMember(first.userId);
-        const time = first.createdAt?.toDate?.();
-
-        // System message — divider style
-        if (isSystem) {
-          return (
-            <div key={item.id} className="flex items-center gap-3 py-1.5 px-2 my-1">
-              <div className="flex-1 h-px bg-[var(--border)]" />
-              <span className="text-[13px] text-[var(--text-muted)] whitespace-nowrap flex items-center gap-1.5">
-                <ArrowRight className="h-3 w-3" />
-                {first.content}
-              </span>
-              <div className="flex-1 h-px bg-[var(--border)]" />
-            </div>
-          );
-        }
-
-        return (
-          <div key={item.id} role="article" aria-label={`${first.displayName}: ${(first.content || '').slice(0, 80)}`}>
-            {/* First message — with avatar */}
-            <div
-              className={`flex gap-3.5 group/msg py-1.5 hover:bg-[var(--bg-hover)] px-4 -mx-4 transition-colors relative ${isMine ? 'border-l-2 border-l-[var(--accent)]/20 hover:bg-[var(--accent)]/[0.03]' : ''}`}
-              onMouseEnter={() => setHoverId(first.id)}
-              onMouseLeave={() => setHoverId(null)}
-            >
-              {/* Avatar */}
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-[var(--bg-elevated)] text-[var(--text-muted)]"
-                style={member?.teamId ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'color-mix(in srgb, var(--accent) 20%, transparent)' } : undefined}>
-                {(first.displayName || '?')[0].toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                {/* Name + Role + Time */}
-                <div className="flex items-baseline gap-2 mb-0.5">
-                  <span className="text-[14px] font-semibold text-[var(--text-primary)]">{first.displayName}</span>
-                  {member?.role && (
-                    <span className="text-[12px] px-1.5 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-muted)]">{member.role}</span>
-                  )}
-                  {time && (
-                    <span className="text-[13px] text-[var(--text-muted)]">
-                      {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  )}
+            // Date separator
+            if (item.type === 'date') {
+              return (
+                <div
+                  key={item.id}
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                  className="flex items-center gap-4 py-3 px-2 my-2"
+                >
+                  <div className="flex-1 h-px bg-[var(--border)]" />
+                  <span className="text-[13px] font-semibold text-[var(--text-muted)] tracking-wider">{item.label}</span>
+                  <div className="flex-1 h-px bg-[var(--border)]" />
                 </div>
-                {/* First message content */}
-                <MessageContent
-                  msg={first}
-                  members={members}
-                  userId={userId}
-                  canManage={canManage}
-                  hoverId={hoverId}
-                  showEmoji={showEmoji}
-                  setHoverId={setHoverId}
-                  setShowEmoji={setShowEmoji}
-                  onReply={onReply}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                  onPin={onPin}
-                  onReaction={onReaction}
-                  onCreateTask={onCreateTask}
-                />
-              </div>
-            </div>
+              );
+            }
 
-            {/* Subsequent messages — no avatar, indented */}
-            {group.slice(1).map(msg => (
+            // Message group
+            const group = item.messages;
+            const first = group[0];
+            const isSystem = first.type === 'system';
+            const isMine = first.userId === userId;
+            const member = getMember(first.userId);
+            const time = first.createdAt?.toDate?.();
+
+            // System message — divider style
+            if (isSystem) {
+              return (
+                <div
+                  key={item.id}
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                  className="flex items-center gap-3 py-1.5 px-2 my-1"
+                >
+                  <div className="flex-1 h-px bg-[var(--border)]" />
+                  <span className="text-[13px] text-[var(--text-muted)] whitespace-nowrap flex items-center gap-1.5">
+                    <ArrowRight className="h-3 w-3" />
+                    {first.content}
+                  </span>
+                  <div className="flex-1 h-px bg-[var(--border)]" />
+                </div>
+              );
+            }
+
+            return (
               <div
-                key={msg.id}
-                className={`group/msg hover:bg-[var(--bg-hover)] px-4 -mx-4 transition-colors relative ${isMine ? 'border-l-2 border-l-[var(--accent)]/20 hover:bg-[var(--accent)]/[0.03]' : ''}`}
-                onMouseEnter={() => setHoverId(msg.id)}
-                onMouseLeave={() => setHoverId(null)}
+                key={item.id}
+                data-index={virtualRow.index}
+                ref={rowVirtualizer.measureElement}
+                role="article"
+                aria-label={`${first.displayName}: ${(first.content || '').slice(0, 80)}`}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
               >
-                {/* Hover timestamp where avatar would be */}
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] text-[var(--text-muted)] opacity-0 group-hover/msg:opacity-100 transition w-[40px] text-center">
-                  {msg.createdAt?.toDate?.()?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                <div className="pl-[54px] py-0.5">
-                  <MessageContent
-                    msg={msg}
-                    members={members}
-                    userId={userId}
-                    canManage={canManage}
-                    hoverId={hoverId}
-                    showEmoji={showEmoji}
-                    setHoverId={setHoverId}
-                    setShowEmoji={setShowEmoji}
-                    onReply={onReply}
-                    onEdit={onEdit}
-                    onDelete={onDelete}
-                    onPin={onPin}
-                    onReaction={onReaction}
-                    onCreateTask={onCreateTask}
-                  />
+                {/* First message — with avatar */}
+                <div
+                  id={`msg-${first.id}`}
+                  className={`flex gap-3.5 group/msg py-1.5 hover:bg-[var(--bg-hover)] px-4 -mx-4 transition-colors relative ${isMine ? 'border-l-2 border-l-[var(--accent)]/20 hover:bg-[var(--accent)]/[0.03]' : ''}`}
+                  onMouseEnter={() => setHoverId(first.id)}
+                  onMouseLeave={() => setHoverId(null)}
+                >
+                  {/* Avatar */}
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 mt-0.5 bg-[var(--bg-elevated)] text-[var(--text-muted)]"
+                    style={member?.teamId ? { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'color-mix(in srgb, var(--accent) 20%, transparent)' } : undefined}>
+                    {(first.displayName || '?')[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {/* Name + Role + Time */}
+                    <div className="flex items-baseline gap-2 mb-0.5">
+                      <span className="text-[14px] font-semibold text-[var(--text-primary)]">{first.displayName}</span>
+                      {member?.role && (
+                        <span className="text-[12px] px-1.5 py-0.5 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-muted)]">{member.role}</span>
+                      )}
+                      {time && (
+                        <span className="text-[13px] text-[var(--text-muted)]">
+                          {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                    {/* First message content */}
+                    <MessageContent
+                      msg={first}
+                      members={members}
+                      userId={userId}
+                      canManage={canManage}
+                      hoverId={hoverId}
+                      showEmoji={showEmoji}
+                      setHoverId={setHoverId}
+                      setShowEmoji={setShowEmoji}
+                      onReply={onReply}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                      onPin={onPin}
+                      onReaction={onReaction}
+                      onCreateTask={onCreateTask}
+                      onOpenThread={onOpenThread}
+                      onBookmark={onBookmark}
+                    />
+                  </div>
                 </div>
+
+                {/* Subsequent messages — no avatar, indented */}
+                {group.slice(1).map(msg => (
+                  <div
+                    key={msg.id}
+                    id={`msg-${msg.id}`}
+                    className={`group/msg hover:bg-[var(--bg-hover)] px-4 -mx-4 transition-colors relative ${isMine ? 'border-l-2 border-l-[var(--accent)]/20 hover:bg-[var(--accent)]/[0.03]' : ''}`}
+                    onMouseEnter={() => setHoverId(msg.id)}
+                    onMouseLeave={() => setHoverId(null)}
+                  >
+                    {/* Hover timestamp where avatar would be */}
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[12px] text-[var(--text-muted)] opacity-0 group-hover/msg:opacity-100 transition w-[40px] text-center">
+                      {msg.createdAt?.toDate?.()?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <div className="pl-[54px] py-0.5">
+                      <MessageContent
+                        msg={msg}
+                        members={members}
+                        userId={userId}
+                        canManage={canManage}
+                        hoverId={hoverId}
+                        showEmoji={showEmoji}
+                        setHoverId={setHoverId}
+                        setShowEmoji={setShowEmoji}
+                        onReply={onReply}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onPin={onPin}
+                        onReaction={onReaction}
+                        onCreateTask={onCreateTask}
+                        onBookmark={onBookmark}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      )}
       <div ref={bottomRef} />
 
       {/* New messages jump button */}
@@ -407,7 +474,7 @@ export default function MessageList({ messages, members, userId, channelType, ca
 // ========== MESSAGE CONTENT ==========
 function MessageContent({
   msg, members, userId, canManage, hoverId, showEmoji, setHoverId, setShowEmoji,
-  onReply, onEdit, onDelete, onPin, onReaction, onCreateTask,
+  onReply, onEdit, onDelete, onPin, onReaction, onCreateTask, onOpenThread, onBookmark,
 }: {
   msg: any; members: any[]; userId: string; canManage: boolean;
   hoverId: string | null; showEmoji: string | null;
@@ -416,8 +483,10 @@ function MessageContent({
   onDelete: (msgId: string) => void; onPin: (msgId: string, isPinned: boolean) => void;
   onReaction: (msgId: string, emoji: string) => void;
   onCreateTask?: (msg: any) => void;
+  onOpenThread?: (msg: any) => void;
+  onBookmark?: (msg: any) => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const media = extractMediaUrls(msg.content || '');
 
   return (
@@ -491,7 +560,7 @@ function MessageContent({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[var(--text-primary)] truncate">{att.name || 'Archivo'}</p>
-                  <p className="text-[13px] text-[var(--text-muted)]">{ext} {att.size ? `· ${formatFileSize(att.size)}` : ''}</p>
+                  <p className="text-[13px] text-[var(--text-muted)]">{ext} {att.size ? `\u00b7 ${formatFileSize(att.size)}` : ''}</p>
                 </div>
                 <Download className="h-4 w-4 text-[var(--text-muted)] group-hover/file:text-[var(--accent)] transition shrink-0" />
               </a>
@@ -524,6 +593,24 @@ function MessageContent({
         </div>
       )}
 
+      {/* Thread reply count indicator */}
+      {msg.replyCount > 0 && onOpenThread && (
+        <button
+          onClick={() => onOpenThread(msg)}
+          className="flex items-center gap-1.5 mt-1.5 text-[var(--accent)] hover:underline transition group/thread"
+        >
+          <MessageCircle className="h-3.5 w-3.5" />
+          <span className="text-[13px] font-semibold">
+            {msg.replyCount} {msg.replyCount === 1 ? (t('chat.reply') || 'reply') : (t('chat.replies') || 'replies')}
+          </span>
+          {msg.lastReplyAt && (
+            <span className="text-[11px] text-[var(--text-muted)] group-hover/thread:text-[var(--accent)]">
+              {'\u00b7'} {msg.lastReplyAt?.toDate?.()?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </button>
+      )}
+
       {/* Hover actions — always top-right */}
       <AnimatePresence>
         {hoverId === msg.id && !msg.deleted && (
@@ -540,6 +627,16 @@ function MessageContent({
             <button onClick={() => onReply(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-md hover:bg-[var(--bg-hover)] transition" title={t('chat.reply')} aria-label={t('chat.reply')}>
               <Reply className="h-4 w-4" />
             </button>
+            {onOpenThread && msg.type !== 'system' && (
+              <button onClick={() => onOpenThread(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent)] rounded-md hover:bg-[var(--bg-hover)] transition" title={t('chat.thread') || 'Thread'}>
+                <MessageCircle className="h-4 w-4" />
+              </button>
+            )}
+            {onBookmark && msg.type !== 'system' && (
+              <button onClick={() => onBookmark(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-amber-400 rounded-md hover:bg-[var(--bg-hover)] transition" title={lang === 'es' ? 'Guardar' : 'Bookmark'}>
+                <Bookmark className="h-4 w-4" />
+              </button>
+            )}
             {onCreateTask && msg.type !== 'system' && (
               <button onClick={() => onCreateTask(msg)} className="p-1.5 text-[var(--text-muted)] hover:text-green-400 rounded-md hover:bg-[var(--bg-hover)] transition" title={t('chat.createTask') || 'Create task'}>
                 <ListTodo className="h-4 w-4" />

@@ -1,20 +1,25 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Target, Loader2 } from 'lucide-react';
+import { Plus, Target, Loader2, GitBranch, LayoutGrid, FileText } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { getGoals, createGoal, updateGoal, deleteGoal } from '@/lib/db';
+import { useFeatureFlag } from '@/lib/feature-flags';
+import { getGoals, createGoal, updateGoal, deleteGoal, getChildGoals } from '@/lib/db';
 import { afterGoalCreated, afterGoalUpdated, afterGoalDeleted } from '@/lib/goal-side-effects';
 import GoalCard from '@/components/goals/goal-card';
 import GoalCreateModal from '@/components/goals/goal-create-modal';
 import GoalDetailDrawer from '@/components/goals/goal-detail-drawer';
 import GoalFilters from '@/components/goals/goal-filters';
+import GoalTemplatePicker from '@/components/goals/goal-template-picker';
+import GoalTreeView from '@/components/goals/goal-tree-view';
 import type { Goal, GoalStatus } from '@/components/goals/constants';
 
 export default function GoalsPage() {
   const { user, me, activeTeamId, can } = useAuth();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const templatesEnabled = useFeatureFlag('goal-templates');
+  const treeVizEnabled = useFeatureFlag('goal-tree-viz');
 
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +31,10 @@ export default function GoalsPage() {
   const [statusFilter, setStatusFilter] = useState<GoalStatus | ''>('');
   const [ownerFilter, setOwnerFilter] = useState('');
   const [menuGoal, setMenuGoal] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'tree'>('grid');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [parentGoalForCreate, setParentGoalForCreate] = useState<Goal | null>(null);
+  const [childGoalsMap, setChildGoalsMap] = useState<Record<string, Goal[]>>({});
 
   const loadGoals = useCallback(async () => {
     setLoading(true);
@@ -107,7 +116,14 @@ export default function GoalsPage() {
     } else {
       await handleCreate(data);
     }
+    setParentGoalForCreate(null);
   };
+
+  // Load child goals for a given goal (for detail drawer)
+  const loadChildGoals = useCallback(async (goalId: string) => {
+    const children = await getChildGoals(goalId);
+    setChildGoalsMap(prev => ({ ...prev, [goalId]: children as Goal[] }));
+  }, []);
 
   // Filtered goals
   const filtered = goals.filter(g => {
@@ -120,6 +136,10 @@ export default function GoalsPage() {
     return true;
   });
 
+  // Tree view: top-level goals (no parent) and their children
+  const topLevel = filtered.filter(g => !g.parentGoalId);
+  const childrenOf = (parentId: string) => filtered.filter(g => g.parentGoalId === parentId);
+
   return (
     <div className="p-6 max-w-7xl mx-auto" onClick={() => setMenuGoal(null)}>
       {/* Header */}
@@ -131,16 +151,48 @@ export default function GoalsPage() {
           </h1>
           <p className="text-[14px] text-[var(--text-muted)] mt-0.5">{t('goals.subtitle')}</p>
         </div>
-        {can('goal', 'create') && (
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => { setEditGoal(null); setShowCreate(true); }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium shadow-md hover:opacity-90 transition"
-          >
-            <Plus className="h-4 w-4" /> {t('goals.createGoal')}
-          </motion.button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex rounded-lg bg-[var(--bg-tertiary)] overflow-hidden">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`px-2.5 py-1.5 transition ${viewMode === 'grid' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
+              title={t('goals.gridView') || 'Grid view'}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('tree')}
+              className={`px-2.5 py-1.5 transition ${viewMode === 'tree' ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
+              title={t('goals.treeView') || 'Tree view'}
+            >
+              <GitBranch className="h-4 w-4" />
+            </button>
+          </div>
+
+          {can('goal', 'create') && (
+            <div className="flex items-center gap-2">
+              {templatesEnabled && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setShowTemplates(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--bg-elevated)] text-[var(--text-secondary)] text-sm font-medium shadow-card hover:bg-[var(--bg-hover)] transition border border-[var(--border-subtle)]"
+                >
+                  <FileText className="h-4 w-4" /> {lang === 'es' ? 'Plantilla' : 'Template'}
+                </motion.button>
+              )}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => { setEditGoal(null); setParentGoalForCreate(null); setShowCreate(true); }}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--accent)] text-white text-sm font-medium shadow-md hover:opacity-90 transition"
+              >
+                <Plus className="h-4 w-4" /> {t('goals.createGoal')}
+              </motion.button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -168,7 +220,8 @@ export default function GoalsPage() {
             </button>
           )}
         </div>
-      ) : (
+      ) : viewMode === 'grid' ? (
+        /* ─── Grid View ─── */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((goal, i) => (
             <motion.div
@@ -179,7 +232,7 @@ export default function GoalsPage() {
             >
               <GoalCard
                 goal={goal}
-                onClick={() => setDetailGoal(goal)}
+                onClick={() => { setDetailGoal(goal); loadChildGoals(goal.id); }}
                 onMenu={e => {
                   e.stopPropagation();
                   setMenuGoal(menuGoal === goal.id ? null : goal.id);
@@ -208,6 +261,96 @@ export default function GoalsPage() {
             </motion.div>
           ))}
         </div>
+      ) : treeVizEnabled ? (
+        /* ─── Enhanced Tree View (GoalTreeView with SVG lines) ─── */
+        <GoalTreeView
+          goals={filtered}
+          onSelectGoal={(goal) => { setDetailGoal(goal); loadChildGoals(goal.id); }}
+        />
+      ) : (
+        /* ─── Fallback Tree View (hierarchical list) ─── */
+        <div className="space-y-2">
+          {topLevel.map((goal, i) => {
+            const children = childrenOf(goal.id);
+            return (
+              <motion.div
+                key={goal.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.03 }}
+              >
+                {/* Parent goal row */}
+                <div
+                  onClick={() => { setDetailGoal(goal); loadChildGoals(goal.id); }}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] cursor-pointer transition group"
+                >
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ background: goal.color || '#7B68EE' }} />
+                  <span className="text-[14px] font-semibold text-[var(--text-primary)] flex-1 truncate">{goal.name}</span>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                    goal.status === 'on_track' ? 'bg-emerald-500/10 text-emerald-400' :
+                    goal.status === 'at_risk' ? 'bg-amber-500/10 text-amber-400' :
+                    goal.status === 'behind' ? 'bg-red-500/10 text-red-400' :
+                    goal.status === 'completed' ? 'bg-blue-500/10 text-blue-400' :
+                    'bg-gray-500/10 text-gray-400'
+                  }`}>
+                    {t(`goals.status${goal.status.charAt(0).toUpperCase() + goal.status.slice(1).replace(/_./g, m => m[1].toUpperCase())}`) || goal.status}
+                  </span>
+                  <div className="flex items-center gap-2 w-24">
+                    <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-base)] overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${goal.progress}%`, background: goal.color || '#7B68EE' }} />
+                    </div>
+                    <span className="text-[11px] text-[var(--text-muted)] w-7 text-right">{goal.progress}%</span>
+                  </div>
+                  {children.length > 0 && (
+                    <span className="text-[11px] text-[var(--text-muted)] ml-1">{children.length} sub</span>
+                  )}
+                </div>
+
+                {/* Child goals (indented) */}
+                {children.length > 0 && (
+                  <div className="ml-6 mt-1 space-y-1 border-l-2 border-[var(--border-subtle)] pl-3">
+                    {children.map(child => {
+                      const grandchildren = childrenOf(child.id);
+                      return (
+                        <div key={child.id}>
+                          <div
+                            onClick={() => { setDetailGoal(child); loadChildGoals(child.id); }}
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[var(--bg-hover)] cursor-pointer transition"
+                          >
+                            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: child.color || '#7B68EE' }} />
+                            <span className="text-[13px] text-[var(--text-secondary)] flex-1 truncate">{child.name}</span>
+                            <div className="flex items-center gap-1.5 w-20">
+                              <div className="flex-1 h-1 rounded-full bg-[var(--bg-base)] overflow-hidden">
+                                <div className="h-full rounded-full" style={{ width: `${child.progress}%`, background: child.color || '#7B68EE' }} />
+                              </div>
+                              <span className="text-[11px] text-[var(--text-muted)] w-7 text-right">{child.progress}%</span>
+                            </div>
+                          </div>
+                          {/* Grandchildren (3rd level) */}
+                          {grandchildren.length > 0 && (
+                            <div className="ml-5 mt-0.5 space-y-0.5 border-l border-[var(--border-subtle)] pl-2.5">
+                              {grandchildren.map(gc => (
+                                <div
+                                  key={gc.id}
+                                  onClick={() => { setDetailGoal(gc); loadChildGoals(gc.id); }}
+                                  className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--bg-hover)] cursor-pointer transition"
+                                >
+                                  <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: gc.color || '#7B68EE' }} />
+                                  <span className="text-[12px] text-[var(--text-muted)] flex-1 truncate">{gc.name}</span>
+                                  <span className="text-[10px] text-[var(--text-muted)]">{gc.progress}%</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
       )}
 
       {/* Has More indicator */}
@@ -222,10 +365,21 @@ export default function GoalsPage() {
       {/* Create/Edit Modal */}
       <GoalCreateModal
         open={showCreate}
-        onClose={() => { setShowCreate(false); setEditGoal(null); }}
+        onClose={() => { setShowCreate(false); setEditGoal(null); setParentGoalForCreate(null); }}
         onSave={handleSaveEdit}
         editGoal={editGoal}
+        parentGoal={parentGoalForCreate}
+        allGoals={goals}
       />
+
+      {/* Template Picker */}
+      {templatesEnabled && (
+        <GoalTemplatePicker
+          open={showTemplates}
+          onClose={() => setShowTemplates(false)}
+          onCreated={loadGoals}
+        />
+      )}
 
       {/* Detail Drawer */}
       <GoalDetailDrawer
@@ -235,6 +389,12 @@ export default function GoalsPage() {
         onUpdate={handleUpdate}
         onDelete={handleDelete}
         onRefresh={loadGoals}
+        childGoals={detailGoal ? (childGoalsMap[detailGoal.id] || []) : []}
+        onCreateChild={(parent) => {
+          setParentGoalForCreate(parent);
+          setEditGoal(null);
+          setShowCreate(true);
+        }}
       />
     </div>
   );

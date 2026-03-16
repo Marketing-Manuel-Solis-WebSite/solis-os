@@ -19,6 +19,9 @@ import DocVersionHistory from '@/components/docs/doc-version-history';
 import { createRevision, getLatestVersionNumber, type DocRevision } from '@/lib/doc-versions';
 import { useToast } from '@/components/notifications/toast-provider';
 import { useI18n } from '@/lib/i18n';
+import { FeatureGate } from '@/components/shared/feature-gate';
+import { useFeatureFlag } from '@/lib/feature-flags';
+import DocTree from '@/components/docs/doc-tree';
 
 // ========== TYPES ==========
 interface Doc {
@@ -38,6 +41,7 @@ interface Doc {
   wordCount: number;
   createdAt: any;
   updatedAt: any;
+  parentDocId?: string | null;
 }
 
 // ========== MAIN PAGE ==========
@@ -260,6 +264,36 @@ export default function DocsPage() {
     load();
   };
 
+  // Create a subpage under a parent document
+  const handleCreateSubpage = async (parentDocId: string) => {
+    if (!can('doc', 'create')) return;
+    const docRef = await createDocument({
+      title: 'Untitled',
+      content: '',
+      contentHtml: '',
+      teamId: activeTeamId === '__all__' ? '' : activeTeamId,
+      createdBy: user!.uid,
+      createdByName: me!.displayName,
+      lastEditedBy: user!.uid,
+      lastEditedByName: me!.displayName,
+      visibility: 'team',
+      starred: false,
+      tags: [],
+      category: '',
+      wordCount: 0,
+      parentDocId,
+    });
+    await afterDocCreated({
+      docId: docRef.id,
+      doc: { title: 'Untitled', parentDocId } as Record<string, any>,
+      actor: { actorId: user!.uid, actorName: me!.displayName },
+    });
+    await load();
+    const { items: refreshed } = await getDocuments(activeTeamId);
+    const newest = (refreshed as Doc[]).find((d: Doc) => d.id === docRef.id);
+    if (newest) setActiveDoc(newest);
+  };
+
   // Initialize version tracking when doc is opened
   useEffect(() => {
     if (activeDoc) {
@@ -358,6 +392,7 @@ export default function DocsPage() {
             members={members}
             isAdmin={isAdmin}
             userId={user!.uid}
+            userName={me?.displayName || ''}
             onSave={(id, data) => handleSave(id, data, true)}
             onDelete={handleDelete}
             onBack={() => { setActiveDoc(null); setShowVersions(false); }}
@@ -365,6 +400,11 @@ export default function DocsPage() {
             showAI={showAI}
             onToggleVersions={() => setShowVersions(!showVersions)}
             showVersions={showVersions}
+            allDocs={docs}
+            onNavigateDoc={(docId) => {
+              const d = docs.find(x => x.id === docId);
+              if (d) { setActiveDoc(d); setShowVersions(false); }
+            }}
           />
         </div>
         {showVersions && (
@@ -508,55 +548,77 @@ export default function DocsPage() {
         </div>
       </div>
 
-      {/* Document Grid/List */}
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-44 skeleton rounded-lg" />)}
-        </div>
-      ) : visible.length === 0 ? (
-        <div className="text-center py-20">
-          <FileText className="h-14 w-14 text-[var(--text-muted)] mx-auto mb-4" />
-          <p className="text-[var(--text-muted)] text-sm mb-2">
-            {hasActiveFilters ? t('docs.noDocsFilter') : t('docs.noDocs')}
-          </p>
-          {hasActiveFilters ? (
-            <button onClick={clearFilters} className="text-sm text-[var(--accent)] hover:underline">{t('docs.clearFilters')}</button>
+      <div className="flex gap-5">
+        {/* Doc tree sidebar (nested-pages feature flag) */}
+        <FeatureGate flag="nested-pages">
+          <aside className="w-60 shrink-0 rounded-xl bg-[var(--bg-secondary)] shadow-card p-2 overflow-y-auto max-h-[calc(100vh-220px)]">
+            <div className="flex items-center justify-between px-2 py-1.5 mb-1">
+              <span className="text-[12px] uppercase tracking-wider text-[var(--text-muted)] font-semibold">Pages</span>
+            </div>
+            <DocTree
+              docs={docs}
+              selectedDocId={undefined}
+              onSelectDoc={(docId) => {
+                const d = docs.find(x => x.id === docId);
+                if (d) setActiveDoc(d);
+              }}
+              onCreateSubpage={handleCreateSubpage}
+            />
+          </aside>
+        </FeatureGate>
+
+        {/* Document Grid/List */}
+        <div className="flex-1 min-w-0">
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-44 skeleton rounded-lg" />)}
+            </div>
+          ) : visible.length === 0 ? (
+            <div className="text-center py-20">
+              <FileText className="h-14 w-14 text-[var(--text-muted)] mx-auto mb-4" />
+              <p className="text-[var(--text-muted)] text-sm mb-2">
+                {hasActiveFilters ? t('docs.noDocsFilter') : t('docs.noDocs')}
+              </p>
+              {hasActiveFilters ? (
+                <button onClick={clearFilters} className="text-sm text-[var(--accent)] hover:underline">{t('docs.clearFilters')}</button>
+              ) : (
+                <button onClick={() => setShowCreate(true)} className="text-sm text-[var(--accent)] hover:underline">{t('docs.createFirst')}</button>
+              )}
+            </div>
+          ) : view === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {visible.map((d, i) => (
+                <DocCard key={d.id} doc={d} index={i} teams={teams}
+                  onClick={() => setActiveDoc(d)}
+                  onDelete={() => handleDelete(d)}
+                  onToggleStar={() => handleToggleStar(d)}
+                  isOwner={d.createdBy === user?.uid || can('doc', 'delete')}
+                />
+              ))}
+            </div>
           ) : (
-            <button onClick={() => setShowCreate(true)} className="text-sm text-[var(--accent)] hover:underline">{t('docs.createFirst')}</button>
+            <div className="space-y-1.5">
+              {visible.map((d, i) => (
+                <DocListItem key={d.id} doc={d} index={i} teams={teams}
+                  onClick={() => setActiveDoc(d)}
+                  onDelete={() => handleDelete(d)}
+                  onToggleStar={() => handleToggleStar(d)}
+                  isOwner={d.createdBy === user?.uid || can('doc', 'delete')}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Has More indicator */}
+          {hasMore && !loading && (
+            <div className="text-center py-4 mt-2">
+              <span className="text-[13px] text-[var(--text-muted)]">
+                {t('common.showingItems', { n: docs.length })} — {t('common.moreAvailable')}
+              </span>
+            </div>
           )}
         </div>
-      ) : view === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {visible.map((d, i) => (
-            <DocCard key={d.id} doc={d} index={i} teams={teams}
-              onClick={() => setActiveDoc(d)}
-              onDelete={() => handleDelete(d)}
-              onToggleStar={() => handleToggleStar(d)}
-              isOwner={d.createdBy === user?.uid || can('doc', 'delete')}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {visible.map((d, i) => (
-            <DocListItem key={d.id} doc={d} index={i} teams={teams}
-              onClick={() => setActiveDoc(d)}
-              onDelete={() => handleDelete(d)}
-              onToggleStar={() => handleToggleStar(d)}
-              isOwner={d.createdBy === user?.uid || can('doc', 'delete')}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Has More indicator */}
-      {hasMore && !loading && (
-        <div className="text-center py-4 mt-2">
-          <span className="text-[13px] text-[var(--text-muted)]">
-            {t('common.showingItems', { n: docs.length })} — {t('common.moreAvailable')}
-          </span>
-        </div>
-      )}
+      </div>
 
       {/* Create Modal */}
       {showCreate && (

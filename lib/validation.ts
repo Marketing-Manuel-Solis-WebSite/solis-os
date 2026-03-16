@@ -52,6 +52,10 @@ export const TaskCreateSchema = z.object({
     id: z.string(),
     title: nonEmptyString.max(500),
     done: z.boolean().default(false),
+    assigneeId: z.string().nullable().optional().default(null),
+    dueDate: optionalDate,
+    status: z.string().optional(),
+    priority: z.enum(TASK_PRIORITIES).optional(),
   })).optional().default([]),
   checklist: z.array(z.object({
     id: z.string(),
@@ -97,6 +101,10 @@ const taskUpdatableFields = z.object({
     id: z.string(),
     title: z.string(),
     done: z.boolean(),
+    assigneeId: z.string().nullable().optional(),
+    dueDate: z.any().nullable().optional(),
+    status: z.string().optional(),
+    priority: z.enum(TASK_PRIORITIES).optional(),
   })),
   checklist: z.array(z.object({
     id: z.string(),

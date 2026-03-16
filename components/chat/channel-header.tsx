@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Hash, Lock, Users, Pin, Settings, MessageCircle, UserPlus, Search, X, Check, Eraser, Menu } from 'lucide-react';
+import { Hash, Lock, Users, Pin, Settings, MessageCircle, UserPlus, Search, X, Check, Eraser, Menu, Bookmark } from 'lucide-react';
 
 interface Props {
   channel: any;
@@ -19,10 +19,12 @@ interface Props {
   onAddMember?: (userId: string) => void;
   onClearView?: () => void;
   onToggleSidebar?: () => void;
+  onSearch?: () => void;
+  onShowBookmarks?: () => void;
 }
 
-export default function ChannelHeader({ channel, members, userId, pinnedCount, memberCount, canManage, onlineMap, getDMName, onShowSettings, onShowMembers, onShowPinned, onAddMember, onClearView, onToggleSidebar }: Props) {
-  const { t } = useI18n();
+export default function ChannelHeader({ channel, members, userId, pinnedCount, memberCount, canManage, onlineMap, getDMName, onShowSettings, onShowMembers, onShowPinned, onAddMember, onClearView, onToggleSidebar, onSearch, onShowBookmarks }: Props) {
+  const { t, lang } = useI18n();
   const isDM = channel.type === 'dm';
   const name = isDM ? getDMName(channel) : channel.name;
   const icon = isDM
@@ -157,6 +159,18 @@ export default function ChannelHeader({ channel, members, userId, pinnedCount, m
           </div>
         )}
 
+        {onSearch && (
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+            onClick={onSearch} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition" title={t('chatSearch.title')}>
+            <Search className="h-4 w-4" />
+          </motion.button>
+        )}
+        {onShowBookmarks && (
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+            onClick={onShowBookmarks} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-amber-400 hover:bg-[var(--bg-hover)] transition" title={lang === 'es' ? 'Guardados' : 'Bookmarks'}>
+            <Bookmark className="h-4 w-4" />
+          </motion.button>
+        )}
         {onClearView && (
           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
             onClick={onClearView} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition" title={t('chat.clearViewTitle')}>

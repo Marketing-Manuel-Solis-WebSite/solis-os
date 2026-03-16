@@ -2,6 +2,7 @@
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { useI18n } from '@/lib/i18n';
+import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { signOut } from 'firebase/auth';
@@ -12,13 +13,18 @@ import FloatingAIChat from '@/components/ai/floating-ai-chat';
 import { ToastProvider, FirebaseToastBridge } from '@/components/notifications/toast-provider';
 import { NotificationProvider } from '@/components/notifications/notification-context';
 import CommandPaletteProvider, { useCommandPalette } from '@/components/command-palette/command-palette-provider';
+import { QueryProvider } from '@/lib/query-provider';
+import { FeatureFlagProvider } from '@/lib/feature-flags';
 import {
   LayoutDashboard, CheckSquare, FileText, MessageSquare, Zap, BarChart3,
   Users, Shield, LogOut, Menu, Bot, ChevronLeft, Sun, Moon, ChevronDown,
   Settings, Loader2, CalendarDays, MoreHorizontal, Target, Clock, PenTool, FileInput, Plug, Search,
-  Layers,
+  Layers, Star,
 } from 'lucide-react';
 import SpaceSidebarTree from '@/components/spaces/space-sidebar-tree';
+import PwaInstallPrompt from '@/components/shared/pwa-install-prompt';
+import { FeatureGate } from '@/components/shared/feature-gate';
+import { getFavorites, type Favorite } from '@/lib/favorites';
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -289,7 +295,24 @@ function Shell({ children }: { children: React.ReactNode }) {
   const morePopRef = useRef<HTMLDivElement>(null);
   const [morePopover, setMorePopover] = useState(false);
 
+  // Favorites
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    getFavorites(user.uid).then((favs) => { if (!cancelled) setFavorites(favs); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [user?.uid, path]); // re-fetch when navigating so list stays fresh
+
   useEffect(() => { if (!loading && !user) router.push('/login'); }, [loading, user, router]);
+
+  // Prefetch all main nav routes for instant navigation
+  useEffect(() => {
+    [...NAV, ...MORE_NAV].forEach(n => router.prefetch(n.href));
+    router.prefetch('/app/admin');
+    router.prefetch('/app/spaces');
+  }, [router]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
@@ -334,7 +357,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       >
         {/* Logo */}
         <div className="h-14 flex items-center px-3 gap-2.5">
-          <img src="/solis-logo.png" alt="Solis" className="w-8 h-8 rounded-lg object-contain shrink-0" />
+          <Image src="/solis-logo.png" alt="Solis" width={32} height={32} className="w-8 h-8 rounded-lg object-contain shrink-0" />
           <AnimatePresence>
             {open && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }} className="min-w-0">
@@ -382,6 +405,78 @@ function Shell({ children }: { children: React.ReactNode }) {
               </button>
             );
           })}
+
+          {/* Favorites section */}
+          <FeatureGate flag="favorites">
+            {open ? (
+              <>
+                <div className="pt-3 pb-1 px-2.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[var(--sidebar-text)] opacity-60">{t('favorites.title')}</p>
+                </div>
+                <button
+                  onClick={() => setFavoritesOpen(!favoritesOpen)}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-200 text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]"
+                >
+                  <Star className="h-5 w-5 shrink-0 text-amber-400" strokeWidth={1.75} fill={favorites.length > 0 ? 'currentColor' : 'none'} />
+                  <span>{t('favorites.title')}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 ml-auto transition-transform duration-200 ${favoritesOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {favoritesOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: EASE }}
+                      className="overflow-hidden"
+                    >
+                      <div className="pl-3 space-y-0.5">
+                        {favorites.length === 0 ? (
+                          <p className="px-2.5 py-2 text-[13px] text-[var(--text-muted)]">{t('favorites.empty')}</p>
+                        ) : (
+                          favorites.map((fav) => {
+                            const hrefMap: Record<string, string> = {
+                              task: '/app/tasks',
+                              goal: '/app/goals',
+                              doc: '/app/docs',
+                              space: `/app/spaces/${fav.entityId}`,
+                              list: '/app/tasks',
+                            };
+                            const iconMap: Record<string, string> = {
+                              task: '✓',
+                              goal: '◎',
+                              doc: '📄',
+                              space: '📁',
+                              list: '📋',
+                            };
+                            return (
+                              <button
+                                key={`${fav.entityType}_${fav.entityId}`}
+                                onClick={() => navTo(hrefMap[fav.entityType] || '/app')}
+                                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm transition-all duration-200 text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]"
+                              >
+                                <span className="text-xs shrink-0">{iconMap[fav.entityType] || '★'}</span>
+                                <span className="truncate">{fav.entityTitle || fav.entityId}</span>
+                                <span className="text-[10px] text-[var(--text-muted)] ml-auto uppercase">{fav.entityType}</span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            ) : (
+              <button
+                onClick={() => { setOpen(true); setFavoritesOpen(true); }}
+                className="w-full flex items-center justify-center py-2 rounded-lg text-sm transition-all duration-200 text-amber-400 hover:text-amber-300 hover:bg-[var(--sidebar-hover)]"
+                title={t('favorites.title')}
+              >
+                <Star className="h-5 w-5" strokeWidth={1.75} fill={favorites.length > 0 ? 'currentColor' : 'none'} />
+              </button>
+            )}
+          </FeatureGate>
 
           {/* Spaces section */}
           {sidebarTeams.length > 0 && (
@@ -690,15 +785,20 @@ function Shell({ children }: { children: React.ReactNode }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <ToastProvider>
-        <NotificationProvider>
-          <CommandPaletteProvider>
-            <Shell>{children}</Shell>
-            <FloatingAIChat />
-            <FirebaseToastBridge />
-          </CommandPaletteProvider>
-        </NotificationProvider>
-      </ToastProvider>
+      <QueryProvider>
+        <FeatureFlagProvider>
+          <ToastProvider>
+            <NotificationProvider>
+              <CommandPaletteProvider>
+                <Shell>{children}</Shell>
+                <FloatingAIChat />
+                <PwaInstallPrompt />
+                <FirebaseToastBridge />
+              </CommandPaletteProvider>
+            </NotificationProvider>
+          </ToastProvider>
+        </FeatureFlagProvider>
+      </QueryProvider>
     </AuthProvider>
   );
 }

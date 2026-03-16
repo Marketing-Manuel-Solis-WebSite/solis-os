@@ -5,10 +5,12 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { getTasks, getAuditLogs, getGoals } from '@/lib/db';
 import { ensureDefaultDashboard, saveDashboard } from '@/lib/dashboard-db';
 import { motion } from 'framer-motion';
-import { Loader2, Calendar, Shield, Sparkles } from 'lucide-react';
+import { Loader2, Calendar, Shield, Sparkles, Share2 } from 'lucide-react';
 import WidgetGrid from '@/components/dashboard/widget-grid';
 import DashboardBuilder from '@/components/dashboard/dashboard-builder';
+import DashboardShareModal from '@/components/dashboard/dashboard-share-modal';
 import type { DashboardConfig, WidgetLayout } from '@/lib/dashboard-types';
+import { useFeatureFlag } from '@/lib/feature-flags';
 
 // ─── Time-of-day greeting helper ────────────────────────────
 function getGreetingKey(): string {
@@ -36,6 +38,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardConfig | null>(null);
   const [editing, setEditing] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const dashboardSharingEnabled = useFeatureFlag('dashboard-sharing');
 
   const isAdmin = useMemo(() => {
     return canSeeAllTeams || ['owner', 'admin', 'director'].includes(me?.role || '');
@@ -197,7 +201,17 @@ export default function Dashboard() {
 
             {/* Builder controls */}
             {dashboard && (
-              <div className="shrink-0">
+              <div className="shrink-0 flex items-center gap-2">
+                {dashboardSharingEnabled && !editing && (
+                  <button
+                    onClick={() => setShowShare(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+                    title={t('dashboardShare.title')}
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    {t('dashboardShare.share')}
+                  </button>
+                )}
                 <DashboardBuilder
                   dashboard={dashboard}
                   editing={editing}
@@ -232,6 +246,15 @@ export default function Dashboard() {
           isAdmin={isAdmin}
           onReorder={handleReorder}
           onRemove={handleRemoveWidget}
+        />
+      )}
+
+      {/* Share modal */}
+      {showShare && dashboard && (
+        <DashboardShareModal
+          dashboard={dashboard}
+          onClose={() => setShowShare(false)}
+          onUpdate={(updated) => setDashboard(updated)}
         />
       )}
     </motion.div>

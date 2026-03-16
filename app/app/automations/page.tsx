@@ -3,18 +3,26 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useEffect, useState, useCallback } from 'react';
 import { getAutomations, createAutomation, updateAutomation, deleteAutomation, logAction, getAutomationLogs } from '@/lib/db';
+import { useFeatureFlag } from '@/lib/feature-flags';
 import {
   Plus, Trash2, Zap, ArrowRight, Power, PowerOff, ChevronDown, ChevronRight,
   Play, Pause, Filter, Clock, CheckSquare, Bell, Mail, MessageSquare, Bot,
-  Users, Tag, Calendar, AlertTriangle, Edit2, Copy, Search, X, Settings, History
+  Users, Tag, Calendar, AlertTriangle, Edit2, Copy, Search, X, Settings, History,
+  Archive, Globe, ListPlus, GitBranch, ClipboardList, Sparkles,
 } from 'lucide-react';
+import AutomationTemplatePicker from '@/components/automations/automation-template-picker';
+import AISuggestionsPanel from '@/components/automations/ai-suggestions-panel';
+import type { AutomationTemplate } from '@/lib/automation-templates';
 
 // === TRIGGER CONFIGS ===
 const TRIGGERS = [
   { id: 'task_created', label: 'Task Created', icon: Plus, color: '#22C55E', desc: 'When a new task is created' },
   { id: 'task_status_changed', label: 'Status Changed', icon: CheckSquare, color: '#3B82F6', desc: 'When a task status changes' },
   { id: 'task_assigned', label: 'Task Assigned', icon: Users, color: '#A855F7', desc: 'When someone is assigned to a task' },
-  { id: 'task_due_approaching', label: 'Due Approaching', icon: Clock, color: '#F59E0B', desc: 'When a task due date is approaching', comingSoon: true },
+  { id: 'task_priority_changed', label: 'Priority Changed', icon: Tag, color: '#F59E0B', desc: 'When a task priority changes' },
+  { id: 'task_due_date_changed', label: 'Due Date Changed', icon: Calendar, color: '#06B6D4', desc: 'When a task due date is set or changed' },
+  { id: 'task_custom_field_changed', label: 'Custom Field Changed', icon: Settings, color: '#8B5CF6', desc: 'When a custom field value changes' },
+  { id: 'task_due_approaching', label: 'Due Approaching', icon: Clock, color: '#64748B', desc: 'When a task due date is approaching', comingSoon: true },
   { id: 'task_overdue', label: 'Task Overdue', icon: AlertTriangle, color: '#EF4444', desc: 'When a task passes its due date', comingSoon: true },
 ];
 
@@ -32,7 +40,15 @@ const CONDITION_OPS = [
   { id: 'equals', label: 'equals' },
   { id: 'not_equals', label: 'does not equal' },
   { id: 'contains', label: 'contains' },
+  { id: 'not_contains', label: 'does not contain' },
+  { id: 'starts_with', label: 'starts with' },
+  { id: 'ends_with', label: 'ends with' },
+  { id: 'greater_than', label: 'is greater than' },
+  { id: 'less_than', label: 'is less than' },
+  { id: 'greater_than_or_equal', label: 'is greater or equal' },
+  { id: 'less_than_or_equal', label: 'is less or equal' },
   { id: 'is_empty', label: 'is empty' },
+  { id: 'is_not_empty', label: 'is not empty' },
 ];
 
 // === ACTION CONFIGS ===
@@ -44,6 +60,11 @@ const ACTIONS = [
   { id: 'remove_tag', label: 'Remove Tag', icon: X, color: '#EF4444', desc: 'Remove a tag from the task', configFields: [{ key: 'tagName', label: 'Tag', type: 'text' }] },
   { id: 'post_comment', label: 'Post Comment', icon: MessageSquare, color: '#06B6D4', desc: 'Auto-comment on the task', configFields: [{ key: 'commentText', label: 'Comment', type: 'text' }] },
   { id: 'send_notification', label: 'Send Notification', icon: Bell, color: '#EC4899', desc: 'Notify team members', configFields: [{ key: 'message', label: 'Message', type: 'text' }] },
+  { id: 'call_webhook', label: 'Call Webhook', icon: Globe, color: '#8B5CF6', desc: 'Send data to an external URL', configFields: [{ key: 'webhookUrl', label: 'Webhook URL', type: 'text' }, { key: 'method', label: 'HTTP Method', options: ['POST', 'PUT', 'PATCH'] }] },
+  { id: 'create_subtask', label: 'Create Subtask', icon: ListPlus, color: '#06B6D4', desc: 'Add a subtask to the task', configFields: [{ key: 'subtaskTitle', label: 'Subtask Title', type: 'text' }] },
+  { id: 'archive_task', label: 'Archive Task', icon: Archive, color: '#64748B', desc: 'Archive the task', configFields: [] },
+  { id: 'duplicate_task', label: 'Duplicate Task', icon: Copy, color: '#F59E0B', desc: 'Create a copy of the task', configFields: [] },
+  { id: 'move_to_list', label: 'Move to List', icon: ArrowRight, color: '#22C55E', desc: 'Move task to a different list', configFields: [{ key: 'listId', label: 'List ID', type: 'text' }] },
 ];
 
 interface Condition {
@@ -59,6 +80,13 @@ interface Action {
   config: Record<string, string>;
 }
 
+interface BranchBlock {
+  id: string;
+  conditions: { field: string; operator: string; value: string }[];
+  thenActions: Action[];
+  elseActions: Action[];
+}
+
 interface AutoRule {
   id: string;
   name: string;
@@ -67,6 +95,7 @@ interface AutoRule {
   triggerConfig: Record<string, string>;
   conditions: Condition[];
   actions: Action[];
+  branches?: BranchBlock[];
   enabled: boolean;
   teamId: string;
   runCount: number;
@@ -103,6 +132,11 @@ export default function AutomationsPage() {
   const [filterEnabled, setFilterEnabled] = useState<'all' | 'active' | 'inactive'>('all');
 
   const canManage = can('automation', 'create');
+  const branchingEnabled = useFeatureFlag('automation-branching');
+  const templatesEnabled = useFeatureFlag('automation-templates');
+  const aiAutomationEnabled = useFeatureFlag('ai-automation-ui');
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showAISuggestions, setShowAISuggestions] = useState(false);
 
   const load = useCallback(async () => {
     const { items: r, hasMore: more } = await getAutomations(activeTeamId);
@@ -157,6 +191,25 @@ export default function AutomationsPage() {
     load();
   };
 
+  const handleTemplateSelect = (template: AutomationTemplate) => {
+    setShowTemplatePicker(false);
+    setEditingRule({
+      id: '',
+      name: template.name,
+      description: template.description,
+      trigger: template.trigger,
+      triggerConfig: {},
+      conditions: template.conditions,
+      actions: template.actions,
+      enabled: true,
+      teamId: activeTeamId === '__all__' ? '' : activeTeamId,
+      runCount: 0,
+      lastRunAt: null,
+      createdAt: null,
+    });
+    setShowBuilder(true);
+  };
+
   // Filter
   let filtered = rules.filter(r => {
     if (search && !r.name?.toLowerCase().includes(search.toLowerCase()) && !r.trigger?.toLowerCase().includes(search.toLowerCase())) return false;
@@ -190,11 +243,27 @@ export default function AutomationsPage() {
           </h1>
           <p className="text-base text-[var(--text-muted)] mt-1">{t('automations.subtitle', { rules: rules.length, runs: totalRuns })}</p>
         </div>
-        {canManage && (
-          <button onClick={() => { setEditingRule(null); setShowBuilder(true); }} className="flex items-center gap-2 px-5 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">
-            <Plus className="h-4 w-4" /> {t('automations.newRule')}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {canManage && aiAutomationEnabled && (
+            <button
+              onClick={() => setShowAISuggestions(true)}
+              className="flex items-center gap-2 px-4 h-10 rounded-md bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 font-medium transition text-sm"
+              data-testid="ai-automation-btn"
+            >
+              <Sparkles className="h-4 w-4" /> AI Suggestions
+            </button>
+          )}
+          {canManage && templatesEnabled && (
+            <button onClick={() => setShowTemplatePicker(true)} className="flex items-center gap-2 px-4 h-10 rounded-md bg-[var(--bg-elevated)] shadow-card text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 font-medium transition text-sm">
+              <ClipboardList className="h-4 w-4" /> {t('automations.templates') || 'Templates'}
+            </button>
+          )}
+          {canManage && (
+            <button onClick={() => { setEditingRule(null); setShowBuilder(true); }} className="flex items-center gap-2 px-5 h-10 rounded-md bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm">
+              <Plus className="h-4 w-4" /> {t('automations.newRule')}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats bar */}
@@ -285,6 +354,16 @@ export default function AutomationsPage() {
                           </span>
                         </span>
                       ))}
+
+                      {/* Branch indicator */}
+                      {(rule.branches || []).length > 0 && (
+                        <span className="flex items-center gap-1">
+                          <ArrowRight className="h-3 w-3 text-[var(--text-muted)]" />
+                          <span className="text-[12px] px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-400 font-medium flex items-center gap-1">
+                            <GitBranch className="h-3 w-3" /> {(rule.branches || []).length} {(rule.branches || []).length === 1 ? 'branch' : 'branches'}
+                          </span>
+                        </span>
+                      )}
 
                       {/* Legacy support for simple trigger/action strings */}
                       {!(rule.actions || []).length && rule.trigger && (
@@ -384,8 +463,43 @@ export default function AutomationsPage() {
           members={[]}
           initialData={editingRule}
           activeTeamId={activeTeamId}
+          branchingEnabled={branchingEnabled}
           onClose={() => { setShowBuilder(false); setEditingRule(null); }}
           onSave={handleSave}
+        />
+      )}
+
+      {/* Template Picker Modal */}
+      {templatesEnabled && (
+        <AutomationTemplatePicker
+          open={showTemplatePicker}
+          onClose={() => setShowTemplatePicker(false)}
+          onSelect={handleTemplateSelect}
+        />
+      )}
+
+      {/* AI Suggestions Panel */}
+      {aiAutomationEnabled && showAISuggestions && (
+        <AISuggestionsPanel
+          onCreateAutomation={(data) => {
+            setShowAISuggestions(false);
+            setEditingRule({
+              id: '',
+              name: data.name,
+              description: data.description,
+              trigger: data.trigger || 'task_created',
+              triggerConfig: {},
+              conditions: [],
+              actions: data.actions.map(a => ({ type: 'add_comment', config: { text: a } })),
+              enabled: true,
+              teamId: activeTeamId === '__all__' ? '' : activeTeamId,
+              runCount: 0,
+              lastRunAt: null,
+              createdAt: null,
+            });
+            setShowBuilder(true);
+          }}
+          onClose={() => setShowAISuggestions(false)}
         />
       )}
     </div>
@@ -393,17 +507,18 @@ export default function AutomationsPage() {
 }
 
 // === BUILDER MODAL ===
-function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSave }: {
-  teams: any[]; members: any[]; initialData: AutoRule | null; activeTeamId: string;
+function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnabled, onClose, onSave }: {
+  teams: any[]; members: any[]; initialData: AutoRule | null; activeTeamId: string; branchingEnabled: boolean;
   onClose: () => void; onSave: (data: any) => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [name, setName] = useState(initialData?.name || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [trigger, setTrigger] = useState(initialData?.trigger || '');
   const [triggerConfig, setTriggerConfig] = useState<Record<string, string>>(initialData?.triggerConfig || {});
   const [conditions, setConditions] = useState<Condition[]>(initialData?.conditions || []);
   const [actions, setActions] = useState<Action[]>(initialData?.actions || []);
+  const [branches, setBranches] = useState<BranchBlock[]>(initialData?.branches || []);
   const [teamId, setTeamId] = useState(initialData?.teamId || (activeTeamId === '__all__' ? '' : activeTeamId));
   const [step, setStep] = useState(0); // 0=trigger, 1=conditions, 2=actions, 3=review
 
@@ -442,6 +557,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
       triggerConfig,
       conditions,
       actions,
+      ...(branches.length > 0 ? { branches } : {}),
       teamId,
       enabled: true,
       runCount: 0,
@@ -612,6 +728,233 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                   </button>
                 ))}
               </div>
+
+              {/* Branch blocks (if/then/else) */}
+              {branchingEnabled && (
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-[12px] uppercase tracking-wider text-purple-400 font-semibold flex items-center gap-1.5">
+                      <GitBranch className="h-3.5 w-3.5" />
+                      {lang === 'es' ? 'Ramificaciones' : 'Branches'}
+                    </label>
+                    <button
+                      onClick={() => setBranches([...branches, { id: Date.now().toString(), conditions: [{ field: 'status', operator: 'equals', value: '' }], thenActions: [], elseActions: [] }])}
+                      className="flex items-center gap-1 px-3 h-7 rounded-lg bg-purple-500/10 text-purple-400 text-[13px] font-medium hover:bg-purple-500/20 transition"
+                    >
+                      <Plus className="h-3 w-3" /> {lang === 'es' ? 'Agregar rama' : 'Add Branch'}
+                    </button>
+                  </div>
+
+                  {branches.length === 0 ? (
+                    <div className="text-center py-6 rounded-xl bg-[var(--bg-elevated)]/50">
+                      <GitBranch className="h-6 w-6 text-[var(--text-muted)] mx-auto mb-2" />
+                      <p className="text-[13px] text-[var(--text-muted)]">
+                        {lang === 'es' ? 'Agrega ramas para ejecutar acciones condicionalmente' : 'Add branches for conditional action execution'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {branches.map((branch, bi) => (
+                        <div key={branch.id} className="rounded-xl border border-purple-500/20 bg-purple-500/[0.03] p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[12px] font-bold text-purple-400">
+                              {lang === 'es' ? `RAMA ${bi + 1}` : `BRANCH ${bi + 1}`}
+                            </span>
+                            <button onClick={() => setBranches(branches.filter(b => b.id !== branch.id))} className="p-1 text-[var(--text-muted)] hover:text-red-400 rounded">
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Branch conditions */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] text-amber-400 font-semibold uppercase">
+                                {lang === 'es' ? 'Si' : 'If'}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  const updated = [...branches];
+                                  updated[bi] = { ...branch, conditions: [...branch.conditions, { field: 'status', operator: 'equals', value: '' }] };
+                                  setBranches(updated);
+                                }}
+                                className="text-[11px] text-amber-400 hover:underline"
+                              >
+                                + {lang === 'es' ? 'Condición' : 'Condition'}
+                              </button>
+                            </div>
+                            <div className="space-y-1.5">
+                              {branch.conditions.map((cond, ci) => (
+                                <div key={ci} className="flex items-center gap-1.5">
+                                  {ci > 0 && <span className="text-[10px] text-amber-400 font-bold px-1">AND</span>}
+                                  <select
+                                    value={cond.field}
+                                    onChange={e => {
+                                      const updated = [...branches];
+                                      updated[bi].conditions[ci] = { ...cond, field: e.target.value };
+                                      setBranches(updated);
+                                    }}
+                                    className="select-dark h-7 text-[12px] flex-1"
+                                  >
+                                    {CONDITION_FIELDS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+                                  </select>
+                                  <select
+                                    value={cond.operator}
+                                    onChange={e => {
+                                      const updated = [...branches];
+                                      updated[bi].conditions[ci] = { ...cond, operator: e.target.value };
+                                      setBranches(updated);
+                                    }}
+                                    className="select-dark h-7 text-[12px] w-28"
+                                  >
+                                    {CONDITION_OPS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                                  </select>
+                                  {(() => {
+                                    const fieldConf = CONDITION_FIELDS.find(f => f.id === cond.field);
+                                    if (fieldConf?.options) {
+                                      return (
+                                        <select
+                                          value={cond.value}
+                                          onChange={e => {
+                                            const updated = [...branches];
+                                            updated[bi].conditions[ci] = { ...cond, value: e.target.value };
+                                            setBranches(updated);
+                                          }}
+                                          className="select-dark h-7 text-[12px] flex-1"
+                                        >
+                                          <option value="">—</option>
+                                          {fieldConf.options.map(o => <option key={o} value={o}>{o}</option>)}
+                                        </select>
+                                      );
+                                    }
+                                    return (
+                                      <input
+                                        value={cond.value}
+                                        onChange={e => {
+                                          const updated = [...branches];
+                                          updated[bi].conditions[ci] = { ...cond, value: e.target.value };
+                                          setBranches(updated);
+                                        }}
+                                        placeholder="value"
+                                        className="input-dark h-7 text-[12px] flex-1"
+                                      />
+                                    );
+                                  })()}
+                                  <button
+                                    onClick={() => {
+                                      const updated = [...branches];
+                                      updated[bi] = { ...branch, conditions: branch.conditions.filter((_, i) => i !== ci) };
+                                      setBranches(updated);
+                                    }}
+                                    className="p-1 text-[var(--text-muted)] hover:text-red-400"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Then actions */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] text-emerald-400 font-semibold uppercase">
+                                {lang === 'es' ? 'Entonces' : 'Then'}
+                              </span>
+                              <select
+                                value=""
+                                onChange={e => {
+                                  if (!e.target.value) return;
+                                  const updated = [...branches];
+                                  updated[bi] = { ...branch, thenActions: [...branch.thenActions, { id: Date.now().toString(), type: e.target.value, config: {} }] };
+                                  setBranches(updated);
+                                  e.target.value = '';
+                                }}
+                                className="select-dark h-6 text-[11px] w-32"
+                              >
+                                <option value="">+ {lang === 'es' ? 'Acción' : 'Action'}</option>
+                                {ACTIONS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+                              </select>
+                            </div>
+                            {branch.thenActions.length === 0 ? (
+                              <p className="text-[11px] text-[var(--text-muted)] py-1">{lang === 'es' ? 'Sin acciones' : 'No actions'}</p>
+                            ) : (
+                              <div className="space-y-1">
+                                {branch.thenActions.map((a, ai) => {
+                                  const ac = ACTIONS.find(x => x.id === a.type);
+                                  return (
+                                    <div key={a.id} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/5 text-[12px]">
+                                      {ac && <ac.icon className="h-3 w-3" style={{ color: ac.color }} />}
+                                      <span className="text-[var(--text-secondary)] flex-1">{ac?.label || a.type}</span>
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...branches];
+                                          updated[bi] = { ...branch, thenActions: branch.thenActions.filter(x => x.id !== a.id) };
+                                          setBranches(updated);
+                                        }}
+                                        className="p-0.5 text-[var(--text-muted)] hover:text-red-400"
+                                      >
+                                        <X className="h-2.5 w-2.5" />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Else actions */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-[11px] text-red-400 font-semibold uppercase">
+                                {lang === 'es' ? 'Si no' : 'Else'}
+                              </span>
+                              <select
+                                value=""
+                                onChange={e => {
+                                  if (!e.target.value) return;
+                                  const updated = [...branches];
+                                  updated[bi] = { ...branch, elseActions: [...branch.elseActions, { id: Date.now().toString(), type: e.target.value, config: {} }] };
+                                  setBranches(updated);
+                                  e.target.value = '';
+                                }}
+                                className="select-dark h-6 text-[11px] w-32"
+                              >
+                                <option value="">+ {lang === 'es' ? 'Acción' : 'Action'}</option>
+                                {ACTIONS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+                              </select>
+                            </div>
+                            {branch.elseActions.length === 0 ? (
+                              <p className="text-[11px] text-[var(--text-muted)] py-1">{lang === 'es' ? 'Sin acciones' : 'No actions'}</p>
+                            ) : (
+                              <div className="space-y-1">
+                                {branch.elseActions.map((a, ai) => {
+                                  const ac = ACTIONS.find(x => x.id === a.type);
+                                  return (
+                                    <div key={a.id} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-500/5 text-[12px]">
+                                      {ac && <ac.icon className="h-3 w-3" style={{ color: ac.color }} />}
+                                      <span className="text-[var(--text-secondary)] flex-1">{ac?.label || a.type}</span>
+                                      <button
+                                        onClick={() => {
+                                          const updated = [...branches];
+                                          updated[bi] = { ...branch, elseActions: branch.elseActions.filter(x => x.id !== a.id) };
+                                          setBranches(updated);
+                                        }}
+                                        className="p-0.5 text-[var(--text-muted)] hover:text-red-400"
+                                      >
+                                        <X className="h-2.5 w-2.5" />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -632,7 +975,48 @@ function BuilderModal({ teams, members, initialData, activeTeamId, onClose, onSa
                     const ac = ACTIONS.find(x => x.id === a.type);
                     return <span key={i} className="text-[13px] px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 font-semibold">THEN: {ac?.label || a.type}</span>;
                   })}
+                  {branches.length > 0 && (
+                    <span className="text-[13px] px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-400 font-semibold flex items-center gap-1.5">
+                      <GitBranch className="h-3.5 w-3.5" /> {branches.length} {lang === 'es' ? (branches.length === 1 ? 'rama' : 'ramas') : (branches.length === 1 ? 'branch' : 'branches')}
+                    </span>
+                  )}
                 </div>
+
+                {/* Branch review details */}
+                {branches.length > 0 && (
+                  <div className="space-y-3 mt-2">
+                    {branches.map((branch, bi) => (
+                      <div key={branch.id} className="rounded-lg border border-purple-500/20 bg-purple-500/[0.03] p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <GitBranch className="h-3.5 w-3.5 text-purple-400" />
+                          <span className="text-[12px] font-bold text-purple-400">{lang === 'es' ? `RAMA ${bi + 1}` : `BRANCH ${bi + 1}`}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[12px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-medium">
+                            IF: {branch.conditions.map(c => {
+                              const f = CONDITION_FIELDS.find(x => x.id === c.field);
+                              const o = CONDITION_OPS.find(x => x.id === c.operator);
+                              return `${f?.label || c.field} ${o?.label || c.operator} ${c.value || '…'}`;
+                            }).join(' AND ')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {branch.thenActions.length > 0 && branch.thenActions.map((a, ai) => {
+                            const ac = ACTIONS.find(x => x.id === a.type);
+                            return <span key={ai} className="text-[12px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">THEN: {ac?.label || a.type}</span>;
+                          })}
+                          {branch.elseActions.length > 0 && branch.elseActions.map((a, ai) => {
+                            const ac = ACTIONS.find(x => x.id === a.type);
+                            return <span key={ai} className="text-[12px] px-2 py-0.5 rounded bg-red-500/10 text-red-400 font-medium">ELSE: {ac?.label || a.type}</span>;
+                          })}
+                          {branch.thenActions.length === 0 && branch.elseActions.length === 0 && (
+                            <span className="text-[12px] text-[var(--text-muted)] italic">{lang === 'es' ? 'Sin acciones configuradas' : 'No actions configured'}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {!canSubmit && (
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/5 border border-red-500/20">

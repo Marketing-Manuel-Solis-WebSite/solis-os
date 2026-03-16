@@ -6,6 +6,7 @@ import {
   doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, limit,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { getOrgIdFromContext, setCurrentOrgId } from '@/lib/org';
 
 export type UserRole = 'owner' | 'admin' | 'manager' | 'member' | 'guest' | 'readonly';
 
@@ -63,6 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Find or create org + membership
         const { membership, orgId, orgData } = await ensureOrgAndMembership(firebaseUser);
         const isAdmin = membership.role === 'owner' || membership.role === 'admin';
+
+        // Propagate orgId to the mutable runtime variable so all modules pick it up
+        setCurrentOrgId(orgId);
+
         setState({ user: firebaseUser, membership, orgId, orgData, loading: false, isAdmin });
       } catch (err) {
         // Auth bootstrap error handled silently
@@ -79,9 +84,18 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+/**
+ * Hook to get the current orgId from the auth context.
+ * Falls back to getOrgIdFromContext() (which returns the default ORG_ID).
+ */
+export function useCurrentOrgId(): string {
+  const { orgId } = useContext(AuthContext);
+  return orgId || getOrgIdFromContext();
+}
+
 // --- Bootstrap: ensure org exists, ensure user has membership ---
 async function ensureOrgAndMembership(user: User) {
-  const ORG_ID = 'solis-center'; // single-tenant for now
+  const { ORG_ID } = await import('@/lib/org');
 
   // 1. Check if org exists, if not create it (first user becomes owner)
   const orgRef = doc(db, 'orgs', ORG_ID);
@@ -90,7 +104,7 @@ async function ensureOrgAndMembership(user: User) {
   if (!orgSnap.exists()) {
     const orgData: OrgData = {
       name: 'Law Office of Manuel Solis',
-      slug: 'solis-center',
+      slug: ORG_ID,
       primaryColor: '#C9A84C',
       secondaryColor: '#1B2A4A',
       timezone: 'America/Chicago',

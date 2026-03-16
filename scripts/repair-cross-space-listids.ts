@@ -11,9 +11,10 @@
  */
 
 import * as admin from 'firebase-admin';
+import { ORG_ID as ORG } from '@/lib/org';
 
 const DRY_RUN = process.argv.includes('--dry-run');
-const ORG = 'solis-center';
+
 
 // Initialize admin SDK
 if (!admin.apps.length) {
