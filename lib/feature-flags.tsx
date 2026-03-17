@@ -118,6 +118,12 @@ const DEFAULT_FLAGS: FeatureFlags = {
   'artifact-views': false,
   'relationship-field': false,
   'automation-apply-template': false,
+  'automation-time-tracked': false,
+  'automation-button-field': false,
+  'automation-dependency-unblocked': false,
+  'calendar-sync': false,
+  'embed-view': false,
+  'space-auto-channels': false,
 };
 
 interface FeatureFlagContextValue {

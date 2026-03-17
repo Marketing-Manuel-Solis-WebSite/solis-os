@@ -163,6 +163,23 @@ registerView({
 });
 
 registerView({
+  id: 'embed',
+  name: 'Embed',
+  nameEs: 'Embebido',
+  iconName: 'ExternalLink',
+  component: (() => null) as unknown as ComponentType<ViewProps>, // Renders via ArtifactViewRenderer
+  capabilities: {
+    groupBy: false,
+    sort: false,
+    filter: false,
+    density: false,
+    columns: false,
+    bulkSelect: false,
+    calendarMode: false,
+  },
+});
+
+registerView({
   id: 'activity',
   name: 'Activity',
   nameEs: 'Actividad',

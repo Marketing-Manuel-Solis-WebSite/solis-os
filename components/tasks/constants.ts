@@ -86,6 +86,7 @@ export const VIEWS = [
   { id: 'timeline' as ViewType, Icon: Clock, shortcut: '6' },
   { id: 'workload' as ViewType, Icon: BarChart3, shortcut: '7' },
   { id: 'team' as ViewType, Icon: Users, shortcut: '8' },
+  { id: 'embed' as ViewType, Icon: Globe, shortcut: undefined },
 ] as const;
 
 export const CALENDAR_MODES = [

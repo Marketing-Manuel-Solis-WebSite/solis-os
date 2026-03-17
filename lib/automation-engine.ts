@@ -538,3 +538,61 @@ export async function onTaskCustomFieldChanged(
     _activeTaskIds.delete(taskId);
   }
 }
+
+// ---- NEW TRIGGERS: time_tracked, button_field_click, dependency_unblocked ----
+
+export async function onTimeTracked(
+  taskId: string,
+  task: Record<string, any>,
+  entry: { hours: number; minutes: number; userId: string },
+  actorId?: string,
+): Promise<void> {
+  if (_activeTaskIds.has(taskId)) return;
+  _activeTaskIds.add(taskId);
+  try {
+    const rules = await getMatchingRules('time_tracked', buildScope(task));
+    const ctx: TriggerContext = { taskId, task, previousData: { timeEntry: entry }, actorId };
+    for (const rule of rules) {
+      await executeRule(rule, ctx);
+    }
+  } finally {
+    _activeTaskIds.delete(taskId);
+  }
+}
+
+export async function onButtonFieldClick(
+  taskId: string,
+  task: Record<string, any>,
+  buttonFieldId: string,
+  actorId?: string,
+): Promise<void> {
+  if (_activeTaskIds.has(taskId)) return;
+  _activeTaskIds.add(taskId);
+  try {
+    const rules = await getMatchingRules('button_field_click', buildScope(task));
+    const ctx: TriggerContext = { taskId, task, previousData: { buttonFieldId }, actorId };
+    for (const rule of rules) {
+      await executeRule(rule, ctx);
+    }
+  } finally {
+    _activeTaskIds.delete(taskId);
+  }
+}
+
+export async function onDependencyUnblocked(
+  taskId: string,
+  task: Record<string, any>,
+  actorId?: string,
+): Promise<void> {
+  if (_activeTaskIds.has(taskId)) return;
+  _activeTaskIds.add(taskId);
+  try {
+    const rules = await getMatchingRules('dependency_unblocked', buildScope(task));
+    const ctx: TriggerContext = { taskId, task, actorId };
+    for (const rule of rules) {
+      await executeRule(rule, ctx);
+    }
+  } finally {
+    _activeTaskIds.delete(taskId);
+  }
+}

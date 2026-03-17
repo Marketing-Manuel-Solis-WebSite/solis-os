@@ -32,6 +32,10 @@ const TRIGGERS = [
   { id: 'scheduled_monthly', label: 'Scheduled Monthly', icon: Calendar, color: '#F59E0B', desc: 'Run once a month on a specific date' },
   // Chat trigger
   { id: 'chat_message_received', label: 'Chat Message', icon: MessageSquare, color: '#EC4899', desc: 'When a chat message matches a pattern' },
+  // New triggers
+  { id: 'time_tracked', label: 'Time Tracked', icon: Clock, color: '#06B6D4', desc: 'When time is logged on a task' },
+  { id: 'button_field_click', label: 'Button Field Click', icon: Play, color: '#22C55E', desc: 'When a button custom field is clicked' },
+  { id: 'dependency_unblocked', label: 'Dependency Unblocked', icon: GitBranch, color: '#8B5CF6', desc: 'When all blocking dependencies are resolved' },
 ];
 
 // === CONDITION FIELDS ===
