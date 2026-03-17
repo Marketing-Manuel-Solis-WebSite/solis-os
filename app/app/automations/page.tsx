@@ -12,6 +12,7 @@ import {
   Building2, FolderOpen, List,
 } from 'lucide-react';
 import AutomationTemplatePicker from '@/components/automations/automation-template-picker';
+import FieldMapper from '@/components/automations/field-mapper';
 import AISuggestionsPanel from '@/components/automations/ai-suggestions-panel';
 import type { AutomationTemplate } from '@/lib/automation-templates';
 
@@ -573,6 +574,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
   const [conditions, setConditions] = useState<Condition[]>(initialData?.conditions || []);
   const [actions, setActions] = useState<Action[]>(initialData?.actions || []);
   const [branches, setBranches] = useState<BranchBlock[]>(initialData?.branches || []);
+  const [fieldMappings, setFieldMappings] = useState<{ id: string; sourceField: string; targetField: string }[]>([]);
   const [teamId, setTeamId] = useState(initialData?.teamId || (activeTeamId === '__all__' ? '' : activeTeamId));
   const [step, setStep] = useState(0); // 0=trigger, 1=conditions, 2=actions, 3=review
 
@@ -898,6 +900,16 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
                       </div>
                     );
                   })}
+                  {/* Field Mapper for apply_template and create_task actions */}
+                  {actions.some(a => a.type === 'apply_template' || a.type === 'create_task') && (
+                    <div className="mt-3 p-3 rounded-xl bg-[var(--bg-base)]">
+                      <FieldMapper
+                        mappings={fieldMappings}
+                        onChange={setFieldMappings}
+                        triggerType={trigger}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
               <div className="grid grid-cols-2 gap-2">

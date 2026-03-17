@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import ContextualDashboard from '@/components/dashboard/contextual-dashboard';
 import SpaceTasksPanel from '@/components/spaces/space-tasks-panel';
+import SpaceChatEmbed from '@/components/chat/space-chat-embed';
 import RequestAccessModal from '@/components/shared/request-access-modal';
 
 // ─── Constants ───────────────────────────────────────────
@@ -365,20 +366,16 @@ export default function SpacePage() {
             )}
             {activeTab === 'chat' && (
               <div className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <MessageSquare className="h-5 w-5 text-[var(--accent)]" />
-                  <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[15px] font-semibold text-[var(--text-primary)] flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-[var(--accent)]" />
                     {lang === 'es' ? 'Chat del Espacio' : 'Space Chat'}
                   </h3>
-                  <button onClick={() => goToModule('/app/chat')} className="text-[12px] text-[var(--accent)] hover:underline ml-auto">
+                  <button onClick={() => goToModule('/app/chat')} className="text-[12px] text-[var(--accent)] hover:underline">
                     {lang === 'es' ? 'Abrir Chat completo →' : 'Open full Chat →'}
                   </button>
                 </div>
-                <p className="text-[13px] text-[var(--text-muted)]">
-                  {lang === 'es'
-                    ? `Conversaciones del equipo ${team?.name || ''}. Los mensajes aquí son visibles para todos los miembros del espacio.`
-                    : `Team conversations for ${team?.name || ''}. Messages here are visible to all space members.`}
-                </p>
+                <SpaceChatEmbed spaceId={spaceId} spaceName={team?.name || spaceId} />
               </div>
             )}
             {activeTab === 'settings' && isManager && (
