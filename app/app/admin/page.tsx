@@ -3,6 +3,8 @@ import { useAuth, Role, Team } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useEffect, useState, useMemo } from 'react';
 import CustomFieldManager from '@/components/admin/custom-field-manager';
+import PermissionInspector from '@/components/admin/permission-inspector';
+import UsageDashboard from '@/components/admin/usage-dashboard';
 import {
   getMembers, updateMember, getAuditLogs, logAction, getOrg, updateOrg,
   getSettings, saveSettings, getWorkspaces, createWorkspace, deleteWorkspace,
@@ -18,15 +20,17 @@ import {
   Shield, Users, Building2, Columns3, Zap, Bell, Bot, Plug, ScrollText,
   FileStack, LayoutGrid, Plus, Trash2, Save, Search, ChevronRight, Check, X,
   Edit2, Palette, Hash, FolderOpen, UserPlus, AlertTriangle, UserX, RotateCcw,
-  Archive, ArchiveRestore, ArrowRightLeft, Loader2, Eye
+  Archive, ArchiveRestore, ArrowRightLeft, Loader2, Eye, Scan, BarChart3
 } from 'lucide-react';
 
-type S = 'org'|'users'|'departments'|'perms'|'struct'|'fields'|'tpl'|'auto'|'notif'|'ai'|'integ'|'audit';
+type S = 'org'|'users'|'departments'|'perms'|'inspector'|'usage'|'struct'|'fields'|'tpl'|'auto'|'notif'|'ai'|'integ'|'audit';
 const SS: {id:S;lKey:string;i:any;dKey:string}[] = [
   {id:'org',lKey:'admin.org',i:Building2,dKey:'admin.orgDesc'},
   {id:'users',lKey:'admin.users',i:Users,dKey:'admin.usersDesc'},
   {id:'departments',lKey:'admin.departments',i:FolderOpen,dKey:'admin.departmentsDesc'},
   {id:'perms',lKey:'admin.permissions',i:Shield,dKey:'admin.permissionsDesc'},
+  {id:'inspector',lKey:'admin.inspector',i:Scan,dKey:'admin.inspectorDesc'},
+  {id:'usage',lKey:'admin.usage',i:BarChart3,dKey:'admin.usageDesc'},
   {id:'struct',lKey:'admin.structure',i:LayoutGrid,dKey:'admin.structureDesc'},
   {id:'fields',lKey:'admin.customFields',i:Columns3,dKey:'admin.customFieldsDesc'},
   {id:'tpl',lKey:'admin.templates',i:FileStack,dKey:'admin.templatesDesc'},
@@ -95,6 +99,8 @@ export default function Admin() {
         {s === 'users' && <UsersS />}
         {s === 'departments' && <DepartmentsS />}
         {s === 'perms' && <PermsS />}
+        {s === 'inspector' && <PermissionInspector />}
+        {s === 'usage' && <UsageDashboard />}
         {s === 'struct' && <CrudS label={t('admin.structure')} fields={['name', 'description']} gFn={getWorkspaces} cFn={createWorkspace} dFn={deleteWorkspace} />}
         {s === 'fields' && <div className="p-6"><CustomFieldManager /></div>}
         {s === 'tpl' && <CrudS label={t('admin.templates')} fields={['name', 'type', 'content']} gFn={getTemplates} cFn={createTemplate} dFn={deleteTemplate} />}
@@ -1035,7 +1041,26 @@ function AuditS() {
   if (ld) return <Sk />;
   return (
     <div className="p-6 max-w-5xl">
-      <h2 className="text-xl font-bold text-[var(--text-primary)] mb-4">{t('admin.auditTitle')}</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-[var(--text-primary)]">{t('admin.auditTitle')}</h2>
+        <button
+          onClick={async () => {
+            try {
+              const res = await fetch('/api/analytics/export?entity=activity_logs&format=csv');
+              if (!res.ok) throw new Error('Export failed');
+              const csv = await res.text();
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href = url;
+              a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click(); URL.revokeObjectURL(url);
+            } catch (err) { console.error('Export error:', err); }
+          }}
+          className="px-4 h-8 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] flex items-center gap-2 border border-[var(--border)]"
+        >
+          {t('common.export') || 'Export CSV'}
+        </button>
+      </div>
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
         <input value={q} onChange={e => setQ(e.target.value)} placeholder={t('admin.auditSearch')} className="input-dark pl-10" />
