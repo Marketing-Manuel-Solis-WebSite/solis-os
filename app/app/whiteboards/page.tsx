@@ -10,6 +10,7 @@ import WhiteboardList from '@/components/whiteboards/whiteboard-list';
 import WhiteboardCreateModal from '@/components/whiteboards/whiteboard-create-modal';
 import WhiteboardCanvas from '@/components/whiteboards/whiteboard-canvas';
 import type { Whiteboard } from '@/components/whiteboards/constants';
+import HubToolbar from '@/components/shared/hub-toolbar';
 
 export default function WhiteboardsPage() {
   const { user, me, activeTeamId, can } = useAuth();
@@ -22,6 +23,11 @@ export default function WhiteboardsPage() {
   const [editBoard, setEditBoard] = useState<Whiteboard | null>(null);
   const [activeBoard, setActiveBoard] = useState<Whiteboard | null>(null);
   const [menuBoard, setMenuBoard] = useState<string | null>(null);
+
+  // Hub toolbar state
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('updatedAt');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const loadBoards = useCallback(async () => {
     setLoading(true);
@@ -73,6 +79,11 @@ export default function WhiteboardsPage() {
         boardId={activeBoard.id}
         boardName={activeBoard.name}
         onBack={() => { setActiveBoard(null); loadBoards(); }}
+        onConvertToTask={(text) => {
+          // Open task creation with pre-filled title from whiteboard element
+          const title = text || 'Task from whiteboard';
+          window.dispatchEvent(new CustomEvent('solis:create-task', { detail: { title, source: 'whiteboard', sourceId: activeBoard.id } }));
+        }}
       />
     );
   }
@@ -100,32 +111,62 @@ export default function WhiteboardsPage() {
         )}
       </div>
 
+      {/* Toolbar */}
+      <HubToolbar
+        search={search}
+        onSearchChange={setSearch}
+        sortOptions={[
+          { value: 'updatedAt', label: t('common.lastModified') || 'Last modified' },
+          { value: 'createdAt', label: t('common.created') || 'Created' },
+          { value: 'name', label: t('common.name') || 'Name' },
+        ]}
+        activeSort={sortBy}
+        onSortChange={setSortBy}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        totalCount={boards.length}
+        filteredCount={search ? boards.filter(b => (b.name || '').toLowerCase().includes(search.toLowerCase())).length : boards.length}
+      />
+
       {/* Content */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-[var(--accent)]" />
-        </div>
-      ) : boards.length === 0 ? (
-        <div className="text-center py-20">
-          <PenTool className="h-10 w-10 text-[var(--text-muted)]/20 mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-1">{t('whiteboards.noBoards')}</h3>
-          <p className="text-[14px] text-[var(--text-muted)] mb-4">{t('whiteboards.noBoardsDesc')}</p>
-          {can('whiteboard', 'create') && (
-            <button onClick={() => { setEditBoard(null); setShowCreate(true); }} className="text-[var(--accent)] text-sm font-medium hover:underline">
-              {t('whiteboards.createBoard')}
-            </button>
-          )}
-        </div>
-      ) : (
-        <WhiteboardList
-          boards={boards}
-          onOpen={board => setActiveBoard(board)}
-          onMenu={(board, e) => {
-            e.stopPropagation();
-            setMenuBoard(menuBoard === board.id ? null : board.id);
-          }}
-        />
-      )}
+      {(() => {
+        let filtered = [...boards];
+        if (search) filtered = filtered.filter(b => (b.name || '').toLowerCase().includes(search.toLowerCase()));
+        filtered.sort((a: any, b: any) => {
+          if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
+          const ta = a[sortBy]?.seconds || 0;
+          const tb = b[sortBy]?.seconds || 0;
+          return tb - ta;
+        });
+
+        if (loading) return (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-6 w-6 animate-spin text-[var(--accent)]" />
+          </div>
+        );
+        if (filtered.length === 0) return (
+          <div className="text-center py-20">
+            <PenTool className="h-10 w-10 text-[var(--text-muted)]/20 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-1">{t('whiteboards.noBoards')}</h3>
+            <p className="text-[14px] text-[var(--text-muted)] mb-4">{t('whiteboards.noBoardsDesc')}</p>
+            {can('whiteboard', 'create') && (
+              <button onClick={() => { setEditBoard(null); setShowCreate(true); }} className="text-[var(--accent)] text-sm font-medium hover:underline">
+                {t('whiteboards.createBoard')}
+              </button>
+            )}
+          </div>
+        );
+        return (
+          <WhiteboardList
+            boards={filtered as Whiteboard[]}
+            onOpen={board => setActiveBoard(board)}
+            onMenu={(board, e) => {
+              e.stopPropagation();
+              setMenuBoard(menuBoard === board.id ? null : board.id);
+            }}
+          />
+        );
+      })()}
 
       {/* Has More indicator */}
       {hasMore && !loading && (

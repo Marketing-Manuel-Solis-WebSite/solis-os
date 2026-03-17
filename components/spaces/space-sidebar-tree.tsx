@@ -10,7 +10,7 @@ import {
 import {
   getFolders, getLists, createFolder, createList, deleteFolder, deleteList,
   updateFolder, updateList, ensureDefaultList,
-  getDocsBySpace, getWhiteboardsBySpace, createDocument, createWhiteboard,
+  getDocsBySpace, getWhiteboardsBySpace, createDocument, createWhiteboard, getForms,
   updateDocument, deleteDocument, updateWhiteboard, deleteWhiteboard,
   type FolderData, type ListData,
 } from '@/lib/db';
@@ -55,6 +55,7 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
   const [lists, setLists] = useState<ListData[]>([]);
   const [spaceDocs, setSpaceDocs] = useState<{ id: string; title: string; folderId?: string | null }[]>([]);
   const [spaceBoards, setSpaceBoards] = useState<{ id: string; name: string; folderId?: string | null }[]>([]);
+  const [spaceForms, setSpaceForms] = useState<{ id: string; title: string; folderId?: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [menuTarget, setMenuTarget] = useState<{ type: 'folder' | 'list' | 'doc' | 'whiteboard'; id: string } | null>(null);
@@ -71,12 +72,14 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
       getLists(spaceId),
       getDocsBySpace(spaceId).catch(() => ({ items: [] })),
       getWhiteboardsBySpace(spaceId).catch(() => ({ items: [] })),
+      getForms(spaceId).catch(() => ({ items: [] })),
     ])
-      .then(([f, l, docsRes, boardsRes]) => {
+      .then(([f, l, docsRes, boardsRes, formsRes]) => {
         setFolders(f);
         setLists(l);
         setSpaceDocs(docsRes.items.map((d: any) => ({ id: d.id, title: d.title || 'Untitled', folderId: d.folderId || null })));
         setSpaceBoards(boardsRes.items.map((b: any) => ({ id: b.id, name: b.name || 'Untitled', folderId: b.folderId || null })));
+        setSpaceForms(((formsRes as any).items || formsRes || []).map((fm: any) => ({ id: fm.id, title: fm.title || 'Untitled', folderId: fm.folderId || null })));
         // Auto-expand folder containing active list, doc, whiteboard, or folder route
         const expandIds = new Set<string>();
         const activeListId = extractListId(path, spaceId);

@@ -1220,6 +1220,12 @@ export default function TaskDetailDrawer({
           />
         </div>
 
+        {/* ===== LINKED GOALS ===== */}
+        <LinkedGoalsSection taskId={task.id} lang={lang} />
+
+        {/* ===== LINKED DOCS ===== */}
+        <LinkedDocsSection taskId={task.id} lang={lang} />
+
         {/* ===== BOTTOM TABS ===== */}
         <div className="sticky bottom-0 bg-[var(--bg-base)] overflow-hidden min-w-0">
           <div className="flex px-6 border-b border-[var(--border-subtle)]">
@@ -1525,5 +1531,67 @@ export default function TaskDetailDrawer({
         {content}
       </motion.div>
     </motion.div>
+  );
+}
+
+// ─── Linked Goals Section ──────────────────────────
+function LinkedGoalsSection({ taskId, lang }: { taskId: string; lang: string }) {
+  const [goals, setGoals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    import('@/lib/relations').then(({ getRelationsForEntity }) =>
+      getRelationsForEntity(taskId).then(rels => {
+        const goalRels = rels.filter((r: any) => r.targetType === 'goal' || r.sourceType === 'goal');
+        setGoals(goalRels);
+        setLoading(false);
+      })
+    ).catch(() => setLoading(false));
+  }, [taskId]);
+  if (loading || goals.length === 0) return null;
+  return (
+    <div className="px-6 py-3 border-t border-[var(--border-subtle)]">
+      <h4 className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <span>🎯</span> {lang === 'es' ? 'Objetivos Vinculados' : 'Linked Goals'}
+      </h4>
+      <div className="space-y-1">
+        {goals.map((g: any) => (
+          <div key={g.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[var(--bg-elevated)] text-[12px]">
+            <span className="text-[var(--success)] font-medium">{g.targetName || g.sourceName}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Linked Docs Section ──────────────────────────
+function LinkedDocsSection({ taskId, lang }: { taskId: string; lang: string }) {
+  const [docs, setDocs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    import('@/lib/relations').then(({ getRelationsForEntity }) =>
+      getRelationsForEntity(taskId).then(rels => {
+        const docRels = rels.filter((r: any) => r.targetType === 'doc' || r.sourceType === 'doc');
+        setDocs(docRels);
+        setLoading(false);
+      })
+    ).catch(() => setLoading(false));
+  }, [taskId]);
+  if (loading || docs.length === 0) return null;
+  return (
+    <div className="px-6 py-3 border-t border-[var(--border-subtle)]">
+      <h4 className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <FileText className="h-3.5 w-3.5" /> {lang === 'es' ? 'Documentos Vinculados' : 'Linked Docs'}
+      </h4>
+      <div className="space-y-1">
+        {docs.map((d: any) => (
+          <a key={d.id} href={`/app/docs?doc=${d.targetId || d.sourceId}`}
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[var(--bg-elevated)] text-[12px] hover:bg-[var(--bg-hover)] transition">
+            <FileText className="h-3.5 w-3.5 text-[var(--accent)]" />
+            <span className="text-[var(--text-primary)]">{d.targetName || d.sourceName}</span>
+          </a>
+        ))}
+      </div>
+    </div>
   );
 }

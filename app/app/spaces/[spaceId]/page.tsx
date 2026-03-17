@@ -15,7 +15,7 @@ import {
   Layers, Users, CheckSquare, Target, FileText, ArrowLeft,
   Loader2, ShieldAlert, ChevronRight, Clock, TrendingUp,
   BarChart3, Calendar, AlertTriangle, LayoutDashboard, Settings2, Settings,
-  FolderOpen, List, Plus, FolderPlus, ListPlus,
+  FolderOpen, List, Plus, FolderPlus, ListPlus, MessageSquare,
 } from 'lucide-react';
 import ContextualDashboard from '@/components/dashboard/contextual-dashboard';
 import SpaceTasksPanel from '@/components/spaces/space-tasks-panel';
@@ -33,7 +33,7 @@ const GOAL_STATUS_COLORS: Record<string, string> = {
   on_track: '#22C55E', at_risk: '#F59E0B', behind: '#EF4444', completed: '#3B82F6',
 };
 
-type Tab = 'overview' | 'dashboard' | 'tasks' | 'docs' | 'goals' | 'settings';
+type Tab = 'overview' | 'dashboard' | 'tasks' | 'docs' | 'goals' | 'chat' | 'settings';
 
 export default function SpacePage() {
   const { user, me, teams, allMembers, canSeeAllTeams, setActiveTeamId, isManager } = useAuth();
@@ -146,6 +146,7 @@ export default function SpacePage() {
     { key: 'tasks', labelKey: 'spaces.tabTasks', icon: <CheckSquare className="h-3.5 w-3.5" />, count: tasks.filter(t => !t.deleted).length },
     { key: 'docs', labelKey: 'spaces.tabDocs', icon: <FileText className="h-3.5 w-3.5" />, count: docs.length },
     { key: 'goals', labelKey: 'spaces.tabGoals', icon: <Target className="h-3.5 w-3.5" />, count: goals.length },
+    { key: 'chat', labelKey: 'nav.chat', icon: <MessageSquare className="h-3.5 w-3.5" /> },
     ...(isManager ? [{ key: 'settings' as Tab, labelKey: 'spaces.tabSettings', icon: <Settings className="h-3.5 w-3.5" /> }] : []),
   ];
 
@@ -361,6 +362,24 @@ export default function SpacePage() {
             )}
             {activeTab === 'goals' && (
               <GoalsTab goals={goals} lang={lang} t={t} teamColor={team?.color} goToModule={goToModule} />
+            )}
+            {activeTab === 'chat' && (
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <MessageSquare className="h-5 w-5 text-[var(--accent)]" />
+                  <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">
+                    {lang === 'es' ? 'Chat del Espacio' : 'Space Chat'}
+                  </h3>
+                  <button onClick={() => goToModule('/app/chat')} className="text-[12px] text-[var(--accent)] hover:underline ml-auto">
+                    {lang === 'es' ? 'Abrir Chat completo →' : 'Open full Chat →'}
+                  </button>
+                </div>
+                <p className="text-[13px] text-[var(--text-muted)]">
+                  {lang === 'es'
+                    ? `Conversaciones del equipo ${team?.name || ''}. Los mensajes aquí son visibles para todos los miembros del espacio.`
+                    : `Team conversations for ${team?.name || ''}. Messages here are visible to all space members.`}
+                </p>
+              </div>
             )}
             {activeTab === 'settings' && isManager && (
               <SettingsTab spaceId={spaceId} t={t} lang={lang} />
