@@ -117,7 +117,7 @@ export default function MobileQuickActions() {
                     className="w-8 h-8 rounded-full flex items-center justify-center"
                     style={{ backgroundColor: action.color + '20' }}
                   >
-                    <action.Icon className="h-4 w-4" style={{ color: action.color }} />
+                    <span style={{ color: action.color }}><action.Icon className="h-4 w-4" /></span>
                   </div>
                   <span className="text-[13px] font-medium text-[var(--text-primary)] whitespace-nowrap">
                     {t(action.labelKey)}
