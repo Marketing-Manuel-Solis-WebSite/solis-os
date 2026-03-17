@@ -14,7 +14,7 @@ import {
 } from '@/lib/db';
 import {
   getViewsForScope, createView as createFirestoreView,
-  updateView as updateFirestoreView,
+  updateView as updateFirestoreView, deleteView as deleteFirestoreView,
   pinView, setDefaultView, shareViewByLink,
 } from '@/lib/views/view-db';
 import { getCurrentOrgId } from '@/lib/org';
@@ -431,6 +431,12 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
 
   const handleDeleteView = async (id: string) => {
     if (!user?.uid) return;
+    // Guard: check if a corresponding Firestore view is required
+    const fsView = firestoreViews.find(v => v.id === id);
+    if (fsView?.visibility === 'required') {
+      toast.error(t('views.cannotDeleteRequired'));
+      return;
+    }
     const updated = savedViews.filter(sv => sv.id !== id);
     setSavedViews(updated);
     if (activePreset === `saved:${id}`) setActivePreset('all');
@@ -447,6 +453,12 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
 
   // ─── Shared view handlers ─────────────────────────────
   const handleDeleteSharedView = async (id: string) => {
+    // Guard: check if this Firestore view is required
+    const fsView = firestoreViews.find(v => v.id === id);
+    if (fsView?.visibility === 'required') {
+      toast.error(t('views.cannotDeleteRequired'));
+      return;
+    }
     const updated = sharedViews.filter(sv => sv.id !== id);
     setSharedViews(updated);
     if (activePreset === `shared:${id}`) setActivePreset('all');

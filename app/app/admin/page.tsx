@@ -6,6 +6,7 @@ import CustomFieldManager from '@/components/admin/custom-field-manager';
 import PermissionInspector from '@/components/admin/permission-inspector';
 import UsageDashboard from '@/components/admin/usage-dashboard';
 import InviteMembersPanel from '@/components/admin/invite-members-panel';
+import StatusTemplateManager from '@/components/admin/status-template-manager';
 import {
   getMembers, updateMember, getAuditLogs, logAction, getOrg, updateOrg,
   getSettings, saveSettings, getWorkspaces, createWorkspace, deleteWorkspace,
@@ -24,7 +25,7 @@ import {
   Archive, ArchiveRestore, ArrowRightLeft, Loader2, Eye, Scan, BarChart3, Mail
 } from 'lucide-react';
 
-type S = 'org'|'users'|'departments'|'invites'|'perms'|'inspector'|'usage'|'struct'|'fields'|'tpl'|'auto'|'notif'|'ai'|'integ'|'audit';
+type S = 'org'|'users'|'departments'|'invites'|'perms'|'inspector'|'usage'|'struct'|'fields'|'stpl'|'tpl'|'auto'|'notif'|'ai'|'integ'|'audit';
 const SS: {id:S;lKey:string;i:any;dKey:string}[] = [
   {id:'org',lKey:'admin.org',i:Building2,dKey:'admin.orgDesc'},
   {id:'users',lKey:'admin.users',i:Users,dKey:'admin.usersDesc'},
@@ -35,6 +36,7 @@ const SS: {id:S;lKey:string;i:any;dKey:string}[] = [
   {id:'usage',lKey:'admin.usage',i:BarChart3,dKey:'admin.usageDesc'},
   {id:'struct',lKey:'admin.structure',i:LayoutGrid,dKey:'admin.structureDesc'},
   {id:'fields',lKey:'admin.customFields',i:Columns3,dKey:'admin.customFieldsDesc'},
+  {id:'stpl',lKey:'admin.statusTemplates',i:Palette,dKey:'admin.statusTemplatesDesc'},
   {id:'tpl',lKey:'admin.templates',i:FileStack,dKey:'admin.templatesDesc'},
   {id:'auto',lKey:'admin.automations',i:Zap,dKey:'admin.automationsDesc'},
   {id:'notif',lKey:'admin.notifications',i:Bell,dKey:'admin.notificationsDesc'},
@@ -106,6 +108,7 @@ export default function Admin() {
         {s === 'usage' && <UsageDashboard />}
         {s === 'struct' && <CrudS label={t('admin.structure')} fields={['name', 'description']} gFn={getWorkspaces} cFn={createWorkspace} dFn={deleteWorkspace} />}
         {s === 'fields' && <div className="p-6"><CustomFieldManager /></div>}
+        {s === 'stpl' && <StatusTemplateManager />}
         {s === 'tpl' && <CrudS label={t('admin.templates')} fields={['name', 'type', 'content']} gFn={getTemplates} cFn={createTemplate} dFn={deleteTemplate} />}
         {s === 'auto' && <CrudS label={t('admin.automations')} fields={['name', 'trigger', 'action']} gFn={getAutomations} cFn={createAutomation} dFn={deleteAutomation} />}
         {s === 'notif' && <ComingSoonS label={t('admin.notifications')} />}

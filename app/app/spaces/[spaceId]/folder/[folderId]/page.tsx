@@ -9,6 +9,7 @@ import {
 } from '@/lib/db';
 import { ArrowLeft, Loader2, ShieldAlert, FolderOpen, List, FileText, PenTool, LayoutDashboard } from 'lucide-react';
 import ContextualDashboard from '@/components/dashboard/contextual-dashboard';
+import HierarchyBreadcrumbs from '@/components/shared/hierarchy-breadcrumbs';
 
 export default function FolderPage() {
   const { user, me, teams, canSeeAllTeams } = useAuth();
@@ -77,6 +78,16 @@ export default function FolderPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
+      {/* Breadcrumbs */}
+      <div className="mb-3">
+        <HierarchyBreadcrumbs
+          spaceId={spaceId}
+          spaceName={team?.name}
+          folderId={folderId}
+          folderName={folder.name}
+        />
+      </div>
+
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">
         <button

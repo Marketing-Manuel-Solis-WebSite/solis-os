@@ -16,11 +16,19 @@ import {
   Loader2, ShieldAlert, ChevronRight, Clock, TrendingUp,
   BarChart3, Calendar, AlertTriangle, LayoutDashboard, Settings2, Settings,
   FolderOpen, List, Plus, FolderPlus, ListPlus, MessageSquare,
+  ChevronUp, ChevronDown, Trash2, Save, Palette, Link2, Unlink,
 } from 'lucide-react';
+import { loadSpaceStatuses, saveSpaceStatuses, generateStatusId, type StatusDef, type StatusCategory, type StatusConfig } from '@/lib/status-config';
+import { getStatusTemplates, subscribeSpaceToTemplate, unsubscribeSpaceFromTemplate, type StatusTemplate } from '@/lib/status-templates';
+import { useToast } from '@/components/notifications/toast-provider';
 import ContextualDashboard from '@/components/dashboard/contextual-dashboard';
 import SpaceTasksPanel from '@/components/spaces/space-tasks-panel';
 import SpaceChatEmbed from '@/components/chat/space-chat-embed';
 import RequestAccessModal from '@/components/shared/request-access-modal';
+import HierarchyBreadcrumbs from '@/components/shared/hierarchy-breadcrumbs';
+import { getViewsForScope, createView as createFirestoreView, deleteView as deleteFirestoreView } from '@/lib/views/view-db';
+import { getCurrentOrgId } from '@/lib/org';
+import type { ViewDefinition } from '@/types';
 
 // ─── Constants ───────────────────────────────────────────
 const STATUS_COLORS: Record<string, string> = {
@@ -213,6 +221,11 @@ export default function SpacePage() {
       transition={{ duration: 0.4 }}
       className="px-6 pt-5 pb-8 max-w-[1440px] mx-auto"
     >
+      {/* ─── Breadcrumbs ────────────────────────────────────── */}
+      <div className="mb-3">
+        <HierarchyBreadcrumbs spaceId={spaceId} spaceName={team?.name} />
+      </div>
+
       {/* ─── Hero ──────────────────────────────────────────── */}
       <div className="mb-6">
         <div className="relative overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-gradient-to-br from-[var(--bg-elevated)] via-[var(--bg-secondary)] to-[var(--accent)]/[0.04]">
@@ -379,7 +392,7 @@ export default function SpacePage() {
               </div>
             )}
             {activeTab === 'settings' && isManager && (
-              <SettingsTab spaceId={spaceId} t={t} lang={lang} />
+              <SettingsTab spaceId={spaceId} userId={user?.uid || ''} t={t} lang={lang} />
             )}
           </motion.div>
         </AnimatePresence>
@@ -695,17 +708,60 @@ function GoalsTab({ goals, lang, t, teamColor, goToModule }: {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SETTINGS TAB (Inheritance)
+// SETTINGS TAB (Inheritance + Status Editor)
 // ═══════════════════════════════════════════════════════════════
-function SettingsTab({ spaceId, t, lang }: {
-  spaceId: string; t: (k: string) => string; lang: string;
+const STATUS_PRESET_COLORS = ['#64748B', '#3B82F6', '#22C55E', '#A855F7', '#EF4444', '#F59E0B', '#EC4899', '#14B8A6'];
+const STATUS_CATEGORIES: StatusCategory[] = ['not_started', 'active', 'done', 'closed'];
+const STATUS_CATEGORY_LABELS: Record<StatusCategory, { en: string; es: string }> = {
+  not_started: { en: 'Not Started', es: 'No iniciado' },
+  active: { en: 'Active', es: 'Activo' },
+  done: { en: 'Done', es: 'Completado' },
+  closed: { en: 'Closed', es: 'Cerrado' },
+};
+const STATUS_CATEGORY_COLORS: Record<StatusCategory, string> = {
+  not_started: '#64748B', active: '#3B82F6', done: '#22C55E', closed: '#94A3B8',
+};
+
+function SettingsTab({ spaceId, userId, t, lang }: {
+  spaceId: string; userId: string; t: (k: string) => string; lang: string;
 }) {
+  const { user } = useAuth();
+  const toast = useToast();
+
   const [config, setConfig] = useState<InheritanceConfig>({
     statusMode: 'inherit', customFieldMode: 'inherit', automationMode: 'inherit',
   });
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+
+  // ─── Required Views state ──────────────────────────────
+  const [requiredViews, setRequiredViews] = useState<ViewDefinition[]>([]);
+  const [loadingViews, setLoadingViews] = useState(true);
+  const [togglingView, setTogglingView] = useState<string | null>(null);
+
+  // ─── Status state ──────────────────────────────
+  const [statusConfig, setStatusConfig] = useState<StatusConfig | null>(null);
+  const [editStatuses, setEditStatuses] = useState<StatusDef[]>([]);
+  const [statusDirty, setStatusDirty] = useState(false);
+  const [savingStatuses, setSavingStatuses] = useState(false);
+  const [subscribedTemplateId, setSubscribedTemplateId] = useState<string | null>(null);
+  const [subscribedTemplateName, setSubscribedTemplateName] = useState<string>('');
+  const [statusTemplates, setStatusTemplates] = useState<StatusTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [loadingStatuses, setLoadingStatuses] = useState(true);
+
+  const VIEW_TYPES = [
+    { id: 'list', labelKey: 'views.list' },
+    { id: 'board', labelKey: 'views.board' },
+    { id: 'calendar', labelKey: 'views.calendar' },
+    { id: 'table', labelKey: 'views.table' },
+    { id: 'gantt', labelKey: 'views.gantt' },
+    { id: 'timeline', labelKey: 'views.timeline' },
+    { id: 'workload', labelKey: 'views.workload' },
+    { id: 'team', labelKey: 'views.team' },
+    { id: 'activity', labelKey: 'views.activity' },
+  ] as const;
 
   useEffect(() => {
     let cancelled = false;
@@ -715,6 +771,200 @@ function SettingsTab({ spaceId, t, lang }: {
     }).catch(() => { if (!cancelled) setLoadingConfig(false); });
     return () => { cancelled = true; };
   }, [spaceId]);
+
+  // Load required views from Firestore
+  useEffect(() => {
+    if (!userId || !spaceId) return;
+    let cancelled = false;
+    setLoadingViews(true);
+    getViewsForScope('space', spaceId, userId).then(views => {
+      if (!cancelled) {
+        setRequiredViews(views.filter(v => v.visibility === 'required'));
+        setLoadingViews(false);
+      }
+    }).catch(() => { if (!cancelled) setLoadingViews(false); });
+    return () => { cancelled = true; };
+  }, [userId, spaceId]);
+
+  const isViewTypeRequired = useCallback((viewTypeId: string) => {
+    return requiredViews.some(v => v.viewType === viewTypeId);
+  }, [requiredViews]);
+
+  const handleToggleRequiredView = useCallback(async (viewTypeId: string) => {
+    if (viewTypeId === 'list') return; // List is always required
+    setTogglingView(viewTypeId);
+    try {
+      const existing = requiredViews.find(v => v.viewType === viewTypeId);
+      if (existing) {
+        // Remove required view
+        await deleteFirestoreView(existing.id);
+        setRequiredViews(prev => prev.filter(v => v.id !== existing.id));
+      } else {
+        // Create required view
+        const viewLabel = VIEW_TYPES.find(vt => vt.id === viewTypeId);
+        const newId = await createFirestoreView({
+          orgId: getCurrentOrgId(),
+          scopeType: 'space',
+          scopeId: spaceId,
+          name: viewLabel ? t(viewLabel.labelKey) : viewTypeId,
+          viewType: viewTypeId,
+          visibility: 'required',
+          isDefault: false,
+          isPinned: false,
+          position: requiredViews.length,
+          config: {},
+          sharedWith: [],
+          createdBy: userId,
+        });
+        setRequiredViews(prev => [...prev, {
+          id: newId,
+          orgId: getCurrentOrgId(),
+          scopeType: 'space',
+          scopeId: spaceId,
+          name: viewLabel ? t(viewLabel.labelKey) : viewTypeId,
+          viewType: viewTypeId,
+          visibility: 'required',
+          isDefault: false,
+          isPinned: false,
+          position: requiredViews.length,
+          config: {},
+          sharedWith: [],
+          createdBy: userId,
+        } as unknown as ViewDefinition]);
+      }
+    } catch (err) {
+      console.error('[Settings] Failed to toggle required view:', err);
+    } finally {
+      setTogglingView(null);
+    }
+  }, [requiredViews, spaceId, userId, t]);
+
+  // Load statuses + templates
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingStatuses(true);
+    Promise.all([
+      loadSpaceStatuses(spaceId),
+      getStatusTemplates(),
+    ]).then(([sc, tpls]) => {
+      if (cancelled) return;
+      setStatusConfig(sc);
+      setEditStatuses(sc.statuses.map((s, i) => ({ ...s, order: i })));
+      setStatusTemplates(tpls);
+      const sub = tpls.find(tp => tp.subscribedSpaces.includes(spaceId));
+      if (sub) {
+        setSubscribedTemplateId(sub.id);
+        setSubscribedTemplateName(sub.name);
+      } else {
+        setSubscribedTemplateId(null);
+        setSubscribedTemplateName('');
+      }
+      setLoadingStatuses(false);
+    }).catch(() => { if (!cancelled) setLoadingStatuses(false); });
+    return () => { cancelled = true; };
+  }, [spaceId]);
+
+  // Status editor helpers
+  const addSpaceStatus = () => {
+    setEditStatuses(prev => [
+      ...prev,
+      {
+        id: `status_${Date.now()}`,
+        name: '',
+        nameEs: '',
+        color: STATUS_PRESET_COLORS[prev.length % STATUS_PRESET_COLORS.length],
+        category: 'active' as StatusCategory,
+        order: prev.length,
+      },
+    ]);
+    setStatusDirty(true);
+  };
+
+  const removeSpaceStatus = (idx: number) => {
+    setEditStatuses(prev => prev.filter((_, i) => i !== idx).map((s, i) => ({ ...s, order: i })));
+    setStatusDirty(true);
+  };
+
+  const moveSpaceStatus = (idx: number, dir: -1 | 1) => {
+    setEditStatuses(prev => {
+      const arr = [...prev];
+      const target = idx + dir;
+      if (target < 0 || target >= arr.length) return arr;
+      [arr[idx], arr[target]] = [arr[target], arr[idx]];
+      return arr.map((s, i) => ({ ...s, order: i }));
+    });
+    setStatusDirty(true);
+  };
+
+  const updateStatusField = (idx: number, patch: Partial<StatusDef>) => {
+    setEditStatuses(prev => prev.map((s, i) => {
+      if (i !== idx) return s;
+      const updated = { ...s, ...patch };
+      if (patch.name !== undefined) {
+        updated.id = generateStatusId(patch.name) || s.id;
+      }
+      return updated;
+    }));
+    setStatusDirty(true);
+  };
+
+  const handleSaveStatuses = async () => {
+    if (!user || !statusConfig) return;
+    const hasStart = editStatuses.some(s => s.category === 'not_started');
+    const hasDone = editStatuses.some(s => s.category === 'done');
+    if (!hasStart || !hasDone) {
+      toast.error(t('statusTemplates.validation'), '');
+      return;
+    }
+    setSavingStatuses(true);
+    try {
+      await saveSpaceStatuses(spaceId, editStatuses, user.uid, statusConfig.version);
+      const refreshed = await loadSpaceStatuses(spaceId);
+      setStatusConfig(refreshed);
+      setEditStatuses(refreshed.statuses.map((s, i) => ({ ...s, order: i })));
+      setStatusDirty(false);
+      toast.success(t('statusTemplates.saved'), '');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error', '');
+    }
+    setSavingStatuses(false);
+  };
+
+  const handleSubscribeToTemplate = async () => {
+    if (!user || !selectedTemplateId) return;
+    setSavingStatuses(true);
+    try {
+      await subscribeSpaceToTemplate(spaceId, selectedTemplateId, user.uid);
+      const [sc, tpls] = await Promise.all([loadSpaceStatuses(spaceId), getStatusTemplates()]);
+      setStatusConfig(sc);
+      setEditStatuses(sc.statuses.map((s, i) => ({ ...s, order: i })));
+      setStatusTemplates(tpls);
+      const sub = tpls.find(tp => tp.subscribedSpaces.includes(spaceId));
+      if (sub) { setSubscribedTemplateId(sub.id); setSubscribedTemplateName(sub.name); }
+      setSelectedTemplateId('');
+      setStatusDirty(false);
+      toast.success(t('statusTemplates.subscribed'), '');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error', '');
+    }
+    setSavingStatuses(false);
+  };
+
+  const handleUnsubscribeFromTemplate = async () => {
+    if (!subscribedTemplateId) return;
+    setSavingStatuses(true);
+    try {
+      await unsubscribeSpaceFromTemplate(spaceId, subscribedTemplateId);
+      setSubscribedTemplateId(null);
+      setSubscribedTemplateName('');
+      const tpls = await getStatusTemplates();
+      setStatusTemplates(tpls);
+      toast.success(t('statusTemplates.unsubscribed'), '');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error', '');
+    }
+    setSavingStatuses(false);
+  };
 
   const updateMode = useCallback((field: keyof InheritanceConfig, value: InheritanceMode) => {
     setConfig(prev => ({ ...prev, [field]: value }));
@@ -745,7 +995,7 @@ function SettingsTab({ spaceId, t, lang }: {
     { field: 'automationMode', labelKey: 'inheritance.automationMode' },
   ];
 
-  if (loadingConfig) {
+  if (loadingConfig || loadingStatuses) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <Loader2 className="h-5 w-5 animate-spin text-[var(--accent)]" />
@@ -824,6 +1074,198 @@ function SettingsTab({ spaceId, t, lang }: {
           </div>
         </div>
       ))}
+
+      {/* Required Views section */}
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-5">
+        <h3 className="text-[13px] font-semibold text-[var(--text-primary)] mb-1">{t('views.requiredViews')}</h3>
+        <p className="text-[12px] text-[var(--text-muted)] mb-4">{t('views.requiredViewsDesc')}</p>
+        {loadingViews ? (
+          <div className="flex items-center gap-2 py-4">
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />
+            <span className="text-[12px] text-[var(--text-muted)]">{t('common.loading')}</span>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {VIEW_TYPES.map(vt => {
+              const isList = vt.id === 'list';
+              const checked = isList || isViewTypeRequired(vt.id);
+              const isToggling = togglingView === vt.id;
+              return (
+                <label
+                  key={vt.id}
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border transition-all duration-200 cursor-pointer ${
+                    checked
+                      ? 'border-[var(--accent)]/30 bg-[var(--accent)]/[0.04]'
+                      : 'border-[var(--border-subtle)] bg-[var(--bg-tertiary)]/40 hover:bg-[var(--bg-hover)]'
+                  } ${isList ? 'opacity-70 cursor-not-allowed' : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={isList || isToggling}
+                    onChange={() => handleToggleRequiredView(vt.id)}
+                    className="w-4 h-4 rounded border-[var(--border-subtle)] text-[var(--accent)] focus:ring-[var(--accent)] accent-[var(--accent)]"
+                  />
+                  <span className={`text-[13px] font-medium flex-1 ${checked ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
+                    {t(vt.labelKey)}
+                  </span>
+                  {isList && (
+                    <span className="text-[10px] text-[var(--text-muted)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded-full">
+                      {t('views.alwaysRequired')}
+                    </span>
+                  )}
+                  {isToggling && <Loader2 className="h-3 w-3 animate-spin text-[var(--accent)]" />}
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ──── Space Statuses Section ──── */}
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-[13px] font-semibold text-[var(--text-primary)] flex items-center gap-2">
+            <Palette className="h-4 w-4 text-[var(--accent)] opacity-80" />
+            {t('spaces.statuses')}
+          </h3>
+          {!subscribedTemplateId && statusDirty && (
+            <button
+              onClick={handleSaveStatuses}
+              disabled={savingStatuses}
+              className="flex items-center gap-1.5 text-[12px] font-semibold px-4 py-1.5 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 transition disabled:opacity-50"
+            >
+              {savingStatuses ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+              {lang === 'es' ? 'Guardar' : 'Save'}
+            </button>
+          )}
+        </div>
+
+        {subscribedTemplateId ? (
+          <div>
+            <div className="flex items-center justify-between mb-3 px-3 py-2.5 rounded-xl bg-[var(--accent)]/[0.06] border border-[var(--accent)]/20">
+              <div className="flex items-center gap-2">
+                <Link2 className="h-3.5 w-3.5 text-[var(--accent)]" />
+                <span className="text-[12px] font-medium text-[var(--text-primary)]">
+                  {t('statusTemplates.subscribedTo').replace('{name}', subscribedTemplateName)}
+                </span>
+              </div>
+              <button
+                onClick={handleUnsubscribeFromTemplate}
+                disabled={savingStatuses}
+                className="flex items-center gap-1 text-[11px] text-red-400 hover:underline disabled:opacity-50"
+              >
+                <Unlink className="h-3 w-3" />
+                {t('statusTemplates.unsubscribe')}
+              </button>
+            </div>
+            <div className="space-y-1">
+              {editStatuses.map(s => (
+                <div key={s.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--bg-tertiary)]/50">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                  <span className="text-[12px] text-[var(--text-primary)] flex-1">
+                    {lang === 'es' ? s.nameEs || s.name : s.name}
+                  </span>
+                  <span
+                    className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: STATUS_CATEGORY_COLORS[s.category] + '20', color: STATUS_CATEGORY_COLORS[s.category] }}
+                  >
+                    {STATUS_CATEGORY_LABELS[s.category][lang === 'es' ? 'es' : 'en']}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="space-y-1 mb-4">
+              {editStatuses.map((s, idx) => (
+                <div key={idx} className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[var(--bg-tertiary)]/50">
+                  <div className="flex flex-col gap-0 shrink-0">
+                    <button onClick={() => moveSpaceStatus(idx, -1)} disabled={idx === 0} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] disabled:opacity-30">
+                      <ChevronUp className="h-3 w-3" />
+                    </button>
+                    <button onClick={() => moveSpaceStatus(idx, 1)} disabled={idx === editStatuses.length - 1} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] disabled:opacity-30">
+                      <ChevronDown className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    {STATUS_PRESET_COLORS.map(c => (
+                      <button
+                        key={c}
+                        onClick={() => updateStatusField(idx, { color: c })}
+                        className={`w-3.5 h-3.5 rounded-full border-2 transition ${
+                          s.color === c ? 'border-white scale-125' : 'border-transparent hover:scale-110'
+                        }`}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                  <input
+                    value={s.name}
+                    onChange={e => updateStatusField(idx, { name: e.target.value })}
+                    placeholder="Name"
+                    className="flex-1 min-w-0 px-2 py-1 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                  />
+                  <input
+                    value={s.nameEs}
+                    onChange={e => updateStatusField(idx, { nameEs: e.target.value })}
+                    placeholder="Nombre"
+                    className="flex-1 min-w-0 px-2 py-1 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                  />
+                  <select
+                    value={s.category}
+                    onChange={e => updateStatusField(idx, { category: e.target.value as StatusCategory })}
+                    className="px-2 py-1 rounded-md bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                  >
+                    {STATUS_CATEGORIES.map(cat => (
+                      <option key={cat} value={cat}>
+                        {STATUS_CATEGORY_LABELS[cat][lang === 'es' ? 'es' : 'en']}
+                      </option>
+                    ))}
+                  </select>
+                  <button onClick={() => removeSpaceStatus(idx)} className="text-[var(--text-muted)] hover:text-red-400 transition shrink-0">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={addSpaceStatus}
+                className="flex items-center gap-1 text-[12px] text-[var(--accent)] hover:underline"
+              >
+                <Plus className="h-3 w-3" />
+                {t('statusTemplates.addStatus')}
+              </button>
+              {statusTemplates.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedTemplateId}
+                    onChange={e => setSelectedTemplateId(e.target.value)}
+                    className="px-2 py-1.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                  >
+                    <option value="">{t('statusTemplates.subscribe')}</option>
+                    {statusTemplates.map(tp => (
+                      <option key={tp.id} value={tp.id}>{tp.name}</option>
+                    ))}
+                  </select>
+                  {selectedTemplateId && (
+                    <button
+                      onClick={handleSubscribeToTemplate}
+                      disabled={savingStatuses}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-[11px] font-semibold hover:opacity-90 transition disabled:opacity-50"
+                    >
+                      {savingStatuses ? <Loader2 className="h-3 w-3 animate-spin" /> : <Link2 className="h-3 w-3" />}
+                      {t('statusTemplates.subscribe')}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

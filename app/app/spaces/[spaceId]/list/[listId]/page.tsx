@@ -3,12 +3,13 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { getTasksByList, getLists, updateList, type ListData } from '@/lib/db';
+import { getTasksByList, getLists, getFolders, updateList, type ListData, type FolderData } from '@/lib/db';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, Loader2, ShieldAlert, List, Pencil, MoreHorizontal,
 } from 'lucide-react';
 import SpaceTasksPanel from '@/components/spaces/space-tasks-panel';
+import HierarchyBreadcrumbs from '@/components/shared/hierarchy-breadcrumbs';
 
 export default function ListPage() {
   const { user, me, teams, allMembers, canSeeAllTeams } = useAuth();
@@ -18,6 +19,7 @@ export default function ListPage() {
 
   const [tasks, setTasks] = useState<any[]>([]);
   const [list, setList] = useState<ListData | null>(null);
+  const [folders, setFolders] = useState<FolderData[]>([]);
   const [loading, setLoading] = useState(true);
   const lastFetchedId = useRef<string | null>(null);
 
@@ -38,13 +40,15 @@ export default function ListPage() {
   const loadData = useCallback(async () => {
     if (!user || !spaceId || !listId || !hasAccess) return;
     setLoading(true);
-    const [tasksRes, listsRes] = await Promise.all([
+    const [tasksRes, listsRes, foldersRes] = await Promise.all([
       getTasksByList(listId).catch(() => ({ items: [] })),
       getLists(spaceId).catch(() => []),
+      getFolders(spaceId).catch(() => []),
     ]);
     setTasks(tasksRes.items);
     const found = listsRes.find((l: ListData) => l.id === listId);
     setList(found || null);
+    setFolders(foldersRes as FolderData[]);
     setLoading(false);
   }, [user, spaceId, listId, hasAccess]);
 
@@ -114,10 +118,24 @@ export default function ListPage() {
     );
   }
 
+  // Resolve parent folder (if list belongs to one)
+  const parentFolder = list?.folderId ? folders.find(f => f.id === list.folderId) : null;
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Header */}
       <div className="px-6 pt-6 pb-3 border-b border-[var(--border-subtle)]">
+        {/* Breadcrumbs */}
+        <div className="mb-2">
+          <HierarchyBreadcrumbs
+            spaceId={spaceId}
+            spaceName={team?.name}
+            folderId={parentFolder?.id}
+            folderName={parentFolder?.name}
+            listId={listId}
+            listName={list.name}
+          />
+        </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push(`/app/spaces/${spaceId}`)}

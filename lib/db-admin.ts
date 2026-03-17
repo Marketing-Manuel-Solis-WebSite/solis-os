@@ -215,6 +215,27 @@ export async function createTeam(data: any) {
     description: data.description || '',
     status: 'active',
   });
+  // Auto-create required 'list' view for every new space
+  try {
+    await adminDb.collection(`orgs/${ORG}/views`).add({
+      orgId: ORG,
+      scopeType: 'space',
+      scopeId: id,
+      name: 'Lista',
+      viewType: 'list',
+      visibility: 'required',
+      isDefault: true,
+      isPinned: false,
+      position: 0,
+      config: {},
+      sharedWith: [],
+      createdBy: data.createdBy || 'system',
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.error('[createTeam] Auto-create required list view failed:', err);
+  }
   return id;
 }
 

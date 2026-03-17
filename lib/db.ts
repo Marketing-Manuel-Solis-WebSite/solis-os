@@ -196,10 +196,31 @@ export async function getActiveTeams() {
 }
 export async function createTeam(data: any) {
   const id = data.id || data.name.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  return setAt(`orgs/${ORG}/teams/${id}`, {
+  const result = await setAt(`orgs/${ORG}/teams/${id}`, {
     name: data.name, color: data.color || '#6B7280', icon: data.icon || '📁', description: data.description || '',
     status: 'active',
   });
+  // Auto-create required 'list' view for every new space
+  try {
+    const { createView } = await import('@/lib/views/view-db');
+    await createView({
+      orgId: ORG,
+      scopeType: 'space',
+      scopeId: id,
+      name: 'Lista',
+      viewType: 'list',
+      visibility: 'required',
+      isDefault: true,
+      isPinned: false,
+      position: 0,
+      config: {},
+      sharedWith: [],
+      createdBy: data.createdBy || 'system',
+    });
+  } catch (err) {
+    console.error('[createTeam] Auto-create required list view failed:', err);
+  }
+  return result;
 }
 export async function updateTeam(id: string, data: any) { return updateAt(`orgs/${ORG}/teams/${id}`, data); }
 export async function deleteTeam(id: string) { return deleteAt(`orgs/${ORG}/teams/${id}`); }
