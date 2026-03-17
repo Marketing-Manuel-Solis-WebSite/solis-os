@@ -65,6 +65,8 @@ export interface Task {
   isRecurrenceTemplate?: boolean;
   recurrenceTemplateId?: string;
   recurrenceInstanceDate?: any;
+  goalId?: string;
+  goalIds?: string[];
 }
 
 // =============================================
@@ -149,6 +151,7 @@ export interface FilterState {
   isBlocked?: boolean;
   noDate?: boolean;
   noAssignee?: boolean;
+  goalId?: string[];
 }
 
 export const EMPTY_FILTERS: FilterState = {
@@ -164,6 +167,7 @@ export const EMPTY_FILTERS: FilterState = {
   isBlocked: false,
   noDate: false,
   noAssignee: false,
+  goalId: [],
 };
 
 // =============================================
@@ -417,6 +421,7 @@ export function countActiveFilters(f: FilterState): number {
     f.isBlocked ? 1 : 0,
     f.noDate ? 1 : 0,
     f.noAssignee ? 1 : 0,
+    (f.goalId || []).length,
   ].reduce((a, b) => a + b, 0);
 }
 
@@ -459,6 +464,9 @@ export function applyFilters(tasks: Task[], filters: FilterState): Task[] {
   if (filters.isBlocked) result = result.filter(t => t.status === 'blocked');
   if (filters.noDate) result = result.filter(t => !t.dueDate);
   if (filters.noAssignee) result = result.filter(t => !t.assignees?.length);
+  if (filters.goalId && filters.goalId.length > 0) {
+    result = result.filter(t => t.goalId && filters.goalId!.includes(t.goalId));
+  }
 
   return result;
 }

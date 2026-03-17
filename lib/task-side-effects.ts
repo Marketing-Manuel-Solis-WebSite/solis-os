@@ -173,6 +173,28 @@ export async function afterTaskUpdated(event: Omit<TaskUpdatedEvent, 'type'>): P
     ));
   }
 
+  // STATUS changed FROM blocked: dependency auto-unblock notification
+  if (field === 'status' && from === 'blocked' && to !== 'blocked') {
+    const unblockedRecipients = [
+      ...(task.assignees || []),
+      ...(task.createdBy ? [task.createdBy] : []),
+    ].filter((uid: string, i: number, arr: string[]) => uid !== actor.actorId && arr.indexOf(uid) === i);
+    if (unblockedRecipients.length > 0) {
+      effects.push(await runEffect('notifyTaskUnblocked', 'important', () =>
+        notifyMany(unblockedRecipients, {
+          type: 'system',
+          title: `Task unblocked`,
+          message: `"${task.title || 'Task'}" is no longer blocked`,
+          entityType: 'task',
+          entityId: taskId,
+          entityUrl: '/app/tasks',
+          actorId: actor.actorId,
+          actorName: actor.actorName,
+        }).then(() => {}),
+      ));
+    }
+  }
+
   // ASSIGNEES changed: notify new assignees
   if (field === 'assignees' && Array.isArray(to) && Array.isArray(from)) {
     const newAssignees = to.filter(

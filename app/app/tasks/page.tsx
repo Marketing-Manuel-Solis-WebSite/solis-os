@@ -18,6 +18,9 @@ import TaskSidebar from '@/components/tasks/task-sidebar';
 import TaskToolbar from '@/components/tasks/task-toolbar';
 import TaskDetailDrawer from '@/components/tasks/task-detail-drawer';
 import TaskCreateModal from '@/components/tasks/task-create-modal';
+import MobileTaskForm from '@/components/mobile/mobile-task-form';
+import BottomSheet from '@/components/mobile/bottom-sheet';
+import { useIsMobile } from '@/lib/hooks/use-mobile-detect';
 import ImportWizard from '@/components/tasks/import-wizard';
 import TaskBulkActions from '@/components/tasks/task-bulk-actions';
 import TaskEmptyState from '@/components/tasks/task-empty-state';
@@ -42,8 +45,9 @@ const PREFS_KEY = 'taskPreferences';
 
 export default function TasksPage() {
   const { user, me, activeTeamId, teams, can, canSeeResource, allMembers, canSeeAllTeams } = useAuth();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
+  const isMobile = useIsMobile();
 
   // Core data
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -843,9 +847,9 @@ export default function TasksPage() {
         )}
       </AnimatePresence>
 
-      {/* Create Modal */}
+      {/* Create Modal — Desktop: full modal, Mobile: bottom sheet */}
       <AnimatePresence>
-        {showCreate && (
+        {showCreate && !isMobile && (
           <TaskCreateModal
             members={members}
             teams={teams}
@@ -855,6 +859,16 @@ export default function TasksPage() {
           />
         )}
       </AnimatePresence>
+      {showCreate && isMobile && (
+        <BottomSheet open={showCreate} onClose={() => setShowCreate(false)} title={lang === 'es' ? 'Nueva Tarea' : 'New Task'}>
+          <MobileTaskForm
+            mode="create"
+            members={members}
+            onSave={async (data) => { await doCreate(data); setShowCreate(false); }}
+            onCancel={() => setShowCreate(false)}
+          />
+        </BottomSheet>
+      )}
 
       {/* Import Wizard */}
       <AnimatePresence>
