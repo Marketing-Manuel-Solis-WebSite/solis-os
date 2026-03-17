@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { notifyUserAdmin } from '@/lib/notify-admin';
 import { ORG_ID as ORG } from '@/lib/org';
+import { onTaskOverdue, onTaskDueApproaching } from '@/lib/automation-engine';
 
 
 
@@ -45,9 +46,11 @@ export async function GET(req: NextRequest) {
       .limit(200)
       .get();
 
+    const overdueTasks: { id: string; data: Record<string, any> }[] = [];
     for (const doc of overdueSnap.docs) {
       const task = doc.data();
       if (task.deleted) continue;
+      overdueTasks.push({ id: doc.id, data: task });
       const assignees: string[] = task.assignees || [];
       for (const uid of assignees) {
         try {
@@ -64,6 +67,15 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Trigger automation rules for overdue tasks
+    for (const task of overdueTasks) {
+      try {
+        await onTaskOverdue(task.id, task.data);
+      } catch (err) {
+        console.error('[Deadlines] automation trigger failed for overdue task:', task.id, err);
+      }
+    }
+
     // 2. Tasks due tomorrow
     const dueSoonSnap = await adminDb
       .collection('tasks')
@@ -74,9 +86,11 @@ export async function GET(req: NextRequest) {
       .limit(200)
       .get();
 
+    const dueSoonTasks: { id: string; data: Record<string, any> }[] = [];
     for (const doc of dueSoonSnap.docs) {
       const task = doc.data();
       if (task.deleted) continue;
+      dueSoonTasks.push({ id: doc.id, data: task });
       const assignees: string[] = task.assignees || [];
       for (const uid of assignees) {
         try {
@@ -90,6 +104,15 @@ export async function GET(req: NextRequest) {
           });
           stats.dueSoon++;
         } catch { stats.errors++; }
+      }
+    }
+
+    // Trigger automation rules for due-approaching tasks
+    for (const task of dueSoonTasks) {
+      try {
+        await onTaskDueApproaching(task.id, task.data);
+      } catch (err) {
+        console.error('[Deadlines] automation trigger failed for due-approaching task:', task.id, err);
       }
     }
 

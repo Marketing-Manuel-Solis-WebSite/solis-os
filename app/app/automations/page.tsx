@@ -24,8 +24,8 @@ const TRIGGERS = [
   { id: 'task_priority_changed', label: 'Priority Changed', icon: Tag, color: '#F59E0B', desc: 'When a task priority changes' },
   { id: 'task_due_date_changed', label: 'Due Date Changed', icon: Calendar, color: '#06B6D4', desc: 'When a task due date is set or changed' },
   { id: 'task_custom_field_changed', label: 'Custom Field Changed', icon: Settings, color: '#8B5CF6', desc: 'When a custom field value changes' },
-  { id: 'task_due_approaching', label: 'Due Approaching', icon: Clock, color: '#64748B', desc: 'When a task due date is approaching', comingSoon: true },
-  { id: 'task_overdue', label: 'Task Overdue', icon: AlertTriangle, color: '#EF4444', desc: 'When a task passes its due date', comingSoon: true },
+  { id: 'task_due_approaching', label: 'Due Approaching', icon: Clock, color: '#64748B', desc: 'When a task due date is approaching' },
+  { id: 'task_overdue', label: 'Task Overdue', icon: AlertTriangle, color: '#EF4444', desc: 'When a task passes its due date' },
   // Scheduled triggers
   { id: 'scheduled_daily', label: 'Scheduled Daily', icon: Clock, color: '#06B6D4', desc: 'Run every day at a specific time' },
   { id: 'scheduled_weekly', label: 'Scheduled Weekly', icon: Calendar, color: '#8B5CF6', desc: 'Run every week on a specific day' },

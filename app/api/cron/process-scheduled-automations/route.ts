@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase-admin';
 import { ORG_ID as ORG } from '@/lib/org';
 import { shouldTriggerNow } from '@/lib/scheduled-triggers';
 import { FieldValue } from 'firebase-admin/firestore';
+import { notifyUsersAdmin } from '@/lib/notify-admin';
 
 const SCHEDULED_TRIGGERS = ['scheduled_daily', 'scheduled_weekly', 'scheduled_monthly'];
 
@@ -65,46 +66,167 @@ export async function GET(req: Request) {
         let actionsExecuted = 0;
         for (const taskDoc of tasksSnap.docs) {
           const task = taskDoc.data();
-          // Check conditions
+          // Check conditions (mirrors automation-engine evaluateCondition — fail-closed)
           const conditionsPass = (rule.conditions || []).every((c: any) => {
-            const val = task[c.field];
+            const rawVal = (() => {
+              switch (c.field) {
+                case 'assignee_count': return task.assignees?.length > 0 ? 'yes' : 'no';
+                case 'has_due_date': return task.dueDate ? 'yes' : 'no';
+                default: return task[c.field];
+              }
+            })();
             switch (c.operator) {
-              case 'equals': return String(val) === String(c.value);
-              case 'not_equals': return String(val) !== String(c.value);
-              case 'contains': return String(val || '').includes(c.value);
-              case 'is_empty': return !val || val === '';
-              case 'is_not_empty': return val && val !== '';
-              default: return true;
+              case 'equals': return String(rawVal) === String(c.value);
+              case 'not_equals': return String(rawVal) !== String(c.value);
+              case 'contains':
+                if (Array.isArray(rawVal)) return rawVal.some((v: any) => String(v) === String(c.value));
+                return String(rawVal || '').includes(String(c.value));
+              case 'not_contains':
+                if (Array.isArray(rawVal)) return !rawVal.some((v: any) => String(v) === String(c.value));
+                return !String(rawVal || '').includes(String(c.value));
+              case 'is_empty': return rawVal === undefined || rawVal === null || rawVal === '' || (Array.isArray(rawVal) && rawVal.length === 0);
+              case 'is_not_empty': return rawVal !== undefined && rawVal !== null && rawVal !== '' && !(Array.isArray(rawVal) && rawVal.length === 0);
+              case 'greater_than': return Number(rawVal) > Number(c.value);
+              case 'less_than': return Number(rawVal) < Number(c.value);
+              case 'greater_than_or_equal': return Number(rawVal) >= Number(c.value);
+              case 'less_than_or_equal': return Number(rawVal) <= Number(c.value);
+              case 'starts_with': return String(rawVal || '').startsWith(String(c.value));
+              case 'ends_with': return String(rawVal || '').endsWith(String(c.value));
+              default: return false; // Unknown operator — fail-closed
             }
           });
 
           if (!conditionsPass) continue;
 
-          // Execute actions (simplified — delegates to automation engine for complex actions)
-          for (const action of rule.actions || []) {
-            const taskRef = adminDb.doc(`tasks/${taskDoc.id}`);
-            switch (action.type) {
-              case 'change_status':
-                if (action.config.status) await taskRef.update({ status: action.config.status, updatedAt: FieldValue.serverTimestamp() });
-                break;
-              case 'set_priority':
-                if (action.config.priority) await taskRef.update({ priority: action.config.priority, updatedAt: FieldValue.serverTimestamp() });
-                break;
-              case 'add_tag':
-                if (action.config.tagName) await taskRef.update({ tags: FieldValue.arrayUnion(action.config.tagName) });
-                break;
-              case 'post_comment':
-                if (action.config.commentText) {
-                  await adminDb.collection(`tasks/${taskDoc.id}/comments`).add({
-                    text: action.config.commentText,
-                    authorId: 'automation',
-                    authorName: `Scheduled: ${rule.name}`,
-                    createdAt: FieldValue.serverTimestamp(),
-                  });
+          // Execute all action types (mirrors automation-engine executeAction)
+          const sorted = [...(rule.actions || [])].sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+          for (const action of sorted) {
+            try {
+              const taskRef = adminDb.doc(`tasks/${taskDoc.id}`);
+              const cfg = action.config || {};
+              switch (action.type) {
+                case 'change_status':
+                  if (cfg.toStatus || cfg.status) await taskRef.update({ status: cfg.toStatus || cfg.status, updatedAt: FieldValue.serverTimestamp() });
+                  break;
+                case 'set_priority':
+                  if (cfg.toPriority || cfg.priority) await taskRef.update({ priority: cfg.toPriority || cfg.priority, updatedAt: FieldValue.serverTimestamp() });
+                  break;
+                case 'assign_user':
+                  if (cfg.assigneeId) await taskRef.update({ assignees: FieldValue.arrayUnion(cfg.assigneeId), updatedAt: FieldValue.serverTimestamp() });
+                  break;
+                case 'add_tag':
+                  if (cfg.tagName) await taskRef.update({ tags: FieldValue.arrayUnion(cfg.tagName) });
+                  break;
+                case 'remove_tag':
+                  if (cfg.tagName) await taskRef.update({ tags: FieldValue.arrayRemove(cfg.tagName) });
+                  break;
+                case 'post_comment':
+                  if (cfg.commentText) {
+                    await adminDb.collection(`tasks/${taskDoc.id}/comments`).add({
+                      text: cfg.commentText,
+                      authorId: 'automation',
+                      authorName: `Scheduled: ${rule.name}`,
+                      automationId: rule.id,
+                      automationName: rule.name,
+                      createdAt: FieldValue.serverTimestamp(),
+                    });
+                  }
+                  break;
+                case 'send_notification': {
+                  const message = cfg.message || `Automation triggered on "${task.title}"`;
+                  const assignees: string[] = task.assignees || [];
+                  if (assignees.length > 0) {
+                    await notifyUsersAdmin(assignees, {
+                      eventType: 'system',
+                      title: 'Automation',
+                      message,
+                      entityType: 'task',
+                      entityId: taskDoc.id,
+                      entityUrl: '/app/tasks',
+                    });
+                  }
+                  break;
                 }
-                break;
+                case 'call_webhook': {
+                  const url = cfg.webhookUrl;
+                  const method = (cfg.method || 'POST') as string;
+                  if (url) {
+                    const resp = await fetch(url, {
+                      method,
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        event: 'automation_triggered',
+                        taskId: taskDoc.id,
+                        task: { title: task.title, status: task.status, priority: task.priority },
+                        actorId: 'system',
+                        timestamp: new Date().toISOString(),
+                      }),
+                    });
+                    if (!resp.ok) throw new Error(`Webhook returned ${resp.status}`);
+                  }
+                  break;
+                }
+                case 'create_subtask': {
+                  if (cfg.subtaskTitle) {
+                    const taskSnap = await adminDb.doc(`tasks/${taskDoc.id}`).get();
+                    const currentSubtasks = taskSnap.data()?.subtasks || [];
+                    await taskRef.update({
+                      subtasks: [...currentSubtasks, { id: Date.now().toString(36), title: cfg.subtaskTitle, done: false }],
+                      updatedAt: FieldValue.serverTimestamp(),
+                    });
+                  }
+                  break;
+                }
+                case 'archive_task':
+                  await taskRef.update({ archived: true, updatedAt: FieldValue.serverTimestamp() });
+                  break;
+                case 'duplicate_task': {
+                  const snap = await taskRef.get();
+                  if (snap.exists) {
+                    const data = snap.data()!;
+                    await adminDb.collection('tasks').add({
+                      ...data,
+                      title: `${data.title || 'Task'} (copy)`,
+                      createdAt: FieldValue.serverTimestamp(),
+                      updatedAt: FieldValue.serverTimestamp(),
+                      createdBy: 'automation',
+                      archived: false,
+                      deleted: false,
+                    });
+                  }
+                  break;
+                }
+                case 'move_to_list':
+                  if (cfg.listId) await taskRef.update({ listId: cfg.listId, updatedAt: FieldValue.serverTimestamp() });
+                  break;
+                case 'apply_template': {
+                  if (cfg.templateId) {
+                    const { applyTaskTemplate } = await import('@/lib/task-templates');
+                    const taskData = await applyTaskTemplate(cfg.templateId, {
+                      teamId: task.teamId || '',
+                      spaceId: task.spaceId || '',
+                      listId: task.listId || '',
+                      createdBy: 'automation',
+                    });
+                    await adminDb.collection('tasks').add({
+                      ...taskData,
+                      orgId: ORG,
+                      parentTaskId: taskDoc.id,
+                      createdAt: FieldValue.serverTimestamp(),
+                      updatedAt: FieldValue.serverTimestamp(),
+                    });
+                  }
+                  break;
+                }
+                default:
+                  console.warn(`[ScheduledAutomation] Unsupported action type: ${action.type}`);
+                  break;
+              }
+              actionsExecuted++;
+            } catch (actionErr: any) {
+              console.error(`[ScheduledAutomation] Action ${action.type} failed on task ${taskDoc.id}:`, actionErr?.message);
+              // Continue to next action — don't break the loop for one failed action
             }
-            actionsExecuted++;
           }
         }
 

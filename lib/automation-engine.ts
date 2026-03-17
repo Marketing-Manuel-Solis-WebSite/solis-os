@@ -596,3 +596,33 @@ export async function onDependencyUnblocked(
     _activeTaskIds.delete(taskId);
   }
 }
+
+// ---- DEADLINE TRIGGERS: task_overdue, task_due_approaching (cron-driven, no actorId) ----
+
+export async function onTaskOverdue(taskId: string, task: Record<string, any>): Promise<void> {
+  if (_activeTaskIds.has(taskId)) return;
+  _activeTaskIds.add(taskId);
+  try {
+    const rules = await getMatchingRules('task_overdue', buildScope(task));
+    const ctx: TriggerContext = { taskId, task };
+    for (const rule of rules) {
+      await executeRule(rule, ctx);
+    }
+  } finally {
+    _activeTaskIds.delete(taskId);
+  }
+}
+
+export async function onTaskDueApproaching(taskId: string, task: Record<string, any>): Promise<void> {
+  if (_activeTaskIds.has(taskId)) return;
+  _activeTaskIds.add(taskId);
+  try {
+    const rules = await getMatchingRules('task_due_approaching', buildScope(task));
+    const ctx: TriggerContext = { taskId, task };
+    for (const rule of rules) {
+      await executeRule(rule, ctx);
+    }
+  } finally {
+    _activeTaskIds.delete(taskId);
+  }
+}
