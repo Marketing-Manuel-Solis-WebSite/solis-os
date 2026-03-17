@@ -21,6 +21,10 @@ import { TeamPerformanceWidget } from './widgets/team-performance';
 import { InboxWidget } from './widgets/inbox-widget';
 import { AIInsightsWidget } from './widgets/ai-insights';
 import { BurndownChartWidget } from './widgets/burndown-chart';
+import { PortfolioSummaryWidget } from './widgets/portfolio-summary';
+import { WorkloadHeatmapWidget } from './widgets/workload-heatmap';
+import { TimeTrackingSummaryWidget } from './widgets/time-tracking-summary';
+import { DepartmentMetricsWidget } from './widgets/department-metrics';
 import { Trash2, GripVertical, LayoutGrid } from 'lucide-react';
 
 const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
@@ -36,6 +40,10 @@ const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
   'inbox': InboxWidget,
   'ai-insights': AIInsightsWidget,
   'burndown-chart': BurndownChartWidget,
+  'portfolio-summary': PortfolioSummaryWidget,
+  'workload-heatmap': WorkloadHeatmapWidget,
+  'time-tracking-summary': TimeTrackingSummaryWidget,
+  'department-metrics': DepartmentMetricsWidget,
 };
 
 const MIN_HEIGHTS: Record<string, number> = {

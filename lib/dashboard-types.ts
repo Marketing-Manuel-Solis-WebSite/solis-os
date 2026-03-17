@@ -40,7 +40,8 @@ export type WidgetType =
   | 'workload-heatmap'
   | 'time-tracking-summary'
   | 'department-metrics'
-  | 'burndown-chart';
+  | 'burndown-chart'
+  | 'portfolio-summary';
 
 export type DashboardScopeType = 'space' | 'folder' | 'list' | 'global';
 export type DashboardVisibility = 'private' | 'shared';
@@ -175,4 +176,8 @@ export const WIDGET_CATALOG: WidgetTypeDefinition[] = [
   { type: 'inbox', nameKey: 'dashboard.widget.inbox', descriptionKey: 'dashboard.widget.inboxDesc', icon: 'Inbox', defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 4 } },
   { type: 'ai-insights', nameKey: 'dashboard.widget.aiInsights', descriptionKey: 'dashboard.widget.aiInsightsDesc', icon: 'Sparkles', defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 3 } },
   { type: 'burndown-chart', nameKey: 'dashboard.widget.burndownChart', descriptionKey: 'dashboard.widget.burndownChartDesc', icon: 'TrendingDown', defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 3 } },
+  { type: 'portfolio-summary', nameKey: 'dashboard.widget.portfolioSummary', descriptionKey: 'dashboard.widget.portfolioSummaryDesc', icon: 'Briefcase', defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 4 } },
+  { type: 'workload-heatmap', nameKey: 'dashboard.widget.workloadHeatmap', descriptionKey: 'dashboard.widget.workloadHeatmapDesc', icon: 'Flame', defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 3 } },
+  { type: 'time-tracking-summary', nameKey: 'dashboard.widget.timeTrackingSummary', descriptionKey: 'dashboard.widget.timeTrackingSummaryDesc', icon: 'Clock', defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 3 } },
+  { type: 'department-metrics', nameKey: 'dashboard.widget.departmentMetrics', descriptionKey: 'dashboard.widget.departmentMetricsDesc', icon: 'Building2', defaultSize: { w: 2, h: 2 }, minSize: { w: 2, h: 2 }, maxSize: { w: 4, h: 3 } },
 ];

@@ -12,6 +12,8 @@ export interface RecurrenceConfig {
   endAfter?: number;         // Max occurrences
   occurrenceCount?: number;  // Generated so far
   lastGeneratedDue?: string; // YYYY-MM-DD of last generated instance (idempotency gate)
+  /** IANA timezone (e.g. "America/New_York"). Defaults to UTC if omitted. */
+  timezone?: string;
 }
 
 // Calculate the next due date based on config and a reference date

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, MousePointer, StickyNote, Type, Square, ArrowRight, CheckSquare, Trash2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { ArrowLeft, MousePointer, StickyNote, Type, Square, ArrowRight, CheckSquare, Trash2, ZoomIn, ZoomOut, RotateCcw, ListPlus } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import {
@@ -15,6 +15,8 @@ interface Props {
   boardId: string;
   boardName: string;
   onBack: () => void;
+  /** Callback to convert selected element text into a task */
+  onConvertToTask?: (text: string) => void;
 }
 
 const TOOLS: { mode: ToolMode; icon: any; labelKey: string }[] = [
@@ -25,7 +27,7 @@ const TOOLS: { mode: ToolMode; icon: any; labelKey: string }[] = [
   { mode: 'arrow', icon: ArrowRight, labelKey: 'whiteboards.toolArrow' },
 ];
 
-export default function WhiteboardCanvas({ boardId, boardName, onBack }: Props) {
+export default function WhiteboardCanvas({ boardId, boardName, onBack, onConvertToTask }: Props) {
   const { t } = useI18n();
   const { user } = useAuth();
   const svgRef = useRef<SVGSVGElement>(null);
@@ -400,13 +402,27 @@ export default function WhiteboardCanvas({ boardId, boardName, onBack }: Props) 
           </button>
         </div>
 
-        {/* Delete */}
+        {/* Selected element actions */}
         {selectedId && (
           <>
             <div className="h-6 w-px bg-[var(--border-subtle)] ml-2" />
+            {onConvertToTask && (
+              <button
+                onClick={() => {
+                  const el = elements.find(e => e.id === selectedId);
+                  if (el && (el.content || el.type === 'sticky' || el.type === 'text')) {
+                    onConvertToTask(el.content || el.type);
+                  }
+                }}
+                className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-subtle)] transition"
+                title={t('whiteboards.convertToTask') || 'Convert to Task'}
+              >
+                <ListPlus className="h-4 w-4" />
+              </button>
+            )}
             <button
               onClick={handleDeleteSelected}
-              className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--error)] hover:bg-[var(--error-bg)] transition ml-2"
+              className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--error)] hover:bg-[var(--error-bg)] transition"
               title={t('whiteboards.deleteElement')}
             >
               <Trash2 className="h-4 w-4" />

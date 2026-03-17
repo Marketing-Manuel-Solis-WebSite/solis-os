@@ -7,7 +7,8 @@ import {
   getFolders, getLists, getDocsBySpace, getWhiteboardsBySpace,
   type FolderData, type ListData,
 } from '@/lib/db';
-import { ArrowLeft, Loader2, ShieldAlert, FolderOpen, List, FileText, PenTool } from 'lucide-react';
+import { ArrowLeft, Loader2, ShieldAlert, FolderOpen, List, FileText, PenTool, LayoutDashboard } from 'lucide-react';
+import ContextualDashboard from '@/components/dashboard/contextual-dashboard';
 
 export default function FolderPage() {
   const { user, me, teams, canSeeAllTeams } = useAuth();
@@ -92,6 +93,11 @@ export default function FolderPage() {
           </p>
         </div>
       </div>
+
+      {/* Overview Dashboard */}
+      <section className="mb-8">
+        <ContextualDashboard scopeType="folder" scopeId={folderId as string} />
+      </section>
 
       {/* Lists section */}
       {lists.length > 0 && (

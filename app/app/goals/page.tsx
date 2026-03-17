@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Target, Loader2, GitBranch, LayoutGrid, FileText } from 'lucide-react';
+import { Plus, Target, Loader2, GitBranch, LayoutGrid, FileText, ArrowUpDown } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useFeatureFlag } from '@/lib/feature-flags';
@@ -35,6 +35,7 @@ export default function GoalsPage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [parentGoalForCreate, setParentGoalForCreate] = useState<Goal | null>(null);
   const [childGoalsMap, setChildGoalsMap] = useState<Record<string, Goal[]>>({});
+  const [sortGoalsBy, setSortGoalsBy] = useState('updatedAt');
 
   const loadGoals = useCallback(async () => {
     setLoading(true);
@@ -125,7 +126,7 @@ export default function GoalsPage() {
     setChildGoalsMap(prev => ({ ...prev, [goalId]: children as Goal[] }));
   }, []);
 
-  // Filtered goals
+  // Filtered and sorted goals
   const filtered = goals.filter(g => {
     if (search) {
       const s = search.toLowerCase();
@@ -134,6 +135,17 @@ export default function GoalsPage() {
     if (statusFilter && g.status !== statusFilter) return false;
     if (ownerFilter && g.ownerId !== ownerFilter) return false;
     return true;
+  }).sort((a: any, b: any) => {
+    if (sortGoalsBy === 'name') return (a.name || '').localeCompare(b.name || '');
+    if (sortGoalsBy === 'progress') return (b.progress || 0) - (a.progress || 0);
+    if (sortGoalsBy === 'dueDate') {
+      const da = a.dueDate?.seconds || Infinity;
+      const db = b.dueDate?.seconds || Infinity;
+      return da - db;
+    }
+    const ta = a[sortGoalsBy]?.seconds || 0;
+    const tb = b[sortGoalsBy]?.seconds || 0;
+    return tb - ta;
   });
 
   // Tree view: top-level goals (no parent) and their children
@@ -152,6 +164,19 @@ export default function GoalsPage() {
           <p className="text-[14px] text-[var(--text-muted)] mt-0.5">{t('goals.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Sort */}
+          <select
+            value={sortGoalsBy}
+            onChange={e => setSortGoalsBy(e.target.value)}
+            className="input-dark h-9 text-[13px] pr-8"
+          >
+            <option value="updatedAt">{lang === 'es' ? 'Reciente' : 'Recent'}</option>
+            <option value="name">{lang === 'es' ? 'Nombre' : 'Name'}</option>
+            <option value="progress">{lang === 'es' ? 'Progreso' : 'Progress'}</option>
+            <option value="dueDate">{lang === 'es' ? 'Fecha limite' : 'Due date'}</option>
+            <option value="createdAt">{lang === 'es' ? 'Creado' : 'Created'}</option>
+          </select>
+
           {/* View toggle */}
           <div className="flex rounded-lg bg-[var(--bg-tertiary)] overflow-hidden">
             <button

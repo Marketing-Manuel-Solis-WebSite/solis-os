@@ -11,6 +11,7 @@ import FormBuilder from '@/components/forms/form-builder';
 import FormShareModal from '@/components/forms/form-share-modal';
 import FormSubmissionsInbox from '@/components/forms/form-submissions-inbox';
 import type { FormDocument } from '@/components/forms/constants';
+import HubToolbar from '@/components/shared/hub-toolbar';
 
 export default function FormsPage() {
   const { user, me, can } = useAuth();
@@ -25,6 +26,12 @@ export default function FormsPage() {
   const [shareForm, setShareForm] = useState<FormDocument | null>(null);
   const [tab, setTab] = useState<'forms' | 'responses'>('forms');
   const mountedRef = useRef(true);
+
+  // Hub toolbar state
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [sortBy, setSortBy] = useState('updatedAt');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
   const hasAccess = can('form', 'create') || me?.role === 'owner' || me?.role === 'admin';
 
@@ -190,10 +197,54 @@ export default function FormsPage() {
         ))}
       </div>
 
+      {/* Toolbar */}
+      {tab === 'forms' && (
+        <HubToolbar
+          search={search}
+          onSearchChange={setSearch}
+          filters={[
+            { id: 'status', label: t('forms.status') || 'Status', options: [
+              { value: 'draft', label: t('forms.draft') || 'Draft' },
+              { value: 'published', label: t('forms.published') || 'Published' },
+              { value: 'closed', label: t('forms.closed') || 'Closed' },
+            ]},
+          ]}
+          activeFilters={{ status: statusFilter }}
+          onFilterChange={(id, value) => { if (id === 'status') setStatusFilter(value); }}
+          sortOptions={[
+            { value: 'updatedAt', label: t('common.lastModified') || 'Last modified' },
+            { value: 'createdAt', label: t('common.created') || 'Created' },
+            { value: 'title', label: t('common.name') || 'Name' },
+          ]}
+          activeSort={sortBy}
+          onSortChange={setSortBy}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          totalCount={forms.length}
+          filteredCount={(() => {
+            let f = forms;
+            if (search) f = f.filter(x => (x.title || '').toLowerCase().includes(search.toLowerCase()));
+            if (statusFilter) f = f.filter(x => x.status === statusFilter);
+            return f.length;
+          })()}
+        />
+      )}
+
       {/* Content */}
       {tab === 'forms' ? (
         <FormList
-          forms={forms}
+          forms={(() => {
+            let f = [...forms];
+            if (search) f = f.filter(x => (x.title || '').toLowerCase().includes(search.toLowerCase()));
+            if (statusFilter) f = f.filter(x => x.status === statusFilter);
+            f.sort((a: any, b: any) => {
+              if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
+              const ta = a[sortBy]?.seconds || a[sortBy]?.getTime?.() || 0;
+              const tb = b[sortBy]?.seconds || b[sortBy]?.getTime?.() || 0;
+              return tb - ta;
+            });
+            return f;
+          })()}
           onSelect={setActiveForm}
           onShare={setShareForm}
           onCreate={handleCreate}
