@@ -6,7 +6,7 @@ import {
   Minus, Link, Image, Eye, Edit2, Sparkles, Clock,
   Lock, Globe, Users, X, Download, Type, Undo2, Redo2,
   Maximize2, Minimize2, Table, CheckSquare, FileText, Upload, FileDown,
-  MessageSquareText,
+  MessageSquareText, Share2,
 } from 'lucide-react';
 import { renderMarkdown } from '@/lib/markdown';
 import { uploadFile, isImageType, formatFileSize } from '@/lib/upload';
@@ -26,6 +26,7 @@ import {
 import DocBreadcrumbs from './doc-breadcrumbs';
 import AIWritingToolbar from './ai-writing-toolbar';
 import FavoriteButton from '@/components/shared/favorite-button';
+import DocShareModal from './doc-share-modal';
 
 // Lazy-load TipTap editor (heavy deps: tiptap + yjs)
 const TiptapEditor = lazy(() => import('./tiptap-editor'));
@@ -101,6 +102,9 @@ export default function DocEditor({ doc, members, isAdmin, userId, userName = ''
 
   // Download menu
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+
+  // Share modal
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Inline comments state
   const [inlineComments, setInlineComments] = useState<InlineComment[]>([]);
@@ -540,6 +544,12 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
             </button>
           )}
 
+          <button onClick={() => setShowShareModal(true)}
+            className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition hover:bg-[var(--bg-hover)]"
+            title={t('docs.share')}>
+            <Share2 className="h-4 w-4" />
+          </button>
+
           {/* Download dropdown */}
           <div className="relative">
             <button onClick={e => { e.stopPropagation(); setShowDownloadMenu(!showDownloadMenu); }}
@@ -866,6 +876,13 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
           <span>{t('docEditor.markdown')}</span>
         </div>
       </div>
+
+      {/* Share Modal */}
+      <DocShareModal
+        doc={{ id: doc.id, title: title || doc.title || '' }}
+        open={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
     </div>
   );
 }

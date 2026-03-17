@@ -2,9 +2,10 @@
 import { useState } from 'react';
 import { type CustomFieldDef } from '@/lib/custom-fields';
 import { useI18n } from '@/lib/i18n';
-import { Star, X, Calculator, Sigma, Link2 } from 'lucide-react';
+import { Star, X, Calculator, Sigma, Link2, Zap, Loader2 } from 'lucide-react';
 import { evaluateFormula } from '@/lib/formula-engine';
 import RelationshipFieldPicker from './relationship-field-picker';
+import { auth } from '@/lib/firebase';
 
 interface Props {
   field: CustomFieldDef;
@@ -20,9 +21,11 @@ interface Props {
   tasks?: { id: string; title: string }[];
   docs?: { id: string; title: string }[];
   goals?: { id: string; name: string }[];
+  /** Task ID — needed for button field automation triggers */
+  taskId?: string;
 }
 
-export default function CustomFieldRenderer({ field, value, onChange, readOnly = false, members = [], allFieldValues = {}, children: childRecords = [], tasks = [], docs = [], goals = [] }: Props) {
+export default function CustomFieldRenderer({ field, value, onChange, readOnly = false, members = [], allFieldValues = {}, children: childRecords = [], tasks = [], docs = [], goals = [], taskId }: Props) {
   const { lang } = useI18n();
   const label = lang === 'es' ? field.nameEs : field.name;
 
@@ -276,6 +279,38 @@ export default function CustomFieldRenderer({ field, value, onChange, readOnly =
       );
     }
 
+    case 'button': {
+      const [btnLoading, setBtnLoading] = useState(false);
+      const handleButtonClick = async () => {
+        onChange(Date.now()); // Record the click timestamp
+        if (!taskId) return;
+        setBtnLoading(true);
+        try {
+          const idToken = await auth.currentUser?.getIdToken();
+          if (!idToken) return;
+          await fetch('/api/automations/button-click', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+            body: JSON.stringify({ taskId, buttonFieldId: field.id }),
+          });
+        } catch (err) {
+          console.error('[CustomField:button] automation trigger failed:', err);
+        } finally {
+          setBtnLoading(false);
+        }
+      };
+      return (
+        <button
+          onClick={handleButtonClick}
+          disabled={btnLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+        >
+          {btnLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+          {label}
+        </button>
+      );
+    }
+
     default:
       return (
         <input
@@ -304,6 +339,7 @@ function renderReadOnly(field: CustomFieldDef, value: unknown, members: any[], l
     case 'formula': return String(value ?? '—');
     case 'rollup': return String(value ?? '—');
     case 'relationship': return Array.isArray(value) ? `${value.length} linked` : '—';
+    case 'button': return value ? (lang === 'es' ? 'Ejecutado' : 'Clicked') : '—';
     default: return String(value);
   }
 }

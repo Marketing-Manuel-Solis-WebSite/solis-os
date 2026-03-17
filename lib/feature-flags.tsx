@@ -18,8 +18,8 @@ export interface FeatureFlags {
 const DEFAULT_FLAGS: FeatureFlags = {
   // Bloque C — Data Model
   'custom-statuses': false,
-  'enriched-subtasks': false,
-  'custom-field-scoping': false,
+  'enriched-subtasks': true,
+  'custom-field-scoping': true,
   // Bloque D — Views
   'view-table': false,
   'view-gantt': false,
@@ -33,7 +33,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   'active-viewers': false,
   'edit-locking': false,
   'nested-pages': false,
-  'doc-comments': false,
+  'doc-comments': true,
   // Bloque K — Chat v2
   'chat-threads': false,
   'chat-search': false,
@@ -75,7 +75,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   'advanced-audit': false,
   'platform-health': false,
   // Bloque E — Inline Comments
-  'inline-comments': false,
+  'inline-comments': true,
   // Bloque F — Custom Roles
   'custom-roles': false,
   // Bloque G — Automation Templates
@@ -115,12 +115,12 @@ const DEFAULT_FLAGS: FeatureFlags = {
   'formula-rollup-fields': false,
   'automation-chat-trigger': false,
   'onboarding-wizard': false,
-  'artifact-views': false,
-  'relationship-field': false,
+  'artifact-views': true,
+  'relationship-field': true,
   'automation-apply-template': false,
-  'automation-time-tracked': false,
-  'automation-button-field': false,
-  'automation-dependency-unblocked': false,
+  'automation-time-tracked': true,
+  'automation-button-field': true,
+  'automation-dependency-unblocked': true,
   'calendar-sync': false,
   'embed-view': false,
   'space-auto-channels': false,

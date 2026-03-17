@@ -567,6 +567,15 @@
         { "fieldPath": "updatedAt", "order": "DESCENDING" }
       ]
     }
+    ,
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "dependencies", "arrayConfig": "CONTAINS" }
+      ]
+    }
   ],
   "fieldOverrides": []
 }

@@ -5,6 +5,7 @@ import { useEffect, useState, useMemo } from 'react';
 import CustomFieldManager from '@/components/admin/custom-field-manager';
 import PermissionInspector from '@/components/admin/permission-inspector';
 import UsageDashboard from '@/components/admin/usage-dashboard';
+import InviteMembersPanel from '@/components/admin/invite-members-panel';
 import {
   getMembers, updateMember, getAuditLogs, logAction, getOrg, updateOrg,
   getSettings, saveSettings, getWorkspaces, createWorkspace, deleteWorkspace,
@@ -20,13 +21,14 @@ import {
   Shield, Users, Building2, Columns3, Zap, Bell, Bot, Plug, ScrollText,
   FileStack, LayoutGrid, Plus, Trash2, Save, Search, ChevronRight, Check, X,
   Edit2, Palette, Hash, FolderOpen, UserPlus, AlertTriangle, UserX, RotateCcw,
-  Archive, ArchiveRestore, ArrowRightLeft, Loader2, Eye, Scan, BarChart3
+  Archive, ArchiveRestore, ArrowRightLeft, Loader2, Eye, Scan, BarChart3, Mail
 } from 'lucide-react';
 
-type S = 'org'|'users'|'departments'|'perms'|'inspector'|'usage'|'struct'|'fields'|'tpl'|'auto'|'notif'|'ai'|'integ'|'audit';
+type S = 'org'|'users'|'departments'|'invites'|'perms'|'inspector'|'usage'|'struct'|'fields'|'tpl'|'auto'|'notif'|'ai'|'integ'|'audit';
 const SS: {id:S;lKey:string;i:any;dKey:string}[] = [
   {id:'org',lKey:'admin.org',i:Building2,dKey:'admin.orgDesc'},
   {id:'users',lKey:'admin.users',i:Users,dKey:'admin.usersDesc'},
+  {id:'invites',lKey:'admin.invitations',i:Mail,dKey:'admin.invitationsDesc'},
   {id:'departments',lKey:'admin.departments',i:FolderOpen,dKey:'admin.departmentsDesc'},
   {id:'perms',lKey:'admin.permissions',i:Shield,dKey:'admin.permissionsDesc'},
   {id:'inspector',lKey:'admin.inspector',i:Scan,dKey:'admin.inspectorDesc'},
@@ -97,6 +99,7 @@ export default function Admin() {
       <div className="flex-1 overflow-y-auto">
         {s === 'org' && <ComingSoonS label={t('admin.organizationTitle')} />}
         {s === 'users' && <UsersS />}
+        {s === 'invites' && <InviteMembersPanel />}
         {s === 'departments' && <DepartmentsS />}
         {s === 'perms' && <PermsS />}
         {s === 'inspector' && <PermissionInspector />}

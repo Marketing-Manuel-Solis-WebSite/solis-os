@@ -923,6 +923,7 @@ export default function TaskDetailDrawer({
                                 onChange={v => setCustomField(field.id, v)}
                                 readOnly={!canUpdate}
                                 members={members}
+                                taskId={task.id}
                               />
                             </div>
                             {field.helpText && (
@@ -958,6 +959,7 @@ export default function TaskDetailDrawer({
                             onChange={v => setCustomField(field.id, v)}
                             readOnly={!canUpdate}
                             members={members}
+                            taskId={task.id}
                           />
                         </div>
                         {canUpdate && (

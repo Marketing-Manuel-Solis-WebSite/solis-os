@@ -4,8 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PenTool, Plus, Loader2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
-import { getWhiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard } from '@/lib/db';
+import { getWhiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard, createTask } from '@/lib/db';
 import { notifyMany } from '@/lib/notifications';
+import { useToast } from '@/components/notifications/toast-provider';
 import WhiteboardList from '@/components/whiteboards/whiteboard-list';
 import WhiteboardCreateModal from '@/components/whiteboards/whiteboard-create-modal';
 import WhiteboardCanvas from '@/components/whiteboards/whiteboard-canvas';
@@ -15,6 +16,7 @@ import HubToolbar from '@/components/shared/hub-toolbar';
 export default function WhiteboardsPage() {
   const { user, me, activeTeamId, can } = useAuth();
   const { t } = useI18n();
+  const toast = useToast();
 
   const [boards, setBoards] = useState<Whiteboard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,10 +81,28 @@ export default function WhiteboardsPage() {
         boardId={activeBoard.id}
         boardName={activeBoard.name}
         onBack={() => { setActiveBoard(null); loadBoards(); }}
-        onConvertToTask={(text) => {
-          // Open task creation with pre-filled title from whiteboard element
+        onConvertToTask={async (text) => {
           const title = text || 'Task from whiteboard';
-          window.dispatchEvent(new CustomEvent('solis:create-task', { detail: { title, source: 'whiteboard', sourceId: activeBoard.id } }));
+          try {
+            await createTask({
+              title,
+              description: `Created from whiteboard: ${activeBoard.name}`,
+              createdBy: user?.uid || '',
+              teamId: activeTeamId === '__all__' ? '' : activeTeamId,
+              source: 'whiteboard',
+              sourceId: activeBoard.id,
+            });
+            toast.success(
+              t('whiteboards.taskCreated') || 'Task created',
+              title,
+            );
+          } catch (err: any) {
+            console.error('[Whiteboard] Failed to convert to task:', err);
+            toast.error(
+              t('common.error') || 'Error',
+              err?.message || 'Failed to create task',
+            );
+          }
         }}
       />
     );

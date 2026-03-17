@@ -67,6 +67,22 @@ export async function afterTimeEntryCreated(event: Omit<TimeEntryCreatedEvent, '
     effects.push(await runEffect('syncTaskTimeSpent', 'important', () =>
       syncTaskTimeSpent(event.entry.taskId),
     ));
+
+    // Automation engine: time_tracked trigger (via API to avoid server-only imports)
+    effects.push(await runEffect('onTimeTracked', 'important', async () => {
+      const { auth } = await import('./firebase');
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+      await fetch('/api/automations/time-tracked', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          taskId: event.entry.taskId,
+          hours: event.entry.hours || 0,
+          minutes: event.entry.minutes || 0,
+        }),
+      });
+    }));
   }
 
   const result = buildResult(cid, 'time_entry.created', effects);

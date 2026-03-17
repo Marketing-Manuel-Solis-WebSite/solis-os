@@ -14,12 +14,15 @@ import {
   addTaskActivityAdmin,
   syncGoalTargetsForTaskAdmin,
 } from './db-admin';
+import { adminDb } from './firebase-admin';
+import { ORG_ID as ORG } from '@/lib/org';
 import { notifyUsersAdmin } from './notify-admin';
 import { queueEvent } from './integrations-db-admin';
 import { dispatchWebhookEvent } from './outbound-webhooks';
 import {
   onTaskCreated, onTaskStatusChanged, onTaskAssigned,
   onTaskPriorityChanged, onTaskDueDateChanged, onTaskCustomFieldChanged,
+  onDependencyUnblocked,
 } from './automation-engine';
 import type {
   TaskCreatedEvent,
@@ -273,6 +276,20 @@ export async function afterTaskUpdatedAdmin(
     effects.push(await runEffect('onTaskCustomFieldChanged', 'important', () =>
       onTaskCustomFieldChanged(taskId, updatedTask, cfName, actor.actorId),
     ));
+  }
+
+  // Dependency unblocked: when a task is completed, fire trigger for all tasks that depend on it
+  if (statusChanged && (to === 'done' || to === 'completed')) {
+    effects.push(await runEffect('onDependencyUnblocked', 'important', async () => {
+      const depSnap = await adminDb.collection('tasks')
+        .where('orgId', '==', ORG)
+        .where('dependencies', 'array-contains', taskId)
+        .get();
+      for (const depDoc of depSnap.docs) {
+        const depTask = { id: depDoc.id, ...depDoc.data() };
+        await onDependencyUnblocked(depDoc.id, depTask, actor.actorId);
+      }
+    }));
   }
 
   const result = buildResult(cid, 'task.updated', effects);

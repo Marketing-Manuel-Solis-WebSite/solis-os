@@ -11,7 +11,7 @@ export type CustomFieldType =
   | 'email' | 'phone' | 'url'
   | 'single_select' | 'multi_select'
   | 'user' | 'rating'
-  | 'formula' | 'rollup' | 'relationship';
+  | 'formula' | 'rollup' | 'relationship' | 'button';
 
 export type FieldScope = 'org' | 'space' | 'list';
 

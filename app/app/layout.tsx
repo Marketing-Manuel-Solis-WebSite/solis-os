@@ -19,10 +19,11 @@ import {
   LayoutDashboard, CheckSquare, FileText, MessageSquare, Zap, BarChart3,
   Users, Shield, LogOut, Menu, Bot, ChevronLeft, ChevronRight, Sun, Moon, ChevronDown,
   Settings, Loader2, CalendarDays, MoreHorizontal, Target, Clock, PenTool, FileInput, Plug, Search,
-  Layers, Star, LayoutTemplate, Share2, EyeOff, GripVertical, Eye,
+  Layers, Star, LayoutTemplate, Share2, EyeOff, GripVertical, Eye, Bell, X,
 } from 'lucide-react';
 import SpaceSidebarTree from '@/components/spaces/space-sidebar-tree';
 import SpaceFeaturesPanel from '@/components/spaces/space-features-panel';
+import NotificationSettings from '@/components/settings/notification-settings';
 import PwaInstallPrompt from '@/components/shared/pwa-install-prompt';
 import ShortcutsHelpModal from '@/components/shared/shortcuts-help-modal';
 import { useGlobalShortcuts } from '@/lib/hooks/use-global-shortcuts';
@@ -206,6 +207,7 @@ function UserMenu() {
   const { me } = useAuth();
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const [notifPrefsOpen, setNotifPrefsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -219,53 +221,91 @@ function UserMenu() {
   if (!me) return null;
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 h-8 pl-1 pr-2.5 rounded-lg hover:bg-[var(--bg-hover)] transition-all duration-200"
-      >
-        <div className="w-6 h-6 rounded-lg bg-[var(--accent-subtle)] flex items-center justify-center text-xs font-semibold text-[var(--accent)]">
-          {(me.displayName || 'U')[0].toUpperCase()}
-        </div>
-        <span className="text-sm font-medium text-[var(--text-secondary)] hidden md:block">{me.displayName?.split(' ')[0]}</span>
-        <ChevronDown className="h-3 w-3 text-[var(--text-muted)]" />
-      </button>
+    <>
+      <div ref={ref} className="relative">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-2 h-8 pl-1 pr-2.5 rounded-lg hover:bg-[var(--bg-hover)] transition-all duration-200"
+        >
+          <div className="w-6 h-6 rounded-lg bg-[var(--accent-subtle)] flex items-center justify-center text-xs font-semibold text-[var(--accent)]">
+            {(me.displayName || 'U')[0].toUpperCase()}
+          </div>
+          <span className="text-sm font-medium text-[var(--text-secondary)] hidden md:block">{me.displayName?.split(' ')[0]}</span>
+          <ChevronDown className="h-3 w-3 text-[var(--text-muted)]" />
+        </button>
 
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, y: 6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 6, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: EASE }}
+              className="absolute right-0 top-full mt-1.5 w-52 rounded-xl bg-[var(--bg-elevated)] shadow-dropdown overflow-hidden z-50"
+            >
+              <div className="px-3 py-3">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">{me.displayName}</p>
+                <p className="text-[13px] text-[var(--text-muted)] mt-0.5">{me.email}</p>
+                <span className="inline-block mt-1.5 text-[12px] px-1.5 py-0.5 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] font-medium uppercase tracking-wider">
+                  {me.role}
+                </span>
+              </div>
+              <div className="h-px bg-[var(--border-subtle)] mx-2" />
+              <div className="p-1.5">
+                <button
+                  onClick={() => { setNotifPrefsOpen(true); setOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-200"
+                >
+                  <Bell className="h-4 w-4" strokeWidth={1.75} /> {t('settings.notifications')}
+                </button>
+                <button
+                  onClick={() => { router.push('/app/admin'); setOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-200"
+                >
+                  <Settings className="h-4 w-4" strokeWidth={1.75} /> {t('common.settings')}
+                </button>
+                <button
+                  onClick={() => { signOut(auth); setOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-[var(--error)] hover:bg-[var(--error-bg)] transition-all duration-200"
+                >
+                  <LogOut className="h-4 w-4" strokeWidth={1.75} /> {t('common.signOut')}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Notification Preferences Modal */}
       <AnimatePresence>
-        {open && (
+        {notifPrefsOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 6, scale: 0.98 }}
-            transition={{ duration: 0.2, ease: EASE }}
-            className="absolute right-0 top-full mt-1.5 w-52 rounded-xl bg-[var(--bg-elevated)] shadow-dropdown overflow-hidden z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+            onClick={(e) => { if (e.target === e.currentTarget) setNotifPrefsOpen(false); }}
           >
-            <div className="px-3 py-3">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">{me.displayName}</p>
-              <p className="text-[13px] text-[var(--text-muted)] mt-0.5">{me.email}</p>
-              <span className="inline-block mt-1.5 text-[12px] px-1.5 py-0.5 rounded-full bg-[var(--accent-subtle)] text-[var(--accent)] font-medium uppercase tracking-wider">
-                {me.role}
-              </span>
-            </div>
-            <div className="h-px bg-[var(--border-subtle)] mx-2" />
-            <div className="p-1.5">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2, ease: EASE }}
+              className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-[var(--bg-base)] shadow-2xl border border-[var(--border-subtle)] p-6"
+            >
               <button
-                onClick={() => { router.push('/app/admin'); setOpen(false); }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all duration-200"
+                onClick={() => setNotifPrefsOpen(false)}
+                className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-muted)] transition-colors"
               >
-                <Settings className="h-4 w-4" strokeWidth={1.75} /> {t('common.settings')}
+                <X className="h-4 w-4" />
               </button>
-              <button
-                onClick={() => { signOut(auth); setOpen(false); }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-[var(--error)] hover:bg-[var(--error-bg)] transition-all duration-200"
-              >
-                <LogOut className="h-4 w-4" strokeWidth={1.75} /> {t('common.signOut')}
-              </button>
-            </div>
+              <NotificationSettings />
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
 
