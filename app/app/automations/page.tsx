@@ -624,6 +624,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
       conditions,
       actions,
       ...(branches.length > 0 ? { branches } : {}),
+      ...(fieldMappings.length > 0 ? { fieldMappings } : {}),
       teamId,
       spaceId: scopeType === 'space' ? scopeId : '',
       folderId: scopeType === 'folder' ? scopeId : '',

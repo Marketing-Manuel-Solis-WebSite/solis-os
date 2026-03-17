@@ -583,6 +583,16 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
     }
   };
 
+  const handleSetViewVisibility = async (viewId: string, visibility: ViewDefinition['visibility']) => {
+    try {
+      await updateFirestoreView(viewId, { visibility });
+      setFirestoreViews(prev => prev.map(v => v.id === viewId ? { ...v, visibility } : v));
+      toast.success(t('views.visibilityUpdated') || 'Visibility updated');
+    } catch (err) {
+      console.error('[SpaceTasks] set view visibility failed:', err);
+    }
+  };
+
   // ─── Preset change ─────────────────────────────────────
   const handlePresetChange = (id: string) => {
     setActivePreset(id);
@@ -794,6 +804,7 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
           onPinView={handlePinView}
           onSetDefaultView={canManageShared ? handleSetDefaultView : undefined}
           onShareViewLink={handleShareViewLink}
+          onSetViewVisibility={canManageShared ? handleSetViewVisibility : undefined}
           viewSaveStatus={viewSaveStatus}
         />
 
@@ -839,6 +850,10 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
                 tasks={tasks}
                 goals={[]}
                 members={members}
+                onArtifactIdChange={async (newId) => {
+                  await updateFirestoreView(activeArtifactView.id!, { artifactId: newId });
+                  setFirestoreViews(prev => prev.map(v => v.id === activeArtifactView.id ? { ...v, artifactId: newId } : v));
+                }}
               />
             </motion.div>
           ) : emptyStateType ? (

@@ -60,6 +60,8 @@ export async function createInvitation(data: {
   invitedByName: string;
   message?: string;
   expiresInDays?: number;
+  /** Optional: specific space IDs to auto-assign on acceptance */
+  targetSpaceIds?: string[];
 }): Promise<{ id: string; token: string }> {
   const token = generateInviteToken();
   const expiresAt = new Date();
@@ -86,6 +88,7 @@ export async function createInvitation(data: {
     invitedBy: data.invitedBy,
     invitedByName: data.invitedByName,
     message: data.message || '',
+    targetSpaceIds: data.targetSpaceIds || [],
     expiresAt,
     acceptedAt: null,
     acceptedBy: null,
@@ -182,16 +185,57 @@ export async function validateInviteToken(token: string): Promise<InviteValidati
  * Accept an invitation — marks it as accepted.
  * The actual member creation should happen in the auth flow
  * using the invite data (role, teamId).
+ * If targetSpaceIds exist, auto-adds user to those spaces via teamIds[].
  */
 export async function acceptInvitation(
   inviteId: string,
   userId: string,
 ): Promise<void> {
-  await updateDoc(doc(db, 'orgs', ORG, 'invitations', inviteId), {
+  // Mark invite as accepted
+  const inviteRef = doc(db, 'orgs', ORG, 'invitations', inviteId);
+  await updateDoc(inviteRef, {
     status: 'accepted' as InviteStatus,
     acceptedAt: serverTimestamp(),
     acceptedBy: userId,
     updatedAt: serverTimestamp(),
+  });
+
+  // Auto-assign to target spaces if specified
+  const invite = await getInvitation(inviteId);
+  const targetSpaces: string[] = (invite as any)?.targetSpaceIds || [];
+  if (targetSpaces.length > 0) {
+    const memberRef = doc(db, 'orgs', ORG, 'members', userId);
+    const memberSnap = await getDoc(memberRef);
+    if (memberSnap.exists()) {
+      const currentTeamIds: string[] = memberSnap.data()?.teamIds || [];
+      const newTeamIds = [...new Set([...currentTeamIds, ...targetSpaces])];
+      await updateDoc(memberRef, { teamIds: newTeamIds, updatedAt: serverTimestamp() });
+    }
+  }
+}
+
+/**
+ * Invite a user directly to a specific space.
+ * Creates an org invite with targetSpaceIds pre-set.
+ */
+export async function inviteToSpace(data: {
+  email: string;
+  role: string;
+  spaceId: string;
+  spaceName: string;
+  invitedBy: string;
+  invitedByName: string;
+  message?: string;
+}): Promise<{ id: string; token: string }> {
+  return createInvitation({
+    email: data.email,
+    role: data.role,
+    teamId: data.spaceId,
+    teamName: data.spaceName,
+    invitedBy: data.invitedBy,
+    invitedByName: data.invitedByName,
+    message: data.message,
+    targetSpaceIds: [data.spaceId],
   });
 }
 

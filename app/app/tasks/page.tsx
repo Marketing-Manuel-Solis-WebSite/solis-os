@@ -26,6 +26,8 @@ import TaskBulkActions from '@/components/tasks/task-bulk-actions';
 import TaskEmptyState from '@/components/tasks/task-empty-state';
 import ArtifactViewRenderer from '@/components/views/artifact-view-renderer';
 import AddViewMenu from '@/components/views/add-view-menu';
+import { lazy, Suspense } from 'react';
+const ExportModal = lazy(() => import('@/components/analytics/export-modal'));
 
 // View registry — registers all 7 built-in views (list, board, calendar, table, gantt, timeline, workload)
 import '@/lib/views/register-views';
@@ -86,6 +88,7 @@ export default function TasksPage() {
   // UI
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
 
   // Firestore first-class views + artifact views
@@ -685,6 +688,7 @@ export default function TasksPage() {
           onDeleteView={handleDeleteView}
           onDuplicateView={handleDuplicateView}
           onImport={can('task', 'create') ? () => setShowImport(true) : undefined}
+          onExport={can('task', 'manage') ? () => setShowExport(true) : undefined}
           firestoreViews={firestoreViews}
           onPinView={(id: string) => handlePinView(id, true)}
           onSetDefaultView={(id: string) => handleSetDefaultView(id, true)}
@@ -746,6 +750,7 @@ export default function TasksPage() {
                   tasks={filteredTasks as any}
                   goals={[]}
                   members={members}
+                  onArtifactIdChange={(newId) => setActiveArtifactView(prev => prev ? { ...prev, id: newId } : prev)}
                 />
               </div>
             ) : (
@@ -883,6 +888,18 @@ export default function TasksPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Export Modal */}
+      {showExport && (
+        <Suspense fallback={null}>
+          <ExportModal
+            open={showExport}
+            onClose={() => setShowExport(false)}
+            defaultEntity="tasks"
+            defaultTeamId={activeTeamId === '__all__' ? undefined : activeTeamId}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

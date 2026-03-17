@@ -69,6 +69,7 @@ export default function FormBuilder({ form, onUpdate, onShare }: Props) {
         consentRequired: toSave.consentRequired,
         retentionDays: toSave.retentionDays,
         status: toSave.status,
+        ...(toSave.folderId !== undefined ? { folderId: toSave.folderId } : {}),
       });
       onUpdateRef.current(toSave);
       setDirty(false);

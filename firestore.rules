@@ -101,6 +101,12 @@ service cloud.firestore {
           allow write: if isSignedIn() && isSelf(userId);
         }
 
+        // Push notification FCM tokens — self-only
+        match /pushTokens/{tokenId} {
+          allow read: if isSignedIn() && isSelf(userId);
+          allow write: if isSignedIn() && isSelf(userId);
+        }
+
         // Chat bookmarks — self-only saved messages
         match /bookmarks/{bookmarkId} {
           allow read: if isSignedIn() && isSelf(userId);
@@ -366,7 +372,11 @@ service cloud.firestore {
     // ======== TASKS ========
 
     match /tasks/{taskId} {
-      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId)
+        && (resource.data.visibility != 'private'
+            || request.auth.uid == resource.data.createdBy
+            || request.auth.uid in resource.data.assignees
+            || isManager(resource.data.orgId));
       // Create: guests can create tasks; listId must be null OR belong to the same team
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId)
         && (request.resource.data.listId == null
@@ -504,7 +514,11 @@ service cloud.firestore {
     // ======== GOALS ========
 
     match /goals/{goalId} {
-      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId);
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId)
+        && (resource.data.visibility != 'private'
+            || request.auth.uid == resource.data.ownerId
+            || request.auth.uid == resource.data.createdBy
+            || isManager(resource.data.orgId));
       allow create: if isSignedIn() && isOrgMember(request.resource.data.orgId);
       allow update: if isSignedIn() && isOrgMember(resource.data.orgId) && canAccessTeamData(resource.data.orgId) && orgIdUnchanged();
       allow delete: if isSignedIn() && isManager(resource.data.orgId);

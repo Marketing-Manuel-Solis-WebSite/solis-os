@@ -6,8 +6,8 @@
 // ============================================================
 
 import {
-  collection, doc, addDoc, updateDoc, getDocs, query, where,
-  orderBy, limit, serverTimestamp,
+  collection, doc, addDoc, updateDoc, getDoc, getDocs, query, where,
+  orderBy, limit, serverTimestamp, arrayUnion,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { getCurrentOrgId, ORG_ID as ORG } from '@/lib/org';
@@ -89,13 +89,55 @@ export async function approveRequest(
   reviewerName: string,
   reviewNote?: string,
 ): Promise<void> {
-  await updateDoc(doc(db, reqCol(), requestId), {
+  // Mark request as approved
+  const reqRef = doc(db, reqCol(), requestId);
+  await updateDoc(reqRef, {
     status: 'approved',
     reviewerId,
     reviewerName,
     reviewNote: reviewNote || '',
     reviewedAt: serverTimestamp(),
   });
+
+  // Auto-grant access based on resource type
+  const reqSnap = await getDoc(reqRef);
+  if (reqSnap.exists()) {
+    const req = reqSnap.data();
+    const orgId = getCurrentOrgId();
+    try {
+      switch (req.resourceType) {
+        case 'space': {
+          // Add requester to the space's teamIds
+          const memberRef = doc(db, `orgs/${orgId}/members/${req.requesterId}`);
+          await updateDoc(memberRef, { teamIds: arrayUnion(req.resourceId) });
+          break;
+        }
+        case 'list': {
+          // Add requester to list's members
+          const listRef = doc(db, `lists/${req.resourceId}`);
+          await updateDoc(listRef, { members: arrayUnion(req.requesterId) });
+          break;
+        }
+        case 'doc': {
+          // Add requester to doc's viewers
+          const docRef = doc(db, `docs/${req.resourceId}`);
+          await updateDoc(docRef, { 'permissions.viewers': arrayUnion(req.requesterId) });
+          break;
+        }
+        case 'channel': {
+          // Add requester to channel's members
+          const channelRef = doc(db, `channels/${req.resourceId}`);
+          await updateDoc(channelRef, { members: arrayUnion(req.requesterId) });
+          break;
+        }
+        // folder, goal, etc. — team-level isolation handles access
+        default:
+          break;
+      }
+    } catch (err) {
+      console.error(`[access-requests] Auto-grant failed for ${req.resourceType}/${req.resourceId}:`, err);
+    }
+  }
 }
 
 /**

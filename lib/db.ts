@@ -713,6 +713,47 @@ export async function addTaskActivity(taskId: string, data: { action: string; fi
   return addTo(`tasks/${taskId}/activity`, data);
 }
 
+/**
+ * Auto-unblock tasks that depend on the completed task.
+ * When a task is marked done, find all tasks that have it as a `blocked_by`
+ * dependency. If ALL their blockers are now done, change status from `blocked` → `todo`.
+ */
+export async function autoUnblockDependents(completedTaskId: string): Promise<string[]> {
+  // Find tasks that reference this task in their dependencies as blocked_by
+  const allTasksSnap = await getDocs(
+    query(collection(db, 'tasks'), where('orgId', '==', ORG), where('status', '==', 'blocked'), limit(200))
+  );
+  const unblockedIds: string[] = [];
+  for (const taskDoc of allTasksSnap.docs) {
+    const task = taskDoc.data();
+    const deps: any[] = task.dependencies || [];
+    // Check if this task has a blocked_by dependency on the completed task
+    const hasBlocker = deps.some((d: any) =>
+      (typeof d === 'string' && d === completedTaskId) ||
+      (d.taskId === completedTaskId && (d.type === 'blocked_by' || !d.type))
+    );
+    if (!hasBlocker) continue;
+    // Check if ALL blocked_by dependencies are now done
+    const blockerIds = deps
+      .filter((d: any) => typeof d === 'string' || d.type === 'blocked_by' || !d.type)
+      .map((d: any) => typeof d === 'string' ? d : d.taskId);
+    let allDone = true;
+    for (const bid of blockerIds) {
+      if (bid === completedTaskId) continue; // already done
+      const blockerDoc = await getOne(`tasks/${bid}`);
+      if (!blockerDoc || (blockerDoc as any).status !== 'done') {
+        allDone = false;
+        break;
+      }
+    }
+    if (allDone) {
+      await updateAt(`tasks/${taskDoc.id}`, { status: 'todo' });
+      unblockedIds.push(taskDoc.id);
+    }
+  }
+  return unblockedIds;
+}
+
 // ===== DOCS =====
 export async function getDocuments(teamId?: string, maxResults = 500, parentDocId?: string | null) {
   if (typeof parentDocId === 'string' || parentDocId === null) {

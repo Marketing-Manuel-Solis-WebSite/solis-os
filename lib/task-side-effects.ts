@@ -9,10 +9,11 @@
 // regardless of which page the operation originates from.
 // ============================================================
 
-import { logAction, addTaskActivity, syncGoalTargetsForTask } from './db';
+import { logAction, addTaskActivity, syncGoalTargetsForTask, getMembers, autoUnblockDependents } from './db';
 import { notifyMany } from './notifications';
 import { handleTaskCompletion } from './recurrence-trigger';
 import { propagateEntityName } from './relations';
+import { getNewMentions, resolveMentionUserIds } from './mention-utils';
 import type {
   TaskCreatedEvent,
   TaskUpdatedEvent,
@@ -159,6 +160,13 @@ export async function afterTaskUpdated(event: Omit<TaskUpdatedEvent, 'type'>): P
     }
   }
 
+  // STATUS → DONE: auto-unblock dependent tasks
+  if (field === 'status' && to === 'done') {
+    effects.push(await runEffect('autoUnblockDependents', 'important', () =>
+      autoUnblockDependents(taskId).then(() => {}),
+    ));
+  }
+
   // STATUS changed: sync goal targets
   if (field === 'status') {
     effects.push(await runEffect('syncGoalTargetsForTask', 'important', () =>
@@ -213,6 +221,31 @@ export async function afterTaskUpdated(event: Omit<TaskUpdatedEvent, 'type'>): P
           actorName: actor.actorName,
         }).then(() => {}),
       ));
+    }
+  }
+
+  // DESCRIPTION changed: detect new @mentions and notify
+  if (field === 'description' && typeof to === 'string') {
+    const oldText = typeof from === 'string' ? from : '';
+    const newNames = getNewMentions(oldText, to);
+    if (newNames.length > 0) {
+      effects.push(await runEffect('notifyTaskMentioned', 'important', async () => {
+        const members = await getMembers();
+        const mentionedIds = resolveMentionUserIds(newNames, members)
+          .filter(uid => uid !== actor.actorId);
+        if (mentionedIds.length > 0) {
+          await notifyMany(mentionedIds, {
+            type: 'task_mentioned',
+            title: `${actor.actorName} te mencionó en una tarea`,
+            message: task.title || 'Tarea',
+            entityType: 'task',
+            entityId: taskId,
+            entityUrl: '/app/tasks',
+            actorId: actor.actorId,
+            actorName: actor.actorName,
+          });
+        }
+      }));
     }
   }
 

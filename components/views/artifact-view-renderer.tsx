@@ -23,6 +23,8 @@ interface ArtifactViewRendererProps {
   tasks?: any[];
   goals?: any[];
   members?: any[];
+  /** Callback when embed URL changes (for persistence) */
+  onArtifactIdChange?: (newId: string) => void;
 }
 
 function LoadingFallback() {
@@ -46,6 +48,7 @@ export default function ArtifactViewRenderer({
   tasks,
   goals,
   members,
+  onArtifactIdChange,
 }: ArtifactViewRendererProps) {
   return (
     <Suspense fallback={<LoadingFallback />}>
@@ -68,7 +71,7 @@ export default function ArtifactViewRenderer({
         <WhiteboardCanvas whiteboardId={artifactId} />
       )}
       {artifactType === 'embed' && (
-        <EmbedView url={artifactId || ''} canEdit />
+        <EmbedView url={artifactId || ''} canEdit onUrlChange={onArtifactIdChange} />
       )}
     </Suspense>
   );

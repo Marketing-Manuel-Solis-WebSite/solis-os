@@ -18,8 +18,10 @@
 // - propagateEntityName for title changes (relation consistency)
 // - Persistent trace via eventLog
 
-import { logAction } from './db';
+import { logAction, getMembers } from './db';
 import { propagateEntityName } from './relations';
+import { getNewMentions, resolveMentionUserIds } from './mention-utils';
+import { notifyMany } from './notifications';
 import type {
   DocCreatedEvent,
   DocUpdatedEvent,
@@ -99,6 +101,31 @@ export async function afterDocUpdated(event: Omit<DocUpdatedEvent, 'type'>): Pro
     effects.push(await runEffect('propagateEntityName', 'important', () =>
       propagateEntityName(event.docId, event.to),
     ));
+  }
+
+  // Content changed: detect new @mentions and notify
+  if (event.field === 'content' && typeof event.to === 'string') {
+    const oldText = typeof event.from === 'string' ? event.from : '';
+    const newNames = getNewMentions(oldText, event.to);
+    if (newNames.length > 0) {
+      effects.push(await runEffect('notifyDocMentioned', 'important', async () => {
+        const members = await getMembers();
+        const mentionedIds = resolveMentionUserIds(newNames, members)
+          .filter(uid => uid !== event.actor.actorId);
+        if (mentionedIds.length > 0) {
+          await notifyMany(mentionedIds, {
+            type: 'doc_mentioned',
+            title: `${event.actor.actorName} te mencionó en un documento`,
+            message: event.doc?.title || 'Documento',
+            entityType: 'doc',
+            entityId: event.docId,
+            entityUrl: '/app/docs',
+            actorId: event.actor.actorId,
+            actorName: event.actor.actorName,
+          });
+        }
+      }));
+    }
   }
 
   if (effects.length > 0) {

@@ -226,6 +226,13 @@ export default function ChatPage() {
       mentionIds: allMentionIds,
     });
 
+    // Fire chat_message_received automation trigger (best-effort)
+    fetch('/api/automations/chat-trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user!.getIdToken()}` },
+      body: JSON.stringify({ channelId: active.id, text: content.trim(), authorName: me!.displayName, teamId: active.teamId || '', spaceId: active.spaceId || '' }),
+    }).catch(() => {});
+
     loadChannels(); // refresh last message
   };
 

@@ -47,3 +47,45 @@ self.addEventListener('fetch', (event) => {
     fetch(request).catch(() => caches.match('/app'))
   );
 });
+
+// ========== PUSH NOTIFICATIONS ==========
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  try {
+    const data = event.data.json();
+    const title = data.title || 'SOLIS OS';
+    const options = {
+      body: data.body || data.message || '',
+      icon: '/icon-192x192.png',
+      badge: '/icon-72x72.png',
+      tag: data.tag || data.entityId || 'solis-notification',
+      data: { url: data.url || data.entityUrl || '/app' },
+      renotify: true,
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+  } catch (e) {
+    // Fallback for non-JSON payloads
+    event.waitUntil(
+      self.registration.showNotification('SOLIS OS', { body: event.data.text() })
+    );
+  }
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/app';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      // Focus existing window if open
+      for (const client of clients) {
+        if (client.url.includes('/app') && 'focus' in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      // Open new window
+      return self.clients.openWindow(url);
+    })
+  );
+});

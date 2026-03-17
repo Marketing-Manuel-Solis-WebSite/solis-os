@@ -245,6 +245,53 @@ async function executeAction(
         }
         break;
       }
+      case 'create_task': {
+        const taskTitle = action.config.taskTitle || action.config.title || `Task from automation`;
+        const newTask: Record<string, any> = {
+          orgId: ORG,
+          title: taskTitle,
+          titleLower: taskTitle.toLowerCase(),
+          status: action.config.status || 'todo',
+          priority: action.config.priority || 'medium',
+          type: action.config.type || 'task',
+          teamId: ctx.task.teamId || '',
+          listId: action.config.listId || ctx.task.listId || null,
+          listIds: action.config.listId ? [action.config.listId] : (ctx.task.listId ? [ctx.task.listId] : []),
+          assignees: action.config.assignees || [],
+          tags: action.config.tags || [],
+          description: action.config.description || '',
+          createdBy: 'automation',
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          archived: false,
+          deleted: false,
+          dependencies: [],
+          customFields: {},
+          watchers: [],
+          subtasks: [],
+          checklist: [],
+          attachments: [],
+        };
+        // Apply field mappings from rule (source task → new task)
+        const mappings: { sourceField: string; targetField: string }[] = (ruleRef as any).fieldMappings || action.config.fieldMappings || [];
+        for (const m of mappings) {
+          if (m.sourceField && m.targetField) {
+            const sourceVal = m.sourceField.startsWith('customFields.')
+              ? ctx.task.customFields?.[m.sourceField.replace('customFields.', '')]
+              : ctx.task[m.sourceField];
+            if (sourceVal !== undefined) {
+              if (m.targetField.startsWith('customFields.')) {
+                newTask.customFields[m.targetField.replace('customFields.', '')] = sourceVal;
+              } else {
+                newTask[m.targetField] = sourceVal;
+              }
+            }
+          }
+        }
+        if (newTask.title) newTask.titleLower = newTask.title.toLowerCase();
+        await adminDb.collection('tasks').add(newTask);
+        break;
+      }
       default:
         return { success: false, error: `Unsupported action type: ${action.type}` };
     }
@@ -292,7 +339,7 @@ const AUTO_DISABLE_THRESHOLD = 5;
 async function executeRule(rule: RuleDoc, ctx: TriggerContext): Promise<void> {
   const start = Date.now();
   const logEntries: { actionType: string; status: string; error?: string }[] = [];
-  const ruleRef = { automationId: rule.id, automationName: rule.name };
+  const ruleRef = { automationId: rule.id, automationName: rule.name, fieldMappings: (rule as any).fieldMappings || [] };
 
   try {
     // Check conditions
@@ -624,5 +671,37 @@ export async function onTaskDueApproaching(taskId: string, task: Record<string, 
     }
   } finally {
     _activeTaskIds.delete(taskId);
+  }
+}
+
+/**
+ * Chat message received trigger — dispatches automations scoped to the channel's space.
+ * Uses a synthetic task context since automations operate on tasks.
+ */
+export async function onChatMessageReceived(
+  channelId: string,
+  message: { text: string; authorId: string; authorName: string },
+  scope: { teamId?: string; spaceId?: string },
+): Promise<void> {
+  const scopeCtx = { orgId: ORG, teamId: scope.teamId, spaceId: scope.spaceId };
+  const rules = await getMatchingRules('chat_message_received', scopeCtx);
+  // Chat triggers use a synthetic task context with the message data
+  const ctx: TriggerContext = {
+    taskId: channelId,
+    task: {
+      title: message.text.slice(0, 100),
+      description: message.text,
+      teamId: scope.teamId || '',
+      spaceId: scope.spaceId || '',
+      assignees: [message.authorId],
+      status: 'todo',
+      priority: 'medium',
+      channelId,
+      authorId: message.authorId,
+      authorName: message.authorName,
+    },
+  };
+  for (const rule of rules) {
+    await executeRule(rule, ctx);
   }
 }

@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, Plus, X, PanelLeft, Keyboard,
+  Search, Plus, X, PanelLeft, Keyboard, Download,
   ArrowUpDown, LayoutList, LayoutGrid, Calendar, Upload,
 } from 'lucide-react';
 import {
@@ -51,6 +51,7 @@ interface Props {
   onDeleteView?: (id: string) => void;
   onDuplicateView?: (sv: SavedView) => void;
   onImport?: () => void;
+  onExport?: () => void;
   allPresets?: any[];
   // Shared views
   sharedViews?: SavedView[];
@@ -64,6 +65,7 @@ interface Props {
   onPinView?: (viewId: string) => void;
   onSetDefaultView?: (viewId: string) => void;
   onShareViewLink?: (viewId: string) => void;
+  onSetViewVisibility?: (viewId: string, visibility: any) => void;
   // View autosave status indicator
   viewSaveStatus?: null | 'saving' | 'saved';
 }
@@ -80,9 +82,9 @@ export default function TaskToolbar({
   onSortByChange, onSortDirToggle, onGroupByChange,
   onNewTask, onClearFilters, onToggleSidebar,
   onPresetChange, onSaveView, onLoadView, onDeleteView, onDuplicateView,
-  onImport, allPresets,
+  onImport, onExport, allPresets,
   sharedViews, onDeleteSharedView, onDuplicateSharedView, onPromoteView, onDemoteView, canManageShared,
-  firestoreViews, onPinView, onSetDefaultView, onShareViewLink,
+  firestoreViews, onPinView, onSetDefaultView, onShareViewLink, onSetViewVisibility,
   viewSaveStatus,
 }: Props) {
   const { t } = useI18n();
@@ -284,6 +286,16 @@ export default function TaskToolbar({
             </button>
           )}
 
+          {onExport && (
+            <button
+              onClick={onExport}
+              className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+              title={t('export.title') || 'Export'}
+            >
+              <Download className="h-4 w-4" />
+            </button>
+          )}
+
           {canCreate && (
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -355,6 +367,7 @@ export default function TaskToolbar({
         onPinView={onPinView}
         onSetDefaultView={onSetDefaultView}
         onShareViewLink={onShareViewLink}
+        onSetViewVisibility={onSetViewVisibility as any}
         saveStatus={viewSaveStatus}
       />
 

@@ -15,6 +15,8 @@ import { useToast } from '@/components/notifications/toast-provider';
 interface Props {
   open: boolean;
   onClose: () => void;
+  defaultEntity?: 'tasks' | 'time_entries' | 'goals' | 'activity_logs';
+  defaultTeamId?: string;
 }
 
 type ExportEntity = 'tasks' | 'time_entries' | 'goals' | 'activity_logs';
@@ -32,15 +34,15 @@ const ENTITIES: { id: ExportEntity; icon: typeof FileText; labelEn: string; labe
   { id: 'activity_logs', icon: Activity, labelEn: 'Activity Logs', labelEs: 'Registro de actividad', color: '#F59E0B' },
 ];
 
-export default function ExportModal({ open, onClose }: Props) {
+export default function ExportModal({ open, onClose, defaultEntity, defaultTeamId }: Props) {
   const { lang } = useI18n();
   const { teams, activeTeamId } = useAuth();
   const toast = useToast();
-  const [entity, setEntity] = useState<ExportEntity>('tasks');
+  const [entity, setEntity] = useState<ExportEntity>(defaultEntity || 'tasks');
   const [format, setFormat] = useState<ExportFormat>('csv');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [teamId, setTeamId] = useState('');
+  const [teamId, setTeamId] = useState(defaultTeamId || '');
   const [exporting, setExporting] = useState(false);
 
   const handleExport = async () => {

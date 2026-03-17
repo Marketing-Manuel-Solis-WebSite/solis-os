@@ -218,6 +218,35 @@ export async function GET(req: Request) {
                   }
                   break;
                 }
+                case 'create_task': {
+                  const taskTitle = cfg.taskTitle || cfg.title || `Task from automation`;
+                  await adminDb.collection('tasks').add({
+                    orgId: ORG,
+                    title: taskTitle,
+                    titleLower: taskTitle.toLowerCase(),
+                    status: cfg.status || 'todo',
+                    priority: cfg.priority || 'medium',
+                    type: cfg.type || 'task',
+                    teamId: task.teamId || rule.teamId || '',
+                    listId: cfg.listId || task.listId || null,
+                    listIds: cfg.listId ? [cfg.listId] : (task.listId ? [task.listId] : []),
+                    assignees: cfg.assignees || [],
+                    tags: cfg.tags || [],
+                    description: cfg.description || '',
+                    createdBy: 'automation',
+                    createdAt: FieldValue.serverTimestamp(),
+                    updatedAt: FieldValue.serverTimestamp(),
+                    archived: false,
+                    deleted: false,
+                    dependencies: [],
+                    customFields: {},
+                    watchers: [],
+                    subtasks: [],
+                    checklist: [],
+                    attachments: [],
+                  });
+                  break;
+                }
                 default:
                   console.warn(`[ScheduledAutomation] Unsupported action type: ${action.type}`);
                   break;

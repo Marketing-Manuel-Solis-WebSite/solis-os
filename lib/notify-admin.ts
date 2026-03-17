@@ -179,6 +179,48 @@ export async function notifyUserAdmin(
     }
   }
 
+  // 4. Send push notification (if user has registered FCM tokens)
+  try {
+    const tokensSnap = await adminDb
+      .collection(`orgs/${ORG}/members/${userId}/pushTokens`)
+      .limit(10)
+      .get();
+    if (!tokensSnap.empty) {
+      const { getMessaging } = await import('firebase-admin/messaging');
+      const messaging = getMessaging();
+      const tokens = tokensSnap.docs.map(d => d.data().token).filter(Boolean);
+      if (tokens.length > 0) {
+        const pushPayload = {
+          notification: {
+            title: params.title,
+            body: params.message,
+          },
+          data: {
+            url: params.entityUrl || '/app',
+            entityId: params.entityId || '',
+            entityType: params.entityType || '',
+            tag: `${params.eventType}:${params.entityId || ''}`,
+          },
+        };
+        // Send to all tokens in parallel; silently remove invalid ones
+        const sendResults = await Promise.allSettled(
+          tokens.map(token => messaging.send({ ...pushPayload, token }))
+        );
+        const invalidTokens = sendResults
+          .map((r, i) => r.status === 'rejected' ? tokens[i] : null)
+          .filter(Boolean);
+        // Clean up invalid tokens
+        for (const badToken of invalidTokens) {
+          await adminDb.doc(`orgs/${ORG}/members/${userId}/pushTokens/${badToken}`).delete().catch(() => {});
+        }
+        (result as any).pushSent = tokens.length - invalidTokens.length;
+      }
+    }
+  } catch (err: any) {
+    // Push is best-effort — don't fail the entire notification
+    console.error(`[notify-admin] push failed for ${userId}:`, err?.message);
+  }
+
   return result;
 }
 

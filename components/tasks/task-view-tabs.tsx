@@ -4,7 +4,7 @@ import { useI18n } from '@/lib/i18n';
 import {
   Inbox, User, Sun, CalendarClock, AlertTriangle, Eye, Bookmark, Plus,
   MoreHorizontal, Pin, Copy, Share2, Pencil, Trash2, X, UserCheck, Globe,
-  Lock, Star, Link, Loader2, Check,
+  Lock, Star, Link, Loader2, Check, Shield, Users, ChevronRight,
 } from 'lucide-react';
 import type { ViewDefinition } from '@/types';
 import { BUILT_IN_PRESETS, type ViewPreset, SavedView } from './constants';
@@ -33,6 +33,7 @@ interface Props {
   onPinView?: (viewId: string) => void;
   onSetDefaultView?: (viewId: string) => void;
   onShareViewLink?: (viewId: string) => void;
+  onSetViewVisibility?: (viewId: string, visibility: ViewDefinition['visibility']) => void;
   // View autosave status indicator
   saveStatus?: null | 'saving' | 'saved';
 }
@@ -53,10 +54,11 @@ export default function TaskViewTabs({
   allPresets,
   sharedViews, onDeleteSharedView, onDuplicateSharedView, onPromoteView, onDemoteView,
   canManageShared,
-  firestoreViews, onPinView, onSetDefaultView, onShareViewLink,
+  firestoreViews, onPinView, onSetDefaultView, onShareViewLink, onSetViewVisibility,
   saveStatus,
 }: Props) {
   const { t } = useI18n();
+  const [visibilityMenuFor, setVisibilityMenuFor] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -188,6 +190,37 @@ export default function TaskViewTabs({
                     <Link className="h-3.5 w-3.5" /> {t('views.shareLink')}
                   </button>
                 )}
+                {onSetViewVisibility && canManageShared && fsView && (
+                  <div className="relative">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setVisibilityMenuFor(visibilityMenuFor === sv.id ? null : sv.id); }}
+                      className="w-full flex items-center justify-between gap-2 px-3.5 py-2 rounded-lg text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+                    >
+                      <span className="flex items-center gap-2"><Eye className="h-3.5 w-3.5" /> {t('views.visibility') || 'Visibility'}</span>
+                      <ChevronRight className="h-3 w-3 text-[var(--text-muted)]" />
+                    </button>
+                    {visibilityMenuFor === sv.id && (
+                      <div className="absolute left-full top-0 ml-1 w-44 rounded-xl bg-[var(--bg-elevated)] shadow-lg z-50 p-1.5">
+                        {([
+                          { val: 'private' as const, icon: Lock, label: t('views.private') },
+                          { val: 'public' as const, icon: Globe, label: t('views.public') },
+                          { val: 'protected' as const, icon: Shield, label: t('views.protected') },
+                          { val: 'space_members' as const, icon: Users, label: t('views.spaceMembers') || 'Space Members' },
+                          { val: 'required' as const, icon: Star, label: t('views.required') },
+                        ] as const).map(opt => (
+                          <button
+                            key={opt.val}
+                            onClick={() => { onSetViewVisibility(fsView.id, opt.val); setVisibilityMenuFor(null); setMenuOpen(null); }}
+                            className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] transition ${fsView.visibility === opt.val ? 'text-[var(--accent)] bg-[var(--accent-subtle)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+                          >
+                            <opt.icon className="h-3.5 w-3.5" /> {opt.label}
+                            {fsView.visibility === opt.val && <Check className="h-3 w-3 ml-auto" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 {onPromoteView && canManageShared && (
                   <button
                     onClick={() => { onPromoteView(sv); setMenuOpen(null); }}
@@ -285,6 +318,37 @@ export default function TaskViewTabs({
                   >
                     <Copy className="h-3.5 w-3.5" /> {t('views.copyToMyViews')}
                   </button>
+                )}
+                {onSetViewVisibility && canManageShared && fsView && (
+                  <div className="relative">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setVisibilityMenuFor(visibilityMenuFor === key ? null : key); }}
+                      className="w-full flex items-center justify-between gap-2 px-3.5 py-2 rounded-lg text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+                    >
+                      <span className="flex items-center gap-2"><Eye className="h-3.5 w-3.5" /> {t('views.visibility') || 'Visibility'}</span>
+                      <ChevronRight className="h-3 w-3 text-[var(--text-muted)]" />
+                    </button>
+                    {visibilityMenuFor === key && (
+                      <div className="absolute left-full top-0 ml-1 w-44 rounded-xl bg-[var(--bg-elevated)] shadow-lg z-50 p-1.5">
+                        {([
+                          { val: 'private' as const, icon: Lock, label: t('views.private') },
+                          { val: 'public' as const, icon: Globe, label: t('views.public') },
+                          { val: 'protected' as const, icon: Shield, label: t('views.protected') },
+                          { val: 'space_members' as const, icon: Users, label: t('views.spaceMembers') || 'Space Members' },
+                          { val: 'required' as const, icon: Star, label: t('views.required') },
+                        ] as const).map(opt => (
+                          <button
+                            key={opt.val}
+                            onClick={() => { onSetViewVisibility(fsView.id, opt.val); setVisibilityMenuFor(null); setMenuOpen(null); }}
+                            className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] transition ${fsView.visibility === opt.val ? 'text-[var(--accent)] bg-[var(--accent-subtle)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+                          >
+                            <opt.icon className="h-3.5 w-3.5" /> {opt.label}
+                            {fsView.visibility === opt.val && <Check className="h-3 w-3 ml-auto" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
                 {onDemoteView && canManageShared && (
                   <button
