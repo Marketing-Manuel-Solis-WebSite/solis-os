@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Edit2, Trash2, Target, Calendar, User, ChevronDown } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, Target, Calendar, User, ChevronDown, FolderOpen } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { useFeatureFlag } from '@/lib/feature-flags';
@@ -244,6 +244,20 @@ export default function GoalDetailDrawer({ goal, open, onClose, onUpdate, onDele
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Goal Folder */}
+              <div className="p-3 rounded-xl bg-[var(--bg-base)]">
+                <p className="text-[11px] text-[var(--text-muted)] uppercase font-semibold mb-1.5">{t('goals.folder')}</p>
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="h-3.5 w-3.5 text-[var(--text-muted)] shrink-0" />
+                  <input
+                    value={goal.goalFolder || ''}
+                    onChange={e => onUpdate(goal.id, { goalFolder: e.target.value.trim() || null })}
+                    placeholder={t('goals.noFolder')}
+                    className="flex-1 h-7 px-2 rounded-md bg-[var(--bg-elevated)] text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none ring-1 ring-[var(--border-subtle)] focus:ring-[var(--accent)] transition"
+                  />
+                </div>
               </div>
 
               {/* Targets section */}

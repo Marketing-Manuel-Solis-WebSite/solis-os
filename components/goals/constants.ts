@@ -20,6 +20,8 @@ export interface Goal {
   parentGoalId?: string | null;
   /** OKR type: objective, key_result, or generic goal. */
   goalType?: GoalType;
+  /** Folder label for grouping goals (e.g. "Q1 Goals", "Revenue Goals"). */
+  goalFolder?: string | null;
 }
 
 export type GoalType = 'objective' | 'key_result' | 'goal';

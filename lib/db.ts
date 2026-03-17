@@ -1625,6 +1625,7 @@ export async function createForm(data: any) {
     createdBy: data.createdBy || '',
     createdByName: data.createdByName || '',
     teamId: data.teamId || '',
+    folderId: data.folderId || null,
   });
 }
 

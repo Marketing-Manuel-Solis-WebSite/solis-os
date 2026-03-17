@@ -677,7 +677,7 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
 
   // ─── AddViewMenu handler ─────────────────────────
   const handleAddView = useCallback(async (viewType: string) => {
-    const artifactTypes = ['dashboard', 'doc', 'form', 'whiteboard'];
+    const artifactTypes = ['dashboard', 'doc', 'form', 'whiteboard', 'embed'];
     if (artifactTypes.includes(viewType)) {
       // Create artifact view in Firestore
       if (!user?.uid) return;

@@ -695,7 +695,7 @@ export default function TasksPage() {
         <div className="flex items-center gap-2 px-4 pb-1">
           <AddViewMenu
             onSelect={(viewType) => {
-              const artifactTypes = ['dashboard', 'doc', 'form', 'whiteboard'];
+              const artifactTypes = ['dashboard', 'doc', 'form', 'whiteboard', 'embed'];
               if (artifactTypes.includes(viewType)) {
                 handleAddArtifactView(viewType);
               } else {

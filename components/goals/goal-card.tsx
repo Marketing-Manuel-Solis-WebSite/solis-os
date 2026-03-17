@@ -1,6 +1,6 @@
 'use client';
 import { motion } from 'framer-motion';
-import { Target, Calendar, User, MoreHorizontal } from 'lucide-react';
+import { Target, Calendar, User, MoreHorizontal, FolderOpen } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import type { Goal } from './constants';
 import { GOAL_STATUSES } from './constants';
@@ -96,6 +96,14 @@ export default function GoalCard({ goal, onClick, onMenu }: Props) {
             <div className={`flex items-center gap-1 text-[12px] ${dueInfo.urgent ? 'text-[var(--error)]' : 'text-[var(--text-muted)]'}`}>
               <Calendar className="h-3 w-3" />
               <span>{dueInfo.text}</span>
+            </div>
+          )}
+
+          {/* Folder */}
+          {goal.goalFolder && (
+            <div className="flex items-center gap-1 text-[12px] text-[var(--text-muted)]">
+              <FolderOpen className="h-3 w-3" />
+              <span className="truncate max-w-[80px]">{goal.goalFolder}</span>
             </div>
           )}
         </div>

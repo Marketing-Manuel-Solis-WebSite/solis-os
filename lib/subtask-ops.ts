@@ -12,7 +12,7 @@ import { ORG_ID as ORG } from '@/lib/org';
 // Tasks with parentTaskId set, stored as first-class tasks.
 // ============================================================
 
-const MAX_DEPTH = 3;
+export const MAX_DEPTH = 7;
 
 /** Fetch a single task by ID (local helper, mirrors db.ts getOne). */
 async function getTask(id: string): Promise<any | null> {
@@ -131,7 +131,7 @@ export async function getSubtasks(parentTaskId: string): Promise<any[]> {
     .filter((t: any) => !t.deleted);
 }
 
-export async function getSubtaskTree(rootTaskId: string, maxDepth = 3): Promise<any> {
+export async function getSubtaskTree(rootTaskId: string, maxDepth = MAX_DEPTH): Promise<any> {
   const task = await getTask(rootTaskId);
   if (!task || maxDepth <= 0) return { ...task, children: [] };
 

@@ -16,6 +16,7 @@ import TaskTimelineView from '@/components/tasks/task-timeline-view';
 import TaskWorkloadView from '@/components/tasks/task-workload-view';
 import TaskTeamView from '@/components/tasks/task-team-view';
 import TaskActivityView from '@/components/tasks/task-activity-view';
+import EmbedView from '@/components/views/embed-view';
 
 // Cast: each view component uses a subset of ViewProps — safe at runtime.
 registerView({
@@ -167,7 +168,7 @@ registerView({
   name: 'Embed',
   nameEs: 'Embebido',
   iconName: 'ExternalLink',
-  component: (() => null) as unknown as ComponentType<ViewProps>, // Renders via ArtifactViewRenderer
+  component: EmbedView as unknown as ComponentType<ViewProps>,
   capabilities: {
     groupBy: false,
     sort: false,

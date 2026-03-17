@@ -622,7 +622,7 @@ export interface EmailTemplate extends BaseEntity {
 // --- Views (First-Class) ---
 export type ViewVisibility = 'private' | 'public' | 'protected' | 'space_members' | 'required';
 export type ViewScopeType = 'space' | 'folder' | 'list' | 'global';
-export type ArtifactType = 'dashboard' | 'doc' | 'form' | 'whiteboard';
+export type ArtifactType = 'dashboard' | 'doc' | 'form' | 'whiteboard' | 'embed';
 
 export interface ViewConfig {
   filters: Record<string, unknown>;
@@ -635,6 +635,7 @@ export interface ViewConfig {
   calendarMode?: 'month' | 'week' | 'day';
   ganttZoom?: 'day' | 'week' | 'month';
   workloadPeriod?: 'week' | 'month';
+  embedUrl?: string;
 }
 
 export interface ViewDefinition extends BaseEntity {

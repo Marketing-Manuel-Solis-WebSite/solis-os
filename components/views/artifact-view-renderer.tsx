@@ -8,8 +8,9 @@ const ContextualDashboard = lazy(() => import('@/components/dashboard/contextual
 const DocEditor = lazy(() => import('@/components/views/lazy-doc-editor'));
 const FormRenderer = lazy(() => import('@/components/views/lazy-form-renderer'));
 const WhiteboardCanvas = lazy(() => import('@/components/views/lazy-whiteboard-canvas'));
+const EmbedView = lazy(() => import('@/components/views/embed-view'));
 
-export type ArtifactType = 'dashboard' | 'doc' | 'form' | 'whiteboard';
+export type ArtifactType = 'dashboard' | 'doc' | 'form' | 'whiteboard' | 'embed';
 
 interface ArtifactViewRendererProps {
   artifactType: ArtifactType;
@@ -65,6 +66,9 @@ export default function ArtifactViewRenderer({
       )}
       {artifactType === 'whiteboard' && (
         <WhiteboardCanvas whiteboardId={artifactId} />
+      )}
+      {artifactType === 'embed' && (
+        <EmbedView url={artifactId || ''} canEdit />
       )}
     </Suspense>
   );

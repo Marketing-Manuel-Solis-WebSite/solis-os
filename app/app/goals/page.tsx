@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Target, Loader2, GitBranch, LayoutGrid, FileText, ArrowUpDown } from 'lucide-react';
+import { Plus, Target, Loader2, GitBranch, LayoutGrid, FileText, ArrowUpDown, FolderOpen } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { useFeatureFlag } from '@/lib/feature-flags';
@@ -36,6 +36,7 @@ export default function GoalsPage() {
   const [parentGoalForCreate, setParentGoalForCreate] = useState<Goal | null>(null);
   const [childGoalsMap, setChildGoalsMap] = useState<Record<string, Goal[]>>({});
   const [sortGoalsBy, setSortGoalsBy] = useState('updatedAt');
+  const [folderFilter, setFolderFilter] = useState<string>('');
 
   const loadGoals = useCallback(async () => {
     setLoading(true);
@@ -134,6 +135,8 @@ export default function GoalsPage() {
     }
     if (statusFilter && g.status !== statusFilter) return false;
     if (ownerFilter && g.ownerId !== ownerFilter) return false;
+    if (folderFilter === '__none__' && g.goalFolder) return false;
+    if (folderFilter && folderFilter !== '__none__' && g.goalFolder !== folderFilter) return false;
     return true;
   }).sort((a: any, b: any) => {
     if (sortGoalsBy === 'name') return (a.name || '').localeCompare(b.name || '');
@@ -221,13 +224,57 @@ export default function GoalsPage() {
       </div>
 
       {/* Filters */}
-      <div className="mb-5">
+      <div className="mb-3">
         <GoalFilters
           search={search} onSearch={setSearch}
           statusFilter={statusFilter} onStatusFilter={setStatusFilter}
           ownerFilter={ownerFilter} onOwnerFilter={setOwnerFilter}
         />
       </div>
+
+      {/* Folder filter chips */}
+      {(() => {
+        const uniqueFolders = Array.from(new Set(goals.map(g => g.goalFolder).filter(Boolean))) as string[];
+        if (uniqueFolders.length === 0) return null;
+        return (
+          <div className="flex items-center gap-1.5 mb-5 flex-wrap">
+            <FolderOpen className="h-3.5 w-3.5 text-[var(--text-muted)] mr-0.5" />
+            <button
+              onClick={() => setFolderFilter('')}
+              className={`px-3 py-1 rounded-lg text-[12px] font-medium transition ${
+                !folderFilter
+                  ? 'bg-[var(--accent-subtle)] text-[var(--accent)] ring-1 ring-[var(--accent)]/30'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+              }`}
+            >
+              {t('goals.allFolders')}
+            </button>
+            {uniqueFolders.map(folder => (
+              <button
+                key={folder}
+                onClick={() => setFolderFilter(folderFilter === folder ? '' : folder)}
+                className={`px-3 py-1 rounded-lg text-[12px] font-medium transition ${
+                  folderFilter === folder
+                    ? 'bg-[var(--accent-subtle)] text-[var(--accent)] ring-1 ring-[var(--accent)]/30'
+                    : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                {folder}
+              </button>
+            ))}
+            <button
+              onClick={() => setFolderFilter(folderFilter === '__none__' ? '' : '__none__')}
+              className={`px-3 py-1 rounded-lg text-[12px] font-medium transition ${
+                folderFilter === '__none__'
+                  ? 'bg-[var(--accent-subtle)] text-[var(--accent)] ring-1 ring-[var(--accent)]/30'
+                  : 'bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:bg-[var(--bg-hover)]'
+              }`}
+            >
+              {t('goals.noFolder')}
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Goals Grid */}
       {loading ? (

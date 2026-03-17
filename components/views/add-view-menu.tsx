@@ -4,11 +4,11 @@ import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, X, List, Columns3, Calendar, Table, GanttChart, Clock, Users,
-  LayoutDashboard, FileText, FileInput, PenTool,
+  LayoutDashboard, FileText, FileInput, PenTool, ExternalLink,
 } from 'lucide-react';
 
 export type TaskViewType = 'list' | 'board' | 'calendar' | 'table' | 'gantt' | 'timeline' | 'workload';
-export type ArtifactViewType = 'dashboard' | 'doc' | 'form' | 'whiteboard';
+export type ArtifactViewType = 'dashboard' | 'doc' | 'form' | 'whiteboard' | 'embed';
 export type ViewType = TaskViewType | ArtifactViewType;
 
 interface AddViewMenuProps {
@@ -32,6 +32,7 @@ const ARTIFACT_VIEWS: { type: ArtifactViewType; labelEs: string; labelEn: string
   { type: 'doc', labelEs: 'Documento', labelEn: 'Doc', icon: FileText },
   { type: 'form', labelEs: 'Formulario', labelEn: 'Form', icon: FileInput },
   { type: 'whiteboard', labelEs: 'Pizarra', labelEn: 'Whiteboard', icon: PenTool },
+  { type: 'embed', labelEs: 'Embebido', labelEn: 'Embed', icon: ExternalLink },
 ];
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];

@@ -38,6 +38,7 @@ export default function GoalCreateModal({ open, onClose, onSave, editGoal, paren
   const [saving, setSaving] = useState(false);
   const [parentGoalId, setParentGoalId] = useState<string>('');
   const [goalType, setGoalType] = useState<GoalType>('goal');
+  const [goalFolder, setGoalFolder] = useState('');
 
   useEffect(() => {
     if (editGoal) {
@@ -53,6 +54,7 @@ export default function GoalCreateModal({ open, onClose, onSave, editGoal, paren
       setTags(editGoal.tags || []);
       setParentGoalId(editGoal.parentGoalId || '');
       setGoalType(editGoal.goalType || 'goal');
+      setGoalFolder(editGoal.goalFolder || '');
     } else {
       setName('');
       setDescription('');
@@ -67,6 +69,7 @@ export default function GoalCreateModal({ open, onClose, onSave, editGoal, paren
       setParentGoalId(parentGoal?.id || '');
       // Default to key_result when parent is an objective
       setGoalType(parentGoal?.goalType === 'objective' ? 'key_result' : 'goal');
+      setGoalFolder('');
     }
   }, [editGoal, open, me, activeTeamId, parentGoal]);
 
@@ -93,6 +96,7 @@ export default function GoalCreateModal({ open, onClose, onSave, editGoal, paren
       visibility,
       tags,
       parentGoalId: parentGoalId || null,
+      goalFolder: goalFolder.trim() || null,
       ...(okrEnabled ? { goalType } : {}),
     });
     setSaving(false);
@@ -275,6 +279,23 @@ export default function GoalCreateModal({ open, onClose, onSave, editGoal, paren
                 </select>
               </div>
             )}
+
+            {/* Goal Folder */}
+            <div>
+              <label className="text-[13px] font-medium text-[var(--text-secondary)] block mb-1">{t('goals.folder')}</label>
+              <input
+                value={goalFolder}
+                onChange={e => setGoalFolder(e.target.value)}
+                placeholder={t('goals.folderPlaceholder')}
+                list="goal-folder-options"
+                className="w-full h-9 px-3 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none ring-1 ring-[var(--border-subtle)] focus:ring-[var(--accent)] transition"
+              />
+              <datalist id="goal-folder-options">
+                {Array.from(new Set(allGoals.map(g => g.goalFolder).filter(Boolean))).map(f => (
+                  <option key={f!} value={f!} />
+                ))}
+              </datalist>
+            </div>
 
             {/* Color picker */}
             <div>

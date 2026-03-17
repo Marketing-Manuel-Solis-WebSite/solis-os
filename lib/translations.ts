@@ -719,6 +719,9 @@ export const translations: Record<Lang, Dict> = {
     'spaces.deleteWhiteboard': 'Eliminar pizarrón',
     'spaces.deleteDocConfirm': '¿Eliminar este documento permanentemente?',
     'spaces.deleteWhiteboardConfirm': '¿Eliminar este pizarrón permanentemente?',
+    'spaces.renameForm': 'Renombrar formulario',
+    'spaces.deleteForm': 'Eliminar formulario',
+    'spaces.deleteFormConfirm': '¿Eliminar este formulario permanentemente?',
     'spaces.moveToFolder': 'Mover a carpeta',
     'spaces.selectDestinationFolder': 'Selecciona la carpeta destino',
     'spaces.emptyFolder': 'Esta carpeta está vacía',
@@ -1426,6 +1429,11 @@ export const translations: Record<Lang, Dict> = {
     'goals.assignedToYou': 'Te asignaron una nueva meta',
     'goals.goalCompleted': 'La meta alcanzó 100%',
     'goals.goalOverdue': 'La meta ha vencido sin completarse',
+    'goals.folder': 'Carpeta de metas',
+    'goals.setFolder': 'Asignar carpeta',
+    'goals.allFolders': 'Todas las carpetas',
+    'goals.noFolder': 'Sin carpeta',
+    'goals.folderPlaceholder': 'Ej: Metas Q1, Revenue...',
 
     // --- Timesheets Module ---
     'timesheets.title': 'Hojas de Horas',
@@ -2342,6 +2350,9 @@ export const translations: Record<Lang, Dict> = {
     'views.workload': 'Carga de trabajo',
     'views.team': 'Equipo',
     'views.activity': 'Actividad',
+    'views.embed': 'Embebido',
+    'views.embedUrl': 'URL para embeber',
+    'views.embedPlaceholder': 'Ingresa la URL',
     'breadcrumbs.spaces': 'Espacios',
 
     // --- Inheritance ---
@@ -3312,6 +3323,9 @@ export const translations: Record<Lang, Dict> = {
     'spaces.deleteWhiteboard': 'Delete whiteboard',
     'spaces.deleteDocConfirm': 'Permanently delete this document?',
     'spaces.deleteWhiteboardConfirm': 'Permanently delete this whiteboard?',
+    'spaces.renameForm': 'Rename form',
+    'spaces.deleteForm': 'Delete form',
+    'spaces.deleteFormConfirm': 'Permanently delete this form?',
     'spaces.moveToFolder': 'Move to folder',
     'spaces.selectDestinationFolder': 'Select destination folder',
     'spaces.emptyFolder': 'This folder is empty',
@@ -4019,6 +4033,11 @@ export const translations: Record<Lang, Dict> = {
     'goals.assignedToYou': 'You were assigned a new goal',
     'goals.goalCompleted': 'The goal reached 100%',
     'goals.goalOverdue': 'The goal is past its due date',
+    'goals.folder': 'Goal folder',
+    'goals.setFolder': 'Set folder',
+    'goals.allFolders': 'All folders',
+    'goals.noFolder': 'No folder',
+    'goals.folderPlaceholder': 'E.g.: Q1 Goals, Revenue...',
 
     // --- Timesheets Module ---
     'timesheets.title': 'Timesheets',
@@ -4935,6 +4954,9 @@ export const translations: Record<Lang, Dict> = {
     'views.workload': 'Workload',
     'views.team': 'Team',
     'views.activity': 'Activity',
+    'views.embed': 'Embed',
+    'views.embedUrl': 'URL to embed',
+    'views.embedPlaceholder': 'Enter URL',
     'breadcrumbs.spaces': 'Spaces',
 
     // --- Inheritance ---

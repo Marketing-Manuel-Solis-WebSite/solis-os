@@ -7,7 +7,7 @@ import {
   Plus, X, ChevronRight, Calendar, User,
   Check, Loader2, Circle, Eye, CheckCircle2, AlertCircle,
 } from 'lucide-react';
-import { createSubtask, deleteSubtask, rollupProgress } from '@/lib/subtask-ops';
+import { createSubtask, deleteSubtask, rollupProgress, MAX_DEPTH } from '@/lib/subtask-ops';
 import { updateTask } from '@/lib/db';
 import { STATUSES, PRIORITIES, getStatusConfig, getPriorityConfig } from './constants';
 
@@ -206,7 +206,7 @@ export default function SubtaskList({
   userId,
   canUpdate,
   onMutate,
-  maxDepth = 3,
+  maxDepth = MAX_DEPTH,
   depth = 0,
   childrenMap = {},
 }: Props) {

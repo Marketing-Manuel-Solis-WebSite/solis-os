@@ -5,13 +5,13 @@ import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronUp, ChevronDown as ChevronDownIcon, FolderOpen, List, Plus, MoreHorizontal,
-  Pencil, Trash2, FolderPlus, ListPlus, FolderInput, FileText, PenTool, Home, LayoutTemplate,
+  Pencil, Trash2, FolderPlus, ListPlus, FolderInput, FileText, PenTool, Home, LayoutTemplate, FileInput,
 } from 'lucide-react';
 import {
   getFolders, getLists, createFolder, createList, deleteFolder, deleteList,
   updateFolder, updateList, ensureDefaultList,
   getDocsBySpace, getWhiteboardsBySpace, createDocument, createWhiteboard, getForms,
-  updateDocument, deleteDocument, updateWhiteboard, deleteWhiteboard,
+  updateDocument, deleteDocument, updateWhiteboard, deleteWhiteboard, updateForm, deleteForm,
   type FolderData, type ListData,
 } from '@/lib/db';
 import { SpaceInputDialog, SpaceConfirmDialog } from './space-input-dialog';
@@ -44,7 +44,10 @@ type DialogState =
   | { action: 'deleteDoc'; docId: string; title: string }
   | { action: 'deleteWhiteboard'; boardId: string; name: string }
   | { action: 'moveDoc'; docId: string; docTitle: string }
-  | { action: 'moveWhiteboard'; boardId: string; boardName: string };
+  | { action: 'moveWhiteboard'; boardId: string; boardName: string }
+  | { action: 'renameForm'; formId: string; currentTitle: string }
+  | { action: 'deleteForm'; formId: string; title: string }
+  | { action: 'moveForm'; formId: string; formTitle: string };
 
 export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, spaceIcon, userId, canManage }: Props) {
   const { t } = useI18n();
@@ -59,7 +62,7 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
   const [spaceForms, setSpaceForms] = useState<{ id: string; title: string; folderId?: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [menuTarget, setMenuTarget] = useState<{ type: 'folder' | 'list' | 'doc' | 'whiteboard'; id: string } | null>(null);
+  const [menuTarget, setMenuTarget] = useState<{ type: 'folder' | 'list' | 'doc' | 'whiteboard' | 'form'; id: string } | null>(null);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [templatePicker, setTemplatePicker] = useState<{ folderId: string | null } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -135,8 +138,10 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
   const folderlessLists = lists.filter(l => !l.folderId);
   const docsByFolder = (fid: string) => spaceDocs.filter(d => d.folderId === fid);
   const boardsByFolder = (fid: string) => spaceBoards.filter(b => b.folderId === fid);
+  const formsByFolder = (fid: string) => spaceForms.filter(f => f.folderId === fid);
   const folderlessDocs = spaceDocs.filter(d => !d.folderId);
   const folderlessBoards = spaceBoards.filter(b => !b.folderId);
+  const folderlessForms = spaceForms.filter(f => !f.folderId);
   const listsByFolder = (folderId: string) => lists.filter(l => l.folderId === folderId);
 
   // Active state helpers for docs/whiteboards/folders
@@ -222,6 +227,7 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
       setLists(prev => prev.map(l => l.folderId === id ? { ...l, folderId: null } : l));
       setSpaceDocs(prev => prev.map(d => d.folderId === id ? { ...d, folderId: null } : d));
       setSpaceBoards(prev => prev.map(b => b.folderId === id ? { ...b, folderId: null } : b));
+      setSpaceForms(prev => prev.map(f => f.folderId === id ? { ...f, folderId: null } : f));
     } else {
       await deleteList(id);
       setLists(prev => prev.filter(l => l.id !== id));
@@ -280,6 +286,29 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
   const handleMoveWhiteboard = async (boardId: string, targetFolderId: string | null) => {
     await updateWhiteboard(boardId, { folderId: targetFolderId });
     setSpaceBoards(prev => prev.map(b => b.id === boardId ? { ...b, folderId: targetFolderId } : b));
+    if (targetFolderId) setExpandedFolders(prev => new Set([...prev, targetFolderId]));
+    setDialog(null);
+    setMenuTarget(null);
+  };
+
+  // ─── Form handlers ──────────────────────────────
+  const handleRenameForm = async (formId: string, title: string) => {
+    await updateForm(formId, { title });
+    setSpaceForms(prev => prev.map(f => f.id === formId ? { ...f, title } : f));
+    setDialog(null);
+    setMenuTarget(null);
+  };
+
+  const handleDeleteForm = async (formId: string) => {
+    await deleteForm(formId);
+    setSpaceForms(prev => prev.filter(f => f.id !== formId));
+    setDialog(null);
+    setMenuTarget(null);
+  };
+
+  const handleMoveForm = async (formId: string, targetFolderId: string | null) => {
+    await updateForm(formId, { folderId: targetFolderId });
+    setSpaceForms(prev => prev.map(f => f.id === formId ? { ...f, folderId: targetFolderId } : f));
     if (targetFolderId) setExpandedFolders(prev => new Set([...prev, targetFolderId]));
     setDialog(null);
     setMenuTarget(null);
@@ -362,7 +391,7 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
                   >
                     <FolderOpen className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} style={{ color: folder.color || spaceColor || 'var(--text-muted)' }} />
                     <span className="truncate">{folder.name}</span>
-                    <span className="text-[10px] text-[var(--text-muted)] ml-auto">{fLists.length + docsByFolder(folder.id!).length + boardsByFolder(folder.id!).length + fSubfolders.length}</span>
+                    <span className="text-[10px] text-[var(--text-muted)] ml-auto">{fLists.length + docsByFolder(folder.id!).length + boardsByFolder(folder.id!).length + formsByFolder(folder.id!).length + fSubfolders.length}</span>
                   </button>
                 </div>
                 {canManage && (
@@ -469,12 +498,32 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
                           artifactType="whiteboard"
                         />
                       ))}
+                      {/* Forms in this folder */}
+                      {formsByFolder(folder.id!).map(fm => (
+                        <ArtifactItem
+                          key={`form-${fm.id}`}
+                          icon={<FileInput className="h-3.5 w-3.5 text-[var(--text-muted)]" strokeWidth={1.75} />}
+                          label={fm.title}
+                          href={`/app/forms?id=${fm.id}`}
+                          active={false}
+                          canManage={canManage}
+                          menuOpen={menuTarget?.type === 'form' && menuTarget.id === fm.id}
+                          menuRef={menuRef}
+                          onMenu={() => setMenuTarget({ type: 'form', id: fm.id })}
+                          onRename={() => { setDialog({ action: 'renameForm', formId: fm.id, currentTitle: fm.title }); setMenuTarget(null); }}
+                          onDelete={canManage ? () => { setDialog({ action: 'deleteForm', formId: fm.id, title: fm.title }); setMenuTarget(null); } : undefined}
+                          onMoveToFolder={canManage && folders.length > 0 ? () => { setDialog({ action: 'moveForm', formId: fm.id, formTitle: fm.title }); setMenuTarget(null); } : undefined}
+                          t={t}
+                          artifactType="form"
+                        />
+                      ))}
                       {/* Subfolders inside this root folder (1 level only) */}
                       {fSubfolders.map((sub) => {
                         const subExpanded = expandedFolders.has(sub.id!);
                         const subLists = listsByFolder(sub.id!);
                         const subDocs = docsByFolder(sub.id!);
                         const subBoards = boardsByFolder(sub.id!);
+                        const subForms = formsByFolder(sub.id!);
                         return (
                           <div key={sub.id}>
                             <div className="group flex items-center">
@@ -498,7 +547,7 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
                                 >
                                   <FolderOpen className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} style={{ color: sub.color || spaceColor || 'var(--text-muted)' }} />
                                   <span className="truncate">{sub.name}</span>
-                                  <span className="text-[10px] text-[var(--text-muted)] ml-auto">{subLists.length + subDocs.length + subBoards.length}</span>
+                                  <span className="text-[10px] text-[var(--text-muted)] ml-auto">{subLists.length + subDocs.length + subBoards.length + subForms.length}</span>
                                 </button>
                               </div>
                               {canManage && (
@@ -600,7 +649,25 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
                                         artifactType="whiteboard"
                                       />
                                     ))}
-                                    {subLists.length === 0 && subDocs.length === 0 && subBoards.length === 0 && (
+                                    {subForms.map(fm => (
+                                      <ArtifactItem
+                                        key={`form-${fm.id}`}
+                                        icon={<FileInput className="h-3.5 w-3.5 text-[var(--text-muted)]" strokeWidth={1.75} />}
+                                        label={fm.title}
+                                        href={`/app/forms?id=${fm.id}`}
+                                        active={false}
+                                        canManage={canManage}
+                                        menuOpen={menuTarget?.type === 'form' && menuTarget.id === fm.id}
+                                        menuRef={menuRef}
+                                        onMenu={() => setMenuTarget({ type: 'form', id: fm.id })}
+                                        onRename={() => { setDialog({ action: 'renameForm', formId: fm.id, currentTitle: fm.title }); setMenuTarget(null); }}
+                                        onDelete={canManage ? () => { setDialog({ action: 'deleteForm', formId: fm.id, title: fm.title }); setMenuTarget(null); } : undefined}
+                                        onMoveToFolder={canManage && folders.length > 0 ? () => { setDialog({ action: 'moveForm', formId: fm.id, formTitle: fm.title }); setMenuTarget(null); } : undefined}
+                                        t={t}
+                                        artifactType="form"
+                                      />
+                                    ))}
+                                    {subLists.length === 0 && subDocs.length === 0 && subBoards.length === 0 && subForms.length === 0 && (
                                       canManage ? (
                                         <button
                                           onClick={() => setDialog({ action: 'createList', folderId: sub.id! })}
@@ -622,7 +689,7 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
                           </div>
                         );
                       })}
-                      {fLists.length === 0 && docsByFolder(folder.id!).length === 0 && boardsByFolder(folder.id!).length === 0 && fSubfolders.length === 0 && (
+                      {fLists.length === 0 && docsByFolder(folder.id!).length === 0 && boardsByFolder(folder.id!).length === 0 && formsByFolder(folder.id!).length === 0 && fSubfolders.length === 0 && (
                         canManage ? (
                           <button
                             onClick={() => setDialog({ action: 'createList', folderId: folder.id! })}
@@ -702,6 +769,25 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
             onMoveToFolder={canManage && folders.length > 0 ? () => { setDialog({ action: 'moveWhiteboard', boardId: b.id, boardName: b.name }); setMenuTarget(null); } : undefined}
             t={t}
             artifactType="whiteboard"
+          />
+        ))}
+        {/* Folderless forms */}
+        {folderlessForms.map(fm => (
+          <ArtifactItem
+            key={`form-${fm.id}`}
+            icon={<FileInput className="h-3.5 w-3.5 text-[var(--text-muted)]" strokeWidth={1.75} />}
+            label={fm.title}
+            href={`/app/forms?id=${fm.id}`}
+            active={false}
+            canManage={canManage}
+            menuOpen={menuTarget?.type === 'form' && menuTarget.id === fm.id}
+            menuRef={menuRef}
+            onMenu={() => setMenuTarget({ type: 'form', id: fm.id })}
+            onRename={() => { setDialog({ action: 'renameForm', formId: fm.id, currentTitle: fm.title }); setMenuTarget(null); }}
+            onDelete={canManage ? () => { setDialog({ action: 'deleteForm', formId: fm.id, title: fm.title }); setMenuTarget(null); } : undefined}
+            onMoveToFolder={canManage && folders.length > 0 ? () => { setDialog({ action: 'moveForm', formId: fm.id, formTitle: fm.title }); setMenuTarget(null); } : undefined}
+            t={t}
+            artifactType="form"
           />
         ))}
 
@@ -904,6 +990,42 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
           folders={folders}
           currentFolderId={spaceBoards.find(b => b.id === dialog.boardId)?.folderId || null}
           onMove={(folderId) => handleMoveWhiteboard(dialog.boardId, folderId)}
+          onCancel={() => setDialog(null)}
+          t={t}
+        />
+      )}
+
+      {/* Rename form */}
+      <SpaceInputDialog
+        open={dialog?.action === 'renameForm'}
+        title={t('spaces.renameForm')}
+        defaultValue={dialog?.action === 'renameForm' ? dialog.currentTitle : ''}
+        confirmLabel={t('common.save')}
+        onConfirm={title => {
+          if (dialog?.action === 'renameForm') handleRenameForm(dialog.formId, title);
+        }}
+        onCancel={() => setDialog(null)}
+      />
+
+      {/* Delete form */}
+      <SpaceConfirmDialog
+        open={dialog?.action === 'deleteForm'}
+        title={dialog?.action === 'deleteForm' ? t('spaces.deleteForm') : ''}
+        description={dialog?.action === 'deleteForm' ? t('spaces.deleteFormConfirm') : ''}
+        onConfirm={() => {
+          if (dialog?.action === 'deleteForm') handleDeleteForm(dialog.formId);
+        }}
+        onCancel={() => setDialog(null)}
+      />
+
+      {/* Move form to folder */}
+      {dialog?.action === 'moveForm' && (
+        <MoveToFolderDialog
+          open
+          itemName={dialog.formTitle}
+          folders={folders}
+          currentFolderId={spaceForms.find(f => f.id === dialog.formId)?.folderId || null}
+          onMove={(folderId) => handleMoveForm(dialog.formId, folderId)}
           onCancel={() => setDialog(null)}
           t={t}
         />
@@ -1149,7 +1271,7 @@ function ArtifactItem({ icon, label, href, active, canManage, menuOpen, menuRef,
   onDelete?: () => void;
   onMoveToFolder?: () => void;
   t?: (k: string) => string;
-  artifactType?: 'doc' | 'whiteboard';
+  artifactType?: 'doc' | 'whiteboard' | 'form';
 }) {
   return (
     <div className="relative group">
@@ -1177,7 +1299,7 @@ function ArtifactItem({ icon, label, href, active, canManage, menuOpen, menuRef,
           {onRename && (
             <button onClick={onRename} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
               <Pencil className="h-3 w-3" />
-              {t(artifactType === 'doc' ? 'spaces.renameDoc' : 'spaces.renameWhiteboard')}
+              {t(artifactType === 'doc' ? 'spaces.renameDoc' : artifactType === 'form' ? 'spaces.renameForm' : 'spaces.renameWhiteboard')}
             </button>
           )}
           {onMoveToFolder && (
@@ -1191,7 +1313,7 @@ function ArtifactItem({ icon, label, href, active, canManage, menuOpen, menuRef,
               <div className="h-px bg-[var(--border-subtle)] my-0.5 mx-2" />
               <button onClick={onDelete} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-[var(--error)] hover:bg-[var(--error-bg)] transition">
                 <Trash2 className="h-3 w-3" />
-                {t(artifactType === 'doc' ? 'spaces.deleteDoc' : 'spaces.deleteWhiteboard')}
+                {t(artifactType === 'doc' ? 'spaces.deleteDoc' : artifactType === 'form' ? 'spaces.deleteForm' : 'spaces.deleteWhiteboard')}
               </button>
             </>
           )}

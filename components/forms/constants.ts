@@ -28,6 +28,7 @@ export interface FormDocument {
   createdBy: string;
   createdByName: string;
   teamId: string;
+  folderId?: string | null;
   createdAt: any;
   updatedAt: any;
 }
