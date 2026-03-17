@@ -145,6 +145,7 @@ RULES:
 - No emojis, no markdown, no bold, no bullets
 - Be direct, clear, and actionable
 - Respond in Spanish`;
+
 }
 
 /** Weekly ops summary */

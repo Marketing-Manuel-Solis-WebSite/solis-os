@@ -5,6 +5,7 @@ import * as Sentry from '@sentry/nextjs';
 
 /**
  * Catches errors thrown inside the root layout itself.
+ * Must conteine thrown inside the second root Layout
  * Must provide its own <html>/<body> because the root layout is broken.
  */
 export default function GlobalError({

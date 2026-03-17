@@ -32,6 +32,7 @@ interface Props {
 type DialogState =
   | null
   | { action: 'createFolder' }
+  | { action: 'createSubfolder'; parentFolderId: string }
   | { action: 'createList'; folderId: string | null }
   | { action: 'createDoc'; folderId: string | null }
   | { action: 'createWhiteboard'; folderId: string | null }
@@ -98,6 +99,11 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
         }
         const aFolderId = extractFolderId(path, spaceId);
         if (aFolderId) expandIds.add(aFolderId);
+        // Also expand parent folders if any expanded folder is a subfolder
+        for (const eid of Array.from(expandIds)) {
+          const folder = f.find(fo => fo.id === eid);
+          if (folder?.parentFolderId) expandIds.add(folder.parentFolderId);
+        }
         if (expandIds.size > 0) {
           setExpandedFolders(prev => new Set([...prev, ...expandIds]));
         }
@@ -124,6 +130,8 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
     });
   };
 
+  const rootFolders = folders.filter(f => !f.parentFolderId);
+  const subfoldersByParent = (parentId: string) => folders.filter(f => f.parentFolderId === parentId);
   const folderlessLists = lists.filter(l => !l.folderId);
   const docsByFolder = (fid: string) => spaceDocs.filter(d => d.folderId === fid);
   const boardsByFolder = (fid: string) => spaceBoards.filter(b => b.folderId === fid);
@@ -139,10 +147,15 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
   const isBoardActive = (boardId: string) => activeBoardId === boardId;
 
   // ─── CRUD handlers ─────────────────────────────────
-  const handleCreateFolder = async (name: string) => {
-    const maxPos = folders.length > 0 ? Math.max(...folders.map(f => f.position)) + 1 : 0;
-    const ref = await createFolder({ spaceId, name, position: maxPos, createdBy: userId });
-    setFolders(prev => [...prev, { id: ref.id, spaceId, name, position: maxPos, createdBy: userId }]);
+  const handleCreateFolder = async (name: string, parentFolderId?: string | null) => {
+    const siblings = parentFolderId
+      ? folders.filter(f => f.parentFolderId === parentFolderId)
+      : folders.filter(f => !f.parentFolderId);
+    const maxPos = siblings.length > 0 ? Math.max(...siblings.map(f => f.position)) + 1 : 0;
+    const ref = await createFolder({ spaceId, name, position: maxPos, parentFolderId: parentFolderId || null, createdBy: userId });
+    const newFolder: FolderData = { id: ref.id, spaceId, name, position: maxPos, parentFolderId: parentFolderId || null, createdBy: userId };
+    setFolders(prev => [...prev, newFolder]);
+    if (parentFolderId) setExpandedFolders(prev => new Set([...prev, parentFolderId]));
     setDialog(null);
   };
 
@@ -201,7 +214,11 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
   const handleDelete = async (type: 'folder' | 'list', id: string) => {
     if (type === 'folder') {
       await deleteFolder(id);
-      setFolders(prev => prev.filter(f => f.id !== id));
+      // Move subfolders to root in local state (server-side deleteFolder handles Firestore)
+      setFolders(prev => prev
+        .filter(f => f.id !== id)
+        .map(f => f.parentFolderId === id ? { ...f, parentFolderId: null } : f)
+      );
       setLists(prev => prev.map(l => l.folderId === id ? { ...l, folderId: null } : l));
       setSpaceDocs(prev => prev.map(d => d.folderId === id ? { ...d, folderId: null } : d));
       setSpaceBoards(prev => prev.map(b => b.folderId === id ? { ...b, folderId: null } : b));
@@ -316,10 +333,12 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
   return (
     <>
       <div className="space-y-0.5 mt-0.5">
-        {/* Folders */}
-        {folders.map((folder, fIdx) => {
+        {/* Root Folders (no parentFolderId) */}
+        {rootFolders.map((folder, fIdx) => {
           const expanded = expandedFolders.has(folder.id!);
           const fLists = listsByFolder(folder.id!);
+          const fSubfolders = subfoldersByParent(folder.id!);
+          const isRootFolder = true; // root folders can have subfolders
           return (
             <div key={folder.id}>
               <div className="group flex items-center">
@@ -343,7 +362,7 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
                   >
                     <FolderOpen className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} style={{ color: folder.color || spaceColor || 'var(--text-muted)' }} />
                     <span className="truncate">{folder.name}</span>
-                    <span className="text-[10px] text-[var(--text-muted)] ml-auto">{fLists.length + docsByFolder(folder.id!).length + boardsByFolder(folder.id!).length}</span>
+                    <span className="text-[10px] text-[var(--text-muted)] ml-auto">{fLists.length + docsByFolder(folder.id!).length + boardsByFolder(folder.id!).length + fSubfolders.length}</span>
                   </button>
                 </div>
                 {canManage && (
@@ -372,16 +391,17 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
                   onRename={() => { setDialog({ action: 'rename', type: 'folder', id: folder.id!, currentName: folder.name }); setMenuTarget(null); }}
                   onDelete={canManage ? () => { setDialog({ action: 'delete', type: 'folder', id: folder.id!, name: folder.name }); setMenuTarget(null); } : undefined}
                   onMoveUp={fIdx > 0 ? () => { reorderFolder(folder.id!, -1); setMenuTarget(null); } : undefined}
-                  onMoveDown={fIdx < folders.length - 1 ? () => { reorderFolder(folder.id!, 1); setMenuTarget(null); } : undefined}
+                  onMoveDown={fIdx < rootFolders.length - 1 ? () => { reorderFolder(folder.id!, 1); setMenuTarget(null); } : undefined}
                   onNewDoc={() => { setDialog({ action: 'createDoc', folderId: folder.id! }); setMenuTarget(null); }}
                   onNewWhiteboard={() => { setDialog({ action: 'createWhiteboard', folderId: folder.id! }); setMenuTarget(null); }}
                   onNewListFromTemplate={canManage ? () => { setTemplatePicker({ folderId: folder.id! }); setMenuTarget(null); } : undefined}
+                  onNewSubfolder={canManage && isRootFolder ? () => { setDialog({ action: 'createSubfolder', parentFolderId: folder.id! }); setMenuTarget(null); } : undefined}
                   t={t}
                   type="folder"
                 />
               )}
 
-              {/* Lists inside folder */}
+              {/* Contents inside folder */}
               <AnimatePresence>
                 {expanded && (
                   <motion.div
@@ -449,7 +469,160 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
                           artifactType="whiteboard"
                         />
                       ))}
-                      {fLists.length === 0 && docsByFolder(folder.id!).length === 0 && boardsByFolder(folder.id!).length === 0 && (
+                      {/* Subfolders inside this root folder (1 level only) */}
+                      {fSubfolders.map((sub) => {
+                        const subExpanded = expandedFolders.has(sub.id!);
+                        const subLists = listsByFolder(sub.id!);
+                        const subDocs = docsByFolder(sub.id!);
+                        const subBoards = boardsByFolder(sub.id!);
+                        return (
+                          <div key={sub.id}>
+                            <div className="group flex items-center">
+                              <div className={`flex items-center flex-1 rounded-lg text-[13px] transition-all duration-150 ${
+                                activeFolderId === sub.id
+                                  ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-medium'
+                                  : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover)]'
+                              }`}>
+                                <button
+                                  onClick={() => toggleFolder(sub.id!)}
+                                  className="p-1 pl-2 shrink-0"
+                                >
+                                  <ChevronRight
+                                    className={`h-3 w-3 transition-transform duration-150 ${subExpanded ? 'rotate-90' : ''}`}
+                                    strokeWidth={2}
+                                  />
+                                </button>
+                                <button
+                                  onClick={() => router.push(`/app/spaces/${spaceId}/folder/${sub.id}`)}
+                                  className="flex items-center gap-1.5 flex-1 py-1 pr-2 min-w-0"
+                                >
+                                  <FolderOpen className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} style={{ color: sub.color || spaceColor || 'var(--text-muted)' }} />
+                                  <span className="truncate">{sub.name}</span>
+                                  <span className="text-[10px] text-[var(--text-muted)] ml-auto">{subLists.length + subDocs.length + subBoards.length}</span>
+                                </button>
+                              </div>
+                              {canManage && (
+                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity mr-1">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setDialog({ action: 'createList', folderId: sub.id! }); }}
+                                    className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--bg-hover)] transition"
+                                    title={t('spaces.newList')}
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setMenuTarget({ type: 'folder', id: sub.id! }); }}
+                                    className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition"
+                                  >
+                                    <MoreHorizontal className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Subfolder context menu — no onNewSubfolder (1 level limit) */}
+                            {menuTarget?.type === 'folder' && menuTarget.id === sub.id && (
+                              <ContextMenu
+                                ref={menuRef}
+                                onRename={() => { setDialog({ action: 'rename', type: 'folder', id: sub.id!, currentName: sub.name }); setMenuTarget(null); }}
+                                onDelete={canManage ? () => { setDialog({ action: 'delete', type: 'folder', id: sub.id!, name: sub.name }); setMenuTarget(null); } : undefined}
+                                onNewDoc={() => { setDialog({ action: 'createDoc', folderId: sub.id! }); setMenuTarget(null); }}
+                                onNewWhiteboard={() => { setDialog({ action: 'createWhiteboard', folderId: sub.id! }); setMenuTarget(null); }}
+                                onNewListFromTemplate={canManage ? () => { setTemplatePicker({ folderId: sub.id! }); setMenuTarget(null); } : undefined}
+                                t={t}
+                                type="folder"
+                              />
+                            )}
+
+                            {/* Subfolder contents */}
+                            <AnimatePresence>
+                              {subExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.15, ease: EASE }}
+                                  className="overflow-hidden"
+                                >
+                                  <div className="pl-4 space-y-0.5">
+                                    {subLists.map((list, lIdx) => (
+                                      <ListItem
+                                        key={list.id}
+                                        list={list}
+                                        active={isListActive(path, spaceId, list.id!)}
+                                        onClick={() => navigateToList(list.id!)}
+                                        onMenu={() => setMenuTarget({ type: 'list', id: list.id! })}
+                                        menuOpen={menuTarget?.type === 'list' && menuTarget.id === list.id}
+                                        menuRef={menuRef}
+                                        canManage={canManage}
+                                        onRename={() => { setDialog({ action: 'rename', type: 'list', id: list.id!, currentName: list.name }); setMenuTarget(null); }}
+                                        onDelete={() => { setDialog({ action: 'delete', type: 'list', id: list.id!, name: list.name }); setMenuTarget(null); }}
+                                        onMoveToFolder={() => { setDialog({ action: 'moveList', listId: list.id!, listName: list.name }); setMenuTarget(null); }}
+                                        onMoveUp={lIdx > 0 ? () => { reorderList(list.id!, -1); setMenuTarget(null); } : undefined}
+                                        onMoveDown={lIdx < subLists.length - 1 ? () => { reorderList(list.id!, 1); setMenuTarget(null); } : undefined}
+                                        folders={folders}
+                                        t={t}
+                                      />
+                                    ))}
+                                    {subDocs.map(doc => (
+                                      <ArtifactItem
+                                        key={`doc-${doc.id}`}
+                                        icon={<FileText className="h-3.5 w-3.5 text-[var(--text-muted)]" strokeWidth={1.75} />}
+                                        label={doc.title}
+                                        href={`/app/docs?id=${doc.id}`}
+                                        active={isDocActive(doc.id)}
+                                        canManage={canManage}
+                                        menuOpen={menuTarget?.type === 'doc' && menuTarget.id === doc.id}
+                                        menuRef={menuRef}
+                                        onMenu={() => setMenuTarget({ type: 'doc', id: doc.id })}
+                                        onRename={() => { setDialog({ action: 'renameDoc', docId: doc.id, currentTitle: doc.title }); setMenuTarget(null); }}
+                                        onDelete={canManage ? () => { setDialog({ action: 'deleteDoc', docId: doc.id, title: doc.title }); setMenuTarget(null); } : undefined}
+                                        onMoveToFolder={canManage && folders.length > 0 ? () => { setDialog({ action: 'moveDoc', docId: doc.id, docTitle: doc.title }); setMenuTarget(null); } : undefined}
+                                        t={t}
+                                        artifactType="doc"
+                                      />
+                                    ))}
+                                    {subBoards.map(b => (
+                                      <ArtifactItem
+                                        key={`wb-${b.id}`}
+                                        icon={<PenTool className="h-3.5 w-3.5 text-[var(--text-muted)]" strokeWidth={1.75} />}
+                                        label={b.name}
+                                        href={`/app/whiteboards?id=${b.id}`}
+                                        active={isBoardActive(b.id)}
+                                        canManage={canManage}
+                                        menuOpen={menuTarget?.type === 'whiteboard' && menuTarget.id === b.id}
+                                        menuRef={menuRef}
+                                        onMenu={() => setMenuTarget({ type: 'whiteboard', id: b.id })}
+                                        onRename={() => { setDialog({ action: 'renameWhiteboard', boardId: b.id, currentName: b.name }); setMenuTarget(null); }}
+                                        onDelete={canManage ? () => { setDialog({ action: 'deleteWhiteboard', boardId: b.id, name: b.name }); setMenuTarget(null); } : undefined}
+                                        onMoveToFolder={canManage && folders.length > 0 ? () => { setDialog({ action: 'moveWhiteboard', boardId: b.id, boardName: b.name }); setMenuTarget(null); } : undefined}
+                                        t={t}
+                                        artifactType="whiteboard"
+                                      />
+                                    ))}
+                                    {subLists.length === 0 && subDocs.length === 0 && subBoards.length === 0 && (
+                                      canManage ? (
+                                        <button
+                                          onClick={() => setDialog({ action: 'createList', folderId: sub.id! })}
+                                          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[12px] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--sidebar-hover)] transition w-full"
+                                        >
+                                          <Plus className="h-3 w-3" />
+                                          {t('spaces.newList')}
+                                        </button>
+                                      ) : (
+                                        <span className="px-2 py-1 text-[11px] text-[var(--text-muted)] opacity-60">
+                                          {t('spaces.emptyFolder')}
+                                        </span>
+                                      )
+                                    )}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        );
+                      })}
+                      {fLists.length === 0 && docsByFolder(folder.id!).length === 0 && boardsByFolder(folder.id!).length === 0 && fSubfolders.length === 0 && (
                         canManage ? (
                           <button
                             onClick={() => setDialog({ action: 'createList', folderId: folder.id! })}
@@ -582,7 +755,18 @@ export default function SpaceSidebarTree({ spaceId, spaceName, spaceColor, space
         title={t('spaces.newFolder')}
         placeholder={t('spaces.folderName')}
         confirmLabel={t('common.save')}
-        onConfirm={handleCreateFolder}
+        onConfirm={name => handleCreateFolder(name)}
+        onCancel={() => setDialog(null)}
+      />
+
+      <SpaceInputDialog
+        open={dialog?.action === 'createSubfolder'}
+        title={t('spaces.newSubfolder')}
+        placeholder={t('spaces.folderName')}
+        confirmLabel={t('common.save')}
+        onConfirm={name => {
+          if (dialog?.action === 'createSubfolder') handleCreateFolder(name, dialog.parentFolderId);
+        }}
         onCancel={() => setDialog(null)}
       />
 
@@ -803,12 +987,19 @@ const ContextMenu = forwardRef<HTMLDivElement, {
   onNewDoc?: () => void;
   onNewWhiteboard?: () => void;
   onNewListFromTemplate?: () => void;
+  onNewSubfolder?: () => void;
   t: (k: string) => string;
   type: 'folder' | 'list';
-}>(({ onRename, onDelete, onMoveToFolder, onMoveUp, onMoveDown, onNewDoc, onNewWhiteboard, onNewListFromTemplate, t, type }, ref) => (
+}>(({ onRename, onDelete, onMoveToFolder, onMoveUp, onMoveDown, onNewDoc, onNewWhiteboard, onNewListFromTemplate, onNewSubfolder, t, type }, ref) => (
   <div ref={ref} className="absolute left-full top-0 ml-1 w-44 rounded-xl bg-[var(--bg-elevated)] shadow-lg z-50 p-1 border border-[var(--border-subtle)]">
-    {(onNewDoc || onNewWhiteboard || onNewListFromTemplate) && (
+    {(onNewDoc || onNewWhiteboard || onNewListFromTemplate || onNewSubfolder) && (
       <>
+        {onNewSubfolder && (
+          <button onClick={onNewSubfolder} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
+            <FolderPlus className="h-3 w-3" />
+            {t('spaces.newSubfolder')}
+          </button>
+        )}
         {onNewListFromTemplate && (
           <button onClick={onNewListFromTemplate} className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition">
             <LayoutTemplate className="h-3 w-3" />

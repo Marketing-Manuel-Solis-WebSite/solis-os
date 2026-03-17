@@ -370,6 +370,7 @@ export interface FolderData {
   name: string;
   position: number;
   color?: string;
+  parentFolderId?: string | null;
   createdBy: string;
   createdAt?: any;
   updatedAt?: any;
@@ -387,7 +388,7 @@ export async function getFolders(spaceId: string): Promise<FolderData[]> {
 }
 
 export async function createFolder(data: Omit<FolderData, 'id' | 'orgId'>) {
-  return addTo('folders', { ...data, orgId: ORG });
+  return addTo('folders', { ...data, parentFolderId: data.parentFolderId || null, orgId: ORG });
 }
 
 export async function updateFolder(id: string, data: Partial<FolderData>) {
@@ -406,6 +407,14 @@ export async function deleteFolder(id: string) {
       await batch.commit();
     }
   }));
+  // Move subfolders to root (parentFolderId cleared)
+  const subQ = query(collection(db, 'folders'), where('orgId', '==', ORG), where('parentFolderId', '==', id));
+  const subSnap = await getDocs(subQ);
+  if (!subSnap.empty) {
+    const batch = writeBatch(db);
+    subSnap.docs.forEach(d => batch.update(d.ref, { parentFolderId: null, updatedAt: serverTimestamp() }));
+    await batch.commit();
+  }
   return deleteAt(`folders/${id}`);
 }
 
@@ -456,14 +465,25 @@ export async function updateList(id: string, data: Partial<ListData>) {
 }
 
 export async function deleteList(id: string) {
-  // Move tasks in this list to no list (clear listId)
+  // Move tasks whose home list is this list to no list (clear listId)
   const q = query(collection(db, 'tasks'), where('orgId', '==', ORG), where('listId', '==', id));
   const snap = await getDocs(q);
   if (!snap.empty) {
     const CHUNK = 450;
     for (let i = 0; i < snap.docs.length; i += CHUNK) {
       const batch = writeBatch(db);
-      snap.docs.slice(i, i + CHUNK).forEach(d => batch.update(d.ref, { listId: null, updatedAt: serverTimestamp() }));
+      snap.docs.slice(i, i + CHUNK).forEach(d => batch.update(d.ref, { listId: null, listIds: arrayRemove(id), updatedAt: serverTimestamp() }));
+      await batch.commit();
+    }
+  }
+  // Also remove from listIds for tasks that have this list as a secondary list (not home)
+  const q2 = query(collection(db, 'tasks'), where('orgId', '==', ORG), where('listIds', 'array-contains', id));
+  const snap2 = await getDocs(q2);
+  if (!snap2.empty) {
+    const CHUNK = 450;
+    for (let i = 0; i < snap2.docs.length; i += CHUNK) {
+      const batch = writeBatch(db);
+      snap2.docs.slice(i, i + CHUNK).forEach(d => batch.update(d.ref, { listIds: arrayRemove(id), updatedAt: serverTimestamp() }));
       await batch.commit();
     }
   }
@@ -497,6 +517,46 @@ export async function getTasksByList(listId: string, maxResults = 500): Promise<
   const docs = hasMore ? s.docs.slice(0, maxResults) : s.docs;
   const items = docs.map(d => ({ id: d.id, ...d.data() }));
   return { items, hasMore };
+}
+
+/** Multi-list query: returns tasks where listIds array-contains the given listId */
+export async function getTasksByListMulti(listId: string, maxResults = 500): Promise<{ items: any[]; hasMore: boolean }> {
+  const q = query(
+    collection(db, 'tasks'),
+    where('orgId', '==', ORG),
+    where('listIds', 'array-contains', listId),
+    orderBy('createdAt', 'desc'),
+    limit(maxResults + 1),
+  );
+  const s = await getDocs(q);
+  const hasMore = s.docs.length > maxResults;
+  const docs = hasMore ? s.docs.slice(0, maxResults) : s.docs;
+  const items = docs.map(d => ({ id: d.id, ...d.data() }));
+  return { items, hasMore };
+}
+
+/** Add a task to an additional list (keeps listId/home list unchanged) */
+export async function addTaskToList(taskId: string, listId: string) {
+  return updateAt(`tasks/${taskId}`, {
+    listIds: arrayUnion(listId),
+  });
+}
+
+/** Remove a task from a list. If removing the home list, reassign to next available. */
+export async function removeTaskFromList(taskId: string, listId: string) {
+  const task = await getOne(`tasks/${taskId}`);
+  if (!task) return;
+  const updates: any = { listIds: arrayRemove(listId) };
+  if ((task as any).listId === listId) {
+    const remaining = ((task as any).listIds || []).filter((id: string) => id !== listId);
+    updates.listId = remaining.length > 0 ? remaining[0] : null;
+  }
+  return updateAt(`tasks/${taskId}`, updates);
+}
+
+/** Change the home list (primary list that determines statuses/custom fields) */
+export async function setHomeList(taskId: string, listId: string) {
+  return updateAt(`tasks/${taskId}`, { listId });
 }
 
 export async function getTasksPaginated({
@@ -551,6 +611,7 @@ export async function createTask(data: any) {
     ...data, orgId: ORG, status: data.status || 'todo', priority: data.priority || 'medium',
     assignees: data.assignees || [], tags: data.tags || [], teamId: data.teamId || '',
     listId: data.listId || null,
+    listIds: data.listId ? [data.listId] : [],
     visibility: data.visibility || 'team',
     description: data.description || '', dueDate: data.dueDate || null, startDate: data.startDate || null,
     timeEstimate: data.timeEstimate || null, timeSpent: data.timeSpent || 0,
@@ -571,7 +632,11 @@ export async function updateTask(id: string, data: any) {
     }
   }
   // Keep titleLower in sync for server-side search
-  const patch = data.title !== undefined ? { ...data, titleLower: data.title.toLowerCase() } : data;
+  const patch = data.title !== undefined ? { ...data, titleLower: data.title.toLowerCase() } : { ...data };
+  // When changing home list, ensure it's in listIds too
+  if (data.listId !== undefined && data.listId !== null) {
+    patch.listIds = arrayUnion(data.listId);
+  }
   return updateAt(`tasks/${id}`, patch);
 }
 export async function deleteTask(id: string) {
@@ -1030,6 +1095,15 @@ export async function getSharedSpaceViews(spaceId: string) {
 }
 export async function saveSharedSpaceViews(spaceId: string, data: any) {
   return setAt(`orgs/${ORG}/spaceSharedViews/${spaceId}`, data);
+}
+
+// ===== SPACE DEFAULT VIEW =====
+export async function getSpaceDefaultView(spaceId: string): Promise<string | null> {
+  const doc = await getOne(`orgs/${ORG}/teams/${spaceId}/settings/defaultView`);
+  return (doc as any)?.viewType || null;
+}
+export async function setSpaceDefaultView(spaceId: string, viewType: string): Promise<void> {
+  await setAt(`orgs/${ORG}/teams/${spaceId}/settings/defaultView`, { viewType });
 }
 
 // ===== USER PREFERENCES =====

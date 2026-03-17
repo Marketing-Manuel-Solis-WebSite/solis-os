@@ -141,6 +141,10 @@ export const translations: Record<Lang, Dict> = {
     'tasks.archive': 'Archivar',
     'tasks.assignTo': 'Asignar a',
     'tasks.moveTo': 'Mover a',
+    'tasks.homeList': 'Lista principal',
+    'tasks.alsoInLists': 'También en',
+    'tasks.addToList': 'Agregar a lista',
+    'tasks.removeFromList': 'Quitar de lista',
 
     // --- Presets ---
     'preset.all': 'Todas',
@@ -714,6 +718,12 @@ export const translations: Record<Lang, Dict> = {
     'spaces.moveToFolder': 'Mover a carpeta',
     'spaces.selectDestinationFolder': 'Selecciona la carpeta destino',
     'spaces.emptyFolder': 'Esta carpeta está vacía',
+    'spaces.newSubfolder': 'Nueva subcarpeta',
+    'spaces.subfolder': 'Subcarpeta',
+    'spaces.subfolders': 'Subcarpetas',
+    'spaces.defaultView': 'Vista predeterminada',
+    'spaces.defaultViewDesc': 'Vista que verán los miembros al abrir este espacio',
+    'spaces.defaultViewNone': 'Sin preferencia (Lista por defecto)',
 
     // --- Views ---
     'views.promoteToShared': 'Compartir con el equipo',
@@ -2706,6 +2716,10 @@ export const translations: Record<Lang, Dict> = {
     'tasks.archive': 'Archive',
     'tasks.assignTo': 'Assign to',
     'tasks.moveTo': 'Move to',
+    'tasks.homeList': 'Home list',
+    'tasks.alsoInLists': 'Also in',
+    'tasks.addToList': 'Add to list',
+    'tasks.removeFromList': 'Remove from list',
 
     'preset.all': 'All',
     'preset.my_tasks': 'My Tasks',
@@ -3271,6 +3285,12 @@ export const translations: Record<Lang, Dict> = {
     'spaces.moveToFolder': 'Move to folder',
     'spaces.selectDestinationFolder': 'Select destination folder',
     'spaces.emptyFolder': 'This folder is empty',
+    'spaces.newSubfolder': 'New subfolder',
+    'spaces.subfolder': 'Subfolder',
+    'spaces.subfolders': 'Subfolders',
+    'spaces.defaultView': 'Default view',
+    'spaces.defaultViewDesc': 'View members will see when opening this space',
+    'spaces.defaultViewNone': 'No preference (List default)',
 
     // --- Views ---
     'views.promoteToShared': 'Share with team',

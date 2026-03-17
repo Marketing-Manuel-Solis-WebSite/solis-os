@@ -38,6 +38,7 @@ export interface Task {
   tags: string[];
   teamId: string;
   listId?: string | null;
+  listIds?: string[];
   createdBy: string;
   dueDate?: any;
   startDate?: any;

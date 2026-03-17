@@ -8,6 +8,7 @@ import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import {
   getTasks, getGoals, getDocuments, getAuditLogs, getUserPreferences, saveUserPreferences,
   getFolders, getLists, createFolder, createList, ensureDefaultList,
+  getSpaceDefaultView, setSpaceDefaultView,
   type FolderData, type ListData,
 } from '@/lib/db';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -740,6 +741,10 @@ function SettingsTab({ spaceId, userId, t, lang }: {
   const [loadingViews, setLoadingViews] = useState(true);
   const [togglingView, setTogglingView] = useState<string | null>(null);
 
+  // ─── Default View state ──────────────────────────
+  const [defaultViewType, setDefaultViewType] = useState<string>('');
+  const [savingDefaultView, setSavingDefaultView] = useState(false);
+
   // ─── Status state ──────────────────────────────
   const [statusConfig, setStatusConfig] = useState<StatusConfig | null>(null);
   const [editStatuses, setEditStatuses] = useState<StatusDef[]>([]);
@@ -772,6 +777,14 @@ function SettingsTab({ spaceId, userId, t, lang }: {
     return () => { cancelled = true; };
   }, [spaceId]);
 
+  // Load default view
+  useEffect(() => {
+    if (!spaceId) return;
+    getSpaceDefaultView(spaceId).then(vt => {
+      if (vt) setDefaultViewType(vt);
+    }).catch(() => {});
+  }, [spaceId]);
+
   // Load required views from Firestore
   useEffect(() => {
     if (!userId || !spaceId) return;
@@ -789,6 +802,18 @@ function SettingsTab({ spaceId, userId, t, lang }: {
   const isViewTypeRequired = useCallback((viewTypeId: string) => {
     return requiredViews.some(v => v.viewType === viewTypeId);
   }, [requiredViews]);
+
+  const handleDefaultViewChange = useCallback(async (viewType: string) => {
+    setDefaultViewType(viewType);
+    setSavingDefaultView(true);
+    try {
+      await setSpaceDefaultView(spaceId, viewType);
+    } catch (err) {
+      console.error('[Settings] Failed to save default view:', err);
+    } finally {
+      setSavingDefaultView(false);
+    }
+  }, [spaceId]);
 
   const handleToggleRequiredView = useCallback(async (viewTypeId: string) => {
     if (viewTypeId === 'list') return; // List is always required
@@ -1120,6 +1145,30 @@ function SettingsTab({ spaceId, userId, t, lang }: {
             })}
           </div>
         )}
+      </div>
+
+      {/* ──── Default View Section ──── */}
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-5">
+        <h3 className="text-[13px] font-semibold text-[var(--text-primary)] mb-1">
+          {t('spaces.defaultView')}
+        </h3>
+        <p className="text-[12px] text-[var(--text-muted)] mb-4">
+          {t('spaces.defaultViewDesc')}
+        </p>
+        <div className="flex items-center gap-3">
+          <select
+            value={defaultViewType}
+            onChange={e => handleDefaultViewChange(e.target.value)}
+            disabled={savingDefaultView}
+            className="flex-1 max-w-xs px-3 py-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-50"
+          >
+            <option value="">{t('spaces.defaultViewNone')}</option>
+            {VIEW_TYPES.map(vt => (
+              <option key={vt.id} value={vt.id}>{t(vt.labelKey)}</option>
+            ))}
+          </select>
+          {savingDefaultView && <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />}
+        </div>
       </div>
 
       {/* ──── Space Statuses Section ──── */}

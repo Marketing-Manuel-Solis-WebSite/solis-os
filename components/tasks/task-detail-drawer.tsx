@@ -7,9 +7,9 @@ import {
   ChevronDown, Download, ExternalLink, FileText,
   Image as ImageIcon, Video, Music, CheckSquare,
   Maximize2, Minimize2, GitBranch, Eye, MessageSquare,
-  Clock, User, Activity, Repeat, Sparkles, Loader2, ArrowRightLeft,
+  Clock, User, Activity, Repeat, Sparkles, Loader2, ArrowRightLeft, Home,
 } from 'lucide-react';
-import { getTaskComments, addTaskComment, getTaskActivity, addTaskActivity } from '@/lib/db';
+import { getTaskComments, addTaskComment, getTaskActivity, addTaskActivity, addTaskToList, removeTaskFromList } from '@/lib/db';
 import { uploadFile, isImageType, isVideoType, isAudioType, formatFileSize } from '@/lib/upload';
 import { notifyMany } from '@/lib/notifications';
 import EntityRelations from '@/components/shared/entity-relations';
@@ -49,6 +49,7 @@ interface Props {
   onUpdate: (id: string, field: string, value: any, old?: any) => void;
   onDelete: (task: any) => void;
   onClose: () => void;
+  onReload?: () => void;
 }
 
 /* ============================================
@@ -84,7 +85,7 @@ const FIELD_GROUP_LABELS: Record<string, string> = {
    ============================================ */
 export default function TaskDetailDrawer({
   task, members, teams, lists, userId, userName,
-  canUpdate, canDelete, onUpdate, onDelete, onClose,
+  canUpdate, canDelete, onUpdate, onDelete, onClose, onReload,
 }: Props) {
   const { t, lang } = useI18n();
   const toast = useToast();
@@ -508,11 +509,12 @@ export default function TaskDetailDrawer({
                 ))}
               </select>
             </div>
-            {/* List selector — move task between lists */}
+            {/* Home list selector — primary list for statuses/custom fields */}
             {lists && lists.length > 0 && (
               <div>
-                <label className="block text-[12px] uppercase tracking-[0.06em] text-[var(--text-muted)] mb-1.5 font-semibold">
-                  {t('spaces.lists')}
+                <label className="block text-[12px] uppercase tracking-[0.06em] text-[var(--text-muted)] mb-1.5 font-semibold flex items-center gap-1">
+                  <Home className="w-3 h-3" />
+                  {t('tasks.homeList')}
                 </label>
                 <select
                   value={task.listId || ''}
@@ -525,6 +527,68 @@ export default function TaskDetailDrawer({
                     <option key={l.id} value={l.id}>{l.name}</option>
                   ))}
                 </select>
+              </div>
+            )}
+            {/* Also in lists — secondary lists (multi-list membership) */}
+            {lists && lists.length > 1 && (
+              <div>
+                <label className="block text-[12px] uppercase tracking-[0.06em] text-[var(--text-muted)] mb-1.5 font-semibold">
+                  {t('tasks.alsoInLists')}
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {(task.listIds || [])
+                    .filter((lid: string) => lid !== task.listId)
+                    .map((lid: string) => {
+                      const listObj = lists.find((l: any) => l.id === lid);
+                      if (!listObj) return null;
+                      return (
+                        <span
+                          key={lid}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[12px] bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+                        >
+                          {listObj.name}
+                          {canUpdate && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await removeTaskFromList(task.id, lid);
+                                  onReload?.();
+                                } catch { /* ignore */ }
+                              }}
+                              className="ml-0.5 hover:text-red-400 transition-colors"
+                              title={t('tasks.removeFromList')}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })}
+                </div>
+                {canUpdate && (() => {
+                  const currentListIds = task.listIds || (task.listId ? [task.listId] : []);
+                  const availableLists = lists.filter((l: any) => !currentListIds.includes(l.id));
+                  if (availableLists.length === 0) return null;
+                  return (
+                    <select
+                      value=""
+                      onChange={async (e) => {
+                        const newListId = e.target.value;
+                        if (!newListId) return;
+                        try {
+                          await addTaskToList(task.id, newListId);
+                          onReload?.();
+                        } catch { /* ignore */ }
+                      }}
+                      className="select-dark w-full h-8 text-xs"
+                    >
+                      <option value="">+ {t('tasks.addToList')}</option>
+                      {availableLists.map((l: any) => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                    </select>
+                  );
+                })()}
               </div>
             )}
             <div>

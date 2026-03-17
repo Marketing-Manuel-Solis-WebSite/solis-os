@@ -10,6 +10,7 @@ import {
   getUserPreferences, saveUserPreferences,
   getSharedSpaceViews, saveSharedSpaceViews,
   getLists, createList, updateList,
+  getSpaceDefaultView,
   type ListData,
 } from '@/lib/db';
 import {
@@ -144,8 +145,9 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
   useEffect(() => {
     if (!user?.uid || !spaceId) return;
     prefsLoaded.current = false;
-    getUserPreferences(user.uid, PREFS_KEY).then((data: any) => {
+    getUserPreferences(user.uid, PREFS_KEY).then(async (data: any) => {
       if (data) {
+        // User has saved preferences — use them
         const merged = { ...DEFAULT_PREFERENCES, ...data } as TaskPreferences;
         setPrefs(merged);
         setView(merged.defaultView);
@@ -159,6 +161,14 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
         setMeMode(merged.meMode);
         setSidebarOpen(merged.sidebarOpen);
         if (merged.pinnedPresets?.length) setPinnedPresets(merged.pinnedPresets);
+      } else {
+        // No user preference — check for space default view
+        try {
+          const spaceDefault = await getSpaceDefaultView(spaceId);
+          if (spaceDefault) {
+            setView(spaceDefault as any);
+          }
+        } catch { /* ignore — fall back to list */ }
       }
       prefsLoaded.current = true;
     }).catch(() => { prefsLoaded.current = true; });
@@ -221,9 +231,9 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
   // ─── Derived data ──────────────────────────────────────
   const presetFilteredTasks = useMemo(() => {
     let base = tasks.filter(tk => !tk.archived && !tk.deleted);
-    // Scope to list if listId is provided
+    // Scope to list if listId is provided (supports multi-list: listIds array)
     if (listId) {
-      base = base.filter(tk => tk.listId === listId);
+      base = base.filter(tk => tk.listId === listId || (tk.listIds && tk.listIds.includes(listId)));
     }
     if (meMode && user?.uid) {
       base = base.filter(tk => tk.assignees?.includes(user.uid));
@@ -916,6 +926,7 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
             onClose={() => setSelectedTask(null)}
             onUpdate={doUpdate}
             onDelete={doDelete}
+            onReload={onReload}
           />
         )}
       </AnimatePresence>

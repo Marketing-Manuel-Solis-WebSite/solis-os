@@ -18,6 +18,7 @@ export default function FolderPage() {
   const { spaceId, folderId } = useParams<{ spaceId: string; folderId: string }>();
 
   const [folder, setFolder] = useState<FolderData | null>(null);
+  const [subfolders, setSubfolders] = useState<FolderData[]>([]);
   const [lists, setLists] = useState<ListData[]>([]);
   const [docs, setDocs] = useState<{ id: string; title: string; folderId?: string | null; updatedAt?: any }[]>([]);
   const [boards, setBoards] = useState<{ id: string; name: string; folderId?: string | null; updatedAt?: any }[]>([]);
@@ -40,6 +41,7 @@ export default function FolderPage() {
       getWhiteboardsBySpace(spaceId).catch(() => ({ items: [] })),
     ]).then(([allFolders, allLists, docsRes, boardsRes]) => {
       setFolder(allFolders.find(f => f.id === folderId) || null);
+      setSubfolders(allFolders.filter(f => f.parentFolderId === folderId));
       setLists(allLists.filter(l => l.folderId === folderId));
       setDocs(docsRes.items
         .filter((d: any) => d.folderId === folderId)
@@ -74,7 +76,7 @@ export default function FolderPage() {
     );
   }
 
-  const totalItems = lists.length + docs.length + boards.length;
+  const totalItems = lists.length + docs.length + boards.length + subfolders.length;
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
@@ -109,6 +111,27 @@ export default function FolderPage() {
       <section className="mb-8">
         <ContextualDashboard scopeType="folder" scopeId={folderId as string} />
       </section>
+
+      {/* Subfolders section */}
+      {subfolders.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-[13px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3">
+            {t('spaces.subfolders')}
+          </h2>
+          <div className="space-y-1">
+            {subfolders.map(sub => (
+              <a
+                key={sub.id}
+                href={`/app/spaces/${spaceId}/folder/${sub.id}`}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--bg-base)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] transition group"
+              >
+                <FolderOpen className="h-4 w-4 text-[var(--text-muted)] group-hover:text-[var(--accent)]" strokeWidth={1.75} style={{ color: sub.color || 'var(--text-muted)' }} />
+                <span className="text-[14px] font-medium text-[var(--text-primary)]">{sub.name}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Lists section */}
       {lists.length > 0 && (
