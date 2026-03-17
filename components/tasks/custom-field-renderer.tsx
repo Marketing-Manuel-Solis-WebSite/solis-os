@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { type CustomFieldDef } from '@/lib/custom-fields';
+import { type CustomFieldDef, type RollupSources, calculateRollup } from '@/lib/custom-fields';
 import { useI18n } from '@/lib/i18n';
 import { Star, X, Calculator, Sigma, Link2, Zap, Loader2 } from 'lucide-react';
 import { evaluateFormula } from '@/lib/formula-engine';
@@ -15,8 +15,10 @@ interface Props {
   members?: any[];
   /** All field values on this task — needed for formula evaluation */
   allFieldValues?: Record<string, any>;
-  /** Subtasks/children for rollup computation */
+  /** Subtasks/children for rollup computation (legacy prop — maps to rollupSources.children) */
   children?: Record<string, any>[];
+  /** Pre-resolved rollup data sources (subtasks, children, relatedTasks) */
+  rollupSources?: RollupSources;
   /** Available entities for relationship picker */
   tasks?: { id: string; title: string }[];
   docs?: { id: string; title: string }[];
@@ -25,13 +27,14 @@ interface Props {
   taskId?: string;
 }
 
-export default function CustomFieldRenderer({ field, value, onChange, readOnly = false, members = [], allFieldValues = {}, children: childRecords = [], tasks = [], docs = [], goals = [], taskId }: Props) {
+export default function CustomFieldRenderer({ field, value, onChange, readOnly = false, members = [], allFieldValues = {}, children: childRecords = [], rollupSources, tasks = [], docs = [], goals = [], taskId }: Props) {
   const { lang } = useI18n();
   const label = lang === 'es' ? field.nameEs : field.name;
 
   const baseInputClass = 'w-full h-8 px-2.5 rounded-lg bg-[var(--bg-elevated)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none border border-transparent focus:border-[var(--accent)]/30 transition';
 
-  if (readOnly) {
+  // Rollup and formula fields always render their computed display (never the static readOnly path)
+  if (readOnly && field.type !== 'rollup' && field.type !== 'formula') {
     return (
       <div className="text-sm text-[var(--text-secondary)]">
         {renderReadOnly(field, value, members, lang)}
@@ -231,8 +234,21 @@ export default function CustomFieldRenderer({ field, value, onChange, readOnly =
     case 'rollup': {
       const config = field.rollupConfig;
       if (!config) return <span className="text-sm text-[var(--text-muted)]">—</span>;
-      const { evaluateRollup } = require('@/lib/formula-engine');
-      const computed = evaluateRollup(config, childRecords);
+
+      // For child_tasks and related_tasks without data, show placeholder
+      if ((config.sourceRelation === 'child_tasks' || config.sourceRelation === 'related_tasks')
+          && !rollupSources?.children?.length && !rollupSources?.relatedTasks?.length && !childRecords.length) {
+        return (
+          <div className="flex items-center gap-1.5 text-sm text-[var(--text-muted)]">
+            <Sigma className="h-3.5 w-3.5 shrink-0" />
+            <span className="italic">{lang === 'es' ? 'Configurar requerido' : 'Configure required'}</span>
+          </div>
+        );
+      }
+
+      // Build sources: prefer explicit rollupSources, fallback to legacy children prop
+      const sources: RollupSources = rollupSources || { children: childRecords };
+      const computed = calculateRollup(field, sources);
       const display = computed !== null
         ? config.resultType === 'percentage' ? `${computed}%` : Number(computed).toLocaleString()
         : '—';

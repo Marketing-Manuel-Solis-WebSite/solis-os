@@ -336,6 +336,91 @@ export function validateCustomFieldValues(
   return errors;
 }
 
+// ─── Rollup Calculation ──────────────────────────────────
+// Pure function — no Firestore calls, no side effects.
+// Accepts pre-fetched source entities and computes the rollup value.
+
+export interface RollupSources {
+  /** Inline subtasks (task.subtasks array — legacy embedded format) */
+  subtasks?: Record<string, any>[];
+  /** Real child tasks (fetched via parentTaskId query or subtask-ops) */
+  children?: Record<string, any>[];
+  /** Related tasks (fetched via relations system) */
+  relatedTasks?: Record<string, any>[];
+}
+
+/**
+ * Calculate a rollup field value from source entities.
+ *
+ * @param fieldDef - The custom field definition with rollupConfig
+ * @param sources  - Pre-fetched source entities (subtasks, children, relatedTasks)
+ * @returns The computed value, or null if not computable
+ */
+export function calculateRollup(
+  fieldDef: CustomFieldDef,
+  sources: RollupSources,
+): number | null {
+  const config = fieldDef.rollupConfig;
+  if (!config) return null;
+
+  // Determine which entities to aggregate based on sourceRelation
+  let entities: Record<string, any>[];
+  switch (config.sourceRelation) {
+    case 'subtasks':
+      // Combine inline subtasks + real children for best coverage
+      entities = [...(sources.subtasks || []), ...(sources.children || [])];
+      break;
+    case 'child_tasks':
+      entities = sources.children || [];
+      break;
+    case 'related_tasks':
+      entities = sources.relatedTasks || [];
+      break;
+    default:
+      return null;
+  }
+
+  if (entities.length === 0) {
+    return config.aggregation === 'count' ? 0 : null;
+  }
+
+  // For percent_done, use status/done fields directly — no sourceField needed
+  if (config.aggregation === 'percent_done') {
+    const done = entities.filter(e => e.status === 'done' || e.done === true).length;
+    return Math.round((done / entities.length) * 100);
+  }
+
+  // For count, just count non-null values of the sourceField
+  if (config.aggregation === 'count') {
+    return entities.filter(e => {
+      const val = e[config.sourceField];
+      return val !== undefined && val !== null;
+    }).length;
+  }
+
+  // Extract numeric values for sum/avg/min/max
+  const values = entities
+    .map(e => e[config.sourceField])
+    .filter(v => v !== undefined && v !== null)
+    .map(Number)
+    .filter(n => !isNaN(n));
+
+  if (values.length === 0) return null;
+
+  switch (config.aggregation) {
+    case 'sum':
+      return values.reduce((a, b) => a + b, 0);
+    case 'avg':
+      return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100) / 100;
+    case 'min':
+      return Math.min(...values);
+    case 'max':
+      return Math.max(...values);
+    default:
+      return null;
+  }
+}
+
 // All available field types with labels
 export const FIELD_TYPE_OPTIONS: { type: CustomFieldType; labelEs: string; labelEn: string }[] = [
   { type: 'text', labelEs: 'Texto', labelEn: 'Text' },

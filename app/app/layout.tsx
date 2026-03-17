@@ -31,6 +31,7 @@ import { useFeatureFlag } from '@/lib/feature-flags';
 import OnboardingWizard from '@/components/onboarding/onboarding-wizard';
 import { shouldShowOnboarding } from '@/lib/onboarding';
 import MobileNav from '@/components/mobile/mobile-nav';
+import MobileQuickActions from '@/components/mobile/mobile-quick-actions';
 import { useIsMobile } from '@/lib/hooks/use-mobile-detect';
 import { FeatureGate } from '@/components/shared/feature-gate';
 import { getFavorites, type Favorite } from '@/lib/favorites';
@@ -1076,8 +1077,13 @@ function Shell({ children }: { children: React.ReactNode }) {
         <OnboardingWizard userId={user.uid} open={showOnboarding} onClose={() => setShowOnboarding(false)} />
       )}
 
-      {/* Mobile Bottom Nav */}
-      {isMobile && <MobileNav />}
+      {/* Mobile Bottom Nav + Quick Actions */}
+      {isMobile && (
+        <>
+          <MobileQuickActions />
+          <MobileNav />
+        </>
+      )}
     </div>
   );
 }

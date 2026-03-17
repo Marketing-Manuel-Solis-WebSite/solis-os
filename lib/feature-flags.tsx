@@ -39,11 +39,11 @@ const DEFAULT_FLAGS: FeatureFlags = {
   'chat-search': false,
   'chat-bookmarks': false,
   // Bloque F — Permissions
-  'guest-role': false,
-  'granular-permissions': false,
+  'guest-role': true,
+  'granular-permissions': true,
   'share-links': false,
   'invite-system': false,
-  'field-level-permissions': false,
+  'field-level-permissions': true,
   'scoped-permissions': false,
   // Bloque G — Automations v2
   'automation-multi-action': false,
@@ -77,7 +77,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   // Bloque E — Inline Comments
   'inline-comments': true,
   // Bloque F — Custom Roles
-  'custom-roles': false,
+  'custom-roles': true,
   // Bloque G — Automation Templates
   'automation-templates': false,
   // Bloque H — Slack, GitHub, Calendar, Zapier

@@ -17,6 +17,8 @@ export type PermAction = 'create' | 'read' | 'update' | 'delete' | 'manage';
 export function normalizeRole(raw: string | undefined | null): Role {
   if (!raw) return 'member';
   const r = raw.toLowerCase().trim();
+  // Custom roles — pass through as-is (format: "custom:{roleId}")
+  if (r.startsWith('custom:')) return raw.trim() as Role;
   // Owner variations
   if (['owner', 'dueño', 'dueña', 'propietario', 'ceo', 'fundador'].includes(r)) return 'owner';
   // Admin variations

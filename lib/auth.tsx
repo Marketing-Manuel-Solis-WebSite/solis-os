@@ -68,6 +68,7 @@ const AuthCtx = createContext<Ctx>({
 });
 
 import { ORG_ID, getCurrentOrgId } from '@/lib/org';
+import { getCustomRoles, type CustomRole } from '@/lib/custom-roles';
 
 // ============================================
 // PROVIDER
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [allMembers, setAllMembers] = useState<Member[]>([]);
   const [activeTeamId, setActiveTeamIdRaw] = useState('');
   const [permMatrix, setPermMatrix] = useState<any>(null);
+  const [customRolesCache, setCustomRolesCache] = useState<Record<string, CustomRole>>({});
   const lastMembersFetchRef = useRef(0);
 
   // Derived state — normalize role for robust comparison
@@ -104,6 +106,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!me) return false;
     const role = me.role;
 
+    // Handle custom roles (format: "custom:{roleId}")
+    if (role.startsWith('custom:')) {
+      const roleId = role.slice(7); // strip "custom:" prefix
+      const customRole = customRolesCache[roleId];
+      if (customRole?.permissions?.[resource as keyof typeof customRole.permissions]) {
+        return !!(customRole.permissions as any)[resource]?.[action];
+      }
+      // Custom role not loaded yet or resource not in its matrix — fail-closed
+      return false;
+    }
+
     // Check custom matrix first
     if (permMatrix?.[role]?.[resource]?.[action] !== undefined) {
       return !!permMatrix[role][resource][action];
@@ -111,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Fall back to defaults
     return DEFAULT_PERMS[role]?.[resource]?.[action] ?? false;
-  }, [me, permMatrix]);
+  }, [me, permMatrix, customRolesCache]);
 
   // Visibility check for resources (tasks, docs, etc)
   const canSeeResource = useCallback((resource: {
@@ -325,6 +338,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setPermMatrix(permSnap.data().matrix);
           }
         }).catch((err) => console.error('[Auth] load permissions failed:', err));
+
+        // Load custom roles for can() resolution of custom:{roleId} members
+        getCustomRoles().then(roles => {
+          const map: Record<string, CustomRole> = {};
+          roles.forEach(r => { map[r.id] = r; });
+          setCustomRolesCache(map);
+        }).catch((err) => console.error('[Auth] load custom roles failed:', err));
 
       } catch (e) {
         setMe(null);

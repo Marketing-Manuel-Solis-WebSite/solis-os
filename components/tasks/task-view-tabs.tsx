@@ -4,7 +4,7 @@ import { useI18n } from '@/lib/i18n';
 import {
   Inbox, User, Sun, CalendarClock, AlertTriangle, Eye, Bookmark, Plus,
   MoreHorizontal, Pin, Copy, Share2, Pencil, Trash2, X, UserCheck, Globe,
-  Lock, Star, Link,
+  Lock, Star, Link, Loader2, Check,
 } from 'lucide-react';
 import type { ViewDefinition } from '@/types';
 import { BUILT_IN_PRESETS, type ViewPreset, SavedView } from './constants';
@@ -33,6 +33,8 @@ interface Props {
   onPinView?: (viewId: string) => void;
   onSetDefaultView?: (viewId: string) => void;
   onShareViewLink?: (viewId: string) => void;
+  // View autosave status indicator
+  saveStatus?: null | 'saving' | 'saved';
 }
 
 const PRESET_ICONS: Record<string, any> = {
@@ -52,6 +54,7 @@ export default function TaskViewTabs({
   sharedViews, onDeleteSharedView, onDuplicateSharedView, onPromoteView, onDemoteView,
   canManageShared,
   firestoreViews, onPinView, onSetDefaultView, onShareViewLink,
+  saveStatus,
 }: Props) {
   const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
@@ -316,6 +319,29 @@ export default function TaskViewTabs({
         <Plus className="h-3 w-3" />
         {t('common.save')}
       </button>
+
+      {/* View autosave status indicator */}
+      {saveStatus && (activePreset.startsWith('saved:') || activePreset.startsWith('shared:')) && (
+        <span
+          className={`flex items-center gap-1 px-2 py-1 text-[11px] font-medium whitespace-nowrap shrink-0 transition-opacity duration-300 ${
+            saveStatus === 'saving'
+              ? 'text-[var(--text-muted)]'
+              : 'text-emerald-500'
+          }`}
+        >
+          {saveStatus === 'saving' ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {t('views.autoSaving')}
+            </>
+          ) : (
+            <>
+              <Check className="h-3 w-3" />
+              {t('views.autoSaved')}
+            </>
+          )}
+        </span>
+      )}
     </div>
   );
 }

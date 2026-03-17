@@ -64,6 +64,8 @@ interface Props {
   onPinView?: (viewId: string) => void;
   onSetDefaultView?: (viewId: string) => void;
   onShareViewLink?: (viewId: string) => void;
+  // View autosave status indicator
+  viewSaveStatus?: null | 'saving' | 'saved';
 }
 
 // =============================================
@@ -81,6 +83,7 @@ export default function TaskToolbar({
   onImport, allPresets,
   sharedViews, onDeleteSharedView, onDuplicateSharedView, onPromoteView, onDemoteView, canManageShared,
   firestoreViews, onPinView, onSetDefaultView, onShareViewLink,
+  viewSaveStatus,
 }: Props) {
   const { t } = useI18n();
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -352,6 +355,7 @@ export default function TaskToolbar({
         onPinView={onPinView}
         onSetDefaultView={onSetDefaultView}
         onShareViewLink={onShareViewLink}
+        saveStatus={viewSaveStatus}
       />
 
       {/* ============================================= */}

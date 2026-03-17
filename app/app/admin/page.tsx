@@ -7,6 +7,11 @@ import PermissionInspector from '@/components/admin/permission-inspector';
 import UsageDashboard from '@/components/admin/usage-dashboard';
 import InviteMembersPanel from '@/components/admin/invite-members-panel';
 import StatusTemplateManager from '@/components/admin/status-template-manager';
+import CustomRoleEditor from '@/components/admin/custom-role-editor';
+import {
+  getCustomRoles, createCustomRole, updateCustomRole, deleteCustomRole,
+  type CustomRole,
+} from '@/lib/custom-roles';
 import {
   getMembers, updateMember, getAuditLogs, logAction, getOrg, updateOrg,
   getSettings, saveSettings, getWorkspaces, createWorkspace, deleteWorkspace,
@@ -682,6 +687,9 @@ function UsersS() {
   const [ld, setLd] = useState(true);
   const [q, setQ] = useState('');
 
+  // Custom roles for role dropdown
+  const [customRolesForDropdown, setCustomRolesForDropdown] = useState<CustomRole[]>([]);
+
   // Create user state
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -693,7 +701,10 @@ function UsersS() {
   const [deleting, setDeleting] = useState(false);
   const [deactivateImpact, setDeactivateImpact] = useState<{ counts: Record<string, number>; total: number } | null>(null);
 
-  useEffect(() => { getMembers().then(m => { setMs(m); setLd(false); }); }, []);
+  useEffect(() => {
+    getMembers().then(m => { setMs(m); setLd(false); });
+    getCustomRoles().then(r => setCustomRolesForDropdown(r)).catch(() => {});
+  }, []);
 
   const cR = async (id: string, r: Role) => {
     if (r === 'owner' && me!.role !== 'owner') { toast.warning(t('admin.actionNotAllowed'), t('admin.onlyOwnerCanAssignOwner')); return; }
@@ -806,6 +817,10 @@ function UsersS() {
               <label className="block text-[12px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 font-semibold">{t('admin.roleLabel')}</label>
               <select value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value as Role })} className="select-dark h-[42px]">
                 {(['admin', 'manager', 'member', 'guest', 'readonly'] as Role[]).map(r => <option key={r} value={r}>{r}</option>)}
+                {customRolesForDropdown.length > 0 && <option disabled>{'---'}</option>}
+                {customRolesForDropdown.map(cr => (
+                  <option key={cr.id} value={`custom:${cr.id}`}>{cr.name}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -859,8 +874,16 @@ function UsersS() {
                     </div>
                   </td>
                   <td className="px-5 py-3">
-                    <select value={m.role} onChange={e => cR(m.id, e.target.value as Role)} className="select-dark text-sm h-8">
-                      {(['owner', 'admin', 'manager', 'member', 'guest', 'readonly'] as Role[]).filter(r => r !== 'owner' || me!.role === 'owner').map(r => <option key={r}>{r}</option>)}
+                    <select
+                      value={m.role?.startsWith('custom:') ? m.role : m.role}
+                      onChange={e => cR(m.id, e.target.value as Role)}
+                      className="select-dark text-sm h-8"
+                    >
+                      {(['owner', 'admin', 'manager', 'member', 'guest', 'readonly'] as Role[]).filter(r => r !== 'owner' || me!.role === 'owner').map(r => <option key={r} value={r}>{r}</option>)}
+                      {customRolesForDropdown.length > 0 && <option disabled>{'---'}</option>}
+                      {customRolesForDropdown.map(cr => (
+                        <option key={cr.id} value={`custom:${cr.id}`}>{cr.name}</option>
+                      ))}
                     </select>
                   </td>
                   <td className="px-5 py-3">
@@ -935,6 +958,12 @@ function PermsS() {
   const rls: Role[] = ['owner', 'admin', 'manager', 'member', 'guest'];
   const [mx, setMx] = useState<any>({});
 
+  // Custom roles state
+  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
+  const [crLoading, setCrLoading] = useState(true);
+  const [showEditor, setShowEditor] = useState(false);
+  const [editingRole, setEditingRole] = useState<CustomRole | undefined>(undefined);
+
   useEffect(() => {
     getSettings('permissions').then((d: any) => {
       if (d?.matrix) setMx(d.matrix);
@@ -981,6 +1010,8 @@ function PermsS() {
         setMx(m);
       }
     });
+    // Load custom roles
+    getCustomRoles().then(r => { setCustomRoles(r); setCrLoading(false); }).catch(() => setCrLoading(false));
   }, []);
 
   const toggle = (r: string, s: string, a: string) => {
@@ -992,6 +1023,43 @@ function PermsS() {
     await saveSettings('permissions', { matrix: mx });
     await logAction({ action: 'updated', resource: 'permissions', detail: 'matrix', actorId: user!.uid, actorName: me!.displayName });
     toast.success(t('admin.permsSaved'), t('admin.permsSavedMsg'));
+  };
+
+  // Custom role handlers
+  const handleSaveRole = async (data: { name: string; description?: string; permissions: any }) => {
+    if (editingRole) {
+      await updateCustomRole(editingRole.id, data);
+      await logAction({ action: 'updated', resource: 'custom_role', detail: data.name, actorId: user!.uid, actorName: me!.displayName });
+      toast.success(t('customRoles.updated'), data.name);
+    } else {
+      await createCustomRole(data);
+      await logAction({ action: 'created', resource: 'custom_role', detail: data.name, actorId: user!.uid, actorName: me!.displayName });
+      toast.success(t('customRoles.created'), data.name);
+    }
+    setShowEditor(false);
+    setEditingRole(undefined);
+    const fresh = await getCustomRoles();
+    setCustomRoles(fresh);
+  };
+
+  const handleDeleteRole = async (role: CustomRole) => {
+    const msg = t('customRoles.deleteConfirm').replace('{name}', role.name);
+    if (!confirm(msg)) return;
+    await deleteCustomRole(role.id);
+    await logAction({ action: 'deleted', resource: 'custom_role', detail: role.name, actorId: user!.uid, actorName: me!.displayName });
+    toast.success(t('customRoles.deleted'), role.name);
+    const fresh = await getCustomRoles();
+    setCustomRoles(fresh);
+  };
+
+  const countPerms = (role: CustomRole): number => {
+    let count = 0;
+    if (role.permissions) {
+      Object.values(role.permissions).forEach((actions: any) => {
+        Object.values(actions).forEach((v: any) => { if (v) count++; });
+      });
+    }
+    return count;
   };
 
   return (
@@ -1027,6 +1095,75 @@ function PermsS() {
           </tbody>
         </table>
       </div>
+
+      {/* Custom Roles Panel */}
+      <div className="mt-10">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-[var(--text-primary)]">{t('customRoles.title')}</h3>
+            <p className="text-sm text-[var(--text-muted)] mt-0.5">{t('customRoles.noRolesDesc')}</p>
+          </div>
+          <button
+            onClick={() => { setEditingRole(undefined); setShowEditor(true); }}
+            className="px-5 h-9 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-text)] font-medium transition text-sm flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" /> {t('customRoles.create')}
+          </button>
+        </div>
+
+        {crLoading ? (
+          <div className="space-y-2">
+            {[1, 2].map(i => <div key={i} className="h-16 skeleton rounded-xl" />)}
+          </div>
+        ) : customRoles.length === 0 ? (
+          <div className="text-center py-12 rounded-xl bg-[var(--bg-secondary)] shadow-card">
+            <Shield className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
+            <p className="text-sm text-[var(--text-muted)]">{t('customRoles.noRoles')}</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {customRoles.map(role => (
+              <div key={role.id} className="flex items-center gap-4 px-5 py-4 rounded-xl bg-[var(--bg-secondary)] shadow-card group">
+                <div className="p-2 rounded-lg bg-[var(--accent-subtle)] border border-[var(--accent)]/20">
+                  <Shield className="h-4 w-4 text-[var(--accent)]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{role.name}</p>
+                  <p className="text-[13px] text-[var(--text-muted)] truncate">
+                    {role.description || t('customRoles.permCount').replace('{count}', String(countPerms(role)))}
+                  </p>
+                </div>
+                <span className="text-[12px] px-2.5 py-1 rounded-lg bg-[var(--bg-elevated)] text-[var(--text-muted)] font-medium">
+                  {t('customRoles.permCount').replace('{count}', String(countPerms(role)))}
+                </span>
+                <button
+                  onClick={() => { setEditingRole(role); setShowEditor(true); }}
+                  className="opacity-0 group-hover:opacity-100 p-2 text-[var(--text-muted)] hover:text-[var(--accent)] rounded-lg transition"
+                  title={t('customRoles.edit')}
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => handleDeleteRole(role)}
+                  className="opacity-0 group-hover:opacity-100 p-2 text-[var(--text-muted)] hover:text-red-400 rounded-lg transition"
+                  title={t('customRoles.delete')}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Custom Role Editor Modal */}
+      {showEditor && (
+        <CustomRoleEditor
+          role={editingRole}
+          onSave={handleSaveRole}
+          onCancel={() => { setShowEditor(false); setEditingRole(undefined); }}
+        />
+      )}
     </div>
   );
 }

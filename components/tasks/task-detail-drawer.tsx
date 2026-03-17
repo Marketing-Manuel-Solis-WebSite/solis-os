@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -207,6 +207,15 @@ export default function TaskDetailDrawer({
   const activeFieldIds = Object.keys(customFields);
   const fieldsByGroup = getFieldsByGroup(activeFields);
   const availableFields = activeFields.filter(f => !activeFieldIds.includes(f.id));
+
+  // --- Rollup sources for custom field computation ---
+  // Provides inline subtasks + real child tasks for rollup fields.
+  // child_tasks and related_tasks source relations beyond subtasks require async fetching
+  // which is deferred — for now, subtasks and percent_done aggregations are fully supported.
+  const rollupSources = useMemo(() => ({
+    subtasks: task.subtasks || [],
+    children: realSubtasks,
+  }), [task.subtasks, realSubtasks]);
 
   // --- Title save ---
   const saveTitle = () => {
@@ -924,6 +933,8 @@ export default function TaskDetailDrawer({
                                 readOnly={!canUpdate}
                                 members={members}
                                 taskId={task.id}
+                                rollupSources={field.type === 'rollup' ? rollupSources : undefined}
+                                allFieldValues={field.type === 'formula' ? customFields : undefined}
                               />
                             </div>
                             {field.helpText && (
@@ -960,6 +971,8 @@ export default function TaskDetailDrawer({
                             readOnly={!canUpdate}
                             members={members}
                             taskId={task.id}
+                            rollupSources={field.type === 'rollup' ? rollupSources : undefined}
+                            allFieldValues={field.type === 'formula' ? customFields : undefined}
                           />
                         </div>
                         {canUpdate && (

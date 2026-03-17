@@ -101,6 +101,12 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
   const [firestoreViews, setFirestoreViews] = useState<ViewDefinition[]>([]);
   const canManageShared = can('task', 'update') && (me?.role === 'owner' || me?.role === 'admin' || me?.role === 'manager');
 
+  // ─── View autosave state ────────────────────────────────
+  const [viewSaveStatus, setViewSaveStatus] = useState<null | 'saving' | 'saved'>(null);
+  const viewAutoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewSavedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedViewConfig = useRef<string | null>(null); // JSON snapshot of the view config when loaded
+
   // Feature flag: granular permissions (per-list ACL)
   const granularPermsEnabled = useFeatureFlag('granular-permissions');
 
@@ -427,6 +433,12 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
     if (sv.columns) setColumns(sv.columns);
     if (sv.subtaskDisplay) setSubtaskDisplay(sv.subtaskDisplay);
     if (sv.calendarMode) setCalendarMode(sv.calendarMode);
+    // Snapshot the loaded config for autosave change detection
+    lastSavedViewConfig.current = JSON.stringify({
+      view: sv.view, filters: sv.filters, sortBy: sv.sortBy, groupBy: sv.groupBy,
+      density: sv.density, columns: sv.columns, subtaskDisplay: sv.subtaskDisplay, calendarMode: sv.calendarMode,
+    });
+    setViewSaveStatus(null);
   };
 
   const handleDeleteView = async (id: string) => {
@@ -578,6 +590,73 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
   const handleSidebarToggle = () => { const n = !sidebarOpen; setSidebarOpen(n); persistPrefs({ sidebarOpen: n }); };
   const handleCalendarModeChange = (m: CalendarMode) => { setCalendarMode(m); persistPrefs({ calendarMode: m }); };
 
+  // ─── View autosave effect ────────────────────────────────
+  // When the active preset is a saved/shared view, detect config changes and auto-save after 1500ms debounce.
+  useEffect(() => {
+    const isSavedView = activePreset.startsWith('saved:');
+    const isSharedView = activePreset.startsWith('shared:');
+    if (!isSavedView && !isSharedView) {
+      lastSavedViewConfig.current = null;
+      return;
+    }
+    // Don't auto-save shared views unless user has permission
+    if (isSharedView && !canManageShared) return;
+    // No snapshot yet means handleLoadView hasn't run
+    if (!lastSavedViewConfig.current) return;
+
+    const currentConfig = JSON.stringify({
+      view, filters, sortBy, groupBy, density, columns, subtaskDisplay, calendarMode,
+    });
+
+    // No change — skip
+    if (currentConfig === lastSavedViewConfig.current) return;
+
+    // Clear previous timer
+    if (viewAutoSaveTimer.current) clearTimeout(viewAutoSaveTimer.current);
+    if (viewSavedFlashTimer.current) clearTimeout(viewSavedFlashTimer.current);
+
+    viewAutoSaveTimer.current = setTimeout(async () => {
+      const viewId = activePreset.replace(/^(saved:|shared:)/, '');
+      setViewSaveStatus('saving');
+
+      try {
+        if (isSavedView && user?.uid) {
+          // Update the saved view in the savedViews array
+          const updatedViews = savedViews.map(sv =>
+            sv.id === viewId
+              ? { ...sv, view, filters, sortBy, groupBy, density, columns, subtaskDisplay, calendarMode }
+              : sv
+          );
+          setSavedViews(updatedViews);
+          await saveUserPreferences(user.uid, VIEWS_KEY, { views: updatedViews });
+        } else if (isSharedView) {
+          // Update the shared view in the sharedViews array
+          const updatedViews = sharedViews.map(sv =>
+            sv.id === viewId
+              ? { ...sv, view, filters, sortBy, groupBy, density, columns, subtaskDisplay, calendarMode }
+              : sv
+          );
+          setSharedViews(updatedViews);
+          await saveSharedSpaceViews(spaceId, { views: updatedViews });
+        }
+
+        // Update snapshot to the new config
+        lastSavedViewConfig.current = currentConfig;
+        setViewSaveStatus('saved');
+
+        // Flash "Saved" for 2 seconds then clear
+        viewSavedFlashTimer.current = setTimeout(() => setViewSaveStatus(null), 2000);
+      } catch (err) {
+        console.error('[SpaceTasks] view autosave failed:', err);
+        setViewSaveStatus(null);
+      }
+    }, 1500);
+
+    return () => {
+      if (viewAutoSaveTimer.current) clearTimeout(viewAutoSaveTimer.current);
+    };
+  }, [activePreset, view, filters, sortBy, groupBy, density, columns, subtaskDisplay, calendarMode, canManageShared, user?.uid, savedViews, sharedViews, spaceId, VIEWS_KEY]);
+
   const canCreate = can('task', 'create');
 
   // ─── Active artifact view (from Firestore views with artifactType) ──
@@ -705,6 +784,7 @@ export default function SpaceTasksPanel({ spaceId, listId, tasks, members, teams
           onPinView={handlePinView}
           onSetDefaultView={canManageShared ? handleSetDefaultView : undefined}
           onShareViewLink={handleShareViewLink}
+          viewSaveStatus={viewSaveStatus}
         />
 
         {/* Add View menu + artifact view tabs */}
