@@ -936,13 +936,13 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-[12px] uppercase tracking-wider text-purple-400 font-semibold flex items-center gap-1.5">
                       <GitBranch className="h-3.5 w-3.5" />
-                      {lang === 'es' ? 'Ramificaciones' : 'Branches'}
+                      {lang === 'es' ? 'Ramas condicionales' : 'Conditional Branches'}
                     </label>
                     <button
                       onClick={() => setBranches([...branches, { id: Date.now().toString(), conditions: [{ field: 'status', operator: 'equals', value: '' }], thenActions: [], elseActions: [] }])}
                       className="flex items-center gap-1 px-3 h-7 rounded-lg bg-purple-500/10 text-purple-400 text-[13px] font-medium hover:bg-purple-500/20 transition"
                     >
-                      <Plus className="h-3 w-3" /> {lang === 'es' ? 'Agregar rama' : 'Add Branch'}
+                      <Plus className="h-3 w-3" /> {t('automations.addBranch')}
                     </button>
                   </div>
 
@@ -952,15 +952,22 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
                       <p className="text-[13px] text-[var(--text-muted)]">
                         {lang === 'es' ? 'Agrega ramas para ejecutar acciones condicionalmente' : 'Add branches for conditional action execution'}
                       </p>
+                      <button
+                        onClick={() => setBranches([...branches, { id: Date.now().toString(), conditions: [{ field: 'status', operator: 'equals', value: '' }], thenActions: [], elseActions: [] }])}
+                        className="text-[13px] text-purple-400 hover:underline mt-2"
+                      >
+                        {t('automations.addBranch')}
+                      </button>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {branches.map((branch, bi) => (
-                        <div key={branch.id} className="rounded-xl border border-purple-500/20 bg-purple-500/[0.03] p-4 space-y-3">
+                        <div key={branch.id} className="rounded-xl border border-purple-500/20 bg-purple-500/[0.03] p-4 space-y-3 ml-3" style={{ borderLeft: '3px solid #A855F7' }}>
                           <div className="flex items-center justify-between">
                             <span className="text-[12px] font-bold text-purple-400">
                               {lang === 'es' ? `RAMA ${bi + 1}` : `BRANCH ${bi + 1}`}
                             </span>
+                            <span className="text-[10px] text-[var(--text-muted)]">({t('automations.branchIf')}/{t('automations.branchThen')}/{t('automations.branchElse')})</span>
                             <button onClick={() => setBranches(branches.filter(b => b.id !== branch.id))} className="p-1 text-[var(--text-muted)] hover:text-red-400 rounded">
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -970,7 +977,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-[11px] text-amber-400 font-semibold uppercase">
-                                {lang === 'es' ? 'Si' : 'If'}
+                                {t('automations.branchIf')}
                               </span>
                               <button
                                 onClick={() => {
@@ -980,7 +987,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
                                 }}
                                 className="text-[11px] text-amber-400 hover:underline"
                               >
-                                + {lang === 'es' ? 'Condición' : 'Condition'}
+                                + {t('automations.addCondition')}
                               </button>
                             </div>
                             <div className="space-y-1.5">
@@ -1059,7 +1066,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-[11px] text-emerald-400 font-semibold uppercase">
-                                {lang === 'es' ? 'Entonces' : 'Then'}
+                                {t('automations.branchThen')}
                               </span>
                               <select
                                 value=""
@@ -1072,7 +1079,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
                                 }}
                                 className="select-dark h-6 text-[11px] w-32"
                               >
-                                <option value="">+ {lang === 'es' ? 'Acción' : 'Action'}</option>
+                                <option value="">+ {lang === 'es' ? 'Acci\u00f3n' : 'Action'}</option>
                                 {ACTIONS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
                               </select>
                             </div>
@@ -1107,7 +1114,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-[11px] text-red-400 font-semibold uppercase">
-                                {lang === 'es' ? 'Si no' : 'Else'}
+                                {t('automations.branchElse')}
                               </span>
                               <select
                                 value=""
@@ -1120,7 +1127,7 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
                                 }}
                                 className="select-dark h-6 text-[11px] w-32"
                               >
-                                <option value="">+ {lang === 'es' ? 'Acción' : 'Action'}</option>
+                                <option value="">+ {lang === 'es' ? 'Acci\u00f3n' : 'Action'}</option>
                                 {ACTIONS.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
                               </select>
                             </div>

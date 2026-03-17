@@ -7,6 +7,7 @@ import PermissionInspector from '@/components/admin/permission-inspector';
 import UsageDashboard from '@/components/admin/usage-dashboard';
 import InviteMembersPanel from '@/components/admin/invite-members-panel';
 import StatusTemplateManager from '@/components/admin/status-template-manager';
+import ViewGovernancePanel from '@/components/admin/view-governance-panel';
 import CustomRoleEditor from '@/components/admin/custom-role-editor';
 import {
   getCustomRoles, createCustomRole, updateCustomRole, deleteCustomRole,
@@ -30,7 +31,7 @@ import {
   Archive, ArchiveRestore, ArrowRightLeft, Loader2, Eye, Scan, BarChart3, Mail
 } from 'lucide-react';
 
-type S = 'org'|'users'|'departments'|'invites'|'perms'|'inspector'|'usage'|'struct'|'fields'|'stpl'|'tpl'|'auto'|'notif'|'ai'|'integ'|'audit';
+type S = 'org'|'users'|'departments'|'invites'|'perms'|'inspector'|'usage'|'struct'|'fields'|'stpl'|'tpl'|'auto'|'views'|'notif'|'ai'|'integ'|'audit';
 const SS: {id:S;lKey:string;i:any;dKey:string}[] = [
   {id:'org',lKey:'admin.org',i:Building2,dKey:'admin.orgDesc'},
   {id:'users',lKey:'admin.users',i:Users,dKey:'admin.usersDesc'},
@@ -44,6 +45,7 @@ const SS: {id:S;lKey:string;i:any;dKey:string}[] = [
   {id:'stpl',lKey:'admin.statusTemplates',i:Palette,dKey:'admin.statusTemplatesDesc'},
   {id:'tpl',lKey:'admin.templates',i:FileStack,dKey:'admin.templatesDesc'},
   {id:'auto',lKey:'admin.automations',i:Zap,dKey:'admin.automationsDesc'},
+  {id:'views',lKey:'admin.views',i:Eye,dKey:'admin.viewsDesc'},
   {id:'notif',lKey:'admin.notifications',i:Bell,dKey:'admin.notificationsDesc'},
   {id:'ai',lKey:'admin.aiConfig',i:Bot,dKey:'admin.aiConfigDesc'},
   {id:'integ',lKey:'admin.integrations',i:Plug,dKey:'admin.integrationsDesc'},
@@ -116,6 +118,7 @@ export default function Admin() {
         {s === 'stpl' && <StatusTemplateManager />}
         {s === 'tpl' && <CrudS label={t('admin.templates')} fields={['name', 'type', 'content']} gFn={getTemplates} cFn={createTemplate} dFn={deleteTemplate} />}
         {s === 'auto' && <CrudS label={t('admin.automations')} fields={['name', 'trigger', 'action']} gFn={getAutomations} cFn={createAutomation} dFn={deleteAutomation} />}
+        {s === 'views' && <ViewGovernancePanel />}
         {s === 'notif' && <ComingSoonS label={t('admin.notifications')} />}
         {s === 'ai' && <ComingSoonS label={t('admin.aiConfig')} />}
         {s === 'integ' && <ComingSoonS label={t('admin.integrations')} />}

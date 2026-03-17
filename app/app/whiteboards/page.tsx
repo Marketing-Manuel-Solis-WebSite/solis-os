@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PenTool, Plus, Loader2 } from 'lucide-react';
+import { PenTool, Plus, Loader2, Lock, Globe, UsersRound } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { getWhiteboards, createWhiteboard, updateWhiteboard, deleteWhiteboard, createTask } from '@/lib/db';
@@ -30,6 +30,7 @@ export default function WhiteboardsPage() {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('updatedAt');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'team' | 'private' | 'public'>('all');
 
   const loadBoards = useCallback(async () => {
     setLoading(true);
@@ -71,6 +72,13 @@ export default function WhiteboardsPage() {
     } else {
       await handleCreate(data);
     }
+    loadBoards();
+  };
+
+  const handleVisibilityChange = async (boardId: string, visibility: 'team' | 'private' | 'public') => {
+    await updateWhiteboard(boardId, { visibility });
+    setMenuBoard(null);
+    toast.success(t('whiteboards.visibilityChanged'));
     loadBoards();
   };
 
@@ -148,9 +156,40 @@ export default function WhiteboardsPage() {
         filteredCount={search ? boards.filter(b => (b.name || '').toLowerCase().includes(search.toLowerCase())).length : boards.length}
       />
 
+      {/* Visibility filter */}
+      <div className="flex items-center gap-1.5 mb-4">
+        {(['all', 'team', 'private', 'public'] as const).map(v => {
+          const Icon = v === 'private' ? Lock : v === 'public' ? Globe : v === 'team' ? UsersRound : null;
+          const label = v === 'all' ? (t('admin.viewsAll') || 'All') : t(`whiteboards.${v}`);
+          return (
+            <button
+              key={v}
+              onClick={() => setVisibilityFilter(v)}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium transition ${
+                visibilityFilter === v
+                  ? 'bg-[var(--accent-subtle)] text-[var(--accent)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] bg-[var(--bg-elevated)]'
+              }`}
+            >
+              {Icon && <Icon className="h-3 w-3" />}
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Content */}
       {(() => {
         let filtered = [...boards];
+        // Filter: private boards only visible to creator and explicit members
+        filtered = filtered.filter(b => {
+          if (b.visibility === 'private') {
+            return b.createdBy === user?.uid || (b.members || []).includes(user?.uid || '');
+          }
+          return true;
+        });
+        // Visibility filter
+        if (visibilityFilter !== 'all') filtered = filtered.filter(b => (b.visibility || 'team') === visibilityFilter);
         if (search) filtered = filtered.filter(b => (b.name || '').toLowerCase().includes(search.toLowerCase()));
         filtered.sort((a: any, b: any) => {
           if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
@@ -205,7 +244,7 @@ export default function WhiteboardsPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed z-50 w-36 py-1 rounded-xl bg-[var(--bg-elevated)] shadow-dropdown"
+              className="fixed z-50 w-48 py-1 rounded-xl bg-[var(--bg-elevated)] shadow-dropdown"
               style={{
                 top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
                 boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
@@ -215,6 +254,28 @@ export default function WhiteboardsPage() {
               <button onClick={() => handleEdit(board)} className="w-full text-left px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg">
                 {t('whiteboards.editBoard')}
               </button>
+              {/* Visibility submenu */}
+              <div className="px-3 py-1.5">
+                <p className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wider mb-1">{t('whiteboards.visibility')}</p>
+                <div className="flex gap-1">
+                  {(['team', 'private', 'public'] as const).map(v => {
+                    const active = (board.visibility || 'team') === v;
+                    const VIcon = v === 'private' ? Lock : v === 'public' ? Globe : UsersRound;
+                    return (
+                      <button
+                        key={v}
+                        onClick={() => !active && handleVisibilityChange(board.id, v)}
+                        className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium transition ${
+                          active ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        <VIcon className="h-2.5 w-2.5" />
+                        {t(`whiteboards.${v}`)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <button onClick={() => handleDelete(board.id)} className="w-full text-left px-3 py-1.5 text-[12px] text-red-400 hover:bg-red-500/5 rounded-lg">
                 {t('whiteboards.deleteBoard')}
               </button>

@@ -1,6 +1,6 @@
 'use client';
 import { motion } from 'framer-motion';
-import { PenTool, MoreHorizontal, Users, Calendar } from 'lucide-react';
+import { PenTool, MoreHorizontal, Users, Calendar, Lock, Globe, UsersRound } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import type { Whiteboard } from './constants';
 
@@ -55,9 +55,26 @@ export default function WhiteboardList({ boards, onOpen, onMenu }: Props) {
               </button>
             </div>
 
+            {/* Visibility badge */}
+            {board.visibility === 'private' && (
+              <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-500/15 text-red-400 text-[10px] font-bold z-10">
+                <Lock className="h-3 w-3" />
+                {t('whiteboards.private')}
+              </div>
+            )}
+            {board.visibility === 'public' && (
+              <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-500/15 text-blue-400 text-[10px] font-bold z-10">
+                <Globe className="h-3 w-3" />
+                {t('whiteboards.public')}
+              </div>
+            )}
+
             {/* Info */}
             <div className="p-3">
-              <h3 className="text-[14px] font-semibold text-[var(--text-primary)] truncate">{board.name}</h3>
+              <div className="flex items-center gap-1.5">
+                {board.visibility === 'private' && <Lock className="h-3 w-3 text-red-400 shrink-0" />}
+                <h3 className="text-[14px] font-semibold text-[var(--text-primary)] truncate">{board.name}</h3>
+              </div>
               {board.description && (
                 <p className="text-[12px] text-[var(--text-muted)] mt-0.5 truncate">{board.description}</p>
               )}

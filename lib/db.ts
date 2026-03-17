@@ -1106,6 +1106,15 @@ export async function setSpaceDefaultView(spaceId: string, viewType: string): Pr
   await setAt(`orgs/${ORG}/teams/${spaceId}/settings/defaultView`, { viewType });
 }
 
+// ===== SPACE DEFAULT TAB =====
+export async function getSpaceDefaultTab(spaceId: string): Promise<string | null> {
+  const d = await getOne(`orgs/${ORG}/teams/${spaceId}/settings/defaultTab`);
+  return (d as any)?.tab || null;
+}
+export async function setSpaceDefaultTab(spaceId: string, tab: string): Promise<void> {
+  await setAt(`orgs/${ORG}/teams/${spaceId}/settings/defaultTab`, { tab });
+}
+
 // ===== USER PREFERENCES =====
 export async function getUserPreferences(userId: string, key: string) {
   return getOne(`orgs/${ORG}/members/${userId}/preferences/${key}`);

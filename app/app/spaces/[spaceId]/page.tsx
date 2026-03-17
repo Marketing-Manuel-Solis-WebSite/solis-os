@@ -9,6 +9,7 @@ import {
   getTasks, getGoals, getDocuments, getAuditLogs, getUserPreferences, saveUserPreferences,
   getFolders, getLists, createFolder, createList, ensureDefaultList,
   getSpaceDefaultView, setSpaceDefaultView,
+  getSpaceDefaultTab, setSpaceDefaultTab,
   type FolderData, type ListData,
 } from '@/lib/db';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -113,8 +114,16 @@ export default function SpacePage() {
   // ─── Load tab preference ─────────────────────────────────
   useEffect(() => {
     if (!user?.uid || !spaceId || tabLoaded.current) return;
-    getUserPreferences(user.uid, `spaceTab_${spaceId}`).then((data: any) => {
-      if (data?.activeTab) setActiveTab(data.activeTab);
+    Promise.all([
+      getUserPreferences(user.uid, `spaceTab_${spaceId}`).catch(() => null),
+      getSpaceDefaultTab(spaceId).catch(() => null),
+    ]).then(([userPref, spaceDefault]: any[]) => {
+      if (userPref?.activeTab) {
+        setActiveTab(userPref.activeTab);
+      } else if (spaceDefault) {
+        setActiveTab(spaceDefault as Tab);
+      }
+      // final fallback is the initial state: 'overview'
       tabLoaded.current = true;
     }).catch(() => { tabLoaded.current = true; });
   }, [user?.uid, spaceId]);
@@ -745,6 +754,10 @@ function SettingsTab({ spaceId, userId, t, lang }: {
   const [defaultViewType, setDefaultViewType] = useState<string>('');
   const [savingDefaultView, setSavingDefaultView] = useState(false);
 
+  // ─── Default Tab state ──────────────────────────
+  const [defaultLandingTab, setDefaultLandingTab] = useState<string>('');
+  const [savingDefaultTab, setSavingDefaultTab] = useState(false);
+
   // ─── Status state ──────────────────────────────
   const [statusConfig, setStatusConfig] = useState<StatusConfig | null>(null);
   const [editStatuses, setEditStatuses] = useState<StatusDef[]>([]);
@@ -783,6 +796,9 @@ function SettingsTab({ spaceId, userId, t, lang }: {
     getSpaceDefaultView(spaceId).then(vt => {
       if (vt) setDefaultViewType(vt);
     }).catch(() => {});
+    getSpaceDefaultTab(spaceId).then(tab => {
+      if (tab) setDefaultLandingTab(tab);
+    }).catch(() => {});
   }, [spaceId]);
 
   // Load required views from Firestore
@@ -812,6 +828,18 @@ function SettingsTab({ spaceId, userId, t, lang }: {
       console.error('[Settings] Failed to save default view:', err);
     } finally {
       setSavingDefaultView(false);
+    }
+  }, [spaceId]);
+
+  const handleDefaultTabChange = useCallback(async (tab: string) => {
+    setDefaultLandingTab(tab);
+    setSavingDefaultTab(true);
+    try {
+      await setSpaceDefaultTab(spaceId, tab);
+    } catch (err) {
+      console.error('[Settings] Failed to save default tab:', err);
+    } finally {
+      setSavingDefaultTab(false);
     }
   }, [spaceId]);
 
@@ -1168,6 +1196,33 @@ function SettingsTab({ spaceId, userId, t, lang }: {
             ))}
           </select>
           {savingDefaultView && <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />}
+        </div>
+      </div>
+
+      {/* ──── Default Landing Tab Section ──── */}
+      <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-5">
+        <h3 className="text-[13px] font-semibold text-[var(--text-primary)] mb-1">
+          {t('spaces.defaultTab')}
+        </h3>
+        <p className="text-[12px] text-[var(--text-muted)] mb-4">
+          {t('spaces.defaultTabDesc')}
+        </p>
+        <div className="flex items-center gap-3">
+          <select
+            value={defaultLandingTab}
+            onChange={e => handleDefaultTabChange(e.target.value)}
+            disabled={savingDefaultTab}
+            className="flex-1 max-w-xs px-3 py-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-50"
+          >
+            <option value="">{t('spaces.defaultTabNone')}</option>
+            <option value="overview">{lang === 'es' ? 'Vista general' : 'Overview'}</option>
+            <option value="dashboard">{lang === 'es' ? 'Dashboard' : 'Dashboard'}</option>
+            <option value="tasks">{lang === 'es' ? 'Tareas' : 'Tasks'}</option>
+            <option value="docs">{lang === 'es' ? 'Documentos' : 'Docs'}</option>
+            <option value="goals">{lang === 'es' ? 'Metas' : 'Goals'}</option>
+            <option value="chat">{lang === 'es' ? 'Chat' : 'Chat'}</option>
+          </select>
+          {savingDefaultTab && <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />}
         </div>
       </div>
 
