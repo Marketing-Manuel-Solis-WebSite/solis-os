@@ -221,6 +221,17 @@ export default function TaskCreateModal({ members, teams, activeTeamId, lists, d
         />
       )}
 
+      {/* Context indicator */}
+      {(d.teamId || d.listId) && (
+        <div className="mx-6 mb-1 flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] bg-[var(--bg-tertiary)]/50 rounded-lg px-3 py-1.5">
+          <span>{lang === 'es' ? 'Creando en' : 'Creating in'}:</span>
+          <span className="font-medium text-[var(--text-secondary)]">
+            {teams.find((t: any) => t.id === d.teamId)?.name || d.teamId}
+            {d.listId && lists?.find((l: any) => l.id === d.listId)?.name ? ` › ${lists.find((l: any) => l.id === d.listId)?.name}` : ''}
+          </span>
+        </div>
+      )}
+
       <div className="px-6 pb-6 space-y-3">
         {/* Title */}
         <input

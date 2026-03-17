@@ -17,7 +17,7 @@ import { QueryProvider } from '@/lib/query-provider';
 import { FeatureFlagProvider } from '@/lib/feature-flags';
 import {
   LayoutDashboard, CheckSquare, FileText, MessageSquare, Zap, BarChart3,
-  Users, Shield, LogOut, Menu, Bot, ChevronLeft, Sun, Moon, ChevronDown,
+  Users, Shield, LogOut, Menu, Bot, ChevronLeft, ChevronRight, Sun, Moon, ChevronDown,
   Settings, Loader2, CalendarDays, MoreHorizontal, Target, Clock, PenTool, FileInput, Plug, Search,
   Layers, Star, LayoutTemplate, Share2, EyeOff, GripVertical, Eye,
 } from 'lucide-react';
@@ -968,6 +968,25 @@ function Shell({ children }: { children: React.ReactNode }) {
             <UserMenu />
           </div>
         </header>
+        {/* Context Breadcrumb */}
+        {path.startsWith('/app/spaces/') && (() => {
+          const segments = path.split('/').filter(Boolean); // ['app','spaces','spaceId',...]
+          const spaceId = segments[2];
+          const spaceName = teams.find((tm: any) => tm.id === spaceId)?.name || spaceId;
+          const hasFolderSeg = segments[3] === 'folder';
+          const folderId = hasFolderSeg ? segments[4] : null;
+          const hasListSeg = segments[3] === 'list';
+          const listId = hasListSeg ? segments[4] : null;
+          return (
+            <div className="flex items-center gap-1.5 px-4 py-1.5 text-[12px] text-[var(--text-muted)] border-b border-[var(--border-subtle)]/50 bg-[var(--bg-base)]">
+              <button onClick={() => router.push('/app/spaces')} className="hover:text-[var(--text-secondary)] transition">Spaces</button>
+              <ChevronRight className="h-3 w-3" />
+              <button onClick={() => router.push(`/app/spaces/${spaceId}`)} className="hover:text-[var(--accent)] transition font-medium">{spaceName}</button>
+              {folderId && <><ChevronRight className="h-3 w-3" /><span className="font-medium">{folderId.slice(0, 8)}</span></>}
+              {listId && <><ChevronRight className="h-3 w-3" /><span className="font-medium">{listId.slice(0, 8)}</span></>}
+            </div>
+          );
+        })()}
         <main className={`min-h-[calc(100vh-56px)] ${isMobile ? 'pb-16' : ''}`}>
           <AnimatePresence mode="popLayout">
             <motion.div

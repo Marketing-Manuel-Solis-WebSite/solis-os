@@ -620,7 +620,7 @@ export interface EmailTemplate extends BaseEntity {
 }
 
 // --- Views (First-Class) ---
-export type ViewVisibility = 'private' | 'public' | 'protected' | 'required';
+export type ViewVisibility = 'private' | 'public' | 'protected' | 'space_members' | 'required';
 export type ViewScopeType = 'space' | 'folder' | 'list' | 'global';
 export type ArtifactType = 'dashboard' | 'doc' | 'form' | 'whiteboard';
 

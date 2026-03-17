@@ -6,6 +6,7 @@ export function canSeeView(userId: string, view: ViewDefinition, userRole: UserR
   if (view.visibility === 'private') return view.createdBy === userId;
   if (view.visibility === 'public' || view.visibility === 'required') return true;
   if (view.visibility === 'protected') return MANAGER_PLUS.includes(userRole) || view.createdBy === userId;
+  if (view.visibility === 'space_members') return true; // Caller already filters by space membership
   return false;
 }
 

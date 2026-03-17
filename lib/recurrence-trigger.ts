@@ -93,5 +93,18 @@ export async function handleTaskCompletion(task: any): Promise<string | null> {
   };
 
   const ref = await createTask(instanceData);
+
+  // Fire side effects (notifications, automations) for the new recurrence instance
+  try {
+    const { afterTaskCreated } = await import('./task-side-effects');
+    await afterTaskCreated({
+      taskId: ref.id,
+      task: { ...instanceData, id: ref.id },
+      actor: { actorId: task.createdBy || 'system', actorName: task.createdByName || 'Recurrence' },
+    });
+  } catch {
+    // Best-effort — don't block recurrence on side-effect failure
+  }
+
   return ref.id;
 }

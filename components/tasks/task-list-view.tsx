@@ -457,39 +457,48 @@ const TaskRow = React.memo(function TaskRow({
                 </div>
               );
 
-            /* ----- STATUS (ClickUp-style toggle) ----- */
+            /* ----- STATUS (click=toggle done, right-click=full menu) ----- */
             case 'status':
               return (
-                <div key={col.id} className={`${widthCls} flex justify-center`}>
+                <div key={col.id} className={`${widthCls} flex justify-center group/statcol relative`}>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (canUpdate) {
-                        onUpdate(task.id, 'status', isDone ? 'todo' : 'done', task.status);
+                      if (canUpdate) onUpdate(task.id, 'status', isDone ? 'todo' : 'done', task.status);
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const el = e.currentTarget.parentElement;
+                      if (el) {
+                        const menu = el.querySelector('[data-status-menu]') as HTMLElement;
+                        if (menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
                       }
                     }}
                     className="group/status relative w-6 h-6 flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
-                    title={isDone ? t('status.todo') : t('status.done')}
+                    title={`${t(`status.${task.status}`)}`}
                   >
-                    {/* Default icon */}
-                    <statusCfg.Icon
-                      className="h-[18px] w-[18px] transition-opacity duration-150 group-hover/status:opacity-0"
-                      style={{ color: statusCfg.color }}
-                    />
-                    {/* Hover: green check (or undo circle for done) */}
-                    {canUpdate && (
-                      isDone ? (
-                        <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/status:opacity-100 transition-opacity duration-150">
-                          <span className="w-[18px] h-[18px] rounded-full border-2 border-[var(--text-muted)]" />
-                        </span>
-                      ) : (
-                        <CheckCircle2
-                          className="absolute h-[18px] w-[18px] opacity-0 group-hover/status:opacity-100 transition-opacity duration-150"
-                          style={{ color: '#22C55E' }}
-                        />
-                      )
-                    )}
+                    <statusCfg.Icon className="h-[18px] w-[18px] transition-opacity duration-150 group-hover/status:opacity-0" style={{ color: statusCfg.color }} />
+                    {canUpdate && (isDone ? (
+                      <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/status:opacity-100 transition-opacity duration-150">
+                        <span className="w-[18px] h-[18px] rounded-full border-2 border-[var(--text-muted)]" />
+                      </span>
+                    ) : (
+                      <CheckCircle2 className="absolute h-[18px] w-[18px] opacity-0 group-hover/status:opacity-100 transition-opacity duration-150" style={{ color: '#22C55E' }} />
+                    ))}
                   </button>
+                  {canUpdate && (
+                    <div data-status-menu style={{ display: 'none' }} className="absolute top-full left-0 mt-1 bg-[var(--bg-base)] border border-[var(--border)] rounded-xl shadow-dropdown p-1 z-50 min-w-[140px]"
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}>
+                      {STATUSES.map(s => (
+                        <button key={s.id} onClick={(e) => { e.stopPropagation(); onUpdate(task.id, 'status', s.id, task.status); (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] hover:bg-[var(--bg-hover)] transition">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }} />
+                          <span className="text-[var(--text-secondary)]">{t(`status.${s.id}`)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
 
@@ -679,6 +688,39 @@ const TaskRow = React.memo(function TaskRow({
                   )}
                 </div>
               );
+
+            /* ----- DEPENDENCIES ----- */
+            case 'dependencies': {
+              const deps = task.dependencies || [];
+              const blocking = deps.filter((d: any) => d.type === 'blocks');
+              const blockedBy = deps.filter((d: any) => d.type === 'blocked_by');
+              const isBlocked = task.status === 'blocked' || blockedBy.length > 0;
+              return (
+                <div key={col.id} className={`${widthCls} flex items-center gap-1.5 overflow-hidden`}>
+                  {deps.length === 0 ? (
+                    <span className="text-[11px] text-[var(--text-muted)] opacity-40">—</span>
+                  ) : (
+                    <>
+                      {isBlocked && (
+                        <span className="flex items-center gap-0.5 text-red-400 text-[11px]" title={`Blocked by ${blockedBy.length}`}>
+                          🔒 {blockedBy.length}
+                        </span>
+                      )}
+                      {blocking.length > 0 && (
+                        <span className="flex items-center gap-0.5 text-amber-400 text-[11px]" title={`Blocking ${blocking.length}`}>
+                          ⚡ {blocking.length}
+                        </span>
+                      )}
+                      {deps.filter((d: any) => d.type === 'related').length > 0 && (
+                        <span className="flex items-center gap-0.5 text-[var(--text-muted)] text-[11px]">
+                          🔗 {deps.filter((d: any) => d.type === 'related').length}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            }
 
             default:
               return null;

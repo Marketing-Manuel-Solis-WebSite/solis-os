@@ -9,11 +9,12 @@ interface WidgetShellProps {
   loading?: boolean;
   className?: string;
   headerRight?: React.ReactNode;
+  dataSource?: string;
   noPadding?: boolean;
   compact?: boolean;
 }
 
-function WidgetShellInner({ title, icon, children, loading, className = '', headerRight, noPadding, compact }: WidgetShellProps) {
+function WidgetShellInner({ title, icon, children, loading, className = '', headerRight, dataSource, noPadding, compact }: WidgetShellProps) {
   return (
     <div
       className={`
@@ -31,7 +32,10 @@ function WidgetShellInner({ title, icon, children, loading, className = '', head
           {icon && <span className="text-[var(--accent)] shrink-0 opacity-80">{icon}</span>}
           <span className="truncate">{title}</span>
         </h3>
-        {headerRight && <div className="flex items-center gap-2 shrink-0 ml-2">{headerRight}</div>}
+        <div className="flex items-center gap-2 shrink-0 ml-2">
+          {dataSource && <span className="text-[10px] text-[var(--text-muted)] font-normal">{dataSource}</span>}
+          {headerRight}
+        </div>
       </div>
 
       {/* Separator */}

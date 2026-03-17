@@ -354,6 +354,9 @@ export default function AutomationsPage() {
                           {t('automations.autoDisabled')}
                         </span>
                       )}
+                      {rule.disabledReason && (
+                        <p className="text-[10px] text-red-400/80 mt-0.5 max-w-xs truncate" title={rule.disabledReason}>{rule.disabledReason}</p>
+                      )}
                       {(rule.consecutiveErrors || 0) > 0 && (
                         <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-semibold">
                           {t('automations.consecutiveErrors', { n: rule.consecutiveErrors || 0 })}
