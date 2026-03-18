@@ -6,6 +6,11 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    settings: {
+      // Explicit React version prevents eslint-plugin-react from calling
+      // the deprecated getFilename() API to auto-detect — fixes crash on ESLint v10
+      react: { version: "19.0" },
+    },
     rules: {
       // Progressive any reduction — start as warn, tighten over time
       "@typescript-eslint/no-explicit-any": "warn",

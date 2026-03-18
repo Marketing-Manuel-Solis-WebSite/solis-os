@@ -7,6 +7,10 @@ const nextConfig = {
     domains: ['firebasestorage.googleapis.com', 'lh3.googleusercontent.com'],
   },
   serverExternalPackages: ['firebase-admin'],
+  eslint: {
+    // CI runs ESLint separately (ci.yml) — skip redundant lint during build
+    ignoreDuringBuilds: true,
+  },
 };
 
 module.exports = process.env.NEXT_PUBLIC_SENTRY_DSN
