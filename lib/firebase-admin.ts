@@ -1,3 +1,4 @@
+import 'server-only';
 // ================================================================
 // Server-side Firebase Admin SDK — singleton for Next.js App Router
 // ================================================================

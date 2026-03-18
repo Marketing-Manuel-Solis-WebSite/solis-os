@@ -648,6 +648,36 @@ function Shell({ children }: { children: React.ReactNode }) {
             </button>
           )}
 
+          {/* Everything — cross-space tasks */}
+          {open ? (
+            <button
+              onClick={() => navTo('/app/everything')}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm transition-all duration-200 relative ${
+                path === '/app/everything'
+                  ? 'bg-[var(--sidebar-active)] text-[var(--sidebar-text-active)] font-semibold'
+                  : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
+              }`}
+            >
+              {path === '/app/everything' && (
+                <motion.div layoutId="nav-indicator-everything" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-[var(--accent)]" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
+              )}
+              <Layers className="h-5 w-5 shrink-0" strokeWidth={1.75} />
+              <span className="truncate">{t('nav.everything')}</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => navTo('/app/everything')}
+              className={`w-full flex items-center justify-center py-2 rounded-lg text-sm transition-all duration-200 ${
+                path === '/app/everything'
+                  ? 'text-[var(--sidebar-text-active)]'
+                  : 'text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-active)] hover:bg-[var(--sidebar-hover)]'
+              }`}
+              title={t('nav.everything')}
+            >
+              <Layers className="h-5 w-5" strokeWidth={1.75} />
+            </button>
+          )}
+
           {/* Spaces section */}
           {sidebarTeams.length > 0 && (
             open ? (

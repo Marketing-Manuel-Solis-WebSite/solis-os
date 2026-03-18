@@ -386,6 +386,15 @@
         { "fieldPath": "orgId", "order": "ASCENDING" },
         { "fieldPath": "type", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "channels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "linkedEntityType", "order": "ASCENDING" },
+        { "fieldPath": "linkedEntityId", "order": "ASCENDING" }
+      ]
     }
     ,
     {

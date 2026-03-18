@@ -1,12 +1,12 @@
 'use client';
-import { useState, Suspense } from 'react';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { useState, useEffect, Suspense } from 'react';
+import { signInWithEmailAndPassword, signInWithPopup, signInWithCustomToken, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { friendlyError, accessErrors } from '@/lib/auth-errors';
 import { useI18n } from '@/lib/i18n';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, Zap, AlertTriangle, ShieldX, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Zap, AlertTriangle, ShieldX, Mail, Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -17,10 +17,35 @@ function LoginForm() {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [showPw, setShowPw] = useState(false);
+  const [ssoEnabled, setSsoEnabled] = useState(false);
+  const [ssoProviderName, setSsoProviderName] = useState('SSO');
   const router = useRouter();
   const searchParams = useSearchParams();
   const accessError = searchParams.get('error');
   const { t, lang } = useI18n();
+
+  // Check if SSO is enabled
+  useEffect(() => {
+    fetch('/api/auth/sso/status')
+      .then(r => r.json())
+      .then(d => { if (d.enabled) { setSsoEnabled(true); setSsoProviderName(d.providerName || 'SSO'); } })
+      .catch(() => {});
+  }, []);
+
+  // Handle SSO token callback (from URL hash after SSO redirect)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash;
+    if (!hash.includes('sso_token=')) return;
+    const token = hash.split('sso_token=')[1]?.split('&')[0];
+    if (!token) return;
+    // Clear hash immediately
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    setBusy(true);
+    signInWithCustomToken(auth, token)
+      .then(() => router.push('/app'))
+      .catch((er: any) => { setErr(er.message || 'SSO sign-in failed'); setBusy(false); });
+  }, [router]);
 
   const go = async (e: React.FormEvent) => {
     e.preventDefault(); setErr(''); setBusy(true);
@@ -36,6 +61,17 @@ function LoginForm() {
     try { await signInWithPopup(auth, new GoogleAuthProvider()); router.push('/app'); }
     catch (er: any) { setErr(er.message || 'Error'); }
     setBusy(false);
+  };
+
+  const ssoLogin = async () => {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/auth/sso/initiate');
+      const data = await res.json();
+      if (data.error) { setErr(data.error); setBusy(false); return; }
+      if (data.state) sessionStorage.setItem('sso_state', data.state);
+      window.location.href = data.url;
+    } catch (er: any) { setErr(er.message || 'SSO error'); setBusy(false); }
   };
 
   const parsedErr = err ? friendlyError(err, lang) : null;
@@ -295,6 +331,20 @@ function LoginForm() {
                 </svg>
                 {t('auth.google')}
               </motion.button>
+
+              {/* SSO Login */}
+              {ssoEnabled && (
+                <motion.button
+                  onClick={ssoLogin}
+                  disabled={busy}
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full h-11 mt-2.5 rounded-xl bg-[var(--bg-input)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-active)] transition-all duration-300 flex items-center justify-center gap-2.5 disabled:opacity-50 border-[1.5px] border-[var(--border)] hover:border-[var(--border-strong)]"
+                >
+                  <KeyRound className="w-4 h-4 text-[var(--accent)]" />
+                  {lang === 'es' ? `Iniciar con ${ssoProviderName}` : `Sign in with ${ssoProviderName}`}
+                </motion.button>
+              )}
             </div>
           </div>
 

@@ -64,6 +64,33 @@ export interface OrgSettings {
   defaultLanguage: string;
   retentionDays: number;
   features: FeatureFlags;
+  security?: SecuritySettings;
+}
+
+export interface SecuritySettings {
+  sso?: SSOConfig;
+  scim?: { enabled: boolean; tokenCount: number };
+  ipAllowlist?: { enabled: boolean; ranges: string[] };
+}
+
+export interface SSOConfig {
+  enabled: boolean;
+  provider: 'saml' | 'oidc';
+  providerName: string;
+  // SAML
+  entityId?: string;
+  ssoUrl?: string;
+  certificate?: string;
+  // OIDC
+  issuer?: string;
+  clientId?: string;
+  clientSecret?: string;
+  discoveryUrl?: string;
+  // Common
+  attributeMapping: { email: string; displayName: string; role?: string };
+  autoProvision: boolean;
+  defaultRole: string;
+  allowedDomains: string[];
 }
 
 export interface FeatureFlags {
@@ -399,7 +426,7 @@ export type TriggerType =
   | 'task_assignee_changed' | 'task_due_date_reached'
   | 'task_due_date_approaching' | 'doc_updated'
   | 'message_mention' | 'webhook_received'
-  | 'schedule_daily' | 'schedule_weekly' | 'schedule_monthly';
+  | 'schedule_daily' | 'schedule_weekly' | 'schedule_monthly' | 'schedule_cron';
 
 export type ConditionOperator = 'equals' | 'not_equals' | 'contains' | 'not_contains'
   | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty' | 'in' | 'not_in';
@@ -409,7 +436,8 @@ export type ActionType =
   | 'add_tag' | 'remove_tag' | 'create_subtask' | 'move_to_list'
   | 'post_comment' | 'send_email' | 'send_webhook'
   | 'create_doc' | 'post_message' | 'generate_ai_summary'
-  | 'create_task';
+  | 'create_task'
+  | 'ai_assign' | 'ai_prioritize' | 'ai_summarize' | 'ai_create_subtasks';
 
 export interface AutomationRule extends BaseEntity {
   orgId: string;

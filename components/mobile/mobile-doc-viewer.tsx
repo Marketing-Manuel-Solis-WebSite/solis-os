@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useI18n } from '@/lib/i18n';
+import { sanitizeHtml } from '@/lib/sanitize-html';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Pencil, ArrowUp } from 'lucide-react';
 
@@ -83,7 +84,7 @@ export default function MobileDocViewer({ doc, onBack, onEdit }: Props) {
               [&_table]:w-full [&_table]:text-[13px]
               [&_th]:text-left [&_th]:p-2 [&_th]:border-b [&_th]:border-[var(--border)]
               [&_td]:p-2 [&_td]:border-b [&_td]:border-[var(--border-subtle)]"
-            dangerouslySetInnerHTML={{ __html: doc.contentHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(doc.contentHtml) }}
           />
         ) : (
           <p className="text-[var(--text-muted)] text-[14px] italic">

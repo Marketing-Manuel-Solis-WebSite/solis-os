@@ -17,7 +17,7 @@ export interface FeatureFlags {
  */
 const DEFAULT_FLAGS: FeatureFlags = {
   // Bloque C — Data Model
-  'custom-statuses': false,
+  'custom-statuses': true,
   'enriched-subtasks': true,
   'custom-field-scoping': true,
   // Bloque D — Views
@@ -41,7 +41,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   // Bloque F — Permissions
   'guest-role': true,
   'granular-permissions': true,
-  'share-links': false,
+  'share-links': true,
   'invite-system': false,
   'field-level-permissions': true,
   'scoped-permissions': false,
@@ -91,7 +91,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   'outbound-webhooks': false,
   // Bloque I — Export & Reporting
   'pdf-export': false,
-  'scheduled-reports': false,
+  'scheduled-reports': true,
   'time-approval': false,
   // Bloque J — OKR
   'okr-hierarchy': false,
@@ -111,7 +111,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   'auto-refresh-analytics': false,
   'task-templates': false,
   // Phase 2 — ClickUp parity features
-  'automation-scheduled-triggers': false,
+  'automation-scheduled-triggers': true,
   'formula-rollup-fields': false,
   'automation-chat-trigger': false,
   'onboarding-wizard': false,
@@ -123,7 +123,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   'automation-dependency-unblocked': true,
   'calendar-sync': false,
   'embed-view': false,
-  'space-auto-channels': false,
+  'space-auto-channels': true,
 };
 
 interface FeatureFlagContextValue {

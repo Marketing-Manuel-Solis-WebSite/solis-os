@@ -192,6 +192,7 @@ export const GROUP_OPTIONS = [
   { id: 'priority' },
   { id: 'type' },
   { id: 'assignee' },
+  { id: 'space' },
   { id: 'none' },
 ] as const;
 
@@ -491,7 +492,7 @@ export function sortTasks(tasks: Task[], sortBy: string, sortDir: 'asc' | 'desc'
   });
 }
 
-export function groupTasks(tasks: Task[], groupBy: string, members: any[], t: (k: string) => string): TaskGroup[] {
+export function groupTasks(tasks: Task[], groupBy: string, members: any[], t: (k: string) => string, teams?: any[]): TaskGroup[] {
   if (groupBy === 'none') return [{ key: 'all', label: t('tasks.all'), tasks, color: '#94A3B8', count: tasks.length }];
   if (groupBy === 'status') return STATUSES.map(s => {
     const tk = tasks.filter(x => x.status === s.id);
@@ -522,6 +523,32 @@ export function groupTasks(tasks: Task[], groupBy: string, members: any[], t: (k
     });
     if (unassigned.length > 0) grouped.push({ key: '__none__', label: t('tasks.unassigned'), tasks: unassigned, color: '#64748B', count: unassigned.length });
     return grouped;
+  }
+  if (groupBy === 'space' && teams) {
+    const spaceMap = new Map<string, Task[]>();
+    const noSpace: Task[] = [];
+    for (const task of tasks) {
+      const tid = task.teamId;
+      if (!tid) { noSpace.push(task); continue; }
+      const list = spaceMap.get(tid);
+      if (list) list.push(task);
+      else spaceMap.set(tid, [task]);
+    }
+    const result: TaskGroup[] = [];
+    for (const [spaceId, spaceTasks] of spaceMap) {
+      const team = teams.find((tm: any) => tm.id === spaceId);
+      result.push({
+        key: spaceId,
+        label: team?.name || spaceId,
+        tasks: spaceTasks,
+        color: team?.color || '#3B82F6',
+        count: spaceTasks.length,
+      });
+    }
+    if (noSpace.length > 0) {
+      result.push({ key: '__none__', label: t('everything.noSpace'), tasks: noSpace, color: '#64748B', count: noSpace.length });
+    }
+    return result;
   }
   return TASK_TYPES.map(tp => {
     const tk = tasks.filter(x => (x.type || 'task') === tp.id);

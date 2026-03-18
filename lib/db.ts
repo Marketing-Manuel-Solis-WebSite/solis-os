@@ -220,6 +220,13 @@ export async function createTeam(data: any) {
   } catch (err) {
     console.error('[createTeam] Auto-create required list view failed:', err);
   }
+  // Auto-create contextual channel for this space (non-blocking)
+  try {
+    const { ensureSpaceChannel } = await import('@/lib/contextual-channels');
+    await ensureSpaceChannel(id, data.name, data.createdBy || 'system');
+  } catch (err) {
+    console.error('[createTeam] Auto-create space channel failed:', err);
+  }
   return result;
 }
 export async function updateTeam(id: string, data: any) { return updateAt(`orgs/${ORG}/teams/${id}`, data); }
@@ -388,7 +395,15 @@ export async function getFolders(spaceId: string): Promise<FolderData[]> {
 }
 
 export async function createFolder(data: Omit<FolderData, 'id' | 'orgId'>) {
-  return addTo('folders', { ...data, parentFolderId: data.parentFolderId || null, orgId: ORG });
+  const ref = await addTo('folders', { ...data, parentFolderId: data.parentFolderId || null, orgId: ORG });
+  // Auto-create contextual channel for this folder (non-blocking)
+  try {
+    const { ensureFolderChannel } = await import('@/lib/contextual-channels');
+    await ensureFolderChannel(ref.id, data.name, data.spaceId, data.createdBy || 'system');
+  } catch (err) {
+    console.error('[createFolder] Auto-create folder channel failed:', err);
+  }
+  return ref;
 }
 
 export async function updateFolder(id: string, data: Partial<FolderData>) {
@@ -457,7 +472,15 @@ export async function getListsByFolder(folderId: string): Promise<ListData[]> {
 }
 
 export async function createList(data: Omit<ListData, 'id' | 'orgId'>) {
-  return addTo('lists', { ...data, orgId: ORG });
+  const ref = await addTo('lists', { ...data, orgId: ORG });
+  // Auto-create contextual channel for this list (non-blocking)
+  try {
+    const { ensureListChannel } = await import('@/lib/contextual-channels');
+    await ensureListChannel(ref.id, data.name, data.spaceId, data.createdBy || 'system');
+  } catch (err) {
+    console.error('[createList] Auto-create list channel failed:', err);
+  }
+  return ref;
 }
 
 export async function updateList(id: string, data: Partial<ListData>) {
@@ -820,6 +843,8 @@ export interface ChannelData {
   lastMessageAt: any;
   lastMessagePreview: string;
   lastMessageBy: string;
+  linkedEntityType?: 'space' | 'folder' | 'list';  // Auto-created location channel type
+  linkedEntityId?: string;                           // ID of the linked space/folder/list
 }
 
 export interface MessageData {
@@ -877,7 +902,7 @@ export async function getAllUserChannels(userId: string): Promise<{ items: any[]
 }
 
 export async function createChannel(data: Partial<ChannelData>) {
-  return addTo('channels', {
+  const doc: any = {
     orgId: ORG,
     name: data.name || '',
     description: data.description || '',
@@ -894,7 +919,10 @@ export async function createChannel(data: Partial<ChannelData>) {
     lastMessageAt: null,
     lastMessagePreview: '',
     lastMessageBy: '',
-  });
+  };
+  if (data.linkedEntityType) doc.linkedEntityType = data.linkedEntityType;
+  if (data.linkedEntityId) doc.linkedEntityId = data.linkedEntityId;
+  return addTo('channels', doc);
 }
 
 export async function updateChannel(id: string, data: Partial<ChannelData>) {
@@ -1376,7 +1404,8 @@ export async function recalculateGoalProgress(goalId: string) {
 /** Get all child goals of a parent goal. */
 export async function getChildGoals(parentGoalId: string) {
   const q = query(
-    collection(db, `orgs/${ORG}/goals`),
+    collection(db, 'goals'),
+    where('orgId', '==', ORG),
     where('parentGoalId', '==', parentGoalId),
     orderBy('createdAt', 'asc'),
   );

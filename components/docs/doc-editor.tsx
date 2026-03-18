@@ -9,6 +9,7 @@ import {
   MessageSquareText, Share2,
 } from 'lucide-react';
 import { renderMarkdown } from '@/lib/markdown';
+import { sanitizeHtml } from '@/lib/sanitize-html';
 import { uploadFile, isImageType, formatFileSize } from '@/lib/upload';
 import { useToast } from '@/components/notifications/toast-provider';
 import { useI18n } from '@/lib/i18n';
@@ -849,7 +850,7 @@ ${forPrint ? '@media print{body{margin:0;padding:10px}@page{margin:1.5cm}}' : ''
           {(mode === 'preview' || mode === 'split') && (
             <div className={`${mode === 'split' ? 'w-1/2' : 'w-full'} overflow-y-auto`}>
               <div className="doc-preview p-6 max-w-3xl mx-auto"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderMarkdown(content)) }} />
             </div>
           )}
         </div>

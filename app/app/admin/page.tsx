@@ -31,7 +31,7 @@ import {
   Archive, ArchiveRestore, ArrowRightLeft, Loader2, Eye, Scan, BarChart3, Mail
 } from 'lucide-react';
 
-type S = 'org'|'users'|'departments'|'invites'|'perms'|'inspector'|'usage'|'struct'|'fields'|'stpl'|'tpl'|'auto'|'views'|'notif'|'ai'|'integ'|'audit';
+type S = 'org'|'users'|'departments'|'invites'|'perms'|'inspector'|'usage'|'struct'|'fields'|'stpl'|'tpl'|'auto'|'views'|'notif'|'ai'|'integ'|'audit'|'security';
 const SS: {id:S;lKey:string;i:any;dKey:string}[] = [
   {id:'org',lKey:'admin.org',i:Building2,dKey:'admin.orgDesc'},
   {id:'users',lKey:'admin.users',i:Users,dKey:'admin.usersDesc'},
@@ -39,6 +39,7 @@ const SS: {id:S;lKey:string;i:any;dKey:string}[] = [
   {id:'departments',lKey:'admin.departments',i:FolderOpen,dKey:'admin.departmentsDesc'},
   {id:'perms',lKey:'admin.permissions',i:Shield,dKey:'admin.permissionsDesc'},
   {id:'inspector',lKey:'admin.inspector',i:Scan,dKey:'admin.inspectorDesc'},
+  {id:'security',lKey:'admin.security',i:Shield,dKey:'admin.securityDesc'},
   {id:'usage',lKey:'admin.usage',i:BarChart3,dKey:'admin.usageDesc'},
   {id:'struct',lKey:'admin.structure',i:LayoutGrid,dKey:'admin.structureDesc'},
   {id:'fields',lKey:'admin.customFields',i:Columns3,dKey:'admin.customFieldsDesc'},
@@ -123,6 +124,7 @@ export default function Admin() {
         {s === 'ai' && <ComingSoonS label={t('admin.aiConfig')} />}
         {s === 'integ' && <ComingSoonS label={t('admin.integrations')} />}
         {s === 'audit' && <AuditS />}
+        {s === 'security' && <SecurityS />}
       </div>
     </div>
   );
@@ -1346,4 +1348,99 @@ function Sk() {
       {[1, 2, 3].map(i => <div key={i} className="h-14 skeleton" />)}
     </div>
   );
+}
+
+// =====================================================
+// SECURITY SECTION — SSO + SCIM + IP Allowlist
+// =====================================================
+
+function SecurityS() {
+  const { t } = useI18n();
+  const { user } = useAuth();
+  const toast = useToast();
+  const [ipConfig, setIpConfig] = useState<{ enabled: boolean; ranges: string[] }>({ enabled: false, ranges: [] });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getSettings('security').then((data: any) => {
+      if (data?.ipAllowlist) {
+        setIpConfig(data.ipAllowlist);
+      }
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  const handleSaveIp = async (enabled: boolean, ranges: string[]) => {
+    try {
+      const current = await getSettings('security') || {};
+      await saveSettings('security', { ...current, ipAllowlist: { enabled, ranges } });
+      setIpConfig({ enabled, ranges });
+      toast?.success?.(t('common.saved'));
+    } catch (err: any) {
+      toast?.error?.(err?.message || 'Failed to save');
+    }
+  };
+
+  if (loading) return <Sk />;
+
+  return (
+    <div className="p-6 max-w-3xl space-y-8">
+      <div>
+        <h2 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
+          <Shield className="h-5 w-5 text-[var(--accent)]" />
+          {t('admin.security')}
+        </h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{t('admin.securityDesc')}</p>
+      </div>
+
+      {/* SSO Configuration */}
+      <div className="rounded-2xl bg-[var(--bg-secondary)] shadow-card p-6">
+        <h3 className="text-[15px] font-bold text-[var(--text-primary)] mb-4">
+          SSO (Single Sign-On)
+        </h3>
+        <SSOConfigFormLazy />
+      </div>
+
+      {/* SCIM Token Management */}
+      <div className="rounded-2xl bg-[var(--bg-secondary)] shadow-card p-6">
+        <h3 className="text-[15px] font-bold text-[var(--text-primary)] mb-4">
+          SCIM 2.0 Provisioning
+        </h3>
+        <SCIMTokenManagerLazy />
+      </div>
+
+      {/* IP Allowlist */}
+      <div className="rounded-2xl bg-[var(--bg-secondary)] shadow-card p-6">
+        <IpAllowlistManagerLazy enabled={ipConfig.enabled} ranges={ipConfig.ranges} onSave={handleSaveIp} />
+      </div>
+    </div>
+  );
+}
+
+// Lazy imports for security components to avoid bundling in non-admin pages
+function SSOConfigFormLazy() {
+  const [Component, setComponent] = useState<any>(null);
+  useEffect(() => {
+    import('@/components/admin/sso-config-form').then(m => setComponent(() => m.default)).catch(() => {});
+  }, []);
+  if (!Component) return <div className="text-sm text-[var(--text-muted)]">Loading SSO configuration...</div>;
+  return <Component />;
+}
+
+function SCIMTokenManagerLazy() {
+  const [Component, setComponent] = useState<any>(null);
+  useEffect(() => {
+    import('@/components/admin/scim-token-manager').then(m => setComponent(() => m.default)).catch(() => {});
+  }, []);
+  if (!Component) return <div className="text-sm text-[var(--text-muted)]">Loading SCIM configuration...</div>;
+  return <Component />;
+}
+
+function IpAllowlistManagerLazy(props: { enabled: boolean; ranges: string[]; onSave: (enabled: boolean, ranges: string[]) => void }) {
+  const [Component, setComponent] = useState<any>(null);
+  useEffect(() => {
+    import('@/components/admin/ip-allowlist-manager').then(m => setComponent(() => m.default)).catch(() => {});
+  }, []);
+  if (!Component) return <div className="text-sm text-[var(--text-muted)]">Loading IP configuration...</div>;
+  return <Component {...props} />;
 }

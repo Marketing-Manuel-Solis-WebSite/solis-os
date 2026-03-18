@@ -14,6 +14,7 @@ import {
 import AutomationTemplatePicker from '@/components/automations/automation-template-picker';
 import FieldMapper from '@/components/automations/field-mapper';
 import AISuggestionsPanel from '@/components/automations/ai-suggestions-panel';
+import ScheduleTriggerConfig from '@/components/automations/schedule-trigger-config';
 import type { AutomationTemplate } from '@/lib/automation-templates';
 
 // === TRIGGER CONFIGS ===
@@ -30,6 +31,7 @@ const TRIGGERS = [
   { id: 'scheduled_daily', label: 'Scheduled Daily', icon: Clock, color: '#06B6D4', desc: 'Run every day at a specific time' },
   { id: 'scheduled_weekly', label: 'Scheduled Weekly', icon: Calendar, color: '#8B5CF6', desc: 'Run every week on a specific day' },
   { id: 'scheduled_monthly', label: 'Scheduled Monthly', icon: Calendar, color: '#F59E0B', desc: 'Run once a month on a specific date' },
+  { id: 'schedule_cron', label: 'Cron Schedule', icon: Clock, color: '#10B981', desc: 'Run on a custom cron expression (advanced)' },
   // Chat trigger
   { id: 'chat_message_received', label: 'Chat Message', icon: MessageSquare, color: '#EC4899', desc: 'When a chat message matches a pattern' },
   // New triggers
@@ -704,56 +706,12 @@ function BuilderModal({ teams, members, initialData, activeTeamId, branchingEnab
               </div>
 
               {/* Schedule config (for scheduled triggers) */}
-              {(trigger === 'scheduled_daily' || trigger === 'scheduled_weekly' || trigger === 'scheduled_monthly') && (
-                <div className="mt-4 p-4 rounded-xl bg-[var(--bg-elevated)] space-y-3">
-                  <p className="text-[12px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                    {lang === 'es' ? 'Configuración de horario' : 'Schedule Configuration'}
-                  </p>
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className="text-[11px] text-[var(--text-muted)] mb-1 block">{lang === 'es' ? 'Hora' : 'Hour'}</label>
-                      <input type="number" min={0} max={23} value={triggerConfig.atHour || '9'}
-                        onChange={e => setTriggerConfig(prev => ({ ...prev, atHour: e.target.value }))}
-                        className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] border border-[var(--border)] focus:border-[var(--accent)] outline-none" />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-[11px] text-[var(--text-muted)] mb-1 block">{lang === 'es' ? 'Minuto' : 'Minute'}</label>
-                      <input type="number" min={0} max={59} value={triggerConfig.atMinute || '0'}
-                        onChange={e => setTriggerConfig(prev => ({ ...prev, atMinute: e.target.value }))}
-                        className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] border border-[var(--border)] focus:border-[var(--accent)] outline-none" />
-                    </div>
-                  </div>
-                  {trigger === 'scheduled_weekly' && (
-                    <div>
-                      <label className="text-[11px] text-[var(--text-muted)] mb-1 block">{lang === 'es' ? 'Día de la semana' : 'Day of week'}</label>
-                      <select value={triggerConfig.dayOfWeek || '1'}
-                        onChange={e => setTriggerConfig(prev => ({ ...prev, dayOfWeek: e.target.value }))}
-                        className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] border border-[var(--border)] focus:border-[var(--accent)] outline-none">
-                        {[['0', lang === 'es' ? 'Domingo' : 'Sunday'], ['1', lang === 'es' ? 'Lunes' : 'Monday'], ['2', lang === 'es' ? 'Martes' : 'Tuesday'], ['3', lang === 'es' ? 'Miércoles' : 'Wednesday'], ['4', lang === 'es' ? 'Jueves' : 'Thursday'], ['5', lang === 'es' ? 'Viernes' : 'Friday'], ['6', lang === 'es' ? 'Sábado' : 'Saturday']].map(([v, l]) => (
-                          <option key={v} value={v}>{l}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {trigger === 'scheduled_monthly' && (
-                    <div>
-                      <label className="text-[11px] text-[var(--text-muted)] mb-1 block">{lang === 'es' ? 'Día del mes' : 'Day of month'}</label>
-                      <input type="number" min={1} max={31} value={triggerConfig.dayOfMonth || '1'}
-                        onChange={e => setTriggerConfig(prev => ({ ...prev, dayOfMonth: e.target.value }))}
-                        className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] border border-[var(--border)] focus:border-[var(--accent)] outline-none" />
-                    </div>
-                  )}
-                  <div>
-                    <label className="text-[11px] text-[var(--text-muted)] mb-1 block">{lang === 'es' ? 'Zona horaria' : 'Timezone'}</label>
-                    <select value={triggerConfig.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}
-                      onChange={e => setTriggerConfig(prev => ({ ...prev, timezone: e.target.value }))}
-                      className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-base)] text-sm text-[var(--text-primary)] border border-[var(--border)] focus:border-[var(--accent)] outline-none">
-                      {['UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Mexico_City', 'America/Bogota', 'America/Sao_Paulo', 'Europe/London', 'Europe/Madrid', 'Europe/Berlin', 'Asia/Tokyo'].map(tz => (
-                        <option key={tz} value={tz}>{tz}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+              {(trigger === 'scheduled_daily' || trigger === 'scheduled_weekly' || trigger === 'scheduled_monthly' || trigger === 'schedule_cron') && (
+                <ScheduleTriggerConfig
+                  triggerType={trigger}
+                  triggerConfig={triggerConfig}
+                  onChange={setTriggerConfig}
+                />
               )}
 
               {/* Chat trigger config */}

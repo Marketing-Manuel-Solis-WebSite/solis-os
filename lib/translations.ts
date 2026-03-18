@@ -24,6 +24,7 @@ export const translations: Record<Lang, Dict> = {
     'nav.orgChart': 'Organigrama',
     'nav.ai': 'Solis AI',
     'nav.admin': 'Administración',
+    'nav.everything': 'Todo',
     'nav.spaces': 'Espacios',
     'nav.templates': 'Plantillas',
 
@@ -108,6 +109,12 @@ export const translations: Record<Lang, Dict> = {
     'group.type': 'Tipo',
     'group.assignee': 'Asignado',
     'group.none': 'Sin agrupar',
+    'group.space': 'Espacio',
+
+    // --- Everything Page ---
+    'everything.title': 'Todo',
+    'everything.subtitle': 'Todas las tareas de todos los espacios',
+    'everything.noSpace': 'Sin espacio',
 
     // --- Tasks Page ---
     'tasks.title': 'Tareas',
@@ -777,6 +784,8 @@ export const translations: Record<Lang, Dict> = {
     'admin.integrationsDesc': 'Webhooks',
     'admin.audit': 'Registro de Auditoría',
     'admin.auditDesc': 'Seguridad',
+    'admin.security': 'Seguridad Avanzada',
+    'admin.securityDesc': 'SSO, SCIM y control de acceso por IP',
     'admin.views': 'Vistas',
     'admin.viewsDesc': 'Gestión de vistas del workspace',
     'admin.viewCount': '{n} vistas',
@@ -2639,6 +2648,7 @@ export const translations: Record<Lang, Dict> = {
     'nav.orgChart': 'Org Chart',
     'nav.ai': 'Solis AI',
     'nav.admin': 'Administration',
+    'nav.everything': 'Everything',
     'nav.spaces': 'Spaces',
     'nav.templates': 'Templates',
 
@@ -2723,6 +2733,12 @@ export const translations: Record<Lang, Dict> = {
     'group.type': 'Type',
     'group.assignee': 'Assignee',
     'group.none': 'No grouping',
+    'group.space': 'Space',
+
+    // --- Everything Page ---
+    'everything.title': 'Everything',
+    'everything.subtitle': 'All tasks across all spaces',
+    'everything.noSpace': 'No space',
 
     // --- Tasks Page ---
     'tasks.title': 'Tasks',
@@ -3384,6 +3400,8 @@ export const translations: Record<Lang, Dict> = {
     'admin.integrationsDesc': 'Webhooks',
     'admin.audit': 'Audit Logs',
     'admin.auditDesc': 'Security',
+    'admin.security': 'Advanced Security',
+    'admin.securityDesc': 'SSO, SCIM and IP access control',
     'admin.views': 'Views',
     'admin.viewsDesc': 'Workspace view management',
     'admin.viewCount': '{n} views',

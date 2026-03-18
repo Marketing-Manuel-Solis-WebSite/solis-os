@@ -7,19 +7,21 @@ import { getSharedItems, type SharedItem } from '@/lib/shared-items';
 import { useRouter } from 'next/navigation';
 import {
   Share2, CheckCircle2, FileText, Target, Search, Filter,
-  Loader2, Inbox, ChevronRight,
+  Loader2, Inbox, ChevronRight, PenTool,
 } from 'lucide-react';
 
 const TYPE_ICONS: Record<string, any> = {
   task: CheckCircle2,
   doc: FileText,
   goal: Target,
+  whiteboard: PenTool,
 };
 
 const TYPE_COLORS: Record<string, string> = {
   task: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
   doc: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
   goal: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+  whiteboard: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
 };
 
 export default function SharedWithMePage() {
@@ -77,17 +79,18 @@ export default function SharedWithMePage() {
 
   // Counts per type
   const counts = useMemo(() => {
-    const c = { all: items.length, task: 0, doc: 0, goal: 0 };
+    const c = { all: items.length, task: 0, doc: 0, goal: 0, whiteboard: 0 };
     items.forEach(i => { if (i.type in c) (c as any)[i.type]++; });
     return c;
   }, [items]);
 
-  // Navigate to item
+  // Navigate to item — deep-link to specific entity
   const goToItem = (item: SharedItem) => {
     switch (item.type) {
-      case 'task': router.push('/app/tasks'); break;
+      case 'task': router.push(`/app/tasks?taskId=${item.id}`); break;
       case 'doc': router.push(`/app/docs?id=${item.id}`); break;
-      case 'goal': router.push('/app/goals'); break;
+      case 'goal': router.push(`/app/goals?goalId=${item.id}`); break;
+      case 'whiteboard': router.push(`/app/whiteboards?id=${item.id}`); break;
     }
   };
 
@@ -112,7 +115,7 @@ export default function SharedWithMePage() {
 
       {/* Type filter pills */}
       <div className="flex items-center gap-2 mb-4">
-        {(['all', 'task', 'doc', 'goal'] as const).map(type => (
+        {(['all', 'task', 'doc', 'goal', 'whiteboard'] as const).map(type => (
           <button
             key={type}
             onClick={() => setTypeFilter(type)}
@@ -122,7 +125,7 @@ export default function SharedWithMePage() {
                 : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text-secondary)]'
             }`}
           >
-            {type === 'all' ? t('common.all') : type === 'task' ? t('nav.tasks') : type === 'doc' ? t('nav.docs') : t('nav.goals')}
+            {type === 'all' ? t('common.all') : type === 'task' ? t('nav.tasks') : type === 'doc' ? t('nav.docs') : type === 'goal' ? t('nav.goals') : 'Whiteboards'}
             <span className="ml-1.5 text-[11px] opacity-70">{(counts as any)[type]}</span>
           </button>
         ))}

@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
+import { sanitizeHtml } from '@/lib/sanitize-html';
 import type { AnalyticsSnapshot } from '@/app/app/analytics/page';
 import { checkAIUsage, incrementAIUsage, logAIAction } from '@/lib/ai-usage';
 import {
@@ -400,7 +401,7 @@ ${deptContext}
                   {copiedId === a.id ? 'Copied!' : 'Copy'}
                 </button>
               </div>
-              <div className="p-5 ai-content" dangerouslySetInnerHTML={{ __html: renderMd(a.answer) }} />
+              <div className="p-5 ai-content" dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderMd(a.answer)) }} />
             </div>
           ))}
         </div>

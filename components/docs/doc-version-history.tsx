@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, Clock, RotateCcw, Eye, ChevronRight, FileText, Loader2 } from 'lucide-react';
 import { getRevisions, getRevision, type DocRevision } from '@/lib/doc-versions';
 import { renderMarkdown } from '@/lib/markdown';
+import { sanitizeHtml } from '@/lib/sanitize-html';
 import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -119,7 +120,7 @@ export default function DocVersionHistory({ docId, currentVersion, onRestore, on
             <div className="flex-1 overflow-y-auto p-4">
               <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-3">{selected.title}</h4>
               <div className="doc-preview text-sm"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(selected.content || '') }} />
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderMarkdown(selected.content || '')) }} />
             </div>
           </div>
         ) : (

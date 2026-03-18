@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Hash, Lock, MessageCircle, Plus, Search, ChevronDown, ChevronRight, X } from 'lucide-react';
+import { Hash, Lock, MessageCircle, Plus, Search, ChevronDown, ChevronRight, X, MapPin, FolderOpen, List } from 'lucide-react';
 
 interface Props {
   channels: any[];
@@ -23,9 +23,11 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
   const { t } = useI18n();
   const [showDMs, setShowDMs] = useState(true);
   const [showChannels, setShowChannels] = useState(true);
+  const [showLocationChannels, setShowLocationChannels] = useState(true);
   const [showDMList, setShowDMList] = useState(false);
 
-  const publicChannels = channels.filter(c => c.type !== 'dm');
+  const publicChannels = channels.filter(c => c.type !== 'dm' && !c.linkedEntityType);
+  const locationChannels = channels.filter(c => c.type !== 'dm' && !!c.linkedEntityType);
   const dmChannels = channels.filter(c => c.type === 'dm');
 
   const filtered = search
@@ -64,6 +66,61 @@ export default function ChannelSidebar({ channels, active, members, userId, sear
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin">
+        {/* Location Channels Section */}
+        {!filtered && locationChannels.length > 0 && (
+          <div className="px-2 pt-3 pb-1">
+            <button onClick={() => setShowLocationChannels(!showLocationChannels)} className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[12px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition">
+              <motion.span animate={{ rotate: showLocationChannels ? 0 : -90 }} transition={{ duration: 0.2 }}>
+                <ChevronDown className="h-3 w-3" />
+              </motion.span>
+              Location Channels <span className="text-[var(--text-muted)] ml-auto opacity-60">{locationChannels.length}</span>
+            </button>
+          </div>
+        )}
+
+        <AnimatePresence initial={false}>
+          {!filtered && showLocationChannels && locationChannels.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="px-2 space-y-0.5 overflow-hidden"
+            >
+              {locationChannels.map((ch, i) => {
+                const isActive = active?.id === ch.id;
+                const isUnread = !isActive && ch.lastMessageAt?.seconds > (readCursors?.[ch.id]?.seconds || 0);
+                const locationIcon = ch.linkedEntityType === 'space'
+                  ? <MapPin className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
+                  : ch.linkedEntityType === 'folder'
+                    ? <FolderOpen className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
+                    : <List className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />;
+                return (
+                  <motion.button
+                    key={ch.id}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.02, duration: 0.2 }}
+                    onClick={() => onSelect(ch)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] transition-all duration-200 group relative ${
+                      isActive
+                        ? 'bg-[var(--accent)]/10 text-[var(--text-primary)] font-semibold border-l-[3px] border-l-[var(--accent)] rounded-r-xl'
+                        : isUnread
+                          ? 'text-[var(--text-primary)] font-semibold hover:bg-[var(--bg-hover)] rounded-md'
+                          : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md'
+                    }`}>
+                    {locationIcon}
+                    <span className="flex-1 text-left truncate">{ch.name}</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-[var(--accent)]/10 text-[var(--accent)] opacity-70 shrink-0">{ch.linkedEntityType}</span>
+                    {isUnread && <span className="w-2 h-2 rounded-full bg-[var(--accent)] shrink-0" />}
+                  </motion.button>
+                );
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Channels Section */}
         {!filtered && (
           <div className="px-2 pt-3 pb-1">

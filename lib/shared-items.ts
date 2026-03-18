@@ -13,7 +13,7 @@ import { getCurrentOrgId } from '@/lib/org';
 
 export interface SharedItem {
   id: string;
-  type: 'task' | 'doc' | 'goal';
+  type: 'task' | 'doc' | 'goal' | 'whiteboard';
   title: string;
   subtitle?: string;
   spaceId?: string;
@@ -169,19 +169,96 @@ export async function getSharedDocs(
 }
 
 /**
- * Get all shared items (tasks + docs) for the user, merged and sorted.
+ * Get goals where user is the owner but not a member of the goal's space.
+ */
+export async function getSharedGoals(
+  userId: string,
+  userTeamIds: string[],
+  maxResults = 100,
+): Promise<SharedItem[]> {
+  const orgId = getCurrentOrgId();
+  const results: SharedItem[] = [];
+
+  const ownerQuery = query(
+    collection(db, 'goals'),
+    where('orgId', '==', orgId),
+    where('ownerId', '==', userId),
+    orderBy('updatedAt', 'desc'),
+    limit(maxResults),
+  );
+
+  const snap = await getDocs(ownerQuery);
+  for (const d of snap.docs) {
+    const data = d.data();
+    if (data.teamId && userTeamIds.includes(data.teamId)) continue;
+    results.push({
+      id: d.id,
+      type: 'goal',
+      title: data.name || 'Untitled Goal',
+      subtitle: data.status,
+      spaceId: data.teamId,
+      createdBy: data.createdBy,
+      updatedAt: data.updatedAt,
+      status: data.status,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Get whiteboards where user is an explicit member but not in the whiteboard's space.
+ */
+export async function getSharedWhiteboards(
+  userId: string,
+  userTeamIds: string[],
+  maxResults = 100,
+): Promise<SharedItem[]> {
+  const orgId = getCurrentOrgId();
+  const results: SharedItem[] = [];
+
+  const memberQuery = query(
+    collection(db, 'whiteboards'),
+    where('orgId', '==', orgId),
+    where('members', 'array-contains', userId),
+    orderBy('updatedAt', 'desc'),
+    limit(maxResults),
+  );
+
+  const snap = await getDocs(memberQuery);
+  for (const d of snap.docs) {
+    const data = d.data();
+    if (data.teamId && userTeamIds.includes(data.teamId)) continue;
+    results.push({
+      id: d.id,
+      type: 'whiteboard',
+      title: data.name || data.title || 'Untitled Whiteboard',
+      subtitle: 'whiteboard',
+      spaceId: data.teamId,
+      createdBy: data.createdBy,
+      updatedAt: data.updatedAt,
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Get all shared items (tasks + docs + goals + whiteboards) for the user, merged and sorted.
  */
 export async function getSharedItems(
   userId: string,
   userTeamIds: string[],
   maxResults = 100,
 ): Promise<SharedItem[]> {
-  const [tasks, docs] = await Promise.all([
+  const [tasks, docs, goals, whiteboards] = await Promise.all([
     getSharedTasks(userId, userTeamIds, maxResults),
     getSharedDocs(userId, userTeamIds, maxResults),
+    getSharedGoals(userId, userTeamIds, maxResults),
+    getSharedWhiteboards(userId, userTeamIds, maxResults),
   ]);
 
-  const all = [...tasks, ...docs];
+  const all = [...tasks, ...docs, ...goals, ...whiteboards];
   // Sort by updatedAt descending
   all.sort((a, b) => {
     const ta = a.updatedAt?.seconds || 0;

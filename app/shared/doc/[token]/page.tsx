@@ -3,6 +3,7 @@ import { useEffect, useState, use } from 'react';
 import { Loader2, AlertCircle, FileText, Lock } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { renderMarkdown } from '@/lib/markdown';
+import { sanitizeHtml } from '@/lib/sanitize-html';
 
 interface SharedDoc {
   title: string;
@@ -27,10 +28,14 @@ export default function SharedDocPage({ params }: { params: Promise<{ token: str
     setLoading(true);
     setError(null);
     try {
-      let url = `/api/docs/public?token=${encodeURIComponent(token)}`;
-      if (pwd) url += `&password=${encodeURIComponent(pwd)}`;
-
-      const res = await fetch(url);
+      // Send password via POST body to avoid URL logging
+      const res = pwd
+        ? await fetch('/api/docs/public', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, password: pwd }),
+          })
+        : await fetch(`/api/docs/public?token=${encodeURIComponent(token)}`);
 
       if (res.status === 403) {
         setNeedsPassword(true);
@@ -145,8 +150,8 @@ export default function SharedDocPage({ params }: { params: Promise<{ token: str
     );
   }
 
-  // Render the document content
-  const html = doc.contentHtml || renderMarkdown(doc.content || '');
+  // Render the document content — sanitize to prevent XSS
+  const html = sanitizeHtml(doc.contentHtml || renderMarkdown(doc.content || ''));
 
   return (
     <div className="min-h-screen bg-[var(--bg-base)]">

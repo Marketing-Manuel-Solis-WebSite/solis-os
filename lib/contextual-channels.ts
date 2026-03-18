@@ -40,6 +40,45 @@ export async function ensureSpaceChannel(
     type: 'public',
     members: [creatorId],
     teamId: spaceId,
+    linkedEntityType: 'space',
+    linkedEntityId: spaceId,
+  } as any);
+
+  return ref.id;
+}
+
+/**
+ * Find or create a channel linked to a Folder.
+ * Returns the channel ID.
+ */
+export async function ensureFolderChannel(
+  folderId: string,
+  folderName: string,
+  spaceId: string,
+  creatorId: string,
+): Promise<string> {
+  const orgId = getCurrentOrgId();
+
+  // Check if channel already exists for this folder
+  const q = query(
+    collection(db, 'channels'),
+    where('orgId', '==', orgId),
+    where('linkedEntityType', '==', 'folder'),
+    where('linkedEntityId', '==', folderId),
+    limit(1),
+  );
+  const snap = await getDocs(q);
+  if (!snap.empty) return snap.docs[0].id;
+
+  // Create new channel
+  const ref = await createChannel({
+    name: `# ${folderName}`,
+    description: `Channel for folder: ${folderName}`,
+    type: 'public',
+    members: [creatorId],
+    teamId: spaceId,
+    linkedEntityType: 'folder',
+    linkedEntityId: folderId,
   } as any);
 
   return ref.id;
@@ -75,6 +114,8 @@ export async function ensureListChannel(
     type: 'public',
     members: [creatorId],
     teamId: spaceId,
+    linkedEntityType: 'list',
+    linkedEntityId: listId,
   } as any);
 
   return ref.id;
@@ -84,7 +125,7 @@ export async function ensureListChannel(
  * Get the channel linked to a specific entity.
  */
 export async function getLinkedChannel(
-  entityType: 'space' | 'list',
+  entityType: 'space' | 'folder' | 'list',
   entityId: string,
 ): Promise<string | null> {
   const orgId = getCurrentOrgId();

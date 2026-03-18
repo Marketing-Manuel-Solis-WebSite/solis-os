@@ -5,7 +5,7 @@ import { shouldTriggerNow } from '@/lib/scheduled-triggers';
 import { FieldValue } from 'firebase-admin/firestore';
 import { notifyUsersAdmin } from '@/lib/notify-admin';
 
-const SCHEDULED_TRIGGERS = ['scheduled_daily', 'scheduled_weekly', 'scheduled_monthly'];
+const SCHEDULED_TRIGGERS = ['scheduled_daily', 'scheduled_weekly', 'scheduled_monthly', 'schedule_cron'];
 
 export async function GET(req: Request) {
   // Auth check — same pattern as other cron endpoints
@@ -35,14 +35,16 @@ export async function GET(req: Request) {
       // Map trigger type to frequency
       const frequency = rule.trigger === 'scheduled_daily' ? 'daily'
         : rule.trigger === 'scheduled_weekly' ? 'weekly'
+        : rule.trigger === 'schedule_cron' ? 'cron'
         : 'monthly';
 
       const triggerConfig = {
-        frequency: frequency as 'daily' | 'weekly' | 'monthly',
+        frequency: frequency as 'daily' | 'weekly' | 'monthly' | 'cron',
         atHour: parseInt(config.atHour || '9', 10),
         atMinute: parseInt(config.atMinute || '0', 10),
         dayOfWeek: config.dayOfWeek != null ? parseInt(config.dayOfWeek, 10) : undefined,
         dayOfMonth: config.dayOfMonth != null ? parseInt(config.dayOfMonth, 10) : undefined,
+        cronExpression: config.cronExpression || undefined,
         timezone: config.timezone || 'UTC',
       };
 

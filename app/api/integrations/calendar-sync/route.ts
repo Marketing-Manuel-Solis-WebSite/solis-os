@@ -8,12 +8,23 @@ import {
   calendarEventToTaskUpdate,
 } from '@/lib/calendar-sync';
 import { FieldValue } from 'firebase-admin/firestore';
+import { authenticateRequest } from '@/lib/server-auth';
 
 export async function POST(req: Request) {
   try {
+    const authedUser = await authenticateRequest(req);
+    if (!authedUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { userId, provider, action, accessToken, calendarId, refreshToken } = await req.json();
     if (!userId || !provider || !action || !accessToken) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // SECURITY: ensure the userId matches the authenticated user
+    if (userId !== authedUser.uid) {
+      return NextResponse.json({ error: 'Forbidden: userId mismatch' }, { status: 403 });
     }
 
     if (action === 'push') {
@@ -77,6 +88,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[calendar-sync] Error:', err?.message);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

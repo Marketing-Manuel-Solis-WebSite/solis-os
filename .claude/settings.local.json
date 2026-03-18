@@ -27,7 +27,8 @@
       "Bash(done)",
       "Bash(for f in app/api/webhooks/*/route.ts)",
       "Bash(find:*)",
-      "Tienes permiso de cada que te pego algun prompt leer, y modificar lo que sea sin preguntarme"
+      "Tienes permiso de cada que te pego algun prompt leer, y modificar lo que sea sin preguntarme",
+      "Bash(grep -rl \"z\\\\.\\\\|from ''''zod''''\" app/api/ --include=*.ts)"
     ]
   }
 }

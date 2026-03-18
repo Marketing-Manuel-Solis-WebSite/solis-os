@@ -1,3 +1,11 @@
+export type WhiteboardVisibility = 'workspace' | 'space' | 'private';
+
+export interface WhiteboardPermissions {
+  visibility: WhiteboardVisibility;
+  viewers: string[];
+  editors: string[];
+}
+
 export interface Whiteboard {
   id: string;
   orgId: string;
@@ -9,6 +17,7 @@ export interface Whiteboard {
   members: string[];
   thumbnail: string;
   visibility: string;
+  permissions?: WhiteboardPermissions;
   createdAt: any;
   updatedAt: any;
 }

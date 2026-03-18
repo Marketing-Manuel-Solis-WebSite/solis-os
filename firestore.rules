@@ -142,6 +142,38 @@ service cloud.firestore {
           allow update: if isAdmin(orgId);
           allow delete: if isAdmin(orgId);
         }
+
+        // Status Templates
+        match /templates/{templateId} {
+          allow read: if isOrgMember(orgId);
+          allow create, update, delete: if isAdmin(orgId);
+        }
+
+        // SCIM Tokens — admin-only
+        match /scimTokens/{tokenId} {
+          allow read: if isAdmin(orgId);
+          allow create, update: if isAdmin(orgId);
+          allow delete: if isAdmin(orgId);
+        }
+
+        // Field Migration Logs — admin read-only
+        match /fieldMigrationLogs/{logId} {
+          allow read: if isAdmin(orgId);
+          allow create: if isAdmin(orgId);
+        }
+
+        // Scheduled Reports — manager+ can create, admin can delete
+        match /scheduledReports/{reportId} {
+          allow read: if isOrgMember(orgId);
+          allow create, update: if isManager(orgId);
+          allow delete: if isAdmin(orgId);
+        }
+
+        // Goal Folders settings
+        match /goalFolders/{folderId} {
+          allow read: if isOrgMember(orgId);
+          allow write: if isManager(orgId);
+        }
       }
 
       // Shared space views — space members can read, manager+ in space can write

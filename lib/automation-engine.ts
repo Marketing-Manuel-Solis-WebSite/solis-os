@@ -1,3 +1,4 @@
+import 'server-only';
 // ============================================================
 // Automation Engine MVP — evaluates rules and executes actions
 // Supports task-based triggers with condition evaluation
@@ -47,6 +48,10 @@ interface TriggerContext {
 
 // Recursion guard — prevents automation actions from re-triggering the engine
 const _activeTaskIds = new Set<string>();
+
+// Depth guard — prevents cross-task chain reactions (A creates B, B triggers C, etc.)
+const MAX_AUTOMATION_DEPTH = 5;
+let _automationDepth = 0;
 
 // ---- Condition Evaluation ----
 
@@ -171,6 +176,10 @@ async function executeAction(
         const url = action.config.webhookUrl;
         const method = (action.config.method || 'POST') as string;
         if (url) {
+          // SECURITY: Validate URL to prevent SSRF
+          const { validateWebhookUrl } = await import('@/lib/security/url-validator');
+          const urlCheck = await validateWebhookUrl(url);
+          if (!urlCheck.valid) throw new Error(`Webhook URL blocked: ${urlCheck.error}`);
           const resp = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
@@ -290,6 +299,37 @@ async function executeAction(
         }
         if (newTask.title) newTask.titleLower = newTask.title.toLowerCase();
         await adminDb.collection('tasks').add(newTask);
+        break;
+      }
+      // ---- AI Actions ----
+      case 'ai_assign': {
+        const { aiAssign } = await import('./ai-automation-actions');
+        const result = await aiAssign(
+          { taskId: ctx.taskId, task: ctx.task, orgId: ORG },
+          { teamId: action.config.teamId, maxCandidates: Number(action.config.maxCandidates) || 20 },
+        );
+        if (!result.success) return { success: false, error: result.error };
+        break;
+      }
+      case 'ai_prioritize': {
+        const { aiPrioritize } = await import('./ai-automation-actions');
+        const result = await aiPrioritize({ taskId: ctx.taskId, task: ctx.task, orgId: ORG });
+        if (!result.success) return { success: false, error: result.error };
+        break;
+      }
+      case 'ai_summarize': {
+        const { aiSummarize } = await import('./ai-automation-actions');
+        const result = await aiSummarize({ taskId: ctx.taskId, task: ctx.task, orgId: ORG });
+        if (!result.success) return { success: false, error: result.error };
+        break;
+      }
+      case 'ai_create_subtasks': {
+        const { aiCreateSubtasks } = await import('./ai-automation-actions');
+        const result = await aiCreateSubtasks(
+          { taskId: ctx.taskId, task: ctx.task, orgId: ORG },
+          { maxSubtasks: Number(action.config.maxSubtasks) || 5 },
+        );
+        if (!result.success) return { success: false, error: result.error };
         break;
       }
       default:
@@ -481,7 +521,9 @@ function buildScope(task: Record<string, any>): ScopeContext {
 
 export async function onTaskCreated(taskId: string, task: Record<string, any>, actorId?: string): Promise<void> {
   if (_activeTaskIds.has(taskId)) return; // recursion guard
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
+  _automationDepth++;
   try {
     const rules = await getMatchingRules('task_created', buildScope(task));
     const ctx: TriggerContext = { taskId, task, actorId };
@@ -490,6 +532,7 @@ export async function onTaskCreated(taskId: string, task: Record<string, any>, a
     }
   } finally {
     _activeTaskIds.delete(taskId);
+    _automationDepth--;
   }
 }
 
@@ -500,7 +543,9 @@ export async function onTaskStatusChanged(
   actorId?: string,
 ): Promise<void> {
   if (_activeTaskIds.has(taskId)) return; // recursion guard
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
+  _automationDepth++;
   try {
     const rules = await getMatchingRules('task_status_changed', buildScope(task));
     const ctx: TriggerContext = { taskId, task, previousData: { status: previousStatus }, actorId };
@@ -509,6 +554,7 @@ export async function onTaskStatusChanged(
     }
   } finally {
     _activeTaskIds.delete(taskId);
+    _automationDepth--;
   }
 }
 
@@ -518,7 +564,9 @@ export async function onTaskAssigned(
   actorId?: string,
 ): Promise<void> {
   if (_activeTaskIds.has(taskId)) return; // recursion guard
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
+  _automationDepth++;
   try {
     const rules = await getMatchingRules('task_assigned', buildScope(task));
     const ctx: TriggerContext = { taskId, task, actorId };
@@ -527,6 +575,7 @@ export async function onTaskAssigned(
     }
   } finally {
     _activeTaskIds.delete(taskId);
+    _automationDepth--;
   }
 }
 
@@ -537,7 +586,9 @@ export async function onTaskPriorityChanged(
   actorId?: string,
 ): Promise<void> {
   if (_activeTaskIds.has(taskId)) return;
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
+  _automationDepth++;
   try {
     const rules = await getMatchingRules('task_priority_changed', buildScope(task));
     const ctx: TriggerContext = { taskId, task, previousData: { priority: previousPriority }, actorId };
@@ -546,6 +597,7 @@ export async function onTaskPriorityChanged(
     }
   } finally {
     _activeTaskIds.delete(taskId);
+    _automationDepth--;
   }
 }
 
@@ -555,7 +607,9 @@ export async function onTaskDueDateChanged(
   actorId?: string,
 ): Promise<void> {
   if (_activeTaskIds.has(taskId)) return;
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
+  _automationDepth++;
   try {
     const rules = await getMatchingRules('task_due_date_changed', buildScope(task));
     const ctx: TriggerContext = { taskId, task, actorId };
@@ -564,6 +618,7 @@ export async function onTaskDueDateChanged(
     }
   } finally {
     _activeTaskIds.delete(taskId);
+    _automationDepth--;
   }
 }
 
@@ -574,7 +629,9 @@ export async function onTaskCustomFieldChanged(
   actorId?: string,
 ): Promise<void> {
   if (_activeTaskIds.has(taskId)) return;
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
+  _automationDepth++;
   try {
     const rules = await getMatchingRules('task_custom_field_changed', buildScope(task));
     const ctx: TriggerContext = { taskId, task, previousData: { changedField: fieldName }, actorId };
@@ -583,6 +640,7 @@ export async function onTaskCustomFieldChanged(
     }
   } finally {
     _activeTaskIds.delete(taskId);
+    _automationDepth--;
   }
 }
 
@@ -595,7 +653,9 @@ export async function onTimeTracked(
   actorId?: string,
 ): Promise<void> {
   if (_activeTaskIds.has(taskId)) return;
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
+  _automationDepth++;
   try {
     const rules = await getMatchingRules('time_tracked', buildScope(task));
     const ctx: TriggerContext = { taskId, task, previousData: { timeEntry: entry }, actorId };
@@ -604,6 +664,7 @@ export async function onTimeTracked(
     }
   } finally {
     _activeTaskIds.delete(taskId);
+    _automationDepth--;
   }
 }
 
@@ -614,7 +675,9 @@ export async function onButtonFieldClick(
   actorId?: string,
 ): Promise<void> {
   if (_activeTaskIds.has(taskId)) return;
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
+  _automationDepth++;
   try {
     const rules = await getMatchingRules('button_field_click', buildScope(task));
     const ctx: TriggerContext = { taskId, task, previousData: { buttonFieldId }, actorId };
@@ -623,6 +686,7 @@ export async function onButtonFieldClick(
     }
   } finally {
     _activeTaskIds.delete(taskId);
+    _automationDepth--;
   }
 }
 
@@ -632,7 +696,9 @@ export async function onDependencyUnblocked(
   actorId?: string,
 ): Promise<void> {
   if (_activeTaskIds.has(taskId)) return;
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
+  _automationDepth++;
   try {
     const rules = await getMatchingRules('dependency_unblocked', buildScope(task));
     const ctx: TriggerContext = { taskId, task, actorId };
@@ -641,6 +707,7 @@ export async function onDependencyUnblocked(
     }
   } finally {
     _activeTaskIds.delete(taskId);
+    _automationDepth--;
   }
 }
 
@@ -648,7 +715,9 @@ export async function onDependencyUnblocked(
 
 export async function onTaskOverdue(taskId: string, task: Record<string, any>): Promise<void> {
   if (_activeTaskIds.has(taskId)) return;
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
+  _automationDepth++;
   try {
     const rules = await getMatchingRules('task_overdue', buildScope(task));
     const ctx: TriggerContext = { taskId, task };
@@ -657,12 +726,15 @@ export async function onTaskOverdue(taskId: string, task: Record<string, any>): 
     }
   } finally {
     _activeTaskIds.delete(taskId);
+    _automationDepth--;
   }
 }
 
 export async function onTaskDueApproaching(taskId: string, task: Record<string, any>): Promise<void> {
   if (_activeTaskIds.has(taskId)) return;
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
+  _automationDepth++;
   try {
     const rules = await getMatchingRules('task_due_approaching', buildScope(task));
     const ctx: TriggerContext = { taskId, task };
@@ -671,6 +743,7 @@ export async function onTaskDueApproaching(taskId: string, task: Record<string, 
     }
   } finally {
     _activeTaskIds.delete(taskId);
+    _automationDepth--;
   }
 }
 

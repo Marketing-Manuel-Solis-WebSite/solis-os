@@ -1,3 +1,4 @@
+import 'server-only';
 // ================================================================
 // Server-side DB helpers using Firebase Admin SDK
 // Mirrors functions from lib/db.ts used by API routes only.

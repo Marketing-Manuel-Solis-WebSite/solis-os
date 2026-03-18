@@ -212,6 +212,40 @@ export async function unsubscribeSpaceFromTemplate(
   });
 }
 
+// ---- Create template from existing Space ----
+
+/**
+ * Create a status template from a Space's current status configuration.
+ * This lets users "save" a Space's statuses as a reusable template.
+ */
+export async function createTemplateFromSpace(
+  spaceId: string,
+  name: string,
+  description: string,
+  userId: string,
+): Promise<string> {
+  // Load the space's current statuses
+  const { loadSpaceStatuses } = await import('./status-config');
+  const config = await loadSpaceStatuses(spaceId);
+
+  if (!config.statuses || config.statuses.length === 0) {
+    throw new Error('Space has no custom statuses to save as template.');
+  }
+
+  // Create template with those statuses
+  const templateId = await createStatusTemplate({
+    name,
+    description,
+    statuses: config.statuses,
+    createdBy: userId,
+  });
+
+  // Auto-subscribe the source space to the new template
+  await subscribeSpaceToTemplate(spaceId, templateId, userId);
+
+  return templateId;
+}
+
 // ---- Blast radius preview ----
 
 /**
