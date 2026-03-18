@@ -7,6 +7,31 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 
+// ---- Security Headers ----
+const SECURITY_HEADERS: Record<string, string> = {
+  'X-Frame-Options': 'DENY',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+  'Content-Security-Policy': [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://lh3.googleusercontent.com",
+    "font-src 'self'",
+    "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.sentry.io",
+    "frame-ancestors 'none'",
+  ].join('; '),
+};
+
+function applySecurityHeaders(response: NextResponse): NextResponse {
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    response.headers.set(key, value);
+  }
+  return response;
+}
+
 // IP allowlist cache — refreshed every 5 minutes
 let cachedAllowlist: { enabled: boolean; ranges: string[] } | null = null;
 let cacheExpiry = 0;
@@ -61,12 +86,12 @@ export async function middleware(request: NextRequest) {
 
   // Only enforce on app and API routes
   if (!pathname.startsWith('/app') && !pathname.startsWith('/api')) {
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next());
   }
 
   // Skip health check and public endpoints
   if (pathname === '/api/health' || pathname.startsWith('/api/docs/public') || pathname.startsWith('/shared/')) {
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next());
   }
 
   // Get client IP
@@ -109,13 +134,14 @@ export async function middleware(request: NextRequest) {
   }
 
   if (cachedAllowlist && !isIpAllowed(ip, cachedAllowlist)) {
-    return new NextResponse(
+    const denied = new NextResponse(
       JSON.stringify({ error: 'Access denied: IP not in allowlist' }),
       { status: 403, headers: { 'Content-Type': 'application/json' } },
     );
+    return applySecurityHeaders(denied);
   }
 
-  return NextResponse.next();
+  return applySecurityHeaders(NextResponse.next());
 }
 
 export const config = {

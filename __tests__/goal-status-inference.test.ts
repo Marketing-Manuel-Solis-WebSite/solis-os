@@ -1,4 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Mock goal-checkins to prevent transitive Firebase client SDK initialization
+vi.mock('@/lib/goal-checkins', () => ({
+  getLatestCheckin: vi.fn().mockResolvedValue(null),
+}));
+
 import {
   inferGoalStatus,
   inferMultipleGoalStatuses,

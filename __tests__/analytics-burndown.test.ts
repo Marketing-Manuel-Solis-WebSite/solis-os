@@ -2,12 +2,33 @@ import { describe, it, expect, vi } from 'vitest';
 
 // Mock Firebase Admin
 const mockDocs = vi.fn().mockReturnValue([]);
+
+function createMockQuery(filters: Array<{ field: string; op: string; value: any }> = []): any {
+  const q: any = {};
+  q._filters = filters;
+  q.where = vi.fn().mockImplementation((field: string, op: string, value: any) =>
+    createMockQuery([...filters, { field, op, value }]),
+  );
+  q.orderBy = vi.fn().mockReturnValue(q);
+  q.startAfter = vi.fn().mockReturnValue(q);
+  q.limit = vi.fn().mockReturnValue(q);
+  q.get = vi.fn().mockImplementation(() => {
+    let docs = mockDocs();
+    for (const f of filters) {
+      if (f.op === '==') {
+        docs = docs.filter((d: any) => d.data()[f.field] === f.value);
+      } else if (f.op === '!=') {
+        docs = docs.filter((d: any) => d.data()[f.field] !== f.value);
+      }
+    }
+    return Promise.resolve({ docs, empty: docs.length === 0 });
+  });
+  return q;
+}
+
 vi.mock('@/lib/firebase-admin', () => ({
   adminDb: {
-    collection: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnThis(),
-      get: vi.fn().mockImplementation(() => Promise.resolve({ docs: mockDocs() })),
-    }),
+    collection: vi.fn().mockImplementation(() => createMockQuery()),
   },
 }));
 

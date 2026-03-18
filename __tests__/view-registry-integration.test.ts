@@ -20,16 +20,16 @@ import '../lib/views/register-views';
 import { getView, getAllViews, hasView } from '../lib/views';
 
 describe('View Registry — Built-in Registration', () => {
-  const ALL_VIEW_IDS = ['list', 'board', 'calendar', 'table', 'gantt', 'timeline', 'workload'] as const;
+  const ALL_VIEW_IDS = ['list', 'board', 'calendar', 'table', 'gantt', 'timeline', 'workload', 'team', 'embed', 'activity'] as const;
 
-  it('registers all 7 built-in views', () => {
+  it('registers all 10 built-in views', () => {
     for (const id of ALL_VIEW_IDS) {
       expect(hasView(id)).toBe(true);
     }
   });
 
-  it('getAllViews returns exactly 7 entries', () => {
-    expect(getAllViews().length).toBe(7);
+  it('getAllViews returns exactly 10 entries', () => {
+    expect(getAllViews().length).toBe(10);
   });
 
   it('list view has correct metadata', () => {
@@ -114,19 +114,19 @@ describe('View Registry — Built-in Registration', () => {
     }
   });
 
-  it('all 7 views have unique shortcut keys 1-7', () => {
+  it('all 8 views with shortcuts have unique shortcut keys 1-8', () => {
     const views = getAllViews();
     const shortcuts = views.map(v => v.shortcut).filter(Boolean);
-    expect(shortcuts.length).toBe(7);
-    expect(new Set(shortcuts).size).toBe(7);
-    for (let i = 1; i <= 7; i++) {
+    expect(shortcuts.length).toBe(8);
+    expect(new Set(shortcuts).size).toBe(8);
+    for (let i = 1; i <= 8; i++) {
       expect(shortcuts).toContain(String(i));
     }
   });
 
-  it('all 7 views have unique ids', () => {
+  it('all 10 views have unique ids', () => {
     const views = getAllViews();
     const ids = views.map(v => v.id);
-    expect(new Set(ids).size).toBe(7);
+    expect(new Set(ids).size).toBe(10);
   });
 });

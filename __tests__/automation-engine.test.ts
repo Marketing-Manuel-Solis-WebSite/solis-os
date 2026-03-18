@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('server-only', () => ({}));
+
 // ---- Mock Firebase Admin SDK ----
 const mockUpdate = vi.fn().mockResolvedValue(undefined);
 const mockAdd = vi.fn().mockResolvedValue({ id: 'mock-id' });

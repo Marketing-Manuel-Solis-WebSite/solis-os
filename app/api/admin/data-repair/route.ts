@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     if (authedOrErr instanceof Response) return authedOrErr;
     const authedUser = authedOrErr;
 
-    const rl = checkRateLimit('data-repair', authedUser.uid, 10);
+    const rl = await checkRateLimit('data-repair', authedUser.uid, 10);
     if (!rl.allowed) {
       return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
     }

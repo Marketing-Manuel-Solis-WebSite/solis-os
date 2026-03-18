@@ -5,30 +5,8 @@ import { afterTaskCreatedAdmin } from '@/lib/task-side-effects-admin';
 import { afterFormSubmittedAdmin } from '@/lib/form-side-effects-admin';
 import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { checkRateLimitPersistent } from '@/lib/integrations-db-admin';
 import type { FormDocument } from '@/components/forms/constants';
-
-// ---- In-memory rate limiter ----
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimit(key: string, maxPerMinute: number): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(key);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + 60000 });
-    return true;
-  }
-  if (entry.count >= maxPerMinute) return false;
-  entry.count++;
-  return true;
-}
-
-// Clean stale entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimitMap) {
-    if (now > entry.resetAt) rateLimitMap.delete(key);
-  }
-}, 300000);
 
 // Simple translation fallback for server-side validation
 function serverT(key: string, params?: Record<string, string | number>): string {
@@ -95,11 +73,12 @@ export async function POST(req: NextRequest) {
       if (now > closeDate) return NextResponse.json({ error: 'Form has closed' }, { status: 403 });
     }
 
-    // Rate limit
+    // Rate limit — Firestore-backed, persistent across serverless instances
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
                req.headers.get('x-real-ip') || 'unknown';
-    const rateLimitKey = `${form.id}:${ip}`;
-    if (!checkRateLimit(rateLimitKey, form.rateLimitPerMinute || 10)) {
+    const rateLimitKey = `form_submit:${form.id}:${ip}`;
+    const allowed = await checkRateLimitPersistent(rateLimitKey, form.rateLimitPerMinute || 10, 60_000);
+    if (!allowed) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
 

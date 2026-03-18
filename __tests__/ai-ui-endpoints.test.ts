@@ -1,4 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Mock server-only to prevent "Cannot be imported from a Client Component" error
+vi.mock('server-only', () => ({}));
+
+// Mock Firebase Admin to prevent SDK initialization hanging in test environments
+vi.mock('@/lib/firebase-admin', () => ({
+  adminDb: {},
+  adminAuth: { verifyIdToken: vi.fn() },
+}));
+
 import {
   promptDecomposeTask,
   promptSuggestAssignees,

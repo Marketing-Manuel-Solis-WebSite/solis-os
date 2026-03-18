@@ -129,6 +129,7 @@ beforeEach(async () => {
       listId: 'list-a1',
       title: 'Task in A',
       status: 'todo',
+      visibility: 'team',
     });
 
     // Shared views for space A and B

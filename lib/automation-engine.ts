@@ -44,12 +44,15 @@ interface TriggerContext {
   previousData?: Record<string, any>;
   actorId?: string;
   actorName?: string;
+  /** Distributed depth counter — survives across serverless invocations */
+  automationDepth?: number;
 }
 
-// Recursion guard — prevents automation actions from re-triggering the engine
+// In-memory recursion guard — prevents re-entrant calls within same invocation
 const _activeTaskIds = new Set<string>();
 
-// Depth guard — prevents cross-task chain reactions (A creates B, B triggers C, etc.)
+// Distributed depth guard — authoritative depth travels in TriggerContext.automationDepth
+// In-memory counter kept as belt-and-suspenders fallback for same-invocation chains
 const MAX_AUTOMATION_DEPTH = 5;
 let _automationDepth = 0;
 
@@ -223,6 +226,7 @@ async function executeAction(
             createdBy: 'automation',
             archived: false,
             deleted: false,
+            _automationDepth: (ctx.automationDepth || 0) + 1,
           });
         }
         break;
@@ -247,15 +251,17 @@ async function executeAction(
           await adminDb.collection('tasks').add({
             ...taskData,
             orgId: ORG,
-            parentTaskId: ctx.taskId, // Link to triggering task
+            parentTaskId: ctx.taskId,
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
+            _automationDepth: (ctx.automationDepth || 0) + 1,
           });
         }
         break;
       }
       case 'create_task': {
         const taskTitle = action.config.taskTitle || action.config.title || `Task from automation`;
+        const currentDepth = ctx.automationDepth || 0;
         const newTask: Record<string, any> = {
           orgId: ORG,
           title: taskTitle,
@@ -280,6 +286,8 @@ async function executeAction(
           subtasks: [],
           checklist: [],
           attachments: [],
+          // Propagate automation depth so downstream triggers know their position in the chain
+          _automationDepth: currentDepth + 1,
         };
         // Apply field mappings from rule (source task → new task)
         const mappings: { sourceField: string; targetField: string }[] = (ruleRef as any).fieldMappings || action.config.fieldMappings || [];
@@ -520,13 +528,16 @@ function buildScope(task: Record<string, any>): ScopeContext {
 }
 
 export async function onTaskCreated(taskId: string, task: Record<string, any>, actorId?: string): Promise<void> {
-  if (_activeTaskIds.has(taskId)) return; // recursion guard
-  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
+  // Distributed depth: read from task document (survives across serverless invocations)
+  const distributedDepth = task._automationDepth || 0;
+  if (distributedDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Distributed depth (${distributedDepth}) >= max (${MAX_AUTOMATION_DEPTH}) — skipping ${taskId}`); return; }
+  if (_activeTaskIds.has(taskId)) return; // in-memory recursion guard (same invocation)
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] In-memory depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
   _automationDepth++;
   try {
     const rules = await getMatchingRules('task_created', buildScope(task));
-    const ctx: TriggerContext = { taskId, task, actorId };
+    const ctx: TriggerContext = { taskId, task, actorId, automationDepth: distributedDepth };
     for (const rule of rules) {
       await executeRule(rule, ctx);
     }
@@ -542,13 +553,15 @@ export async function onTaskStatusChanged(
   previousStatus: string,
   actorId?: string,
 ): Promise<void> {
-  if (_activeTaskIds.has(taskId)) return; // recursion guard
-  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
+  const distributedDepth = task._automationDepth || 0;
+  if (distributedDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Distributed depth (${distributedDepth}) >= max — skipping ${taskId}`); return; }
+  if (_activeTaskIds.has(taskId)) return;
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] In-memory depth reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
   _automationDepth++;
   try {
     const rules = await getMatchingRules('task_status_changed', buildScope(task));
-    const ctx: TriggerContext = { taskId, task, previousData: { status: previousStatus }, actorId };
+    const ctx: TriggerContext = { taskId, task, previousData: { status: previousStatus }, actorId, automationDepth: distributedDepth };
     for (const rule of rules) {
       await executeRule(rule, ctx);
     }
@@ -563,13 +576,15 @@ export async function onTaskAssigned(
   task: Record<string, any>,
   actorId?: string,
 ): Promise<void> {
-  if (_activeTaskIds.has(taskId)) return; // recursion guard
-  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
+  const distributedDepth = task._automationDepth || 0;
+  if (distributedDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Distributed depth (${distributedDepth}) >= max — skipping ${taskId}`); return; }
+  if (_activeTaskIds.has(taskId)) return;
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] In-memory depth reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
   _automationDepth++;
   try {
     const rules = await getMatchingRules('task_assigned', buildScope(task));
-    const ctx: TriggerContext = { taskId, task, actorId };
+    const ctx: TriggerContext = { taskId, task, actorId, automationDepth: distributedDepth };
     for (const rule of rules) {
       await executeRule(rule, ctx);
     }
@@ -585,13 +600,15 @@ export async function onTaskPriorityChanged(
   previousPriority: string,
   actorId?: string,
 ): Promise<void> {
+  const distributedDepth = task._automationDepth || 0;
+  if (distributedDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Distributed depth (${distributedDepth}) >= max — skipping ${taskId}`); return; }
   if (_activeTaskIds.has(taskId)) return;
-  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] In-memory depth reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
   _automationDepth++;
   try {
     const rules = await getMatchingRules('task_priority_changed', buildScope(task));
-    const ctx: TriggerContext = { taskId, task, previousData: { priority: previousPriority }, actorId };
+    const ctx: TriggerContext = { taskId, task, previousData: { priority: previousPriority }, actorId, automationDepth: distributedDepth };
     for (const rule of rules) {
       await executeRule(rule, ctx);
     }
@@ -606,13 +623,15 @@ export async function onTaskDueDateChanged(
   task: Record<string, any>,
   actorId?: string,
 ): Promise<void> {
+  const distributedDepth = task._automationDepth || 0;
+  if (distributedDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Distributed depth (${distributedDepth}) >= max — skipping ${taskId}`); return; }
   if (_activeTaskIds.has(taskId)) return;
-  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] In-memory depth reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
   _automationDepth++;
   try {
     const rules = await getMatchingRules('task_due_date_changed', buildScope(task));
-    const ctx: TriggerContext = { taskId, task, actorId };
+    const ctx: TriggerContext = { taskId, task, actorId, automationDepth: distributedDepth };
     for (const rule of rules) {
       await executeRule(rule, ctx);
     }
@@ -628,13 +647,15 @@ export async function onTaskCustomFieldChanged(
   fieldName: string,
   actorId?: string,
 ): Promise<void> {
+  const distributedDepth = task._automationDepth || 0;
+  if (distributedDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Distributed depth (${distributedDepth}) >= max — skipping ${taskId}`); return; }
   if (_activeTaskIds.has(taskId)) return;
-  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] In-memory depth reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
   _automationDepth++;
   try {
     const rules = await getMatchingRules('task_custom_field_changed', buildScope(task));
-    const ctx: TriggerContext = { taskId, task, previousData: { changedField: fieldName }, actorId };
+    const ctx: TriggerContext = { taskId, task, previousData: { changedField: fieldName }, actorId, automationDepth: distributedDepth };
     for (const rule of rules) {
       await executeRule(rule, ctx);
     }
@@ -652,13 +673,15 @@ export async function onTimeTracked(
   entry: { hours: number; minutes: number; userId: string },
   actorId?: string,
 ): Promise<void> {
+  const distributedDepth = task._automationDepth || 0;
+  if (distributedDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Distributed depth (${distributedDepth}) >= max — skipping ${taskId}`); return; }
   if (_activeTaskIds.has(taskId)) return;
-  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] In-memory depth reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
   _automationDepth++;
   try {
     const rules = await getMatchingRules('time_tracked', buildScope(task));
-    const ctx: TriggerContext = { taskId, task, previousData: { timeEntry: entry }, actorId };
+    const ctx: TriggerContext = { taskId, task, previousData: { timeEntry: entry }, actorId, automationDepth: distributedDepth };
     for (const rule of rules) {
       await executeRule(rule, ctx);
     }
@@ -674,13 +697,15 @@ export async function onButtonFieldClick(
   buttonFieldId: string,
   actorId?: string,
 ): Promise<void> {
+  const distributedDepth = task._automationDepth || 0;
+  if (distributedDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Distributed depth (${distributedDepth}) >= max — skipping ${taskId}`); return; }
   if (_activeTaskIds.has(taskId)) return;
-  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] In-memory depth reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
   _automationDepth++;
   try {
     const rules = await getMatchingRules('button_field_click', buildScope(task));
-    const ctx: TriggerContext = { taskId, task, previousData: { buttonFieldId }, actorId };
+    const ctx: TriggerContext = { taskId, task, previousData: { buttonFieldId }, actorId, automationDepth: distributedDepth };
     for (const rule of rules) {
       await executeRule(rule, ctx);
     }
@@ -695,13 +720,15 @@ export async function onDependencyUnblocked(
   task: Record<string, any>,
   actorId?: string,
 ): Promise<void> {
+  const distributedDepth = task._automationDepth || 0;
+  if (distributedDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Distributed depth (${distributedDepth}) >= max — skipping ${taskId}`); return; }
   if (_activeTaskIds.has(taskId)) return;
-  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] In-memory depth reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
   _automationDepth++;
   try {
     const rules = await getMatchingRules('dependency_unblocked', buildScope(task));
-    const ctx: TriggerContext = { taskId, task, actorId };
+    const ctx: TriggerContext = { taskId, task, actorId, automationDepth: distributedDepth };
     for (const rule of rules) {
       await executeRule(rule, ctx);
     }
@@ -714,13 +741,15 @@ export async function onDependencyUnblocked(
 // ---- DEADLINE TRIGGERS: task_overdue, task_due_approaching (cron-driven, no actorId) ----
 
 export async function onTaskOverdue(taskId: string, task: Record<string, any>): Promise<void> {
+  const distributedDepth = task._automationDepth || 0;
+  if (distributedDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Distributed depth (${distributedDepth}) >= max — skipping ${taskId}`); return; }
   if (_activeTaskIds.has(taskId)) return;
-  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] In-memory depth reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
   _automationDepth++;
   try {
     const rules = await getMatchingRules('task_overdue', buildScope(task));
-    const ctx: TriggerContext = { taskId, task };
+    const ctx: TriggerContext = { taskId, task, automationDepth: distributedDepth };
     for (const rule of rules) {
       await executeRule(rule, ctx);
     }
@@ -731,13 +760,15 @@ export async function onTaskOverdue(taskId: string, task: Record<string, any>): 
 }
 
 export async function onTaskDueApproaching(taskId: string, task: Record<string, any>): Promise<void> {
+  const distributedDepth = task._automationDepth || 0;
+  if (distributedDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Distributed depth (${distributedDepth}) >= max — skipping ${taskId}`); return; }
   if (_activeTaskIds.has(taskId)) return;
-  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] Max depth (${MAX_AUTOMATION_DEPTH}) reached — skipping ${taskId}`); return; }
+  if (_automationDepth >= MAX_AUTOMATION_DEPTH) { console.warn(`[AutomationEngine] In-memory depth reached — skipping ${taskId}`); return; }
   _activeTaskIds.add(taskId);
   _automationDepth++;
   try {
     const rules = await getMatchingRules('task_due_approaching', buildScope(task));
-    const ctx: TriggerContext = { taskId, task };
+    const ctx: TriggerContext = { taskId, task, automationDepth: distributedDepth };
     for (const rule of rules) {
       await executeRule(rule, ctx);
     }
