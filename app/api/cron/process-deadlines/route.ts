@@ -16,6 +16,7 @@ import { adminDb } from '@/lib/firebase-admin';
 import { notifyUserAdmin } from '@/lib/notify-admin';
 import { ORG_ID as ORG } from '@/lib/org';
 import { onTaskOverdue, onTaskDueApproaching } from '@/lib/automation-engine';
+import { logActionAdmin } from '@/lib/db-admin';
 
 
 
@@ -140,6 +141,14 @@ export async function GET(req: NextRequest) {
         stats.goalAtRisk++;
       } catch { stats.errors++; }
     }
+
+    await logActionAdmin({
+      action: 'cron_process_deadlines',
+      resource: 'tasks',
+      detail: `Deadlines processed: overdue=${stats.overdue}, dueSoon=${stats.dueSoon}, goalAtRisk=${stats.goalAtRisk}, errors=${stats.errors}`,
+      actorId: 'system',
+      actorName: 'Cron: process-deadlines',
+    });
 
     return NextResponse.json({ ok: true, stats });
   } catch (err: any) {

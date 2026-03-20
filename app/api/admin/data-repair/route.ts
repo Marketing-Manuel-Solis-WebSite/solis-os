@@ -17,6 +17,7 @@ import {
   cleanOrphanedTimeEntries,
   cleanStaleWhiteboardTaskRefs,
 } from '@/lib/data-repair';
+import { logActionAdmin } from '@/lib/db-admin';
 
 const VALID_ACTIONS = ['report', 'repair', 'clean_relations', 'repair_goals', 'clean_subcollections', 'clean_presence', 'clean_time_entries', 'clean_whiteboard_refs'] as const;
 type RepairAction = typeof VALID_ACTIONS[number];
@@ -42,24 +43,35 @@ export async function POST(req: NextRequest) {
       return apiErr(`Unknown action. Use: ${VALID_ACTIONS.join(', ')}`, 400);
     }
 
+    let result: any;
     switch (action as RepairAction) {
       case 'report':
-        return apiOk({ results: await runIntegrityReport() });
+        result = { results: await runIntegrityReport() }; break;
       case 'repair':
-        return apiOk({ results: await runFullRepair() });
+        result = { results: await runFullRepair() }; break;
       case 'clean_relations':
-        return apiOk({ result: await cleanOrphanedRelations() });
+        result = { result: await cleanOrphanedRelations() }; break;
       case 'repair_goals':
-        return apiOk({ result: await repairBrokenGoalTargetLinks() });
+        result = { result: await repairBrokenGoalTargetLinks() }; break;
       case 'clean_subcollections':
-        return apiOk({ result: await cleanOrphanedTaskSubcollections() });
+        result = { result: await cleanOrphanedTaskSubcollections() }; break;
       case 'clean_presence':
-        return apiOk({ result: await cleanStalePresence() });
+        result = { result: await cleanStalePresence() }; break;
       case 'clean_time_entries':
-        return apiOk({ result: await cleanOrphanedTimeEntries() });
+        result = { result: await cleanOrphanedTimeEntries() }; break;
       case 'clean_whiteboard_refs':
-        return apiOk({ result: await cleanStaleWhiteboardTaskRefs() });
+        result = { result: await cleanStaleWhiteboardTaskRefs() }; break;
     }
+
+    await logActionAdmin({
+      action: 'admin_data_repair',
+      resource: 'system',
+      detail: `Data repair action="${action}" by user ${authedUser.uid}`,
+      actorId: authedUser.uid,
+      actorName: authedUser.email || authedUser.uid,
+    });
+
+    return apiOk(result);
   } catch (err) {
     console.error('[DataRepair] operation failed:', err);
     return apiErr('Internal error', 500);

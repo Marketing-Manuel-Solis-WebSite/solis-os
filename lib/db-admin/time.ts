@@ -42,16 +42,22 @@ export async function createTimeEntry(data: any) {
 export async function updateTimeEntry(id: string, data: any) { return updateAt(`time-entries/${id}`, data); }
 export async function deleteTimeEntry(id: string) { return deleteAt(`time-entries/${id}`); }
 
-// Recalculate task.timeSpent from all time entries (idempotent, admin SDK)
+// Recalculate task.timeSpent from all time entries (transactional, idempotent, admin SDK)
 export async function syncTaskTimeSpentAdmin(taskId: string) {
   if (!taskId) return;
-  const snap = await adminDb.collection('time-entries')
-    .where('orgId', '==', ORG)
-    .where('taskId', '==', taskId)
-    .get();
-  const totalMinutes = snap.docs.reduce((sum, d) => {
-    const e = d.data();
-    return sum + ((e.hours || 0) * 60 + (e.minutes || 0));
-  }, 0);
-  await updateAt(`tasks/${taskId}`, { timeSpent: totalMinutes });
+  const taskRef = adminDb.doc(`tasks/${taskId}`);
+  await adminDb.runTransaction(async (txn) => {
+    // Read task inside transaction to ensure atomicity
+    await txn.get(taskRef);
+    // Query all time entries for this task
+    const snap = await adminDb.collection('time-entries')
+      .where('orgId', '==', ORG)
+      .where('taskId', '==', taskId)
+      .get();
+    const totalMinutes = snap.docs.reduce((sum, d) => {
+      const e = d.data();
+      return sum + ((e.hours || 0) * 60 + (e.minutes || 0));
+    }, 0);
+    txn.update(taskRef, { timeSpent: totalMinutes });
+  });
 }

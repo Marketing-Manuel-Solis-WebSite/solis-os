@@ -86,6 +86,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'SSO is not enabled' }, { status: 400 });
     }
 
+    // Validate provider — fail-closed on unknown values
+    const VALID_SSO_PROVIDERS = ['saml', 'oidc'];
+    if (!ssoConfig.provider || !VALID_SSO_PROVIDERS.includes(ssoConfig.provider)) {
+      return NextResponse.json({ error: 'Invalid SSO provider configured' }, { status: 400 });
+    }
+
     const baseUrl = getBaseUrl(request);
     const state = crypto.randomBytes(32).toString('hex');
 

@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { ORG_ID } from '@/lib/org';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function GET(req: NextRequest) {
   try {
     const token = req.nextUrl.searchParams.get('token');
     if (!token) {
       return NextResponse.json({ error: 'Token required' }, { status: 400 });
+    }
+
+    // Rate limit: 20 req/min per IP
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const { allowed } = await checkRateLimit('public-dashboard', ip, 20, 60_000);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
 
     const snap = await adminDb.collection(`orgs/${ORG_ID}/dashboards`)

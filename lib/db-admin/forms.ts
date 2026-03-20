@@ -36,6 +36,7 @@ export async function createFormSubmission(formId: string, data: any) {
     convertedAt: null,
     convertedBy: null,
     consentGiven: data.consentGiven ?? false,
+    consentTimestamp: data.consentTimestamp || null,
   });
 }
 

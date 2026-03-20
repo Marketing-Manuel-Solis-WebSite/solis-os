@@ -4,10 +4,17 @@ import { createTask } from '@/lib/db-admin';
 import { verifySignature } from '@/lib/integrations-crypto';
 import { notifyUsersAdmin } from '@/lib/notify-admin';
 import { afterTaskCreatedAdmin } from '@/lib/task-side-effects-admin';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
     const { token } = await params;
+
+    // Rate limit: 60 req/min per token
+    const { allowed } = await checkRateLimit('incoming-webhook', token, 60, 60_000);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
 
     // Find incoming webhook by token
     const webhook = await getIncomingWebhookByToken(token);

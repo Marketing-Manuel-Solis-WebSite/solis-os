@@ -5,6 +5,11 @@ import { addIntegration, getIntegrationByProvider, updateIntegration } from '@/l
 import type { IntegrationProvider } from '@/lib/integrations-types';
 import { INTEGRATION_CATALOG } from '@/lib/integrations-catalog';
 
+// Known OAuth-capable providers from the integration catalog
+const VALID_OAUTH_PROVIDERS = INTEGRATION_CATALOG
+  .filter(i => i.oauthSupported)
+  .map(i => i.provider);
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const rawAppUrl = process.env.NEXT_PUBLIC_APP_URL || '';
   const appUrl = rawAppUrl.startsWith('http') ? rawAppUrl : `https://${rawAppUrl}`;
@@ -12,6 +17,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
 
   try {
     const { provider } = await params;
+
+    // Validate provider against known OAuth-capable catalogue
+    if (!provider || !VALID_OAUTH_PROVIDERS.includes(provider as IntegrationProvider)) {
+      return NextResponse.redirect(`${redirectUrl}?error=invalid_provider`);
+    }
+
     const url = new URL(req.url);
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');

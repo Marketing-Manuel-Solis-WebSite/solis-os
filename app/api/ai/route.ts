@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { authenticateRequest } from '@/lib/server-auth';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // =====================================================
 // UNIVERSAL RESPONSE FORMATTING SYSTEM
@@ -241,6 +242,12 @@ export async function POST(request: NextRequest) {
     authedUser = await authenticateRequest(request);
     if (!authedUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limit: 20 req/min per userId
+    const { allowed } = await checkRateLimit('ai-chat', authedUser.uid, 20, 60_000);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
 
     // Input validation — truncate oversized inputs

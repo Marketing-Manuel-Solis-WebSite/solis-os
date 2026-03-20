@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { checkRateLimit } from '@/lib/rate-limit';
+import crypto from 'crypto';
 
 // ================================================================
 // Shared helper: look up share link, validate, and return doc
@@ -41,9 +43,14 @@ async function fetchSharedDoc(token: string, password?: string | null) {
     return NextResponse.json({ error: 'max_uses' }, { status: 410 });
   }
 
-  // Check password if the link has one
+  // Check password if the link has one (timing-safe comparison)
   if (link.password) {
-    if (!password || password !== link.password) {
+    if (!password) {
+      return NextResponse.json({ error: 'password_required' }, { status: 403 });
+    }
+    const a = Buffer.from(String(password));
+    const b = Buffer.from(String(link.password));
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
       return NextResponse.json({ error: 'password_required' }, { status: 403 });
     }
   }
@@ -84,6 +91,14 @@ export async function GET(req: NextRequest) {
     if (!token) {
       return NextResponse.json({ error: 'Token required' }, { status: 400 });
     }
+
+    // Rate limit: 20 req/min per IP
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const { allowed } = await checkRateLimit('public-docs', ip, 20, 60_000);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
+
     // GET requests: password-free access only
     // Password-protected docs MUST use POST to avoid URL-logged credentials
     return fetchSharedDoc(token, null);
@@ -100,6 +115,13 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit: 20 req/min per IP
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const { allowed } = await checkRateLimit('public-docs', ip, 20, 60_000);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
+
     const body = await req.json();
     const token = body?.token;
     const password = body?.password;

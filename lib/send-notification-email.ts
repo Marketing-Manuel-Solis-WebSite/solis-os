@@ -81,12 +81,25 @@ export async function sendNotificationEmail(params: SendEmailParams): Promise<Se
     return { success: false, error: 'RESEND_API_KEY not configured' };
   }
 
-  const typeLabel = TYPE_LABELS[params.type] || 'Notification';
-  const subject = `${typeLabel}: ${params.title}`;
+  // --- Privacy transformations (applied to email only, not stored notification) ---
+  // Strip email addresses from actorName
+  const sanitizedActorName = (params.actorName || '')
+    .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[usuario]');
+  // Truncate title to 50 chars for subject line
+  const truncatedTitle = params.title.length > 50
+    ? params.title.slice(0, 50) + '...'
+    : params.title;
+  // Truncate message/body to 200 chars
+  const truncatedMessage = params.message.length > 200
+    ? params.message.slice(0, 200) + '...'
+    : params.message;
 
-  const safeTitle = escapeHtml(params.title);
-  const safeMessage = escapeHtml(params.message);
-  const safeActorName = escapeHtml(params.actorName || '');
+  const typeLabel = TYPE_LABELS[params.type] || 'Notification';
+  const subject = `${typeLabel}: ${truncatedTitle}`;
+
+  const safeTitle = escapeHtml(truncatedTitle);
+  const safeMessage = escapeHtml(truncatedMessage);
+  const safeActorName = escapeHtml(sanitizedActorName);
 
   const ctaUrl = params.entityUrl
     ? `${APP_URL}${params.entityUrl.startsWith('/') ? params.entityUrl : '/' + params.entityUrl}`

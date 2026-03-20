@@ -7,6 +7,7 @@
 // ================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import { logActionAdmin } from '@/lib/db-admin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,14 @@ export async function GET(req: NextRequest) {
   try {
     const { processScheduledReports } = await import('@/lib/scheduled-reports');
     const results = await processScheduledReports();
+
+    await logActionAdmin({
+      action: 'cron_scheduled_reports',
+      resource: 'scheduledReports',
+      detail: `Processed ${results.length} scheduled reports`,
+      actorId: 'system',
+      actorName: 'Cron: scheduled-reports',
+    });
 
     return NextResponse.json({
       ok: true,

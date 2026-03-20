@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { requireAdmin } from '@/lib/server-auth';
 import { ORG_ID as ORG } from '@/lib/org';
+import { logActionAdmin } from '@/lib/db-admin';
 
 
 
@@ -53,6 +54,15 @@ export async function GET(req: NextRequest) {
     if (auth instanceof Response) return auth;
 
     const result = await findViolations();
+
+    await logActionAdmin({
+      action: 'admin_repair_listids',
+      resource: 'tasks',
+      detail: `Dry-run: found ${result.violations.length} violations out of ${result.totalTasks} tasks`,
+      actorId: auth.uid,
+      actorName: auth.email || auth.uid,
+    });
+
     return NextResponse.json({
       mode: 'dry-run',
       totalTasks: result.totalTasks,
@@ -87,6 +97,14 @@ export async function POST(req: NextRequest) {
       await batch.commit();
       repaired += chunk.length;
     }
+
+    await logActionAdmin({
+      action: 'admin_repair_listids',
+      resource: 'tasks',
+      detail: `Live repair: fixed ${repaired} cross-space listId violations`,
+      actorId: auth.uid,
+      actorName: auth.email || auth.uid,
+    });
 
     return NextResponse.json({
       mode: 'live',

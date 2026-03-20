@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFormByToken } from '@/lib/db-admin';
+import { checkRateLimit } from '@/lib/rate-limit';
+
+const TOKEN_FORMAT = /^[a-zA-Z0-9_-]+$/;
 
 export async function GET(
   _req: NextRequest,
@@ -7,8 +10,15 @@ export async function GET(
 ) {
   const { token } = await params;
 
-  if (!token || token.length < 8) {
+  if (!token || token.length < 8 || !TOKEN_FORMAT.test(token)) {
     return NextResponse.json({ error: 'Invalid token' }, { status: 400 });
+  }
+
+  // Rate limit: 30 req/min per IP
+  const ip = _req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const { allowed } = await checkRateLimit('public-forms', ip, 30, 60_000);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 
   const form = await getFormByToken(token);

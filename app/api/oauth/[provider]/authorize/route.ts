@@ -4,6 +4,12 @@ import { randomBytes } from 'crypto';
 import { authenticateRequest } from '@/lib/server-auth';
 import { adminDb } from '@/lib/firebase-admin';
 import { ORG_ID } from '@/lib/org';
+import { INTEGRATION_CATALOG } from '@/lib/integrations-catalog';
+
+// Known OAuth-capable providers from the integration catalog
+const VALID_OAUTH_PROVIDERS = INTEGRATION_CATALOG
+  .filter(i => i.oauthSupported)
+  .map(i => i.provider);
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   try {
@@ -25,6 +31,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
     }
 
     const { provider } = await params;
+
+    // Validate provider against known OAuth-capable catalogue
+    if (!provider || !VALID_OAUTH_PROVIDERS.includes(provider as any)) {
+      return NextResponse.json({ error: 'Invalid or unsupported OAuth provider' }, { status: 400 });
+    }
 
     // Generate state for CSRF protection — include uid to bind flow to user
     const raw = randomBytes(16).toString('hex');

@@ -34,6 +34,12 @@ export async function POST(req: NextRequest) {
 
     const eventType = payload.event || payload.type || 'custom.event';
 
+    // Validate eventType format: must be module.action pattern (alphanumeric + dots/underscores)
+    const EVENT_TYPE_FORMAT = /^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/;
+    if (!EVENT_TYPE_FORMAT.test(eventType)) {
+      return NextResponse.json({ error: 'Invalid eventType format. Expected pattern: module.action' }, { status: 400 });
+    }
+
     await queueEvent({
       eventType: 'task.created',
       entityId: payload.id?.toString() || '',

@@ -5,7 +5,7 @@
 import {
   collection, getDocs, query, where,
   addTo, updateAt, deleteAt, getByOrg, getByTeam,
-  db, ORG,
+  db, ORG, doc, runTransaction,
 } from './helpers';
 
 export async function getTimeEntries(teamId?: string, maxResults = 500) {
@@ -65,10 +65,16 @@ export async function createTimeEntry(data: any) {
 export async function updateTimeEntry(id: string, data: any) { return updateAt(`time-entries/${id}`, data); }
 export async function deleteTimeEntry(id: string) { return deleteAt(`time-entries/${id}`); }
 
-// Recalculate task.timeSpent from all time entries (idempotent)
+// Recalculate task.timeSpent from all time entries (transactional, idempotent)
 export async function syncTaskTimeSpent(taskId: string) {
   if (!taskId) return;
-  const entries = await getTimeEntriesByTask(taskId);
-  const totalMinutes = entries.reduce((sum: number, e: any) => sum + ((e.hours || 0) * 60 + (e.minutes || 0)), 0);
-  await updateAt(`tasks/${taskId}`, { timeSpent: totalMinutes });
+  const taskRef = doc(db, `tasks/${taskId}`);
+  await runTransaction(db, async (txn) => {
+    // Read task inside transaction to ensure atomicity
+    await txn.get(taskRef);
+    // Query all time entries for this task
+    const entries = await getTimeEntriesByTask(taskId);
+    const totalMinutes = entries.reduce((sum: number, e: any) => sum + ((e.hours || 0) * 60 + (e.minutes || 0)), 0);
+    txn.update(taskRef, { timeSpent: totalMinutes });
+  });
 }

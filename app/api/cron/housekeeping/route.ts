@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 import { ORG_ID as ORG } from '@/lib/org';
+import { logActionAdmin } from '@/lib/db-admin';
 
 
 const BATCH_LIMIT = 450;
@@ -379,6 +380,14 @@ export async function GET(req: NextRequest) {
     console.error('[Housekeeping] form retention enforcement failed:', err);
     stats.formRetention = `error: ${err?.message}`;
   }
+
+  await logActionAdmin({
+    action: 'cron_housekeeping',
+    resource: 'system',
+    detail: `Housekeeping completed: ${JSON.stringify(stats)}`,
+    actorId: 'system',
+    actorName: 'Cron: housekeeping',
+  });
 
   return NextResponse.json({ ok: true, stats });
 }

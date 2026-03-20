@@ -141,6 +141,7 @@ export async function POST(req: NextRequest) {
       convertedAt: null,
       convertedBy: null,
       consentGiven: !!consentGiven,
+      consentTimestamp: consentGiven ? new Date().toISOString() : null,
     });
 
     // Auto-convert to task if enabled

@@ -12,6 +12,7 @@ import {
   type WritingRequest,
   type WritingAction,
 } from '@/lib/ai-writing-assistant';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,12 @@ export async function POST(request: NextRequest) {
     const user = await authenticateRequest(request);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limit: 15 req/min per userId
+    const { allowed } = await checkRateLimit('ai-writing', user.uid, 15, 60_000);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
 
     const body = await request.json();

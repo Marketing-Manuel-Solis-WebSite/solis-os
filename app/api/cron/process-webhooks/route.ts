@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processEventQueue } from '@/lib/event-dispatcher';
+import { logActionAdmin } from '@/lib/db-admin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,15 @@ export async function GET(req: NextRequest) {
 
   try {
     const result = await processEventQueue();
+
+    await logActionAdmin({
+      action: 'cron_process_events',
+      resource: 'webhookEvents',
+      detail: `Processed event queue: ${JSON.stringify(result)}`,
+      actorId: 'system',
+      actorName: 'Cron: process-webhooks',
+    });
+
     return NextResponse.json({ ok: true, ...result });
   } catch (err: any) {
     console.error('[Cron/ProcessWebhooks] failed:', err);

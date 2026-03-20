@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { ORG_ID as ORG } from '@/lib/org';
+import { logActionAdmin } from '@/lib/db-admin';
 
 
 
@@ -38,6 +39,14 @@ export async function GET(req: NextRequest) {
       savedAt: FieldValue.serverTimestamp(),
       _incremental: incremental,
       _deltaCount: deltaCount ?? null,
+    });
+
+    await logActionAdmin({
+      action: 'cron_analytics_snapshot',
+      resource: 'analyticsSnapshots',
+      detail: `Snapshot saved for ${dateKey}, incremental=${incremental}, deltaCount=${deltaCount ?? 'n/a'}`,
+      actorId: 'system',
+      actorName: 'Cron: analytics-snapshot',
     });
 
     return NextResponse.json({ ok: true, date: dateKey, incremental, deltaCount, snapshot });

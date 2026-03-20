@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { authenticateRequest } from '@/lib/server-auth';
 import { promptDecomposeTask, parseAIJSON } from '@/lib/ai-task-assistant';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,12 @@ export async function POST(request: NextRequest) {
     const user = await authenticateRequest(request);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Rate limit: 10 req/min per userId
+    const { allowed } = await checkRateLimit('ai-decompose', user.uid, 10, 60_000);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
 
     const body = await request.json();

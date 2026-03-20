@@ -4,6 +4,7 @@ import { ORG_ID as ORG } from '@/lib/org';
 import { shouldTriggerNow } from '@/lib/scheduled-triggers';
 import { FieldValue } from 'firebase-admin/firestore';
 import { notifyUsersAdmin } from '@/lib/notify-admin';
+import { logActionAdmin } from '@/lib/db-admin';
 
 const SCHEDULED_TRIGGERS = ['scheduled_daily', 'scheduled_weekly', 'scheduled_monthly', 'schedule_cron'];
 
@@ -297,6 +298,14 @@ export async function GET(req: Request) {
         results.push({ ruleId: rule.id, ruleName: rule.name, triggered: false, error: err.message });
       }
     }
+
+    await logActionAdmin({
+      action: 'cron_scheduled_automations',
+      resource: 'automations',
+      detail: `Processed ${results.length} scheduled automations: ${results.filter(r => r.triggered).length} triggered`,
+      actorId: 'system',
+      actorName: 'Cron: process-scheduled-automations',
+    });
 
     return NextResponse.json({ processed: results.length, results });
   } catch (err: any) {
